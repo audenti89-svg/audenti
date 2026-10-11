@@ -7,5 +7,20 @@
     background-color: #f8fafc;
     color: #0f172a;
     font-family: var(--font-inter), system-ui, sans-serif;
+    min-height: 100dvh;
+    min-height: -webkit-fill-available;
   }
 }
+
+/* Landscape / Orientation Adaptive Utilities */
+@media (orientation: landscape) and (max-height: 600px) {
+  .modal-landscape-scroll {
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+  .landscape-compact-py {
+    padding-top: 1rem !important;
+    padding-bottom: 1rem !important;
+  }
+}
+

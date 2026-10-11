@@ -230,7 +230,7 @@ export function AudentiQRCodeCard() {
   }
 
   return (
-    <div className="bg-slate-900/90 border-2 border-amber-400/80 rounded-3xl p-8 max-w-xl mx-auto shadow-2xl relative overflow-hidden text-center space-y-6">
+    <div className="bg-slate-900/90 border-2 border-amber-400/80 rounded-3xl p-5 sm:p-8 max-w-xl mx-auto shadow-2xl relative overflow-hidden text-center space-y-4 sm:space-y-6 modal-landscape-scroll">
       <div className="absolute top-0 right-0 w-40 h-40 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Header */}
@@ -384,7 +384,7 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0b1120] text-slate-100 flex flex-col selection:bg-amber-400 selection:text-slate-950 relative">
+    <div className="min-h-[100dvh] bg-[#0b1120] text-slate-100 flex flex-col selection:bg-amber-400 selection:text-slate-950 relative">
       
       {/* 1. NAVBAR INSTITUCIONAL */}
       <header className="sticky top-0 z-40 backdrop-blur-md bg-[#0b1120]/90 border-b border-slate-800/80 px-4 sm:px-6 lg:px-12 py-3.5">

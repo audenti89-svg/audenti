@@ -8,7 +8,7 @@
   "display_override": ["window-controls-overlay", "standalone"],
   "background_color": "#202D4C",
   "theme_color": "#202D4C",
-  "orientation": "any",
+  "orientation": "portrait",
   "categories": ["medical", "business", "productivity", "utilities"],
   "lang": "es-MX",
   "icons": [
