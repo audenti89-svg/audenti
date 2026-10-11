@@ -9,12 +9,17 @@ import {
   User,
   ChevronDown,
   Sparkles,
-  MapPin
+  MapPin,
+  Menu
 } from 'lucide-react'
 import { useBranchStore, BranchId, BRANCHES_DATA } from '@/stores/branchStore'
 import { useNotificationSound } from '@/hooks/useNotificationSound'
 
-export function Header() {
+export interface HeaderProps {
+  onMenuToggle?: () => void
+}
+
+export function Header({ onMenuToggle }: HeaderProps) {
   const { currentBranchId, setBranchId, getCurrentBranch } = useBranchStore()
   const currentBranch = getCurrentBranch()
   const { playTone } = useNotificationSound()
@@ -26,10 +31,20 @@ export function Header() {
   }
 
   return (
-    <header className="fixed top-0 left-72 right-0 h-20 bg-white/85 backdrop-blur-md border-b border-slate-200/80 z-40 flex items-center justify-between px-8 shadow-xs">
-      {/* Selector de Sucursal Reactivo */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex items-center bg-slate-50 px-3.5 py-2 rounded-xl border border-slate-200 hover:border-amber-400 transition-colors shadow-2xs">
+    <header className="fixed top-0 left-0 lg:left-72 right-0 h-20 bg-white/85 backdrop-blur-md border-b border-slate-200/80 z-30 flex items-center justify-between px-4 sm:px-6 lg:px-8 shadow-xs">
+      {/* Botón hamburguesa en móvil + Selector de Sucursal Reactivo */}
+      <div className="flex items-center gap-2 sm:gap-3">
+        {onMenuToggle && (
+          <button
+            type="button"
+            onClick={onMenuToggle}
+            className="lg:hidden p-2 rounded-xl text-slate-700 hover:bg-slate-100 transition-colors"
+            aria-label="Abrir Menú Lateral"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
+        <div className="relative flex items-center bg-slate-50 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl border border-slate-200 hover:border-amber-400 transition-colors shadow-2xs max-w-[200px] sm:max-w-none">
           <Building2 className="w-4 h-4 text-amber-600 mr-2 shrink-0" />
           <select
             value={currentBranchId}
@@ -44,7 +59,7 @@ export function Header() {
         </div>
 
         {/* Badge Dinámico de Estado de la Sucursal */}
-        <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold transition-all ${
+        <div className={`hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold transition-all ${
           currentBranch.isUpcoming
             ? 'bg-purple-50 text-purple-900 border-purple-200'
             : 'bg-emerald-50 text-emerald-800 border-emerald-200'
@@ -56,8 +71,8 @@ export function Header() {
         </div>
       </div>
 
-      {/* Buscador global */}
-      <div className="flex-1 max-w-lg mx-6">
+      {/* Buscador global (Oculto en móvil pequeño) */}
+      <div className="hidden md:block flex-1 max-w-lg mx-4 lg:mx-6">
         <div className="relative w-full">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -69,8 +84,8 @@ export function Header() {
       </div>
 
       {/* Controles de Perfil y Notificaciones */}
-      <div className="flex items-center gap-2.5">
-        <div className="relative flex items-center bg-slate-100/70 px-2.5 py-1.5 rounded-xl border border-slate-200/50">
+      <div className="flex items-center gap-1.5 sm:gap-2.5">
+        <div className="hidden sm:flex relative items-center bg-slate-100/70 px-2.5 py-1.5 rounded-xl border border-slate-200/50">
           <ShieldCheck className="w-3.5 h-3.5 text-slate-600 mr-1.5 shrink-0" />
           <select className="bg-transparent text-[11px] font-bold text-slate-700 pr-4 appearance-none focus:outline-none cursor-pointer">
             <option>Rol: Director Médico</option>

@@ -36,10 +36,12 @@ import {
   Copy,
   Check,
   Share2,
-  X
+  X,
+  Menu
 } from 'lucide-react'
 import { AudentiLogo } from '@/components/ui/AudentiLogo'
 import { QRCodeSVG } from 'qrcode.react'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 // ==========================================
 // 1. COMPONENTE BANNER FLOTANTE PWA CON EVENTO REAL
@@ -307,6 +309,8 @@ export function AudentiQRCodeCard() {
 // ==========================================
 export default function LandingPage() {
   const [activeBranchTab, setActiveBranchTab] = useState<'balbuena' | 'guadalupe' | 'roma'>('balbuena')
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const isMobile = useIsMobile()
 
   const specialties = [
     {
@@ -383,12 +387,13 @@ export default function LandingPage() {
     <div className="min-h-screen bg-[#0b1120] text-slate-100 flex flex-col selection:bg-amber-400 selection:text-slate-950 relative">
       
       {/* 1. NAVBAR INSTITUCIONAL */}
-      <header className="sticky top-0 z-40 backdrop-blur-md bg-[#0b1120]/90 border-b border-slate-800/80 px-6 lg:px-12 py-3.5">
+      <header className="sticky top-0 z-40 backdrop-blur-md bg-[#0b1120]/90 border-b border-slate-800/80 px-4 sm:px-6 lg:px-12 py-3.5">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <Link href="/" className="hover:opacity-90 transition-opacity">
-            <AudentiLogo size={42} doctorName="Dra. Aura Estudillo" />
+            <AudentiLogo size={isMobile ? 34 : 42} doctorName="Dra. Aura Estudillo" />
           </Link>
 
+          {/* Menú de Navegación Escritorio */}
           <nav className="hidden md:flex items-center gap-6 text-xs font-semibold text-slate-400">
             <a href="#filosofia" className="hover:text-amber-400 transition-colors">¿Quiénes Somos?</a>
             <a href="#especialidades" className="hover:text-amber-400 transition-colors">Especialidades</a>
@@ -397,44 +402,98 @@ export default function LandingPage() {
             <a href="#portal" className="hover:text-amber-400 transition-colors">Portal PWA</a>
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md transition-all active:scale-95"
+              className="inline-flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md transition-all active:scale-95"
             >
-              Acceso al Sistema
-              <ArrowRight className="w-4 h-4" />
+              <span className="hidden sm:inline">Acceso al Sistema</span>
+              <span className="sm:hidden">Acceso</span>
+              <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </Link>
+
+            {/* Botón Menú Hamburguesa en Móvil */}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 rounded-xl text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors"
+              aria-label="Abrir Menú de Navegación"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
           </div>
         </div>
+
+        {/* Menú Desplegable Responsivo para Teléfono */}
+        {mobileMenuOpen && (
+          <div className="md:hidden mt-3 pt-3 border-t border-slate-800 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+            <nav className="flex flex-col gap-1 text-sm font-semibold text-slate-300">
+              <a
+                href="#filosofia"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-amber-400 transition-colors"
+              >
+                ¿Quiénes Somos?
+              </a>
+              <a
+                href="#especialidades"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-amber-400 transition-colors"
+              >
+                Especialidades
+              </a>
+              <a
+                href="#qr-section"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 rounded-lg hover:bg-slate-800 text-amber-300 font-bold transition-colors"
+              >
+                Código QR Institucional
+              </a>
+              <a
+                href="#sucursales"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-amber-400 transition-colors"
+              >
+                Sucursales
+              </a>
+              <a
+                href="#portal"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-amber-400 transition-colors"
+              >
+                Portal PWA
+              </a>
+            </nav>
+          </div>
+        )}
       </header>
 
       {/* 2. HERO SECTION */}
-      <section className="relative px-6 lg:px-12 pt-20 pb-24 overflow-hidden border-b border-slate-800">
+      <section className="relative px-4 sm:px-6 lg:px-12 pt-12 sm:pt-20 pb-16 sm:pb-24 overflow-hidden border-b border-slate-800">
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute top-1/3 left-1/4 w-[450px] h-[450px] bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="max-w-5xl mx-auto text-center space-y-7 relative z-10">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold">
-            <Sparkles className="w-4 h-4 text-amber-400" />
-            Clínica Dental &amp; Plataforma Tecnológica de Vanguardia
+        <div className="max-w-5xl mx-auto text-center space-y-5 sm:space-y-7 relative z-10">
+          <div className="inline-flex items-center gap-2 px-3.5 sm:px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] sm:text-xs font-bold">
+            <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
+            <span>Clínica Dental &amp; Plataforma Tecnológica de Vanguardia</span>
           </div>
 
-          <h1 className="text-4xl sm:text-6xl font-black text-white tracking-tight leading-tight">
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-tight">
             Excelencia en Odontología &amp; Innovación Clínica <br className="hidden sm:block" />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-amber-200 to-amber-500">
               Dra. Aura Estudillo
             </span>
           </h1>
 
-          <p className="text-base sm:text-lg text-slate-400 max-w-3xl mx-auto leading-relaxed">
+          <p className="text-sm sm:text-base lg:text-lg text-slate-400 max-w-3xl mx-auto leading-relaxed px-2">
             Excelencia en salud bucal, odontología integral y especializada con tecnología de punta y atención personalizada para toda la familia.
           </p>
 
-          <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4 pt-2 sm:pt-4 max-w-md sm:max-w-none mx-auto">
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-2.5 px-8 py-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-sm shadow-xl shadow-amber-400/20 transition-all hover:scale-105 active:scale-95"
+              className="inline-flex items-center justify-center gap-2.5 px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-400/20 transition-all hover:scale-105 active:scale-95"
             >
               Acceder al Sistema / Dashboard
               <ArrowRight className="w-4 h-4" />
@@ -442,7 +501,7 @@ export default function LandingPage() {
 
             <a
               href="#qr-section"
-              className="inline-flex items-center gap-2.5 px-7 py-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm border border-slate-700 shadow-lg transition-all"
+              className="inline-flex items-center justify-center gap-2.5 px-6 sm:px-7 py-3.5 sm:py-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs sm:text-sm border border-slate-700 shadow-lg transition-all"
             >
               <QrCode className="w-4 h-4 text-amber-400" />
               Ver Código QR Institucional
@@ -450,7 +509,7 @@ export default function LandingPage() {
           </div>
 
 
-          <div className="pt-6 flex flex-wrap items-center justify-center gap-8 text-xs text-slate-400 border-t border-slate-800/80 max-w-2xl mx-auto">
+          <div className="pt-6 flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-xs text-slate-400 border-t border-slate-800/80 max-w-2xl mx-auto">
             <span className="flex items-center gap-2 font-medium">
               <Monitor className="w-4 h-4 text-emerald-400" /> Windows / macOS / Linux
             </span>
@@ -465,14 +524,14 @@ export default function LandingPage() {
       </section>
 
       {/* 3. SECCIÓN DEDICADA: CÓDIGO QR INSTITUCIONAL CON LOGO AUDENTI */}
-      <section id="qr-section" className="px-6 lg:px-12 py-24 bg-slate-950/70 border-b border-slate-800">
+      <section id="qr-section" className="px-4 sm:px-6 lg:px-12 py-14 sm:py-20 lg:py-24 bg-slate-950/70 border-b border-slate-800">
         <div className="max-w-4xl mx-auto space-y-6">
           <AudentiQRCodeCard />
         </div>
       </section>
 
       {/* 4. ¿QUIÉNES SOMOS & FILOSOFÍA? */}
-      <section id="filosofia" className="px-6 lg:px-12 py-24 max-w-7xl mx-auto w-full border-b border-slate-800">
+      <section id="filosofia" className="px-4 sm:px-6 lg:px-12 py-14 sm:py-20 lg:py-24 max-w-7xl mx-auto w-full border-b border-slate-800">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           <div className="lg:col-span-5 bg-gradient-to-b from-slate-800/80 to-slate-900 border border-slate-700/80 rounded-3xl p-8 space-y-6 shadow-2xl relative overflow-hidden">
             <div className="flex items-center gap-4">
@@ -539,17 +598,17 @@ export default function LandingPage() {
       </section>
 
       {/* 5. ESPECIALIDADES */}
-      <section id="especialidades" className="px-6 lg:px-12 py-24 max-w-7xl mx-auto w-full border-b border-slate-800 space-y-12">
+      <section id="especialidades" className="px-4 sm:px-6 lg:px-12 py-14 sm:py-20 lg:py-24 max-w-7xl mx-auto w-full border-b border-slate-800 space-y-8 sm:space-y-12">
         <div className="text-center space-y-3">
           <span className="px-3.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 uppercase tracking-widest border border-amber-500/20">
             Servicios Clínicos
           </span>
-          <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+          <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
             Especialidades Odontológicas Integradas
           </h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {specialties.map((spec) => {
             const Icon = spec.icon
             return (
@@ -574,13 +633,13 @@ export default function LandingPage() {
       </section>
 
       {/* 6. SUCURSALES */}
-      <section id="sucursales" className="px-6 lg:px-12 py-24 bg-slate-950/60 border-b border-slate-800">
-        <div className="max-w-7xl mx-auto space-y-12">
+      <section id="sucursales" className="px-4 sm:px-6 lg:px-12 py-14 sm:py-20 lg:py-24 bg-slate-950/60 border-b border-slate-800">
+        <div className="max-w-7xl mx-auto space-y-8 sm:space-y-12">
           <div className="text-center space-y-3">
             <span className="px-3.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 uppercase tracking-widest border border-amber-500/20">
               Sedes Clínicas
             </span>
-            <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+            <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
               Ubicaciones de la Red Dra. Aura Estudillo
             </h2>
           </div>
@@ -588,7 +647,7 @@ export default function LandingPage() {
           <div className="flex justify-center gap-2 flex-wrap">
             <button
               onClick={() => setActiveBranchTab('balbuena')}
-              className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all ${
                 activeBranchTab === 'balbuena' ? 'bg-amber-400 text-slate-950 shadow-md' : 'bg-slate-800 text-slate-300'
               }`}
             >
@@ -596,7 +655,7 @@ export default function LandingPage() {
             </button>
             <button
               onClick={() => setActiveBranchTab('guadalupe')}
-              className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all ${
                 activeBranchTab === 'guadalupe' ? 'bg-amber-400 text-slate-950 shadow-md' : 'bg-slate-800 text-slate-300'
               }`}
             >
@@ -604,19 +663,19 @@ export default function LandingPage() {
             </button>
             <button
               onClick={() => setActiveBranchTab('roma')}
-              className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+              className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all ${
                 activeBranchTab === 'roma' ? 'bg-amber-400 text-slate-950 shadow-md' : 'bg-slate-800 text-slate-300'
               }`}
             >
-              Colonia Roma (Próximamente)
+              Colonia Roma
             </button>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-4xl mx-auto space-y-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-8 max-w-4xl mx-auto space-y-4">
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase">
               {branchesData[activeBranchTab].badge}
             </span>
-            <h3 className="text-2xl font-black text-white">{branchesData[activeBranchTab].name}</h3>
+            <h3 className="text-xl sm:text-2xl font-black text-white">{branchesData[activeBranchTab].name}</h3>
             <p className="text-xs font-semibold text-amber-400">{branchesData[activeBranchTab].doctor}</p>
             <p className="text-xs text-slate-300">{branchesData[activeBranchTab].address}</p>
             <p className="text-xs font-bold text-white">Tel: {branchesData[activeBranchTab].phone}</p>
@@ -626,19 +685,19 @@ export default function LandingPage() {
       </section>
 
       {/* 7. PORTAL DE ACCESO TECNOLÓGICO */}
-      <section id="portal" className="px-6 lg:px-12 py-24 max-w-7xl mx-auto w-full border-b border-slate-800 space-y-12">
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-4xl mx-auto text-center space-y-6">
+      <section id="portal" className="px-4 sm:px-6 lg:px-12 py-14 sm:py-20 lg:py-24 max-w-7xl mx-auto w-full border-b border-slate-800 space-y-8 sm:space-y-12">
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-4xl mx-auto text-center space-y-6">
           <div className="w-14 h-14 rounded-2xl bg-amber-400/10 border border-amber-400/30 text-amber-400 flex items-center justify-center mx-auto">
             <Lock className="w-7 h-7" />
           </div>
-          <h3 className="text-2xl font-black text-white">Inicio de Sesión Seguro por Roles</h3>
+          <h3 className="text-xl sm:text-2xl font-black text-white">Inicio de Sesión Seguro por Roles</h3>
           <p className="text-xs text-slate-400 max-w-md mx-auto">
             Acceso diferenciado para Dirección General, Especialistas, Recepción y Pacientes.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md"
+              className="inline-flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md"
             >
               Ingresar al Sistema Clínico
               <ArrowRight className="w-4 h-4" />

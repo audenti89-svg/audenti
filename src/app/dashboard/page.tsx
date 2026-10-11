@@ -43,7 +43,7 @@ export default function DashboardPage() {
               {currentBranch.statusBadge}
             </span>
           </div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
             Buen día, <span className="text-amber-600">{currentBranch.doctorInCharge}</span>
           </h1>
           <p className="text-sm text-slate-600 max-w-2xl leading-relaxed">
