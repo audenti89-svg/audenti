@@ -207,7 +207,7 @@ export function FloatingPWABanner() {
 // ==========================================
 export function AudentiQRCodeCard() {
   const [copied, setCopied] = useState(false)
-  const currentUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
+  const currentUrl = 'https://audenti-pwa.vercel.app/'
 
   const handleCopy = () => {
     if (typeof navigator !== 'undefined') {

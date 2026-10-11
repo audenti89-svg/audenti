@@ -17,7 +17,6 @@ import { PriorityTasksCard } from '@/components/dashboard/PriorityTasksCard'
 import { QuickActions } from '@/components/dashboard/QuickActions'
 
 import { useBranchStore } from '@/stores/branchStore'
-import { DynamicQrWithLogo } from '@/components/ui/DynamicQrWithLogo'
 
 export default function DashboardPage() {
   const currentBranch = useBranchStore((state) => state.getCurrentBranch())
@@ -122,15 +121,9 @@ export default function DashboardPage() {
           <PatientFlowTimeline />
         </div>
 
-        {/* Right: Finance + Tasks + Dynamic QR (5 cols) */}
+        {/* Right: Finance + Tasks (5 cols) */}
         <div className="lg:col-span-5 space-y-6">
           <FinanceCard />
-          <DynamicQrWithLogo
-            title="Código QR Institucional • Audenti"
-            subtitle="Dra. Aura Estudillo • Escanear para acceder a la PWA o referir pacientes"
-            size={180}
-            referralCode="AUD-AURA-BLB"
-          />
           <PriorityTasksCard />
         </div>
       </section>

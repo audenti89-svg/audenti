@@ -15,7 +15,6 @@ import {
 import { Odontogram } from '@/components/clinical/Odontogram'
 import { FamilyNucleusManager } from '@/components/clinical/FamilyNucleusManager'
 import { MedicalQuestionnaire } from '@/components/clinical/MedicalQuestionnaire'
-import { DynamicQrWithLogo } from '@/components/ui/DynamicQrWithLogo'
 
 export default function ExpedientePage() {
   return (
@@ -96,15 +95,6 @@ export default function ExpedientePage() {
               })}
             </div>
           </div>
-
-          {/* Código QR Dinámico con Isotipo AUDENTI */}
-          <DynamicQrWithLogo
-            title="QR de Fidelización & Red Familiar"
-            subtitle="Mateo Morales Ruiz • Dra. Aura Estudillo"
-            size={140}
-            patientId="MM-4422"
-            referralCode="REF-MM4422"
-          />
         </div>
 
         {/* Columna Derecha: Odontograma Vectorial Interactivo */}
