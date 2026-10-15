@@ -30,6 +30,7 @@ import {
 import { AudentiLogo } from '@/components/ui/AudentiLogo'
 import { AuthModal } from '@/components/auth/AuthModal'
 import { QRCodeSVG } from 'qrcode.react'
+import { PublicAiChatWidget } from '@/components/ai/PublicAiChatWidget'
 
 // ASSETS OFICIALES OBLIGATORIOS
 const ASSETS = {
@@ -1284,6 +1285,9 @@ export default function LandingPage() {
         onClose={() => setAuthModalOpen(false)}
         defaultMode={authMode}
       />
+
+      {/* Widget de Conversión IA Pública (Llama 3.1 8B Groq) */}
+      <PublicAiChatWidget />
     </div>
   )
 }

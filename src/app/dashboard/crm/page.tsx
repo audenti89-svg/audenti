@@ -28,7 +28,12 @@ import {
   CheckCircle2,
   ChevronRight,
   FileCheck,
-  Building2
+  Building2,
+  Headphones,
+  Volume2,
+  VolumeX,
+  AlertTriangle,
+  Lightbulb
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { QuickRegisterModal } from '@/components/clinical/QuickRegisterModal'
@@ -82,6 +87,91 @@ export default function CrmPage() {
   const [selectedPatientForAi, setSelectedPatientForAi] = useState<any | null>(null)
   const [aiGeneratedMessage, setAiGeneratedMessage] = useState<string>('')
   const [aiMeta, setAiMeta] = useState<any | null>(null)
+
+  // Estado de Auditoría Proactiva en Background
+  const [isAuditing, setIsAuditing] = useState(false)
+  const [auditData, setAuditData] = useState<any | null>(null)
+
+  // Estado del Reporte de Audio Ejecutivo para la Dra. Aura
+  const [isBriefGenerating, setIsBriefGenerating] = useState(false)
+  const [executiveBrief, setExecutiveBrief] = useState<any | null>(null)
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false)
+
+  const handleRunProactiveAudit = async () => {
+    setIsAuditing(true)
+    try {
+      const res = await fetch('/api/ai/crm-proactive-audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const data = await res.json()
+      if (data?.success && data?.analysis) {
+        setAuditData(data.analysis)
+      }
+    } catch (err) {
+      console.error('Error running proactive audit:', err)
+    } finally {
+      setIsAuditing(false)
+    }
+  }
+
+  const handleGenerateExecutiveAudio = async () => {
+    setIsBriefGenerating(true)
+    try {
+      const res = await fetch('/api/ai/executive-audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'daily_closing',
+          doctorName: 'Dra. Aura Estudillo',
+          clinicData: {
+            totalPatients: patients.length,
+            activeTreatments: stageCounts.tratamiento_activo,
+            revenueToday: 24500,
+            pendingFollowups: stageCounts.presupuesto_enviado,
+            atRiskPatients: stageCounts.contacto_inicial
+          }
+        })
+      })
+      const data = await res.json()
+      if (data?.success && data?.data) {
+        setExecutiveBrief(data.data)
+        // Reproducir locución por voz
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+          window.speechSynthesis.cancel()
+          const utterance = new SpeechSynthesisUtterance(data.data.script)
+          utterance.lang = 'es-MX'
+          utterance.rate = 1.05
+          utterance.onend = () => setIsPlayingAudio(false)
+          utterance.onerror = () => setIsPlayingAudio(false)
+          setIsPlayingAudio(true)
+          window.speechSynthesis.speak(utterance)
+        }
+      }
+    } catch (err) {
+      console.error('Error generating executive audio:', err)
+    } finally {
+      setIsBriefGenerating(false)
+    }
+  }
+
+  const handleToggleAudio = () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      if (isPlayingAudio) {
+        window.speechSynthesis.cancel()
+        setIsPlayingAudio(false)
+      } else if (executiveBrief?.script) {
+        window.speechSynthesis.cancel()
+        const utterance = new SpeechSynthesisUtterance(executiveBrief.script)
+        utterance.lang = 'es-MX'
+        utterance.rate = 1.05
+        utterance.onend = () => setIsPlayingAudio(false)
+        utterance.onerror = () => setIsPlayingAudio(false)
+        setIsPlayingAudio(true)
+        window.speechSynthesis.speak(utterance)
+      }
+    }
+  }
 
   const handleGenerateAiFollowup = async (patient?: any) => {
     setIsAiGenerating(true)
@@ -556,6 +646,96 @@ export default function CrmPage() {
                 {copied ? '¡Copiado al portapapeles!' : 'Copiar Texto'}
               </button>
             </div>
+          </div>
+
+          {/* ======================================================== */}
+          {/* MÓDULO 2: SISTEMA DE INFORMES & AUDIO PODCAST DRA. AURA */}
+          {/* ======================================================== */}
+          <div className="p-4 rounded-xl bg-slate-900 text-white space-y-3 shadow-sm border border-slate-800">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Headphones className="w-4 h-4 text-amber-400" />
+                <span className="text-xs font-bold text-white tracking-tight">Audio Podcast Ejecutivo</span>
+              </div>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 font-mono">
+                Cierre de Jornada
+              </span>
+            </div>
+
+            <p className="text-[11px] text-slate-300 leading-relaxed">
+              Genera una síntesis ejecutiva por voz para la Dra. Aura Estudillo con el balance del día, altas y alertas de retención.
+            </p>
+
+            {executiveBrief && (
+              <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 space-y-1.5 text-xs">
+                <p className="font-bold text-amber-400">{executiveBrief.headline}</p>
+                <p className="text-slate-300 text-[11px] italic leading-snug">"{executiveBrief.script}"</p>
+                <div className="pt-1 flex items-center justify-between text-[10px] text-slate-400">
+                  <span>Acción: <strong>{executiveBrief.actionItem}</strong></span>
+                  <button
+                    onClick={handleToggleAudio}
+                    className="inline-flex items-center gap-1 text-amber-400 hover:text-amber-300 font-bold"
+                  >
+                    {isPlayingAudio ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                    {isPlayingAudio ? 'Pausar Audio' : 'Escuchar de nuevo'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleGenerateExecutiveAudio}
+              disabled={isBriefGenerating}
+              className="w-full py-2.5 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
+            >
+              <Volume2 className={`w-3.5 h-3.5 ${isBriefGenerating ? 'animate-bounce' : ''}`} />
+              {isBriefGenerating ? 'Generando Reporte y Voz...' : 'Escuchar Audio Reporte Diario'}
+            </button>
+          </div>
+
+          {/* ======================================================== */}
+          {/* MÓDULO 3: DIAGNÓSTICO PROACTIVO & DETECCIÓN DE FUGAS (LEAKS) */}
+          {/* ======================================================== */}
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/90 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
+                <span className="text-xs font-bold text-slate-900">Auditoría Proactiva CRM</span>
+              </div>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 font-bold">
+                Llama 3.3 70B
+              </span>
+            </div>
+
+            <p className="text-[11px] text-slate-500">
+              Escanea la base para prevenir pacientes en riesgo de abandono y optimizar tratamientos de alta rentabilidad.
+            </p>
+
+            {auditData && (
+              <div className="p-3 bg-white rounded-xl border border-slate-200 text-xs space-y-2">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                    Alerta de Fuga: {auditData.leakAlert?.riskLevel}
+                  </span>
+                  <p className="text-[11px] text-slate-700 mt-1">{auditData.leakAlert?.description}</p>
+                </div>
+                <div className="pt-1.5 border-t border-slate-100 flex items-start gap-1.5 text-[11px] text-slate-600">
+                  <Lightbulb className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                  <span><strong>Oportunidad:</strong> {auditData.financialInsight?.opportunityService} ({auditData.financialInsight?.projectedImpact})</span>
+                </div>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleRunProactiveAudit}
+              disabled={isAuditing}
+              className="w-full py-2 px-3 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-800 text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isAuditing ? 'animate-spin' : ''}`} />
+              {isAuditing ? 'Analizando Base de Pacientes...' : 'Escanear Fugas y Oportunidades'}
+            </button>
           </div>
         </div>
       </div>
