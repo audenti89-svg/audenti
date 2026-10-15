@@ -1,8 +1,9 @@
 -- ============================================================================
 -- AUDENTI / DENTALCLOUD SAAS: EXPANSION PROTOCOL (CHATS, GROUPS & APPOINTMENT LOGS)
+-- Script Seguro e Idempotente para Supabase SQL Editor
 -- ============================================================================
 
--- 1. Tabla de Grupos Personalizados de Chat (Internos y Pacientes/Familias/Referidos)
+-- 1. Tabla de Grupos Personalizados de Chat
 CREATE TABLE IF NOT EXISTS chat_custom_groups (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES tenants(id),
@@ -49,6 +50,20 @@ CREATE TABLE IF NOT EXISTS in_app_notifications (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Habilitar Realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE in_app_notifications;
-ALTER PUBLICATION supabase_realtime ADD TABLE appointment_logs;
+-- 5. Habilitar Realtime de forma segura
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'in_app_notifications'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE in_app_notifications;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'appointment_logs'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE appointment_logs;
+  END IF;
+END $$;

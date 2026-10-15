@@ -1,9 +1,9 @@
 -- ============================================================================
 -- AUDENTI / DENTALCLOUD SAAS: MÓDULO OMNI-CANAL, RED DE REFERIDOS Y FAMILIAS
--- Script de Migración y Funciones RPC para Supabase PostgreSQL + Realtime
+-- Script Seguro e Idempotente para Supabase SQL Editor
 -- ============================================================================
 
--- 1. Actualización de columnas en pacientes (si no existen)
+-- 1. Actualización de columnas en patients (si no existen)
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'patients' AND column_name = 'qr_code_source') THEN
@@ -31,11 +31,25 @@ BEGIN
   END IF;
 END $$;
 
--- 3. Habilitar Supabase Realtime para la mensajería
-ALTER PUBLICATION supabase_realtime ADD TABLE chat_messages;
-ALTER PUBLICATION supabase_realtime ADD TABLE chat_channels;
+-- 3. Habilitar Supabase Realtime de forma segura
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'chat_messages'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE chat_messages;
+  END IF;
 
--- 4. Función RPC para obtener la Red de Confianza del Paciente (Referidor + Núcleo Familiar)
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'chat_channels'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE chat_channels;
+  END IF;
+END $$;
+
+-- 4. Función RPC para obtener la Red de Confianza del Paciente
 CREATE OR REPLACE FUNCTION get_patient_trust_network(p_patient_id UUID)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -58,34 +72,34 @@ BEGIN
   END IF;
 
   -- Obtener referidor (si tiene)
-  SELECT id, full_name, phone, referral_code
-  INTO v_referrer
-  FROM patients
-  WHERE id = v_patient.referred_by;
+  IF v_patient.referred_by IS NOT NULL THEN
+    SELECT id, full_name, referral_code
+    INTO v_referrer
+    FROM patients
+    WHERE id = v_patient.referred_by;
+  END IF;
 
-  -- Obtener miembros de la familia
-  SELECT 
-    fn.id AS nucleus_id,
-    fn.name AS nucleus_name,
-    COALESCE(
-      jsonb_agg(
-        jsonb_build_object(
-          'patient_id', rel_p.id,
-          'name', rel_p.full_name,
-          'phone', rel_p.phone,
-          'relationship', fr.relationship_type
-        )
-      ) FILTER (WHERE rel_p.id IS NOT NULL),
-      '[]'::jsonb
-    ) AS members
-  INTO v_family
-  FROM family_nuclei fn
-  LEFT JOIN family_relationships fr ON fr.family_nucleus_id = fn.id AND fr.patient_id = p_patient_id
-  LEFT JOIN patients rel_p ON rel_p.id = fr.related_patient_id
-  WHERE fn.id = v_patient.family_nucleus_id OR fr.family_nucleus_id IS NOT NULL
-  GROUP BY fn.id, fn.name;
+  -- Obtener núcleo familiar (si tiene)
+  IF v_patient.family_nucleus_id IS NOT NULL THEN
+    SELECT fn.id AS nucleus_id, fn.name AS nucleus_name,
+           COALESCE(
+             jsonb_agg(
+               jsonb_build_object(
+                 'id', p.id,
+                 'name', p.full_name,
+                 'relationship', fnm.relationship
+               )
+             ) FILTER (WHERE p.id IS NOT NULL), '[]'::jsonb
+           ) AS members
+    INTO v_family
+    FROM family_nuclei fn
+    LEFT JOIN family_nucleus_members fnm ON fnm.nucleus_id = fn.id
+    LEFT JOIN patients p ON p.id = fnm.patient_id
+    WHERE fn.id = v_patient.family_nucleus_id
+    GROUP BY fn.id, fn.name;
+  END IF;
 
-  -- Construir respuesta JSON
+  -- Construir respuesta unificada
   v_network := jsonb_build_object(
     'patient', jsonb_build_object(
       'id', v_patient.id,
@@ -138,12 +152,11 @@ BEGIN
     FROM chat_channels
     WHERE tenant_id = p_tenant_id 
       AND family_nucleus_id = p_family_group_id
-      AND channel_type = 'family'
     LIMIT 1;
 
     IF v_channel_id IS NULL THEN
       INSERT INTO chat_channels (tenant_id, name, channel_type, family_nucleus_id)
-      VALUES (p_tenant_id, 'Canal Familiar', 'family', p_family_group_id)
+      VALUES (p_tenant_id, 'Chat Familiar', 'family', p_family_group_id)
       RETURNING id INTO v_channel_id;
     END IF;
   END IF;
