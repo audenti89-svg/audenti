@@ -23,7 +23,9 @@ import {
   ArrowUpRight,
   Star,
   Menu,
-  X
+  X,
+  Coffee,
+  Wine
 } from 'lucide-react'
 import { AudentiLogo } from '@/components/ui/AudentiLogo'
 import { AuthModal } from '@/components/auth/AuthModal'
@@ -54,7 +56,12 @@ export default function LandingPage() {
   const [splitPercent, setSplitPercent] = useState(0)
   const [isOverText, setIsOverText] = useState(false)
   const heroRef = useRef<HTMLDivElement>(null)
+  const particleCanvasRef = useRef<HTMLCanvasElement>(null)
   const rafId = useRef<number | null>(null)
+
+  // Referencias para manejo táctil no invasivo (Liberar scroll vertical en móviles)
+  const touchStartPos = useRef<{ x: number; y: number } | null>(null)
+  const isHorizontalGesture = useRef<boolean | null>(null)
 
   const openAuth = (mode: 'login' | 'register' = 'login') => {
     setAuthMode(mode)
@@ -79,12 +86,139 @@ export default function LandingPage() {
   }, [])
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    updateSplit(e.clientX)
+    // Si es evento de puntero tipo mouse/pen o arrastre libre
+    if (e.pointerType !== 'touch') {
+      updateSplit(e.clientX)
+    }
   }
 
   const handlePointerDown = (e: React.PointerEvent) => {
-    updateSplit(e.clientX)
+    if (e.pointerType !== 'touch') {
+      updateSplit(e.clientX)
+    }
   }
+
+  // GESTOS TÁCTILES MÓVILES OPTIMIZADOS (LIBERA SCROLL VERTICAL)
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0]
+    if (!touch) return
+    touchStartPos.current = { x: touch.clientX, y: touch.clientY }
+    isHorizontalGesture.current = null
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const touch = e.touches[0]
+    if (!touch || !touchStartPos.current) return
+
+    const deltaX = Math.abs(touch.clientX - touchStartPos.current.x)
+    const deltaY = Math.abs(touch.clientY - touchStartPos.current.y)
+
+    // Si aún no hemos determinado la intención del gesto
+    if (isHorizontalGesture.current === null) {
+      if (deltaX > 8 && deltaX > deltaY) {
+        // Gesto horizontal claro del comparador
+        isHorizontalGesture.current = true
+      } else if (deltaY > 8) {
+        // Gesto vertical para scrollear la página hacia abajo
+        isHorizontalGesture.current = false
+      }
+    }
+
+    // Solo actualizamos el slider si es un gesto deliberadamente horizontal
+    if (isHorizontalGesture.current === true) {
+      updateSplit(touch.clientX)
+    }
+  }
+
+  const handleTouchEnd = () => {
+    touchStartPos.current = null
+    isHorizontalGesture.current = null
+  }
+
+  // CANVAS DE PARTÍCULAS INTERACTIVAS (TINCIÓN DINÁMICA DE DIENTES / REPELENCIA CLÍNICA)
+  useEffect(() => {
+    const canvas = particleCanvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    let animFrame: number
+    let width = (canvas.width = canvas.parentElement?.clientWidth || window.innerWidth)
+    let height = (canvas.height = canvas.parentElement?.clientHeight || window.innerHeight)
+
+    const handleResize = () => {
+      if (!canvas) return
+      width = canvas.width = canvas.parentElement?.clientWidth || window.innerWidth
+      height = canvas.height = canvas.parentElement?.clientHeight || window.innerHeight
+    }
+    window.addEventListener('resize', handleResize)
+
+    // Generador de partículas orgánicas (café, pigmentos, taninos)
+    const PARTICLE_COUNT = 36
+    const particles = Array.from({ length: PARTICLE_COUNT }, () => ({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      vx: (Math.random() - 0.25) * 0.9,
+      vy: (Math.random() - 0.4) * 0.8,
+      size: Math.random() * 2.8 + 1.2,
+      opacity: Math.random() * 0.6 + 0.2,
+      color: Math.random() > 0.45 ? '#b45309' : Math.random() > 0.5 ? '#7f1d1d' : '#d97706', // café, vino tinto, azúcares
+      seed: Math.random() * 100,
+    }))
+
+    const render = () => {
+      ctx.clearRect(0, 0, width, height)
+
+      // Línea divisoria actual basada en splitPercent
+      const currentSplitX = (splitPercent / 100) * width
+
+      particles.forEach((p) => {
+        p.seed += 0.02
+        p.x += p.vx + Math.sin(p.seed) * 0.35
+        p.y += p.vy + Math.cos(p.seed) * 0.35
+
+        // Rebote o reaparición en bordes
+        if (p.x < 0) p.x = width
+        if (p.x > width) p.x = 0
+        if (p.y < 0) p.y = height
+        if (p.y > height) p.y = 0
+
+        // Si la partícula está en la zona AFTER (dientes limpios), se repele / disipa
+        const isInBeforeSide = p.x <= currentSplitX
+
+        ctx.save()
+        if (isInBeforeSide) {
+          // Zona sucia: partículas atraídas a la estructura dental, pigmentando
+          ctx.globalAlpha = p.opacity
+          ctx.fillStyle = p.color
+          ctx.shadowBlur = 6
+          ctx.shadowColor = p.color
+          ctx.beginPath()
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
+          ctx.fill()
+        } else {
+          // Zona limpia: escudo de brillo clínico refractivo (repelencia)
+          ctx.globalAlpha = p.opacity * 0.25
+          ctx.fillStyle = '#38bdf8' // Destello celeste / blanco de protección
+          ctx.shadowBlur = 8
+          ctx.shadowColor = '#38bdf8'
+          ctx.beginPath()
+          ctx.arc(p.x, p.y, p.size * 0.7, 0, Math.PI * 2)
+          ctx.fill()
+        }
+        ctx.restore()
+      })
+
+      animFrame = requestAnimationFrame(render)
+    }
+
+    render()
+
+    return () => {
+      cancelAnimationFrame(animFrame)
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [splitPercent])
 
   // Carrusel de Especialistas
   const teamCarouselRef = useRef<HTMLDivElement>(null)
@@ -282,15 +416,46 @@ export default function LandingPage() {
         ref={heroRef}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
-        onTouchStart={(e) => {
-          if (e.touches[0]) updateSplit(e.touches[0].clientX)
-        }}
-        onTouchMove={(e) => {
-          if (e.touches[0]) updateSplit(e.touches[0].clientX)
-        }}
-        className="relative w-full h-[100svh] min-h-[640px] select-none touch-none outline-none overflow-hidden bg-slate-950 cursor-crosshair pt-16"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        className="relative w-full h-[100svh] min-h-[640px] select-none touch-pan-y outline-none overflow-hidden bg-slate-950 cursor-crosshair pt-16"
         aria-label="Comparador interactivo de moldes dentales con seguimiento de cursor y táctil"
       >
+        {/* ELEMENTOS DE COMIDA/BEBIDA SEMITRANSPARENTES FLOTANTES (Pigmentos alimenticios) */}
+        <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden">
+          {/* Café y Taninos (Arriba Izquierda) */}
+          <div className="absolute top-28 left-[8%] sm:left-[12%] flex items-center gap-2 p-2.5 sm:p-3 rounded-2xl bg-amber-950/20 backdrop-blur-md border border-amber-500/20 shadow-lg text-amber-200/60 animate-bounce duration-1000 select-none">
+            <Coffee className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500/70" />
+            <span className="text-[10px] font-mono tracking-widest uppercase hidden sm:inline">Taninos • Café</span>
+          </div>
+
+          {/* Vino Tinto y Cromógenos (Arriba Derecha) */}
+          <div className="absolute top-36 right-[6%] sm:right-[15%] flex items-center gap-2 p-2.5 sm:p-3 rounded-2xl bg-rose-950/20 backdrop-blur-md border border-rose-500/20 shadow-lg text-rose-200/60 animate-pulse select-none">
+            <Wine className="w-4 h-4 sm:w-5 sm:h-5 text-rose-400/70" />
+            <span className="text-[10px] font-mono tracking-widest uppercase hidden sm:inline">Cromógenos • Vino</span>
+          </div>
+
+          {/* Azúcares y Almidones Adherentes (Centro Izquierda) */}
+          <div className="absolute top-[48%] left-[4%] sm:left-[7%] flex items-center gap-2 p-2 sm:p-2.5 rounded-2xl bg-orange-950/20 backdrop-blur-md border border-orange-500/20 shadow-lg text-orange-200/50 select-none">
+            <div className="w-2.5 h-2.5 rounded-full bg-amber-400/50 animate-ping" />
+            <span className="text-[10px] font-mono tracking-widest uppercase">Biofilm • Sacarosa</span>
+          </div>
+
+          {/* Ácidos y Placa Bacteriana (Centro Derecha) */}
+          <div className="absolute top-[52%] right-[4%] sm:right-[8%] flex items-center gap-2 p-2 sm:p-2.5 rounded-2xl bg-yellow-950/20 backdrop-blur-md border border-yellow-500/20 shadow-lg text-yellow-200/50 select-none">
+            <div className="w-2 h-2 rounded-sm bg-yellow-400/50 rotate-45" />
+            <span className="text-[10px] font-mono tracking-widest uppercase">Pigmento Orgánico</span>
+          </div>
+        </div>
+
+        {/* CANVAS DE PARTÍCULAS DINÁMICAS (Flujo hacia BEFORE / Repelencia en AFTER) */}
+        <canvas
+          ref={particleCanvasRef}
+          className="absolute inset-0 w-full h-full pointer-events-none z-10"
+        />
+
         {/* CAPA 1: AFTER (Clean cast - Dientes 100% Blancos - 1.webp) */}
         <div className="absolute inset-0 w-full h-full overflow-hidden">
           <img
