@@ -23,10 +23,17 @@ import {
   ShieldAlert,
   Info,
   RefreshCw,
-  Users
+  Users,
+  Filter,
+  CheckCircle2,
+  ChevronRight,
+  FileCheck,
+  Building2
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { QuickRegisterModal } from '@/components/clinical/QuickRegisterModal'
+
+type CrmStage = 'all' | 'contacto_inicial' | 'cita_valoracion' | 'primera_atencion' | 'presupuesto_enviado' | 'tratamiento_activo' | 'paciente_fiel'
 
 export default function CrmPage() {
   const [copied, setCopied] = useState(false)
@@ -34,6 +41,9 @@ export default function CrmPage() {
   const [appointmentsCount, setAppointmentsCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
+  const [activeStageFilter, setActiveStageFilter] = useState<CrmStage>('all')
+  const [patientStages, setPatientStages] = useState<Record<string, CrmStage>>({})
+
   const supabase = createClient()
 
   const fetchCrmData = async () => {
@@ -42,8 +52,20 @@ export default function CrmPage() {
       const { data: pts } = await supabase.from('patients').select('*').order('created_at', { ascending: false })
       const { count: apptCount } = await supabase.from('appointments').select('*', { count: 'exact', head: true })
 
-      setPatients(pts || [])
+      const patientList = pts || []
+      setPatients(patientList)
       setAppointmentsCount(apptCount || 0)
+
+      // Inicializar etapas locales a partir de su estado real
+      const initialMap: Record<string, CrmStage> = {}
+      patientList.forEach((p) => {
+        if (!p.onboarding_completed) {
+          initialMap[p.id] = 'contacto_inicial'
+        } else {
+          initialMap[p.id] = 'cita_valoracion'
+        }
+      })
+      setPatientStages(initialMap)
     } catch (err) {
       console.warn('Error fetching CRM data:', err)
       setPatients([])
@@ -56,36 +78,111 @@ export default function CrmPage() {
     fetchCrmData()
   }, [])
 
+  const handleChangeStage = (patientId: string, newStage: CrmStage) => {
+    setPatientStages(prev => ({
+      ...prev,
+      [patientId]: newStage
+    }))
+  }
+
+  const stageCounts = {
+    contacto_inicial: Object.values(patientStages).filter(s => s === 'contacto_inicial').length,
+    cita_valoracion: Object.values(patientStages).filter(s => s === 'cita_valoracion').length,
+    primera_atencion: Object.values(patientStages).filter(s => s === 'primera_atencion').length,
+    presupuesto_enviado: Object.values(patientStages).filter(s => s === 'presupuesto_enviado').length,
+    tratamiento_activo: Object.values(patientStages).filter(s => s === 'tratamiento_activo').length,
+    paciente_fiel: Object.values(patientStages).filter(s => s === 'paciente_fiel').length,
+  }
+
   const kpis = [
-    { label: 'Pacientes Registrados', value: patients.length.toString(), delta: '+0%', icon: UserPlus, note: 'Base de pacientes activa' },
-    { label: 'Citas en Sistema', value: appointmentsCount.toString(), delta: '+0%', icon: Calendar, note: 'Total histórico y próximas' },
+    { label: 'Pacientes en Embudo', value: patients.length.toString(), delta: '+0%', icon: UserPlus, note: 'Base total en seguimiento' },
+    { label: 'Citas en Tiempo Real', value: appointmentsCount.toString(), delta: '+0%', icon: Calendar, note: 'Agenda clínica activa' },
     { label: 'Expedientes Verificados', value: patients.filter(p => p.onboarding_completed).length.toString(), icon: CheckCircle, note: 'Bioseguridad completada' },
-    { label: 'En Espera de Cita', value: patients.length > appointmentsCount ? (patients.length - appointmentsCount).toString() : '0', icon: RotateCcw, note: 'Por agendar valoración' },
+    { label: 'Presupuestos Activos', value: stageCounts.presupuesto_enviado.toString(), icon: Receipt, note: 'En revisión por paciente' },
   ]
 
   const funnelStages = [
-    { n: '01', label: 'Contacto Nuevo', sub: 'Registrados en el sistema', count: patients.length, color: 'text-amber-800 bg-amber-50 border-amber-200', icon: Mail, value: 'En blanco',
-      details: [['Directorio:', `${patients.length}`], ['Por agendar:', `${patients.length}`]] },
-    { n: '02', label: 'Cita Agendada', sub: 'En agenda clínica', count: appointmentsCount, color: 'text-blue-800 bg-blue-50 border-blue-200', icon: Calendar, value: 'Tiempo real',
-      details: [['Confirmadas:', `${appointmentsCount}`]] },
-    { n: '03', label: 'Primera Atención', sub: 'Diagnóstico e historia', count: 0, color: 'text-slate-800 bg-slate-50 border-slate-200', icon: Stethoscope, value: '$0.00 MXN',
-      details: [['Odontograma:', '0'], ['Expedientes:', `${patients.length}`]] },
-    { n: '04', label: 'Plan Presentado', sub: 'Presupuesto emitido', count: 0, color: 'text-amber-900 bg-amber-100/50 border-amber-300', icon: Receipt, value: '$0.00 MXN',
-      details: [['Por aceptar:', '0']] },
-    { n: '05', label: 'Tx en Curso', sub: 'En tratamiento activo', count: 0, color: 'text-indigo-800 bg-indigo-50 border-indigo-200', icon: Activity, value: 'En proceso',
-      details: [['Gabinete:', '0']] },
-    { n: '06', label: 'Paciente Fiel', sub: 'Control preventivo', count: 0, color: 'text-emerald-800 bg-emerald-50 border-emerald-200', icon: CheckCircle, value: 'Salud óptima',
-      details: [['Semestral:', '0']] },
+    {
+      id: 'contacto_inicial',
+      n: '01',
+      label: 'Contacto Nuevo',
+      sub: 'Prospecto / Registro web',
+      count: stageCounts.contacto_inicial,
+      color: 'text-amber-800 bg-amber-50 border-amber-200',
+      icon: Mail,
+      value: stageCounts.contacto_inicial === 0 ? 'Sin prospectos' : `${stageCounts.contacto_inicial} prospectos`,
+      details: [['Directorio:', `${patients.length}`], ['Pendientes:', `${stageCounts.contacto_inicial}`]]
+    },
+    {
+      id: 'cita_valoracion',
+      n: '02',
+      label: 'Cita de Valoración',
+      sub: 'Agendada en consultorio',
+      count: stageCounts.cita_valoracion,
+      color: 'text-blue-800 bg-blue-50 border-blue-200',
+      icon: Calendar,
+      value: appointmentsCount === 0 ? '0 citas' : `${appointmentsCount} agendadas`,
+      details: [['Confirmadas:', `${appointmentsCount}`]]
+    },
+    {
+      id: 'primera_atencion',
+      n: '03',
+      label: 'Primera Atención',
+      sub: 'Diagnóstico & Odontograma',
+      count: stageCounts.primera_atencion,
+      color: 'text-slate-800 bg-slate-50 border-slate-200',
+      icon: Stethoscope,
+      value: '$0.00 MXN',
+      details: [['Odontograma:', `${stageCounts.primera_atencion}`]]
+    },
+    {
+      id: 'presupuesto_enviado',
+      n: '04',
+      label: 'Plan Presentado',
+      sub: 'Cotización / Presupuesto',
+      count: stageCounts.presupuesto_enviado,
+      color: 'text-amber-900 bg-amber-100/50 border-amber-300',
+      icon: Receipt,
+      value: '$0.00 MXN',
+      details: [['Por aceptar:', `${stageCounts.presupuesto_enviado}`]]
+    },
+    {
+      id: 'tratamiento_activo',
+      n: '05',
+      label: 'Tx en Curso',
+      sub: 'Tratamiento en sillón',
+      count: stageCounts.tratamiento_activo,
+      color: 'text-indigo-800 bg-indigo-50 border-indigo-200',
+      icon: Activity,
+      value: 'En gabinete',
+      details: [['En curso:', `${stageCounts.tratamiento_activo}`]]
+    },
+    {
+      id: 'paciente_fiel',
+      n: '06',
+      label: 'Paciente Fiel',
+      sub: 'Preventivo semestral',
+      count: stageCounts.paciente_fiel,
+      color: 'text-emerald-800 bg-emerald-50 border-emerald-200',
+      icon: CheckCircle,
+      value: 'Salud óptima',
+      details: [['Al día:', `${stageCounts.paciente_fiel}`]]
+    },
   ]
 
   const copyMessage = () => {
-    const text = 'Hola, te compartimos el plan de tratamiento y citas disponibles para tu atención odontológica con la Dra. Aura Estudillo. ¿Te gustaría agendar en este momento?'
+    const text = 'Hola, te saludamos del consultorio dental de la Dra. Aura Estudillo. Te compartimos el plan de tratamiento y citas disponibles para tu atención odontológica. ¿Te gustaría agendar en este momento?'
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
       navigator.clipboard.writeText(text)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }
   }
+
+  const filteredPatients = patients.filter(p => {
+    if (activeStageFilter === 'all') return true
+    return (patientStages[p.id] || 'contacto_inicial') === activeStageFilter
+  })
 
   return (
     <div className="flex flex-col w-full space-y-6 pb-12">
@@ -94,25 +191,35 @@ export default function CrmPage() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-200 uppercase tracking-wide">
-              Módulo CRM & Fidelización
+              Módulo CRM &amp; Seguimiento Clínico
             </span>
             <span className="text-slate-500 text-xs">• Sincronizado en tiempo real</span>
           </div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            CRM Dental &amp; Fidelización de Pacientes
+            CRM Dental &amp; Ciclo de Vida del Paciente
           </h1>
           <p className="text-xs text-slate-500 max-w-3xl mt-0.5">
-            Dra. Aura Estudillo • Céd. Prof. 8492019 | Gestión del ciclo clínico y fidelización preventiva.
+            Dra. Aura Estudillo • Céd. Prof. 8492019 | Trazabilidad del prospecto desde el contacto inicial hasta el plan de tratamiento completado.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setIsRegisterOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold shadow-xs transition-colors cursor-pointer"
-        >
-          <UserPlus className="w-4 h-4" />
-          + Registrar Paciente (Alta Rápida)
-        </button>
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={fetchCrmData}
+            className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors"
+            title="Sincronizar CRM"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsRegisterOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold shadow-xs transition-colors cursor-pointer"
+          >
+            <UserPlus className="w-4 h-4" />
+            + Registrar Paciente (Alta Rápida)
+          </button>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -193,35 +300,81 @@ export default function CrmPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
             <div>
               <h2 className="text-lg font-bold text-slate-900 tracking-tight">Tablero de Seguimiento Activo</h2>
-              <p className="text-xs text-slate-500">Acciones programadas para pacientes en seguimiento crítico y presupuestos abiertos.</p>
+              <p className="text-xs text-slate-500">Acciones programadas para pacientes en seguimiento clínico y presupuestos abiertos.</p>
+            </div>
+            {/* Filter Pills */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setActiveStageFilter('all')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                  activeStageFilter === 'all'
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Todos ({patients.length})
+              </button>
+              {funnelStages.map(s => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setActiveStageFilter(s.id as CrmStage)}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                    activeStageFilter === s.id
+                      ? 'bg-amber-400 text-slate-950 font-bold shadow-2xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {s.label} ({s.count})
+                </button>
+              ))}
             </div>
           </div>
 
           <div className="space-y-3">
-            {patients.length === 0 ? (
+            {filteredPatients.length === 0 ? (
               <div className="p-8 rounded-xl bg-slate-50/70 border border-slate-200/70 text-center space-y-2">
                 <Users className="w-8 h-8 text-slate-400 mx-auto" />
-                <p className="text-xs font-bold text-slate-700">No hay pacientes en seguimiento activo</p>
-                <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
-                  La base está lista en blanco. Al registrar pacientes se activará el seguimiento automatizado y los recordatorios.
+                <p className="text-xs font-bold text-slate-700">
+                  {patients.length === 0
+                    ? 'No hay pacientes en seguimiento activo'
+                    : 'No hay pacientes en esta etapa del embudo'}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setIsRegisterOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400 text-slate-950 text-xs font-bold shadow-xs hover:bg-amber-300 transition-colors"
-                >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  + Registrar Primer Paciente
-                </button>
+                <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                  {patients.length === 0
+                    ? 'La base está lista en blanco. Al registrar pacientes se activará el seguimiento automatizado y los recordatorios.'
+                    : 'Puedes cambiar la etapa de un paciente desde el selector de etapa en cualquier momento.'}
+                </p>
+                {patients.length === 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsRegisterOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400 text-slate-950 text-xs font-bold shadow-xs hover:bg-amber-300 transition-colors"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    + Registrar Primer Paciente
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setActiveStageFilter('all')}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-200 text-slate-800 text-xs font-semibold hover:bg-slate-300 transition-colors"
+                  >
+                    Ver todos los pacientes
+                  </button>
+                )}
               </div>
             ) : (
-              patients.slice(0, 5).map((p) => {
+              filteredPatients.map((p) => {
                 const initials = (p.full_name || 'Paciente')
                   .split(' ')
                   .map((n: string) => n[0])
                   .slice(0, 2)
                   .join('')
                   .toUpperCase()
+
+                const currentStage = patientStages[p.id] || 'contacto_inicial'
 
                 return (
                   <div key={p.id} className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/70 hover:bg-slate-50 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -243,15 +396,34 @@ export default function CrmPage() {
                         </p>
                       </div>
                     </div>
-                    <a
-                      href={`https://wa.me/${(p.phone || '').replace(/[^0-9]/g, '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-colors shadow-xs shrink-0 bg-emerald-600 text-white hover:bg-emerald-700"
-                    >
-                      <MessageCircle className="w-3.5 h-3.5" />
-                      Contactar WhatsApp
-                    </a>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Etapa:</span>
+                        <select
+                          value={currentStage}
+                          onChange={(e) => handleChangeStage(p.id, e.target.value as CrmStage)}
+                          className="text-xs font-bold bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-800 shadow-2xs focus:ring-1 focus:ring-amber-500 outline-none cursor-pointer"
+                        >
+                          <option value="contacto_inicial">01. Contacto Nuevo</option>
+                          <option value="cita_valoracion">02. Cita Valoración</option>
+                          <option value="primera_atencion">03. Primera Atención</option>
+                          <option value="presupuesto_enviado">04. Plan Presentado</option>
+                          <option value="tratamiento_activo">05. Tx en Curso</option>
+                          <option value="paciente_fiel">06. Paciente Fiel</option>
+                        </select>
+                      </div>
+
+                      <a
+                        href={`https://wa.me/${(p.phone || '').replace(/[^0-9]/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-xs shrink-0 bg-emerald-600 text-white hover:bg-emerald-700"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        WhatsApp
+                      </a>
+                    </div>
                   </div>
                 )
               })
