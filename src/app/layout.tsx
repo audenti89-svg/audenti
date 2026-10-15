@@ -17,13 +17,26 @@ const outfit = Outfit({
 })
 
 export const metadata: Metadata = {
-  title: 'DentalCloud Pro — Dirección General Dra. Aura Estudillo',
-  description: 'Plataforma SaaS integral de gestión clínica, multi-sucursal y franquicias odontológicas bajo la dirección de la Dra. Aura Estudillo',
+  title: 'Audenti — DentalCloud Pro | Dra. Aura Estudillo',
+  description: 'Plataforma integral de gestión clínica, CRM odontológico y expedientes bajo la dirección de la Dra. Aura Estudillo (Céd. Prof. 8492019)',
   manifest: '/manifest.json',
+  icons: {
+    icon: [
+      { url: '/favicon.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'default',
-    title: 'DentalCloud Pro',
+    statusBarStyle: 'black-translucent',
+    title: 'Audenti Pro',
+  },
+  formatDetection: {
+    telephone: false,
   },
 }
 
@@ -31,8 +44,8 @@ export const viewport: Viewport = {
   themeColor: '#202D4C',
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
+  userScalable: true,
 }
 
 export default function RootLayout({
@@ -43,13 +56,18 @@ export default function RootLayout({
   return (
     <html lang="es" className={`${inter.variable} ${outfit.variable}`}>
       <head>
-        {/* PWA Tags */}
+        {/* PWA Universal Meta Tags (Android, iOS, Windows, macOS, Linux) */}
         <link rel="manifest" href="/manifest.json" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="DentalCloud Pro" />
+        <meta name="apple-mobile-web-app-title" content="Audenti Pro" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="application-name" content="DentalCloud Pro" />
+        <meta name="application-name" content="Audenti Pro" />
+        <meta name="msapplication-TileColor" content="#202D4C" />
+        <meta name="msapplication-tap-highlight" content="no" />
+        <meta name="theme-color" content="#202D4C" />
 
         {/* Tailwind CSS CDN de Respaldo Inmediato para Garantizar Renderizado 100% de Clases y Colores */}
         <Script src="https://cdn.tailwindcss.com" strategy="beforeInteractive" />
