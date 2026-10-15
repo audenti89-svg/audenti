@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   UserPlus,
   TrendingUp,
@@ -21,63 +21,65 @@ import {
   Sparkle,
   ArrowRight,
   ShieldAlert,
-  Info
+  Info,
+  RefreshCw,
+  Users
 } from 'lucide-react'
+import { createClient } from '@/utils/supabase/client'
+import { QuickRegisterModal } from '@/components/clinical/QuickRegisterModal'
 
 export default function CrmPage() {
   const [copied, setCopied] = useState(false)
+  const [patients, setPatients] = useState<any[]>([])
+  const [appointmentsCount, setAppointmentsCount] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [isRegisterOpen, setIsRegisterOpen] = useState(false)
+  const supabase = createClient()
+
+  const fetchCrmData = async () => {
+    setLoading(true)
+    try {
+      const { data: pts } = await supabase.from('patients').select('*').order('created_at', { ascending: false })
+      const { count: apptCount } = await supabase.from('appointments').select('*', { count: 'exact', head: true })
+
+      setPatients(pts || [])
+      setAppointmentsCount(apptCount || 0)
+    } catch (err) {
+      console.warn('Error fetching CRM data:', err)
+      setPatients([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchCrmData()
+  }, [])
 
   const kpis = [
-    { label: 'Nuevos Contactos del Mes', value: '38', delta: '+14%', icon: UserPlus, note: 'Meta mensual: 40', progress: 95 },
-    { label: 'Tasa Conversión a Plan',   value: '68.2%', delta: '+3.4 pt', icon: ThumbsUp, note: 'Aceptados: 26 de 38 presupuestos', quality: 'Excelente' },
-    { label: 'Pacientes Reactivados',    value: '11', icon: RotateCcw, note: 'Reactivados tras recordatorio semestral' },
-    { label: 'Inactivos (>6 meses)',     value: '34', icon: UserX, isError: true, tags: ['22 Sin respuesta', '7 Domicilio', '5 Alta'] },
+    { label: 'Pacientes Registrados', value: patients.length.toString(), delta: '+0%', icon: UserPlus, note: 'Base de pacientes activa' },
+    { label: 'Citas en Sistema', value: appointmentsCount.toString(), delta: '+0%', icon: Calendar, note: 'Total histórico y próximas' },
+    { label: 'Expedientes Verificados', value: patients.filter(p => p.onboarding_completed).length.toString(), icon: CheckCircle, note: 'Bioseguridad completada' },
+    { label: 'En Espera de Cita', value: patients.length > appointmentsCount ? (patients.length - appointmentsCount).toString() : '0', icon: RotateCcw, note: 'Por agendar valoración' },
   ]
 
   const funnelStages = [
-    { n: '01', label: 'Contacto Nuevo',     sub: 'Solicitudes entrantes', count: 24, color: 'text-amber-800 bg-amber-50 border-amber-200', icon: Mail, value: '$48,000 MXN',
-      details: [['QR Audenti:', '14'], ['Recomendación:', '6'], ['WhatsApp:', '4']] },
-    { n: '02', label: 'Cita de Valoración', sub: 'Agendada en consultorio', count: 18, color: 'text-blue-800 bg-blue-50 border-blue-200', icon: Calendar, value: 'Confirmación al 88%',
-      details: [['Próx. 48 hrs:', '11'], ['Esta semana:', '7'], ['Recordatorio auto:', 'Activo']] },
-    { n: '03', label: 'Primera Atención',   sub: 'Diagnóstico y escaneo', count: 15, color: 'text-slate-800 bg-slate-50 border-slate-200', icon: Stethoscope, value: 'Atendidos en el período',
-      details: [['Odontograma OK:', '15'], ['RX / Tomografía:', '12'], ['Fotografía intraoral:', '14']] },
-    { n: '04', label: 'Plan Presentado',    sub: 'En decisión / Cotización', count: 12, color: 'text-amber-900 bg-amber-100/50 border-amber-300', icon: Receipt, value: '$86,400 MXN abiertos',
-      details: [['Día 1-5:', '4'], ['Día 6-10:', '5'], ['>10 días (Alerta):', '3']] },
-    { n: '05', label: 'Tx en Curso',        sub: 'Tratamientos activos', count: 29, color: 'text-indigo-800 bg-indigo-50 border-indigo-200', icon: Activity, value: 'Asistencia puntual 96%',
-      details: [['Ortodoncia:', '14'], ['Implantología:', '9'], ['Rehabilitación:', '6']] },
-    { n: '06', label: 'Paciente Fiel',      sub: 'Control preventivo', count: 142, color: 'text-emerald-800 bg-emerald-50 border-emerald-200', icon: CheckCircle, value: 'Salud óptima',
-      details: [['Profilaxis al día:', '108'], ['Cita próx. mes:', '23'], ['Programa Familia:', '11']] },
-  ]
-
-  const trackingPatients = [
-    {
-      initials: 'MR', name: 'Mariana Ruíz', age: '34 años • ID #AUD-9821', tag: 'Ortodoncia Alineadores',
-      contact: 'Ayer vía WhatsApp', budget: '$24,000 MXN en revisión',
-      next: 'Enviar simulación 3D de sonrisa (Hoy)',
-      action: { label: 'Contactar WhatsApp', icon: MessageCircle, bg: 'bg-emerald-600 text-white hover:bg-emerald-700' },
-    },
-    {
-      initials: 'RG', name: 'Roberto Garza', age: '45 años • ID #AUD-6419', tag: 'Implante Pza 36',
-      contact: 'Hace 3 días', budget: 'Esperando cicatrización ósea (Semana 8)',
-      next: 'Agendar cita de torque y toma de impresión corona',
-      action: { label: 'Agendar Cita', icon: Calendar, bg: 'bg-slate-900 text-white hover:bg-slate-800' },
-    },
-    {
-      initials: 'SH', name: 'Sofía Hernández', age: '(Mamá de Mateo, 8 años)', tag: 'Odontopediatría',
-      contact: 'Hace 1 semana', budget: 'Recordatorio preventivo semestral',
-      next: 'Cita sábado matutino propuesta (Pendiente confirmación)',
-      action: { label: 'Ver Historial', icon: Stethoscope, bg: 'bg-white text-slate-900 border border-slate-200 hover:bg-slate-50' },
-    },
-    {
-      initials: 'CM', name: 'Carlos Mendoza', age: '29 años • ID #AUD-3104', tag: 'Post-extracción Molares',
-      contact: 'Hoy 09:30 AM (Check-in postoperatorio)', budget: 'Evolución favorable',
-      next: 'Confirmar retiro de puntos con asistente clínico',
-      action: { label: 'Ficha Clínica', icon: Receipt, bg: 'bg-white text-slate-900 border border-slate-200 hover:bg-slate-50' },
-    },
+    { n: '01', label: 'Contacto Nuevo', sub: 'Registrados en el sistema', count: patients.length, color: 'text-amber-800 bg-amber-50 border-amber-200', icon: Mail, value: 'En blanco',
+      details: [['Directorio:', `${patients.length}`], ['Por agendar:', `${patients.length}`]] },
+    { n: '02', label: 'Cita Agendada', sub: 'En agenda clínica', count: appointmentsCount, color: 'text-blue-800 bg-blue-50 border-blue-200', icon: Calendar, value: 'Tiempo real',
+      details: [['Confirmadas:', `${appointmentsCount}`]] },
+    { n: '03', label: 'Primera Atención', sub: 'Diagnóstico e historia', count: 0, color: 'text-slate-800 bg-slate-50 border-slate-200', icon: Stethoscope, value: '$0.00 MXN',
+      details: [['Odontograma:', '0'], ['Expedientes:', `${patients.length}`]] },
+    { n: '04', label: 'Plan Presentado', sub: 'Presupuesto emitido', count: 0, color: 'text-amber-900 bg-amber-100/50 border-amber-300', icon: Receipt, value: '$0.00 MXN',
+      details: [['Por aceptar:', '0']] },
+    { n: '05', label: 'Tx en Curso', sub: 'En tratamiento activo', count: 0, color: 'text-indigo-800 bg-indigo-50 border-indigo-200', icon: Activity, value: 'En proceso',
+      details: [['Gabinete:', '0']] },
+    { n: '06', label: 'Paciente Fiel', sub: 'Control preventivo', count: 0, color: 'text-emerald-800 bg-emerald-50 border-emerald-200', icon: CheckCircle, value: 'Salud óptima',
+      details: [['Semestral:', '0']] },
   ]
 
   const copyMessage = () => {
-    const text = 'Hola Mariana, te compartimos el plan de pagos diferidos para tu tratamiento de alineadores que revisamos en tu última consulta. ¿Te gustaría agendar una llamada de 5 minutos con la Dra. Sofía?'
+    const text = 'Hola, te compartimos el plan de tratamiento y citas disponibles para tu atención odontológica con la Dra. Aura Estudillo. ¿Te gustaría agendar en este momento?'
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
       navigator.clipboard.writeText(text)
       setCopied(true)
@@ -100,15 +102,16 @@ export default function CrmPage() {
             CRM Dental &amp; Fidelización de Pacientes
           </h1>
           <p className="text-xs text-slate-500 max-w-3xl mt-0.5">
-            Gestión del ciclo de vida del paciente, recordatorios de prevención semestral y seguimiento activo de presupuestos.
+            Dra. Aura Estudillo • Céd. Prof. 8492019 | Gestión del ciclo clínico y fidelización preventiva.
           </p>
         </div>
         <button
           type="button"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold shadow-xs transition-colors"
+          onClick={() => setIsRegisterOpen(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold shadow-xs transition-colors cursor-pointer"
         >
           <UserPlus className="w-4 h-4" />
-          + Nuevo Contacto / Paciente
+          + Registrar Paciente (Alta Rápida)
         </button>
       </div>
 
@@ -121,11 +124,11 @@ export default function CrmPage() {
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{k.label}</span>
                 <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-200/70 flex items-center justify-center">
-                  <Icon className={`w-4 h-4 ${k.isError ? 'text-rose-600' : 'text-amber-600'}`} />
+                  <Icon className="w-4 h-4 text-amber-600" />
                 </div>
               </div>
               <div className="mt-3 flex items-baseline gap-2">
-                <span className={`text-3xl font-bold tracking-tight ${k.isError ? 'text-rose-600' : 'text-slate-900'}`}>
+                <span className="text-3xl font-bold tracking-tight text-slate-900">
                   {k.value}
                 </span>
                 {k.delta && (
@@ -136,28 +139,7 @@ export default function CrmPage() {
                 )}
               </div>
               <div className="mt-2.5">
-                {k.progress && (
-                  <div>
-                    <div className="flex justify-between text-[11px] mb-1">
-                      <span className="text-slate-500">{k.note}</span>
-                      <span className="font-bold text-slate-900">{k.progress}%</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-amber-400 rounded-full" style={{ width: `${k.progress}%` }} />
-                    </div>
-                  </div>
-                )}
-                {k.quality && <p className="text-xs font-bold text-amber-700">{k.quality}</p>}
-                {k.note && !k.progress && !k.quality && (
-                  <p className="text-[11px] text-slate-500">{k.note}</p>
-                )}
-                {k.tags && (
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {k.tags.map(t => (
-                      <span key={t} className="bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded text-[10px] text-slate-600">{t}</span>
-                    ))}
-                  </div>
-                )}
+                <p className="text-[11px] text-slate-500">{k.note}</p>
               </div>
             </div>
           )
@@ -216,38 +198,64 @@ export default function CrmPage() {
           </div>
 
           <div className="space-y-3">
-            {trackingPatients.map((p) => {
-              const ActionIcon = p.action.icon
-              return (
-                <div key={p.name} className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/70 hover:bg-slate-50 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="flex items-start gap-3.5">
-                    <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
-                      {p.initials}
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h4 className="text-xs font-bold text-slate-900">{p.name}</h4>
-                        <span className="text-[11px] text-slate-500">{p.age}</span>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">{p.tag}</span>
+            {patients.length === 0 ? (
+              <div className="p-8 rounded-xl bg-slate-50/70 border border-slate-200/70 text-center space-y-2">
+                <Users className="w-8 h-8 text-slate-400 mx-auto" />
+                <p className="text-xs font-bold text-slate-700">No hay pacientes en seguimiento activo</p>
+                <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
+                  La base está lista en blanco. Al registrar pacientes se activará el seguimiento automatizado y los recordatorios.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsRegisterOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400 text-slate-950 text-xs font-bold shadow-xs hover:bg-amber-300 transition-colors"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  + Registrar Primer Paciente
+                </button>
+              </div>
+            ) : (
+              patients.slice(0, 5).map((p) => {
+                const initials = (p.full_name || 'Paciente')
+                  .split(' ')
+                  .map((n: string) => n[0])
+                  .slice(0, 2)
+                  .join('')
+                  .toUpperCase()
+
+                return (
+                  <div key={p.id} className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/70 hover:bg-slate-50 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3.5">
+                      <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                        {initials}
                       </div>
-                      <p className="text-xs text-slate-600">Último contacto: {p.contact}</p>
-                      <p className="text-xs font-semibold text-slate-900">{p.budget}</p>
-                      <div className="flex items-center gap-1.5 text-xs pt-0.5">
-                        <span className="px-1.5 py-0.5 rounded bg-white font-bold text-amber-700 border border-amber-200 text-[10px]">Próxima acción:</span>
-                        <span className="text-slate-700 text-xs">{p.next}</span>
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="text-xs font-bold text-slate-900">{p.full_name}</h4>
+                          <span className="text-[11px] text-slate-500 font-mono">ID: {p.id.slice(0, 8)}</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                            {p.onboarding_completed ? 'Bioseguridad Verificada' : 'Onboarding Pendiente'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600">Teléfono: {p.phone || 'Sin número'}</p>
+                        <p className="text-xs font-semibold text-slate-900">
+                          {p.email ? `Correo: ${p.email}` : 'Sin correo registrado'}
+                        </p>
                       </div>
                     </div>
+                    <a
+                      href={`https://wa.me/${(p.phone || '').replace(/[^0-9]/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-colors shadow-xs shrink-0 bg-emerald-600 text-white hover:bg-emerald-700"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      Contactar WhatsApp
+                    </a>
                   </div>
-                  <button
-                    type="button"
-                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-colors shadow-xs shrink-0 ${p.action.bg}`}
-                  >
-                    <ActionIcon className="w-3.5 h-3.5" />
-                    {p.action.label}
-                  </button>
-                </div>
-              )
-            })}
+                )
+              })
+            )}
           </div>
         </div>
 
@@ -275,32 +283,35 @@ export default function CrmPage() {
           {/* Borrador Generado por IA */}
           <div className="p-4 rounded-xl bg-amber-50/50 border border-amber-200/80 space-y-3">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-amber-900">Para: Mariana Ruíz (Alineadores)</span>
+              <span className="font-bold text-amber-900">Plantilla Oficial: Recordatorio Clínico</span>
               <span className="text-slate-500">Canal: WhatsApp</span>
             </div>
             <p className="p-3 bg-white rounded-xl border border-slate-200/80 text-xs italic text-slate-700 leading-relaxed shadow-2xs">
-              “Hola Mariana, esperamos que estés excelente. Te comparto el esquema de pagos diferidos para tu tratamiento de alineadores que revisamos en tu última consulta. ¿Te gustaría agendar una llamada de 5 minutos con la Dra. Sofía?”
+              “Hola, te saludamos del consultorio de la Dra. Aura Estudillo. Esperamos que te encuentres muy bien. Te compartimos el esquema y citas disponibles para tu atención odontológica. ¿Te gustaría agendar una valoración?”
             </p>
             <div className="flex flex-col gap-2 pt-1">
               <button
                 type="button"
                 onClick={copyMessage}
-                className="w-full py-2 px-3 rounded-xl bg-white border border-slate-200 text-slate-800 text-xs font-bold hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 shadow-2xs"
+                className="w-full py-2 px-3 rounded-xl bg-white border border-slate-200 text-slate-800 text-xs font-bold hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 shadow-2xs cursor-pointer"
               >
                 <Copy className="w-3.5 h-3.5" />
                 {copied ? '¡Copiado al portapapeles!' : 'Copiar Texto'}
-              </button>
-              <button
-                type="button"
-                className="w-full py-2 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold transition-colors flex items-center justify-center gap-2 shadow-xs"
-              >
-                <Send className="w-3.5 h-3.5" />
-                Enviar con Aprobación Médica
               </button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Modal Flotante de Alta Rápida */}
+      <QuickRegisterModal
+        isOpen={isRegisterOpen}
+        onClose={() => setIsRegisterOpen(false)}
+        onPatientCreated={() => {
+          setIsRegisterOpen(false)
+          fetchCrmData()
+        }}
+      />
     </div>
   )
 }

@@ -19,11 +19,13 @@ import {
   Sparkles,
   AlertTriangle,
   UserCheck,
-  RefreshCw
+  RefreshCw,
+  X
 } from 'lucide-react'
 import { useNotificationSound } from '@/hooks/useNotificationSound'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
+import { QuickRegisterModal } from '@/components/clinical/QuickRegisterModal'
 
 type TimeHorizon = 'present' | 'past' | 'future'
 
@@ -49,8 +51,32 @@ export default function CalendarPage() {
   const [doctorFilter, setDoctorFilter] = useState('all')
   const [appointments, setAppointments] = useState<ClinicalAppointment[]>([])
   const [loading, setLoading] = useState(true)
+  const [showNewModal, setShowNewModal] = useState(false)
+  const [showQuickRegister, setShowQuickRegister] = useState(false)
+  const [patientsList, setPatientsList] = useState<any[]>([])
+  const [newPatientId, setNewPatientId] = useState('')
+  const [newTreatment, setNewTreatment] = useState('Consulta Odontológica General')
+  const [newDate, setNewDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [newTime, setNewTime] = useState('10:00')
+  const [newDuration, setNewDuration] = useState('45')
+  const [newNotes, setNewNotes] = useState('')
+  const [savingAppointment, setSavingAppointment] = useState(false)
 
   const supabase = createClient()
+
+  const loadPatients = async () => {
+    try {
+      const { data } = await supabase.from('patients').select('id, full_name, phone').order('full_name')
+      if (data && data.length > 0) {
+        setPatientsList(data)
+        if (!newPatientId) setNewPatientId(data[0].id)
+      } else {
+        setPatientsList([])
+      }
+    } catch (e) {
+      console.warn('Error loading patients for appointment modal:', e)
+    }
+  }
 
   const fetchAppointments = async () => {
     setLoading(true)
@@ -141,6 +167,46 @@ export default function CalendarPage() {
     }
   }
 
+  const handleOpenNewAppointment = () => {
+    loadPatients()
+    setShowNewModal(true)
+  }
+
+  const handleSaveAppointment = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newPatientId) {
+      alert('Debes seleccionar o registrar un paciente primero.')
+      return
+    }
+
+    setSavingAppointment(true)
+    try {
+      const startDateTime = new Date(`${newDate}T${newTime}:00`)
+      const endDateTime = new Date(startDateTime.getTime() + parseInt(newDuration, 10) * 60000)
+
+      const { error } = await supabase.from('appointments').insert({
+        patient_id: newPatientId,
+        treatment_type: newTreatment,
+        start_time: startDateTime.toISOString(),
+        end_time: endDateTime.toISOString(),
+        status: 'scheduled',
+        notes: newNotes.trim() || 'Cita generada en consultorio',
+      })
+
+      if (error) throw error
+
+      playTone('message')
+      setShowNewModal(false)
+      setNewNotes('')
+      fetchAppointments()
+    } catch (err: any) {
+      console.error('Error al agendar cita:', err)
+      alert(err?.message || 'Error al agendar cita')
+    } finally {
+      setSavingAppointment(false)
+    }
+  }
+
   return (
     <div className="flex flex-col w-full space-y-6 pb-12">
       {/* Header */}
@@ -180,13 +246,14 @@ export default function CalendarPage() {
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
 
-          <Link
-            href="/dashboard/agenda"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold shadow-xs transition-colors"
+          <button
+            type="button"
+            onClick={handleOpenNewAppointment}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold shadow-xs transition-colors cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             + Nueva Cita
-          </Link>
+          </button>
         </div>
       </div>
 
@@ -311,6 +378,149 @@ export default function CalendarPage() {
           ))
         )}
       </div>
+
+      {/* Modal Flotante de Agendar Cita */}
+      {showNewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          <div
+            onClick={() => setShowNewModal(false)}
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-md transition-opacity"
+          />
+          <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 sm:p-8 text-slate-900 z-10 animate-in zoom-in-95">
+            <button
+              onClick={() => setShowNewModal(false)}
+              className="absolute top-5 right-5 p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2 mb-1">
+              <Calendar className="w-5 h-5 text-amber-600" />
+              <h2 className="text-lg font-bold text-[#202D4C]">Agendar Nueva Cita</h2>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">Dra. Aura Estudillo • Gabinete Dental Principal</p>
+
+            <form onSubmit={handleSaveAppointment} className="space-y-4 text-xs">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold uppercase text-slate-600">Paciente</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickRegister(true)}
+                    className="text-[11px] font-bold text-amber-600 hover:underline"
+                  >
+                    + Alta Rápida de Paciente
+                  </button>
+                </div>
+                {patientsList.length === 0 ? (
+                  <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-xs flex items-center justify-between">
+                    <span>No hay pacientes registrados aún.</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowQuickRegister(true)}
+                      className="px-2.5 py-1 bg-amber-400 text-slate-950 rounded-lg font-bold text-[11px]"
+                    >
+                      Registrar Ahora
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value={newPatientId}
+                    onChange={(e) => setNewPatientId(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900"
+                  >
+                    {patientsList.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.full_name} {p.phone ? `(${p.phone})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Tipo de Tratamiento</label>
+                <input
+                  type="text"
+                  required
+                  value={newTreatment}
+                  onChange={(e) => setNewTreatment(e.target.value)}
+                  placeholder="Ej. Profilaxis, Ortodoncia, Resina, Valoración..."
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Fecha</label>
+                  <input
+                    type="date"
+                    required
+                    value={newDate}
+                    onChange={(e) => setNewDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Hora</label>
+                  <input
+                    type="time"
+                    required
+                    value={newTime}
+                    onChange={(e) => setNewTime(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Duración</label>
+                  <select
+                    value={newDuration}
+                    onChange={(e) => setNewDuration(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900"
+                  >
+                    <option value="30">30 min</option>
+                    <option value="45">45 min</option>
+                    <option value="60">60 min</option>
+                    <option value="90">90 min</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Notas Clínicas / Motivo</label>
+                <input
+                  type="text"
+                  value={newNotes}
+                  onChange={(e) => setNewNotes(e.target.value)}
+                  placeholder="Ej. Primera cita, molestia en molar, revisión..."
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900"
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={savingAppointment || !newPatientId}
+                  className="w-full py-2.5 bg-amber-400 hover:bg-amber-300 disabled:opacity-50 text-slate-950 font-bold rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {savingAppointment ? 'Guardando en agenda...' : 'Confirmar y Guardar Cita'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Rápido de Registro de Pacientes si no hay ninguno */}
+      <QuickRegisterModal
+        isOpen={showQuickRegister}
+        onClose={() => setShowQuickRegister(false)}
+        onPatientCreated={() => {
+          setShowQuickRegister(false)
+          loadPatients()
+        }}
+      />
     </div>
   )
 }

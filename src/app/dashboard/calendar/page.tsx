@@ -68,7 +68,7 @@ export default function CalendarPage() {
   const [modalSlot, setModalSlot] = useState({ date: '2026-10-10', time: '12:00' })
   const [newTitle, setNewTitle] = useState('')
   const [newPatient, setNewPatient] = useState('')
-  const [newDoctor, setNewDoctor] = useState('Dra. Sofía Valero')
+  const [newDoctor, setNewDoctor] = useState('Dra. Aura Estudillo')
   const [newChair, setNewChair] = useState('Gabinete 1 (Principal)')
   const [isFamilyBatch, setIsFamilyBatch] = useState(false)
 
@@ -89,8 +89,8 @@ export default function CalendarPage() {
   // Abrir modal de creación al hacer clic en un slot
   const handleSlotClick = (date: string, time: string) => {
     setModalSlot({ date, time })
-    setNewTitle('Consulta de Valoración')
-    setNewPatient('Mateo Morales Ruiz')
+    setNewTitle('')
+    setNewPatient('')
     setShowQuickCreateModal(true)
   }
 

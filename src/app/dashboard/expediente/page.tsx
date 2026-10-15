@@ -23,12 +23,14 @@ import { FamilyNucleusManager } from '@/components/clinical/FamilyNucleusManager
 import { MedicalQuestionnaire } from '@/components/clinical/MedicalQuestionnaire'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
+import { QuickRegisterModal } from '@/components/clinical/QuickRegisterModal'
 
 export default function ExpedientePage() {
   const supabase = createClient()
   const [patients, setPatients] = useState<any[]>([])
   const [selectedPatient, setSelectedPatient] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [isRegisterOpen, setIsRegisterOpen] = useState(false)
 
   // Modal para editar ficha
   const [isEditing, setIsEditing] = useState(false)
@@ -152,13 +154,14 @@ export default function ExpedientePage() {
             <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">Expediente Clínico</h1>
             <p className="text-xs text-slate-500 mt-0.5">Dra. Aura Estudillo • Céd. Prof. 8492019</p>
           </div>
-          <Link
-            href="/onboarding"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold shadow-xs transition-colors"
+          <button
+            type="button"
+            onClick={() => setIsRegisterOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold shadow-xs transition-colors cursor-pointer"
           >
             <UserPlus className="w-4 h-4" />
-            + Registrar Primer Paciente
-          </Link>
+            + Registrar Paciente (Alta Rápida)
+          </button>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center shadow-xs space-y-3">
@@ -167,9 +170,28 @@ export default function ExpedientePage() {
           </div>
           <h2 className="text-base font-bold text-slate-900">Base de Expedientes Lista y en Blanco</h2>
           <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-            No hay ningún paciente registrado todavía. Al dar de alta un paciente desde la recepción o cuando completen su onboarding post-login, se desplegará su ficha médica, odontograma interactivo y cuestionario de salud.
+            No hay ningún paciente registrado todavía. Al dar de alta un paciente con el botón superior o cuando completen su onboarding post-login, se desplegará su ficha médica, odontograma interactivo y cuestionario de salud.
           </p>
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => setIsRegisterOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors shadow-xs cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4 text-amber-400" />
+              Dar de alta primer paciente ahora
+            </button>
+          </div>
         </div>
+
+        <QuickRegisterModal
+          isOpen={isRegisterOpen}
+          onClose={() => setIsRegisterOpen(false)}
+          onPatientCreated={() => {
+            setIsRegisterOpen(false)
+            fetchPatients()
+          }}
+        />
       </div>
     )
   }

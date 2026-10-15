@@ -29,80 +29,7 @@ export default function InventarioPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
 
-  const items: InventoryItem[] = [
-    {
-      id: '1',
-      code: 'INS-001',
-      name: 'Anestésico Mepivacaína 3% con Epinefrina',
-      category: 'Anestésicos & Farmacia',
-      stock: 45,
-      minStock: 20,
-      unit: 'Cárpules',
-      supplier: 'Depósito Dental Odontomex',
-      lastRestock: '02/Oct/2026',
-      status: 'optimal',
-    },
-    {
-      id: '2',
-      code: 'INS-002',
-      name: 'Resina Compuesta Nanohíbrida A2 (Jeringa 4g)',
-      category: 'Operatoria & Estética',
-      stock: 3,
-      minStock: 5,
-      unit: 'Jeringas',
-      supplier: '3M Dental Distribuidor',
-      lastRestock: '15/Sep/2026',
-      status: 'low',
-    },
-    {
-      id: '3',
-      code: 'INS-003',
-      name: 'Campos Quirúrgicos Estériles Descartables',
-      category: 'Bioseguridad',
-      stock: 120,
-      minStock: 50,
-      unit: 'Unidades',
-      supplier: 'BioClean Dental',
-      lastRestock: '05/Oct/2026',
-      status: 'optimal',
-    },
-    {
-      id: '4',
-      code: 'INS-004',
-      name: 'Limas Rotatorias NiTi Conicidad ProTaper Gold',
-      category: 'Endodoncia',
-      stock: 2,
-      minStock: 4,
-      unit: 'Blisters (6pz)',
-      supplier: 'Dentsply Sirona México',
-      lastRestock: '20/Ago/2026',
-      status: 'critical',
-    },
-    {
-      id: '5',
-      code: 'INS-005',
-      name: 'Guantes de Nitrilo Morado Talla M (Caja 100pz)',
-      category: 'Bioseguridad',
-      stock: 8,
-      minStock: 6,
-      unit: 'Cajas',
-      supplier: 'BioClean Dental',
-      lastRestock: '28/Sep/2026',
-      status: 'optimal',
-    },
-    {
-      id: '6',
-      code: 'INS-006',
-      name: 'Gel Grabador Ácido Fosfórico al 37%',
-      category: 'Operatoria & Estética',
-      stock: 4,
-      minStock: 3,
-      unit: 'Jeringas',
-      supplier: 'Ivoclar Vivadent',
-      lastRestock: '10/Sep/2026',
-      status: 'optimal',
-    },
-  ]
+  const [items, setItems] = useState<InventoryItem[]>([])
 
   const categories = ['all', 'Anestésicos & Farmacia', 'Operatoria & Estética', 'Bioseguridad', 'Endodoncia']
 
@@ -149,7 +76,7 @@ export default function InventarioPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-xl">
-            4
+            {items.filter(i => i.status === 'optimal').length}
           </div>
           <div>
             <span className="text-xs font-bold text-slate-900 block">Insumos en Nivel Óptimo</span>
@@ -159,21 +86,21 @@ export default function InventarioPage() {
 
         <div className="bg-white p-5 rounded-2xl border border-amber-200 bg-amber-50/20 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xl">
-            1
+            {items.filter(i => i.status === 'low').length}
           </div>
           <div>
             <span className="text-xs font-bold text-amber-900 block">Stock Cercano al Mínimo</span>
-            <span className="text-[11px] text-amber-700">Resina Compuesta A2 por reponer</span>
+            <span className="text-[11px] text-amber-700">Insumos por reponer</span>
           </div>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-rose-200 bg-rose-50/20 shadow-sm flex items-center gap-4">
           <div className="w-12 h-12 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold text-xl">
-            1
+            {items.filter(i => i.status === 'critical').length}
           </div>
           <div>
             <span className="text-xs font-bold text-rose-900 block">Alerta Crítica</span>
-            <span className="text-[11px] text-rose-700">Limas rotatorias NiTi agotándose</span>
+            <span className="text-[11px] text-rose-700">Insumos agotados</span>
           </div>
         </div>
       </div>
@@ -198,48 +125,58 @@ export default function InventarioPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              <tr>
-                <th className="px-6 py-3.5">Código / Insumo</th>
-                <th className="px-6 py-3.5">Categoría</th>
-                <th className="px-6 py-3.5">Stock Actual</th>
-                <th className="px-6 py-3.5">Mínimo</th>
-                <th className="px-6 py-3.5">Proveedor</th>
-                <th className="px-6 py-3.5 text-right">Estatus</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-xs">
-              {filtered.map((item) => (
-                <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
-                  <td className="px-6 py-4">
-                    <span className="font-mono text-[11px] font-bold text-slate-500 block">{item.code}</span>
-                    <span className="font-bold text-slate-900 block text-xs">{item.name}</span>
-                  </td>
-                  <td className="px-6 py-4 text-slate-600">{item.category}</td>
-                  <td className="px-6 py-4">
-                    <span className="font-bold text-slate-900 text-sm">{item.stock}</span>{' '}
-                    <span className="text-[11px] text-slate-500">{item.unit}</span>
-                  </td>
-                  <td className="px-6 py-4 text-slate-500 font-medium">{item.minStock} {item.unit}</td>
-                  <td className="px-6 py-4 text-slate-600">{item.supplier}</td>
-                  <td className="px-6 py-4 text-right">
-                    <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                      item.status === 'optimal'
-                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                        : item.status === 'low'
-                        ? 'bg-amber-100 text-amber-900 border-amber-200'
-                        : 'bg-rose-100 text-rose-900 border-rose-200 animate-pulse'
-                    }`}>
-                      {item.status === 'optimal' ? 'Óptimo' : item.status === 'low' ? 'Bajo' : 'Crítico'}
-                    </span>
-                  </td>
+        {filtered.length === 0 ? (
+          <div className="p-12 text-center space-y-3">
+            <Package className="w-10 h-10 text-slate-300 mx-auto" />
+            <h3 className="text-sm font-bold text-slate-800">No hay insumos registrados en el inventario</h3>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              El catálogo de insumos y materiales dentales está limpio y listo para registrar productos con sus niveles mínimos de bioseguridad.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <tr>
+                  <th className="px-6 py-3.5">Código / Insumo</th>
+                  <th className="px-6 py-3.5">Categoría</th>
+                  <th className="px-6 py-3.5">Stock Actual</th>
+                  <th className="px-6 py-3.5">Mínimo</th>
+                  <th className="px-6 py-3.5">Proveedor</th>
+                  <th className="px-6 py-3.5 text-right">Estatus</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-xs">
+                {filtered.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="px-6 py-4">
+                      <span className="font-mono text-[11px] font-bold text-slate-500 block">{item.code}</span>
+                      <span className="font-bold text-slate-900 block text-xs">{item.name}</span>
+                    </td>
+                    <td className="px-6 py-4 text-slate-600">{item.category}</td>
+                    <td className="px-6 py-4">
+                      <span className="font-bold text-slate-900 text-sm">{item.stock}</span>{' '}
+                      <span className="text-[11px] text-slate-500">{item.unit}</span>
+                    </td>
+                    <td className="px-6 py-4 text-slate-500 font-medium">{item.minStock} {item.unit}</td>
+                    <td className="px-6 py-4 text-slate-600">{item.supplier}</td>
+                    <td className="px-6 py-4 text-right">
+                      <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                        item.status === 'optimal'
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                          : item.status === 'low'
+                          ? 'bg-amber-100 text-amber-900 border-amber-200'
+                          : 'bg-rose-100 text-rose-900 border-rose-200 animate-pulse'
+                      }`}>
+                        {item.status === 'optimal' ? 'Óptimo' : item.status === 'low' ? 'Bajo' : 'Crítico'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )

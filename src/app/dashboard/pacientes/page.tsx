@@ -16,12 +16,14 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
+import { QuickRegisterModal } from '@/components/clinical/QuickRegisterModal'
 
 export default function PacientesPage() {
   const [patients, setPatients] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [isRegisterOpen, setIsRegisterOpen] = useState(false)
   const supabase = createClient()
 
   const fetchPatients = async () => {
@@ -97,13 +99,14 @@ export default function PacientesPage() {
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
-          <Link
-            href="/onboarding"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold shadow-xs transition-colors"
+          <button
+            type="button"
+            onClick={() => setIsRegisterOpen(true)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold shadow-xs transition-colors cursor-pointer"
           >
             <UserPlus className="w-4 h-4" />
-            + Registrar Paciente
-          </Link>
+            + Registrar Paciente (Alta Rápida)
+          </button>
         </div>
       </div>
 
@@ -144,15 +147,16 @@ export default function PacientesPage() {
           </div>
           <h3 className="text-sm font-bold text-slate-800">No hay pacientes registrados</h3>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            La base de datos está completamente limpia y lista para producción. Los nuevos pacientes aparecerán aquí en cuanto inicien sesión o completen su bioseguridad en el portal.
+            La base de datos está completamente limpia y lista para producción. Los nuevos pacientes aparecerán aquí en cuanto registres un paciente o completen su bioseguridad en el portal.
           </p>
-          <Link
-            href="/onboarding"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#202D4C] text-white text-xs font-bold hover:bg-[#162139] transition-colors"
+          <button
+            type="button"
+            onClick={() => setIsRegisterOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold transition-colors cursor-pointer shadow-xs"
           >
             <UserPlus className="w-4 h-4" />
-            Dar de alta primer paciente
-          </Link>
+            + Registrar Primer Paciente (Alta Rápida)
+          </button>
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
@@ -251,6 +255,15 @@ export default function PacientesPage() {
           </div>
         </div>
       )}
+      {/* Modal Flotante de Alta Rápida de Pacientes */}
+      <QuickRegisterModal
+        isOpen={isRegisterOpen}
+        onClose={() => setIsRegisterOpen(false)}
+        onPatientCreated={() => {
+          setIsRegisterOpen(false)
+          fetchPatients()
+        }}
+      />
     </div>
   )
 }

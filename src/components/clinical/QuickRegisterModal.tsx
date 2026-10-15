@@ -17,9 +17,10 @@ interface QuickRegisterModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess?: (patient: any) => void
+  onPatientCreated?: () => void
 }
 
-export function QuickRegisterModal({ isOpen, onClose, onSuccess }: QuickRegisterModalProps) {
+export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreated }: QuickRegisterModalProps) {
   const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
@@ -72,6 +73,7 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess }: QuickRegister
       if (error) throw error
 
       if (onSuccess) onSuccess(data)
+      if (onPatientCreated) onPatientCreated()
       onClose()
     } catch (err: any) {
       console.error('Error al registrar paciente rápido:', err)
