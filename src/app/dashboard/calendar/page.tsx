@@ -40,7 +40,7 @@ interface CalendarAppointment {
 }
 
 const DOCTORS = [
-  { id: 'doc-1', name: 'Dra. Sofía Valero', specialty: 'Odontología Integral', color: 'border-l-amber-500 bg-amber-50 text-amber-950' },
+  { id: 'doc-1', name: 'Dra. Aura Estudillo', specialty: 'Dirección Médica & Especialista', color: 'border-l-amber-500 bg-amber-50 text-amber-950' },
   { id: 'doc-2', name: 'Dr. Ramírez López', specialty: 'Ortodoncia & Alineadores', color: 'border-l-blue-500 bg-blue-50 text-blue-950' },
   { id: 'doc-3', name: 'Dr. Cortés', specialty: 'Endodoncia Mecanizada', color: 'border-l-emerald-500 bg-emerald-50 text-emerald-950' },
   { id: 'doc-4', name: 'Dra. Gutiérrez', specialty: 'Cirugía & Implantología', color: 'border-l-purple-500 bg-purple-50 text-purple-950' },
@@ -53,78 +53,7 @@ const HOURS = [
   '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'
 ]
 
-const INITIAL_APPOINTMENTS: CalendarAppointment[] = [
-  {
-    id: 'apt-1',
-    title: 'Profilaxis Profunda & Detartraje',
-    patientName: 'Laura Patricia Vega',
-    doctor: 'Dra. Sofía Valero',
-    chair: 'Gabinete 1 (Principal)',
-    specialty: 'Odontología Integral',
-    date: '2026-10-10',
-    startTime: '09:00',
-    endTime: '09:45',
-    durationMin: 45,
-    status: 'completed',
-    color: 'bg-emerald-100 text-emerald-900 border-l-4 border-emerald-500',
-  },
-  {
-    id: 'apt-2',
-    title: 'Biopulpectomía Pza 16 (Instrumentación rotatoria)',
-    patientName: 'Mateo Morales Ruiz',
-    doctor: 'Dr. Cortés',
-    chair: 'Gabinete 1 (Principal)',
-    specialty: 'Endodoncia Mecanizada',
-    date: '2026-10-10',
-    startTime: '10:00',
-    endTime: '11:15',
-    durationMin: 75,
-    status: 'in_chair',
-    color: 'bg-amber-100 text-amber-950 border-l-4 border-amber-500 ring-2 ring-amber-400/50',
-  },
-  {
-    id: 'apt-3',
-    title: 'Control Mensual Brackets / Cambio NiTi',
-    patientName: 'Daniela Montes',
-    doctor: 'Dr. Ramírez López',
-    chair: 'Gabinete 2',
-    specialty: 'Ortodoncia & Alineadores',
-    date: '2026-10-10',
-    startTime: '11:30',
-    endTime: '12:15',
-    durationMin: 45,
-    status: 'in_waiting',
-    color: 'bg-blue-100 text-blue-900 border-l-4 border-blue-500',
-  },
-  {
-    id: 'apt-4',
-    title: 'Diagnóstico Clínico Integral y Plan Dental',
-    patientName: 'Jorge Luis Rivas',
-    doctor: 'Dra. Sofía Valero',
-    chair: 'Gabinete 1 (Principal)',
-    specialty: 'Odontología Integral',
-    date: '2026-10-10',
-    startTime: '13:00',
-    endTime: '13:45',
-    durationMin: 45,
-    status: 'confirmed',
-    color: 'bg-slate-100 text-slate-900 border-l-4 border-slate-500',
-  },
-  {
-    id: 'apt-5',
-    title: 'Fase Quirúrgica Implante Pza 36',
-    patientName: 'Roberto Garza',
-    doctor: 'Dra. Gutiérrez',
-    chair: 'Quirófano Quirúrgico',
-    specialty: 'Cirugía & Implantología',
-    date: '2026-10-10',
-    startTime: '16:00',
-    endTime: '17:30',
-    durationMin: 90,
-    status: 'confirmed',
-    color: 'bg-purple-100 text-purple-950 border-l-4 border-purple-500',
-  },
-]
+const INITIAL_APPOINTMENTS: CalendarAppointment[] = []
 
 export default function CalendarPage() {
   const { soundEnabled, setSoundEnabled, playTone } = useNotificationSound()
