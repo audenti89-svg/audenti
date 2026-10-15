@@ -383,10 +383,10 @@ export default function LandingPage() {
       {/* ======================================================== */}
       {/* 1. NAVBAR MINIMALISTA FLOTANTE */}
       {/* ======================================================== */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-[#F6F6F6]/85 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-8 lg:px-12 py-3.5 transition-all">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link href="/" className="hover:opacity-90 transition-opacity">
-            <AudentiLogo size={38} doctorName="Dra. Aura Estudillo" />
+      <header className="fixed top-0 left-0 right-0 z-50 bg-[#F6F6F6]/90 backdrop-blur-md border-b border-slate-200/80 px-3 sm:px-8 lg:px-12 py-2.5 sm:py-3.5 transition-all">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
+          <Link href="/" className="hover:opacity-90 transition-opacity shrink-0">
+            <AudentiLogo size={32} doctorName="Dra. Aura Estudillo" />
           </Link>
 
           {/* Menú Desktop */}
@@ -398,28 +398,28 @@ export default function LandingPage() {
             <a href="#contacto" className="hover:text-slate-900 transition-colors">Ubicación</a>
           </nav>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             <button
               onClick={() => openAuth('login')}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-slate-300 hover:border-slate-900 bg-white text-xs font-bold text-slate-800 transition-all shadow-2xs cursor-pointer"
+              className="inline-flex items-center gap-1 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full border border-slate-300 hover:border-slate-900 bg-white text-[11px] sm:text-xs font-bold text-slate-800 transition-all shadow-2xs cursor-pointer whitespace-nowrap"
             >
-              <Lock className="w-3.5 h-3.5 text-amber-500" />
-              Acceso Clínico
+              <Lock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-500" />
+              <span>Acceso Clínico</span>
             </button>
             <a
               href="#reservar"
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-slate-900 hover:bg-slate-800 text-xs font-bold text-white transition-all shadow-xs"
+              className="inline-flex items-center gap-1 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-slate-900 hover:bg-slate-800 text-[11px] sm:text-xs font-bold text-white transition-all shadow-xs whitespace-nowrap"
             >
-              Agendar Cita
-              <ArrowRight className="w-3.5 h-3.5 text-amber-400" />
+              <span>Agendar</span>
+              <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400 hidden xs:inline" />
             </a>
-            {/* Botón Móvil */}
+            {/* Botón Menú Móvil */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-xl text-slate-700 hover:bg-slate-200 transition-colors"
+              className="md:hidden p-1.5 sm:p-2 rounded-xl text-slate-700 hover:bg-slate-200 transition-colors"
               aria-label="Abrir menú"
             >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              {mobileMenuOpen ? <X className="w-4 h-4 sm:w-5 sm:h-5" /> : <Menu className="w-4 h-4 sm:w-5 sm:h-5" />}
             </button>
           </div>
         </div>
@@ -483,11 +483,11 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Micro-indicador del consumo alimenticio dinámico */}
+        {/* Indicador Único y Limpio del consumo alimenticio dinámico */}
         {splitPercent > 5 && (
-          <div className="absolute top-20 sm:top-24 left-1/2 -translate-x-1/2 z-30 pointer-events-none transition-opacity duration-300">
-            <span className="px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-amber-950/90 text-amber-300 backdrop-blur-md border border-amber-500/40 shadow-lg">
-              🍽️ Placa &amp; Pigmentación ({Math.round(splitPercent)}%)
+          <div className="absolute top-16 sm:top-24 left-1/2 -translate-x-1/2 z-30 pointer-events-none transition-opacity duration-300">
+            <span className="px-3.5 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-amber-950/90 text-amber-300 backdrop-blur-md border border-amber-500/40 shadow-lg whitespace-nowrap">
+              🍽️ PLACA &amp; PIGMENTACIÓN — NIVEL ACTIVO {Math.round(splitPercent)}%
             </span>
           </div>
         )}
@@ -548,73 +548,91 @@ export default function LandingPage() {
         {/* ======================================================== */}
         {/* ESTRUCTURA MÓVIL SECUENCIAL Y FLUIDA (block md:hidden) */}
         {/* ======================================================== */}
-        <div className="md:hidden relative z-20 px-5 flex flex-col gap-6 w-full max-w-lg mx-auto">
+        <div className="md:hidden relative z-20 px-4 flex flex-col gap-5 w-full max-w-lg mx-auto">
           {/* 1° Titular y Descripción */}
-          <div className="text-center space-y-2.5">
+          <div className="text-center space-y-2">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-amber-300 text-[10px] font-bold uppercase tracking-wider">
               <Sparkles className="w-3 h-3 text-amber-400" />
               Lumen Clinical Aesthetics • Audenti Pro
             </div>
-            <h1 className="text-3xl font-black text-white tracking-tight leading-tight font-hanken">
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight font-hanken">
               La arquitectura de tu mejor sonrisa.
             </h1>
-            <p className="text-xs text-slate-300 leading-relaxed max-w-sm mx-auto">
+            <p className="text-xs text-slate-300 leading-relaxed max-w-xs mx-auto">
               Odontología de alta precisión, biocompatibilidad suiza y escaneo 3D con la Dra. Aura Estudillo (Céd. Prof. 8492019).
             </p>
           </div>
 
           {/* 2° Botones de Acción */}
-          <div className="flex items-center justify-center gap-2.5">
+          <div className="flex items-center justify-center gap-2">
             <a
               href="#reservar"
-              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shadow-lg transition-all active:scale-95"
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shadow-lg transition-all active:scale-95"
             >
               Reservar Cita
               <ArrowRight className="w-3.5 h-3.5" />
             </a>
             <a
               href="#about"
-              className="inline-flex items-center justify-center px-4 py-2.5 rounded-full bg-white/15 hover:bg-white/25 text-white text-xs font-bold border border-white/20 backdrop-blur-md transition-all"
+              className="inline-flex items-center justify-center px-3.5 py-2 rounded-full bg-white/15 hover:bg-white/25 text-white text-xs font-bold border border-white/20 backdrop-blur-md transition-all"
             >
               Conocer Estudio
             </a>
           </div>
 
-          {/* 3° Área del Modelo Dental Interactivo (Completamente visible) */}
-          <div className="relative w-full aspect-4/3 rounded-3xl overflow-hidden border border-white/15 shadow-2xl bg-slate-900/60 my-1">
-            {/* Capa After */}
-            <div className="absolute inset-0 w-full h-full">
+          {/* 3° Área del Modelo Dental Interactivo (+40% más grande, con comida Veo 3 integrada) */}
+          <div className="relative w-full h-[330px] rounded-3xl overflow-hidden border border-white/20 shadow-2xl bg-slate-950 my-1">
+            {/* Fondo de Comida Veo 3 dentro de la tarjeta móvil con opacidad suave */}
+            <div 
+              className="absolute inset-0 pointer-events-none z-10 overflow-hidden transition-all duration-300 ease-out"
+              style={{
+                opacity: Math.max(0.12, 0.50 - (splitPercent / 100) * 0.40),
+                filter: `blur(${(splitPercent / 100) * 1.5}px)`,
+              }}
+            >
+              <img
+                src={ASSETS.floatingFood}
+                alt="Alimentos pigmentantes flotantes"
+                className="w-full h-full object-cover object-center mix-blend-screen select-none"
+              />
+            </div>
+
+            {/* Capa After (Dientes Blancos - Tamaño Ampliado 40%) */}
+            <div className="absolute inset-0 w-full h-full overflow-hidden">
               <img
                 src={ASSETS.after}
                 alt="Dientes blancos después"
-                className="w-full h-full object-cover object-center pointer-events-none"
+                className="w-full h-full object-cover object-center scale-110 pointer-events-none"
               />
+              <div className="absolute inset-0 bg-linear-to-t from-slate-950/60 via-transparent to-slate-950/20 pointer-events-none" />
             </div>
-            {/* Capa Before interactiva */}
+
+            {/* Capa Before interactiva (Dientes Manchados) */}
             <div
               className="absolute inset-y-0 left-0 overflow-hidden transition-[width] duration-75 ease-out"
               style={{ width: `${splitPercent}%` }}
             >
               <div
                 className="relative h-full"
-                style={{ width: heroRef.current ? `${heroRef.current.clientWidth - 40}px` : '90vw' }}
+                style={{ width: heroRef.current ? `${heroRef.current.clientWidth - 32}px` : '92vw' }}
               >
                 <img
                   src={ASSETS.before}
                   alt="Dientes manchados antes"
-                  className="w-full h-full object-cover object-center pointer-events-none"
+                  className="w-full h-full object-cover object-center scale-110 pointer-events-none"
                 />
+                <div className="absolute inset-0 bg-linear-to-t from-slate-950/70 via-transparent to-slate-950/30 pointer-events-none" />
               </div>
             </div>
 
             {/* Badges de fase en móvil */}
-            <div className="absolute top-2.5 left-2.5 z-20 pointer-events-none">
-              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-slate-950/80 text-slate-300 border border-white/10">
+            <div className="absolute top-3 left-3 z-20 pointer-events-none">
+              <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-950/85 text-slate-200 border border-white/20 shadow-md">
                 Antes
               </span>
             </div>
-            <div className="absolute top-2.5 right-2.5 z-20 pointer-events-none">
-              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-amber-400 text-slate-950 font-black border border-amber-300">
+            <div className="absolute top-3 right-3 z-20 pointer-events-none">
+              <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 border border-amber-300 shadow-md">
                 Después
               </span>
             </div>
