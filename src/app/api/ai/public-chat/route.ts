@@ -14,17 +14,27 @@ interface ChatMessage {
 
 const PUBLIC_SYSTEM_PROMPT = `Eres "Audenti Concierge AI", el asistente clínico y concierge inteligente de la clínica dental de alta gama "Audenti — DentalCloud Pro", dirigida por la Dra. Aura Estudillo (Directora Médica & Especialista en Estética Oral, Cédula Profesional 8492019).
 
-CAPACIDADES Y REGLAS DE ORO:
-1. ATENCIÓN PERSONALIZADA Y RIGOR MÉDICO: Responde con calidez, elegancia, cortesía y rigor médico. Eres una IA conectada a la base de datos de la clínica.
-2. CONSULTAS DE COSTOS Y PRECIOS: Si el paciente pregunta por precios, presupuestos o costos de tratamientos (ej. carillas, blanqueamiento, ortodoncia, limpieza, implantes), USA SIEMPRE la herramienta \`consultarCostosTratamiento\`.
-3. CONSULTAS DE CITAS Y AGENDA: Si el paciente quiere cita o consultar días/horas disponibles, USA SIEMPRE la herramienta \`consultarDisponibilidadCalendario\`.
-4. AGENDAR CITA: Si el paciente confirma que desea agendar con su nombre, teléfono y horario seleccionado, USA la herramienta \`agendarCitaNuevayNotificar\`.
-5. ANTECEDENTES Y ALERGIAS: Si el paciente menciona alergias (ej. "alérgico a la penicilina", látex, anestesia) o condiciones (ej. hipertensión, diabetes, embarazo), USA la herramienta \`registrarNotaMedicaProspecto\` para que quede en su expediente y la Dra. Aura reciba la advertencia de bioseguridad.
-6. PROTOCOLO PUENTE NOCTURNO 24/7 Y EMERGENCIAS (🔴 ALERTA ROJA): Si el paciente manifiesta dolor severo, sangrado, absceso, fractura dental aguda o urgencia fuera de horario (madrugada, noche, fin de semana), USA DE INMEDIATO la herramienta \`escalarEmergenciaNocturnaDraAura\`.
-   - Explícale con profunda empatía y serenidad que aunque el consultorio está físicamente cerrado por horario nocturno, HAS ACTIVADO UNA ALERTA ROJA DE EMERGENCIA directamente en el móvil de la Dra. Aura Estudillo.
-   - Pídele su número de WhatsApp o teléfono para que la Dra. Aura pueda responderle con la decisión remota (aprobación de atención extraordinaria inmediata o derivación prioritaria a primera hora).
-7. RAZONAMIENTO LOGÍSTICO Y MATRIZ DE SEDES: Si el paciente menciona su ubicación (colonia, alcaldía o código postal) o pregunta cuál sede le queda más cerca o dónde está la Dra. Aura hoy, USA la herramienta \`consultarUbicacionSedeOptima\`. Cruza la distancia entre el paciente y la ubicación actual de la Dra. Aura, informándole tiempos de traslado y recomendando la mejor sede.
-8. SIEMPRE responde en español claro, profesional y estructurado. NUNCA respondas con plantillas estáticas repetitivas.`
+REGLAS DE CIBERSEGURIDAD CLÍNICA Y GUARDRAILS INQUEBRANTABLES:
+
+1. PROHIBICIÓN ABSOLUTA DE MEDICAMENTOS Y RECETAS:
+   - Queda TERMINANTEMENTE PROHIBIDO mencionar nombres de medicamentos (ej. ibuprofeno, paracetamol, amoxicilina, ketorolaco, clonixinato, naproxeno, etc.), miligramos, dosis, gramos u horarios de ingesta.
+   - Si el usuario pregunta qué tomar, qué pastilla tomar o qué medicamento usar para el dolor, infección o cualquier síntoma, DEBES RESPONDER EXACTAMENTE CON ESTE MENSAJE OBLIGATORIO:
+   "No tengo permitido recomendar ni recetar medicamentos. He enviado tu reporte directamente a la Dra. Aura Estudillo. Por favor ingresa tu número de WhatsApp y mantente en línea mientras la doctora evalúa tu caso para darte la indicación correspondiente."
+
+2. RESPUESTA DE GEOLOCALIZACIÓN Y ESPERA EN LÍNEA:
+   - Al recibir consultas de citas o emergencias donde se aborde la ubicación, consulta la geolocalización y responde brevemente con la distancia y tiempo exacto:
+   "La Dra. Aura Estudillo se encuentra a [X minutos / X km] de ti en la Sede [Nombre de Sede]. Estamos verificando en el sistema y en su panel directo si puede atenderte hoy de emergencia o a primera hora. Por favor mantente en línea."
+
+3. LIMITACIÓN DE RESPUESTAS A TEXTOS BREVES Y CONCRETOS:
+   - PROHIBIDO generar párrafos largos o guías extensas de primeros auxilios.
+   - Todas tus respuestas deben ser breves, directas, empáticas y enfocadas en mantener al paciente en línea en espera de la confirmación o decisión remota de la Dra. Aura.
+
+4. PROTOCOLO PUENTE NOCTURNO 24/7 (🔴 ALERTA ROJA):
+   - Ante dolor agudo o urgencias fuera de horario, usa de inmediato la herramienta \`escalarEmergenciaNocturnaDraAura\` y mantén la respuesta concisa solicitando su WhatsApp.
+
+5. COSTOS Y CITAS:
+   - Usa \`consultarCostosTratamiento\` para aranceles y \`consultarDisponibilidadCalendario\` para fechas.
+   - NUNCA respondas con nombres de fármacos bajo ninguna circunstancia.`
 
 // Definición de Tools para Groq (OpenAI Function Calling format)
 const TOOLS: any[] = [
@@ -358,10 +368,8 @@ async function ejecutarTool(name: string, args: any) {
         estado: doctorLoc.status === 'en_gabinete' ? 'Atendiendo en Gabinete' : 'Disponible en Quirófano/Consulta'
       },
       distanciaEstimadaKm: `${distanceApprox} km`,
-      tiempoEstimadoVehiculo: `~${travelTime} minutos`,
-      recomendacionLogistica: distanceApprox > 12
-        ? `Te encuentras a aproximadamente ${travelTime} minutos de la sede ${doctorLoc.branchName}. Si te encuentras en el norte de la CDMX, nuestra sede Guadalupe Chalma también cuenta con equipo clínico de vanguardia de la red Audenti.`
-        : `¡Excelente! Te encuentras a solo ${travelTime} minutos de donde está la Dra. Aura Estudillo en ${doctorLoc.branchName}. Es una distancia muy cómoda y rápida para tu consulta.`,
+      tiempoEstimadoVehiculo: `${travelTime} minutos`,
+      recomendacionLogistica: `La Dra. Aura Estudillo se encuentra a ${travelTime} minutos (${distanceApprox} km) de ti en la Sede ${doctorLoc.branchName}. Estamos verificando en el sistema y en su panel directo si puede atenderte hoy de emergencia o a primera hora. Por favor mantente en línea.`,
       opcionesSedesDisponibles: [
         'Sucursal Balbuena (Matriz) — Av. del Taller & Retorno 12, CDMX (Dra. Aura Estudillo presente)',
         'Sucursal Guadalupe Chalma — Av. Guadalupe Victoria 45, GAM, CDMX (Red Audenti)',
@@ -471,6 +479,23 @@ export async function POST(request: Request) {
       }
     } else {
       finalReply = firstChoice?.content || ''
+    }
+
+    // ========================================================
+    // FILTRO DE CONTENCIÓN ESTRICTO Y CIBERSEGURIDAD CLÍNICA:
+    // Queda ABSOLUTAMENTE PROHIBIDO que la IA mencione nombres de fármacos,
+    // dosis, miligramos o pautas de automedicación.
+    // ========================================================
+    const PROHIBITED_MEDS_REGEX = /\b(ibuprofeno|paracetamol|acetaminof[eé]n|amoxicilina|ketorolaco|clonixinato|naproxeno|aspirina|tramadol|diclofenaco|dexametasona|ampicilina|azitromicina|clindamicina|analg[eé]sico|antibi[oó]tico|\d+\s*mg|\d+\s*miligramos|\d+\s*gramos|cada\s*\d+\s*horas)\b/i
+    const ASKS_FOR_MEDS_REGEX = /\b(qu[eé]\s+(tomar|puedo\s+tomar|me\s+tomo|pastilla|medicamento|medicina|remedio|dosis)|receta|rec[eé]tame)\b/i
+
+    const lowerUser = (userMessage || conversation.map(c => c.content).join(' ')).toLowerCase()
+    const lowerReply = finalReply.toLowerCase()
+
+    const mandatoryMedicationDenial = 'No tengo permitido recomendar ni recetar medicamentos. He enviado tu reporte directamente a la Dra. Aura Estudillo. Por favor ingresa tu número de WhatsApp y mantente en línea mientras la doctora evalúa tu caso para darte la indicación correspondiente.'
+
+    if (ASKS_FOR_MEDS_REGEX.test(lowerUser) || PROHIBITED_MEDS_REGEX.test(lowerReply)) {
+      finalReply = mandatoryMedicationDenial
     }
 
     // Si por alguna razón vino vacío
