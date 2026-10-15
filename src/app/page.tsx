@@ -47,9 +47,10 @@ export default function LandingPage() {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
-  // ESTADO DEL COMPARADOR BEFORE / AFTER CON requestAnimationFrame
-  const [splitPercent, setSplitPercent] = useState(50)
-  const [isDragging, setIsDragging] = useState(false)
+  // ESTADO DEL COMPARADOR BEFORE / AFTER CON HOVER TRACKING AUTOMÁTICO
+  // Cuando el cursor está a la izquierda (0%), la máscara de dientes sucios es 0% (se ven 100% blancos).
+  // A medida que se mueve hacia la derecha, se revela progresivamente la capa de dientes sucios.
+  const [splitPercent, setSplitPercent] = useState(0)
   const [isOverText, setIsOverText] = useState(false)
   const heroRef = useRef<HTMLDivElement>(null)
   const rafId = useRef<number | null>(null)
@@ -60,13 +61,15 @@ export default function LandingPage() {
     setMobileMenuOpen(false)
   }
 
-  // Actualizar posición de la barra con rAF para 60fps sin stutter
+  // Actualizar posición del revelado automáticamente con el cursor / touch mediante rAF
   const updateSplit = useCallback((clientX: number) => {
     if (!heroRef.current) return
     const rect = heroRef.current.getBoundingClientRect()
     const offsetX = clientX - rect.left
     const rawPct = (offsetX / rect.width) * 100
-    const clamped = Math.max(5, Math.min(95, rawPct))
+    // Totalmente a la izquierda = 0% sucio (100% blanco)
+    // Hacia la derecha = se expande la capa de dientes sucios (hasta 100%)
+    const clamped = Math.max(0, Math.min(100, rawPct))
 
     if (rafId.current) cancelAnimationFrame(rafId.current)
     rafId.current = requestAnimationFrame(() => {
@@ -74,30 +77,12 @@ export default function LandingPage() {
     })
   }, [])
 
-  const handlePointerDown = (e: React.PointerEvent) => {
-    setIsDragging(true)
-    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
-    updateSplit(e.clientX)
-  }
-
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isDragging) return
     updateSplit(e.clientX)
   }
 
-  const handlePointerUp = (e: React.PointerEvent) => {
-    setIsDragging(false)
-    try {
-      ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
-    } catch {}
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowLeft') {
-      setSplitPercent((prev) => Math.max(5, prev - 4))
-    } else if (e.key === 'ArrowRight') {
-      setSplitPercent((prev) => Math.min(95, prev + 4))
-    }
+  const handlePointerDown = (e: React.PointerEvent) => {
+    updateSplit(e.clientX)
   }
 
   // Carrusel de Especialistas
@@ -292,13 +277,10 @@ export default function LandingPage() {
         ref={heroRef}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        tabIndex={0}
-        onKeyDown={handleKeyDown}
-        className="relative w-full h-[100svh] min-h-[640px] select-none touch-none outline-none overflow-hidden bg-slate-950 cursor-ew-resize pt-16"
-        aria-label="Comparador interactivo de moldes dentales antes y después"
+        className="relative w-full h-[100svh] min-h-[640px] select-none touch-none outline-none overflow-hidden bg-slate-950 cursor-crosshair pt-16"
+        aria-label="Comparador interactivo de moldes dentales con seguimiento de cursor"
       >
-        {/* CAPA 1: AFTER (Clean cast - 1.webp) */}
+        {/* CAPA 1: AFTER (Clean cast - Dientes 100% Blancos - 1.webp) */}
         <div className="absolute inset-0 w-full h-full overflow-hidden">
           <img
             src={ASSETS.after}
@@ -309,9 +291,11 @@ export default function LandingPage() {
           <div className="absolute inset-0 bg-linear-to-t from-slate-950/80 via-transparent to-slate-950/30 pointer-events-none" />
         </div>
 
-        {/* CAPA 2: BEFORE (Stained cast - 2.webp) recortada con splitPercent */}
+        {/* CAPA 2: BEFORE (Stained cast - Dientes Manchados - 2.webp) */}
+        {/* Totalmente a la izquierda (0%) muestra dientes 100% blancos. */}
+        {/* Al mover el cursor a la derecha, se revela de izquierda a derecha. */}
         <div
-          className="absolute inset-y-0 left-0 overflow-hidden"
+          className="absolute inset-y-0 left-0 overflow-hidden transition-[width] duration-75 ease-out"
           style={{ width: `${splitPercent}%` }}
         >
           <div
@@ -325,23 +309,6 @@ export default function LandingPage() {
               draggable={false}
             />
             <div className="absolute inset-0 bg-linear-to-t from-slate-950/85 via-transparent to-slate-950/40 pointer-events-none" />
-          </div>
-        </div>
-
-        {/* LÍNEA DIVISORIA DRAGGABLE */}
-        <div
-          className="absolute top-0 bottom-0 z-30 pointer-events-none flex items-center justify-center -translate-x-1/2"
-          style={{ left: `${splitPercent}%` }}
-        >
-          {/* Línea vertical */}
-          <div className="w-[2px] h-full bg-white/90 shadow-[0_0_12px_rgba(255,255,255,0.8)]" />
-
-          {/* Manija táctil central */}
-          <div className="absolute top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/95 text-slate-900 border-2 border-slate-900/10 shadow-2xl flex items-center justify-center pointer-events-auto cursor-grab active:cursor-grabbing backdrop-blur-md transition-transform active:scale-110">
-            <div className="flex items-center gap-0.5 text-xs font-bold">
-              <ChevronLeft className="w-3.5 h-3.5" />
-              <ChevronRight className="w-3.5 h-3.5" />
-            </div>
           </div>
         </div>
 
@@ -425,7 +392,7 @@ export default function LandingPage() {
         {/* Hint de Interacción */}
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 pointer-events-none text-center">
           <span className="text-[10px] font-semibold tracking-wider uppercase text-slate-400 bg-slate-950/60 backdrop-blur-xs px-3 py-1 rounded-full border border-white/10">
-            ← Arrastra la barra para comparar resultados →
+            ← Desplaza el cursor o desliza tu dedo para revelar el cambio →
           </span>
         </div>
       </section>
