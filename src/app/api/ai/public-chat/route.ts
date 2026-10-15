@@ -501,17 +501,25 @@ export async function POST(request: Request) {
     const lowerReply = (finalReply || '').toLowerCase()
 
     // =========================================================================
-    // MOTOR DE DETECCIÓN E INTENCIÓN DE ALERTAS DE AURA AI:
-    // 1. Alerta Roja (🔴): Urgencias, dolor intenso, abscesos, muela rota, sangrado.
-    // 2. Alerta Amarilla (🟡): Solicitud de cita, valoración o diseño de sonrisa.
-    // 3. Consultas Generales: Respuestas autónomas por la IA sin alertar a la doctora.
+    // MOTOR DE CALIBRACIÓN DE TRIAJE ESTRICTO (SEVERITY THRESHOLDS):
+    // 1. 🔴 NIVEL ROJO (Urgencia Médica Real 24/7):
+    //    Triggers ÚNICOS: dolor insoportable, dolor muy fuerte, sangrado, se cayó un diente,
+    //    infección severa, hinchazón severa, absceso agudo, accidente / golpe.
+    // 2. 🟡 NIVEL AMARILLO (Cita Prioritaria / Valoración Especializada):
+    //    Triggers: diseño de sonrisa, carillas, ortodoncia, molestia leve, sensibilidad.
+    // 3. 🟢 NIVEL VERDE (Standard Booking / Cita de Rutina):
+    //    Triggers: cita, revisión, limpieza, agendar, costos, información.
+    //    Acción: NO dispara alertas rojas. Responde con calidez y orienta a agendar.
     // =========================================================================
-    const RED_ALERT_REGEX = /\b(dolor|me\s+duele|duele|muela|infecci[oó]n|urgencia|sangrado|emergencia|hinchaz[oó]n|flem[oó]n|golpe|absceso|insoportable|calmante|fractura)\b/i
-    const YELLOW_ALERT_REGEX = /\b(cita|agendar|apartar|horario|disponible|cu[aá]ndo\s+puedo|valoraci[oó]n|diseño\s+de\s+sonrisa|carillas|blanqueamiento|limpieza|consulta)\b/i
+    const RED_ALERT_STRICT_REGEX = /\b(dolor\s+(insoportable|muy\s+fuerte|intenso|agudo|severo)|sangrado|se\s+me\s+cay[oó]\s+un\s+diente|se\s+cay[oó]\s+el\s+diente|infecci[oó]n|hinchaz[oó]n\s+severa|flem[oó]n|absceso|accidente|golpe\s+en\s+la\s+boca)\b/i
+    const YELLOW_PRIORITY_REGEX = /\b(diseño\s+de\s+sonrisa|carillas|ortodoncia|alineadores|sensibilidad|molestia\s+leve|implante)\b/i
 
-    const isRed = RED_ALERT_REGEX.test(lowerUser)
-    const isYellow = !isRed && YELLOW_ALERT_REGEX.test(lowerUser)
+    const isRoutineBookingOrGeneral = /\b(revisi[oó]n|limpieza|profilaxis|agendar|cita|costos|precios|informaci[oó]n|horario)\b/i.test(lowerUser)
 
+    const isRed = RED_ALERT_STRICT_REGEX.test(lowerUser)
+    const isYellow = !isRed && !isRoutineBookingOrGeneral && YELLOW_PRIORITY_REGEX.test(lowerUser)
+
+    // Solo se registra en el panel de alertas si es una Urgencia Roja real o una Solicitud Amarilla de alta especialidad
     if (isRed || isYellow) {
       const caseId = `${isRed ? 'RED' : 'YEL'}-${Date.now().toString().slice(-6)}`
       const nowTime = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
@@ -520,7 +528,6 @@ export async function POST(request: Request) {
       const phoneMatch = userMessage?.match(/\b\d{10}\b/) || conversation.map(c => c.content || '').join(' ').match(/\b\d{10}\b/)
       const detectedPhone = phoneMatch ? phoneMatch[0] : '[Desconocido] Pendiente por WhatsApp'
 
-      // Detectar sede preferida o por defecto Balbuena
       const targetBranch = lowerUser.includes('chalma') || lowerUser.includes('gam') || lowerUser.includes('gustavo')
         ? 'Sede Guadalupe Chalma'
         : 'Sede Balbuena (Matriz)'
@@ -531,15 +538,15 @@ export async function POST(request: Request) {
         patientName: detectedPhone !== '[Desconocido] Pendiente por WhatsApp' ? `Paciente (${detectedPhone})` : '[Desconocido] Paciente Web en Línea',
         phone: detectedPhone,
         painLevel: (isRed ? 'severo' : 'moderado') as 'severo' | 'moderado',
-        symptoms: userMessage || conversation[conversation.length - 1]?.content || (isRed ? 'Urgencia por dolor agudo' : 'Solicitud de Cita / Valoración'),
+        symptoms: userMessage || conversation[conversation.length - 1]?.content || (isRed ? 'Urgencia por dolor agudo' : 'Valoración Estética Especializada'),
         timestamp: nowTime,
         chatSnippet: `Mensaje recibido: "${userMessage || conversation[conversation.length - 1]?.content}"`,
         status: 'pending' as const,
         branchName: targetBranch,
         proposedSlot: isYellow ? {
-          date: 'Mañana',
-          time: '11:00 AM',
-          treatment: lowerUser.includes('carilla') ? 'Carillas E.Max' : lowerUser.includes('blanque') ? 'Blanqueamiento LED' : 'Valoración Estética'
+          date: 'Próxima fecha disponible',
+          time: '11:00 AM o 16:00 PM',
+          treatment: lowerUser.includes('carilla') ? 'Carillas E.Max' : 'Diseño de Sonrisa'
         } : undefined
       }
 
@@ -547,7 +554,6 @@ export async function POST(request: Request) {
         globalThis.__audenti_emergency_cases = []
       }
 
-      // Evitar duplicar caso idéntico en los últimos 30 segundos
       const exists = globalThis.__audenti_emergency_cases.some(c => c.symptoms === newAlertCase.symptoms)
       if (!exists) {
         globalThis.__audenti_emergency_cases = [newAlertCase, ...globalThis.__audenti_emergency_cases].slice(0, 30)

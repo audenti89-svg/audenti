@@ -60,12 +60,13 @@ export function NightEmergencyRedAlertBanner() {
       const data = await res.json()
       if (data?.success && Array.isArray(data.cases)) {
         setCases(data.cases)
-        const pending = data.cases.find((c: EmergencyCase) => c.status === 'pending')
-        if (pending && (!activeCase || activeCase.id !== pending.id)) {
-          setActiveCase(pending)
+        // Auto-abrir la ventana emergente ÚNICAMENTE para emergencias rojas reales
+        const pendingRed = data.cases.find((c: EmergencyCase) => c.status === 'pending' && c.alertType === 'red_emergency')
+        if (pendingRed && (!activeCase || activeCase.id !== pendingRed.id)) {
+          setActiveCase(pendingRed)
           setMinimized(false)
           playTone('arrival')
-        } else if (!pending) {
+        } else if (!pendingRed && activeCase?.alertType === 'red_emergency') {
           setActiveCase(null)
         }
       }
