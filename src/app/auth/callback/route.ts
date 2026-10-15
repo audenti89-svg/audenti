@@ -1,19 +1,46 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/utils/supabase/server';
+import { createServerClient } from '@supabase/ssr';
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
-  const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/dashboard';
+  const requestUrl = new URL(request.url);
+  const code = requestUrl.searchParams.get('code');
+  const origin = requestUrl.origin;
+  const next = requestUrl.searchParams.get('next') ?? '/dashboard';
 
   if (code) {
-    const supabase = await createClient();
+    // Preparar respuesta para inyectar cookies directamente
+    let response = NextResponse.redirect(`${origin}${next}`);
+
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ysxcjrxuakfqzzseiaiy.supabase.co',
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_Wdm8x6QfGCWQNKqwLRejXA__r5Cg13m',
+      {
+        cookies: {
+          getAll() {
+            // Obtener cookies del header de la petición
+            const cookieHeader = request.headers.get('cookie') ?? '';
+            return cookieHeader.split(';').map((c) => {
+              const [name, ...rest] = c.trim().split('=');
+              return { name, value: rest.join('=') };
+            }).filter((c) => c.name);
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              response.cookies.set(name, value, options);
+            });
+          },
+        },
+      }
+    );
+
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+      return response;
     }
+
+    console.error('Error al intercambiar código OAuth:', error);
+    return NextResponse.redirect(`${origin}/auth/login?error=${encodeURIComponent(error.message)}`);
   }
 
-  // Si ocurre un error en el intercambio, regresar a login
-  return NextResponse.redirect(`${origin}/auth/login?error=auth_failed`);
+  return NextResponse.redirect(`${origin}/auth/login?error=no_code_provided`);
 }

@@ -1,13 +1,28 @@
 'use client';
 
 import { createClient } from '@/utils/supabase/client';
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
-export default function LoginPage() {
+function LoginForm() {
   const supabase = createClient();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  useEffect(() => {
+    const errorParam = searchParams.get('error');
+    if (errorParam) {
+      if (errorParam === 'auth_failed') {
+        setErrorMsg('No se pudo completar la sesión con Google. Intenta nuevamente.');
+      } else if (errorParam === 'no_code_provided') {
+        setErrorMsg('No se recibió código de autorización del proveedor.');
+      } else {
+        setErrorMsg(decodeURIComponent(errorParam));
+      }
+    }
+  }, [searchParams]);
 
   const handleGoogleLogin = async () => {
     setLoading(true);
@@ -59,5 +74,13 @@ export default function LoginPage() {
         <span className="font-semibold text-slate-400">Céd. Prof. 8492019</span>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-slate-400 text-xs">Cargando...</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }
