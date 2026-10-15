@@ -17,6 +17,7 @@ import {
 export function SmartPwaFloatingBanner() {
   const { isInstallable, isStandalone, promptInstall, dismissPrompt } = usePwaInstall()
   const [showIosGuide, setShowIosGuide] = useState(false)
+  const [showAndroidGuide, setShowAndroidGuide] = useState(false)
   const [installSuccess, setInstallSuccess] = useState(false)
 
   // Si ya está en modo Standalone (instalada), no renderizar absolutamente nada
@@ -25,7 +26,7 @@ export function SmartPwaFloatingBanner() {
   }
 
   // Si no está lista o fue descartada, no mostrar
-  if (!isInstallable && !showIosGuide) {
+  if (!isInstallable && !showIosGuide && !showAndroidGuide) {
     return null
   }
 
@@ -37,7 +38,17 @@ export function SmartPwaFloatingBanner() {
         dismissPrompt()
       }, 3000)
     } else if (res.outcome === 'manual_guide') {
-      setShowIosGuide(true)
+      // Detectar si es iOS o Android
+      if (typeof window !== 'undefined') {
+        const ua = navigator.userAgent.toLowerCase()
+        if (ua.includes('iphone') || ua.includes('ipad') || ua.includes('ipod')) {
+          setShowIosGuide(true)
+        } else {
+          setShowAndroidGuide(true)
+        }
+      } else {
+        setShowIosGuide(true)
+      }
     }
   }
 
@@ -171,6 +182,56 @@ export function SmartPwaFloatingBanner() {
 
             <button
               onClick={() => setShowIosGuide(false)}
+              className="w-full py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Guía Rápida para Android (Chrome, Edge, Samsung Internet) */}
+      {showAndroidGuide && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-sm w-full space-y-4 text-white shadow-2xl relative animate-in zoom-in-95 duration-200">
+            <button
+              onClick={() => setShowAndroidGuide(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-xl text-slate-400 hover:text-white bg-slate-800"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <AudentiLogo variant="icon" size={38} />
+              <div>
+                <h3 className="text-sm font-bold">Instalar en Android</h3>
+                <p className="text-[11px] text-slate-400">Pasos sencillos para Chrome / Edge</p>
+              </div>
+            </div>
+
+            <ol className="space-y-3 text-xs text-slate-300">
+              <li className="flex items-start gap-2.5 p-2 rounded-xl bg-slate-800/60">
+                <span className="w-5 h-5 rounded-full bg-amber-400 text-slate-950 font-bold flex items-center justify-center shrink-0 text-[10px]">
+                  1
+                </span>
+                <span>Toca el menú de <strong>tres puntos (⋮)</strong> en la esquina superior derecha del navegador.</span>
+              </li>
+              <li className="flex items-start gap-2.5 p-2 rounded-xl bg-slate-800/60">
+                <span className="w-5 h-5 rounded-full bg-amber-400 text-slate-950 font-bold flex items-center justify-center shrink-0 text-[10px]">
+                  2
+                </span>
+                <span>Selecciona <strong>"Instalar aplicación"</strong> o <strong>"Agregar a la pantalla principal"</strong>.</span>
+              </li>
+              <li className="flex items-start gap-2.5 p-2 rounded-xl bg-slate-800/60">
+                <span className="w-5 h-5 rounded-full bg-amber-400 text-slate-950 font-bold flex items-center justify-center shrink-0 text-[10px]">
+                  3
+                </span>
+                <span>Confirma tocando <strong>"Instalar"</strong>. El icono de Audenti aparecerá en tus aplicaciones.</span>
+              </li>
+            </ol>
+
+            <button
+              onClick={() => setShowAndroidGuide(false)}
               className="w-full py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs"
             >
               Entendido

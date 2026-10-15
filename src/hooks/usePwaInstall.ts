@@ -36,24 +36,40 @@ export function usePwaInstall() {
       return
     }
 
-    // 3. Capturar evento nativo `beforeinstallprompt` (Chrome, Edge, Android)
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault()
-      setDeferredPrompt(e)
+    // 3. Revisar si el evento ya fue capturado tempranamente por el script del head
+    if (typeof window !== 'undefined' && (window as any).__pwaDeferredPrompt) {
+      setDeferredPrompt((window as any).__pwaDeferredPrompt)
       setIsInstallable(true)
     }
 
-    // 4. Capturar cuando el usuario completa la instalación
+    // 4. Capturar evento nativo `beforeinstallprompt` (Chrome, Edge, Android)
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault()
+      setDeferredPrompt(e)
+      ;(window as any).__pwaDeferredPrompt = e
+      setIsInstallable(true)
+    }
+
+    const handlePromptReady = () => {
+      if ((window as any).__pwaDeferredPrompt) {
+        setDeferredPrompt((window as any).__pwaDeferredPrompt)
+        setIsInstallable(true)
+      }
+    }
+
+    // 5. Capturar cuando el usuario completa la instalación
     const handleAppInstalled = () => {
       setIsStandalone(true)
       setIsInstallable(false)
       setDeferredPrompt(null)
+      ;(window as any).__pwaDeferredPrompt = null
       if (typeof window !== 'undefined') {
         localStorage.setItem('pwa_installed_confirmed', 'true')
       }
     }
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    window.addEventListener('pwa-prompt-ready', handlePromptReady)
     window.addEventListener('appinstalled', handleAppInstalled)
 
     // Listener para cambios de display-mode
@@ -70,6 +86,7 @@ export function usePwaInstall() {
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+      window.removeEventListener('pwa-prompt-ready', handlePromptReady)
       window.removeEventListener('appinstalled', handleAppInstalled)
       if (mediaQuery.removeEventListener) {
         mediaQuery.removeEventListener('change', handleMediaChange)
