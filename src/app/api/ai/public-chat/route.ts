@@ -12,17 +12,18 @@ interface ChatMessage {
   tool_calls?: any[]
 }
 
-const PUBLIC_SYSTEM_PROMPT = `Eres "Audenti Concierge AI", el asistente clínico y concierge inteligente de la clínica dental de alta gama "Audenti — DentalCloud Pro", dirigida por la Dra. Aura Estudillo (Directora Médica & Especialista en Estética Oral, Cédula Profesional 8492019).
+const PUBLIC_SYSTEM_PROMPT = `Eres "Aura AI", la asistente virtual y concierge inteligente de la clínica dental de alta gama "Audenti — DentalCloud Pro", dirigida por la Dra. Aura Estudillo (Directora Médica & Especialista en Estética Oral, Cédula Profesional 8492019).
 
-REGLAS DE CIBERSEGURIDAD CLÍNICA Y GUARDRAILS INQUEBRANTABLES:
+REGLAS DE CIBERSEGURIDAD CLÍNICA, PRIVACIDAD Y GUARDRAILS INQUEBRANTABLES:
 
 1. PROHIBICIÓN ABSOLUTA DE MEDICAMENTOS Y RECETAS:
-   - Queda TERMINANTEMENTE PROHIBIDO mencionar nombres de medicamentos (ej. ibuprofeno, paracetamol, amoxicilina, ketorolaco, clonixinato, naproxeno, etc.), miligramos, dosis, gramos u horarios de ingesta.
+   - Queda TERMINANTEMENTE PROHIBIDO mencionar nombres de medicamentos (ej. ibuprofeno, paracetamol, amoxicilina, ketorolaco, clonixinato, naproxeno, aspirina, etc.), miligramos, dosis, gramos u horarios de ingesta.
    - Si el usuario pregunta qué tomar, qué pastilla tomar o qué medicamento usar para el dolor, infección o cualquier síntoma, DEBES RESPONDER EXACTAMENTE CON ESTE MENSAJE OBLIGATORIO:
    "No tengo permitido recomendar ni recetar medicamentos. He enviado tu reporte directamente a la Dra. Aura Estudillo. Por favor ingresa tu número de WhatsApp y mantente en línea mientras la doctora evalúa tu caso para darte la indicación correspondiente."
 
-2. RESPUESTA DE GEOLOCALIZACIÓN Y ESPERA EN LÍNEA:
-   - Al recibir consultas de citas o emergencias donde se aborde la ubicación, consulta la geolocalización y responde brevemente con la distancia y tiempo exacto:
+2. PRIVACIDAD DE GEOLOCALIZACIÓN Y TIEMPOS RELATIVOS:
+   - NUNCA reveles calles, números ni direcciones físicas exactas de las sedes ni del paciente, para resguardar la seguridad y privacidad.
+   - Limítate estrictamente a informar el nombre de la sede y el cálculo de tiempos relativos de traslado o distancia:
    "La Dra. Aura Estudillo se encuentra a [X minutos / X km] de ti en la Sede [Nombre de Sede]. Estamos verificando en el sistema y en su panel directo si puede atenderte hoy de emergencia o a primera hora. Por favor mantente en línea."
 
 3. LIMITACIÓN DE RESPUESTAS A TEXTOS BREVES Y CONCRETOS:
@@ -34,7 +35,7 @@ REGLAS DE CIBERSEGURIDAD CLÍNICA Y GUARDRAILS INQUEBRANTABLES:
 
 5. COSTOS Y CITAS:
    - Usa \`consultarCostosTratamiento\` para aranceles y \`consultarDisponibilidadCalendario\` para fechas.
-   - NUNCA respondas con nombres de fármacos bajo ninguna circunstancia.`
+   - NUNCA respondas con nombres de fármacos ni desgloses de automedicación.`
 
 // Definición de Tools para Groq (OpenAI Function Calling format)
 const TOOLS: any[] = [
@@ -328,8 +329,8 @@ async function ejecutarTool(name: string, args: any) {
     const { zonaPaciente, lat, lng } = args
     const doctorLoc = globalThis.__audenti_doctor_location || {
       branchId: 'balbuena',
-      branchName: 'Sucursal Balbuena (Matriz)',
-      address: 'Av. del Taller & Retorno 12, Jardín Balbuena, CDMX',
+      branchName: 'Sede Balbuena',
+      address: 'Zona Balbuena, CDMX',
       lat: 19.4187,
       lng: -99.1124,
       status: 'en_gabinete'
@@ -364,16 +365,15 @@ async function ejecutarTool(name: string, args: any) {
       zonaReportada: zonaPaciente,
       sedeActivaDraAura: {
         nombre: doctorLoc.branchName,
-        direccion: doctorLoc.address,
-        estado: doctorLoc.status === 'en_gabinete' ? 'Atendiendo en Gabinete' : 'Disponible en Quirófano/Consulta'
+        estado: doctorLoc.status === 'en_gabinete' ? 'Atendiendo en Gabinete' : 'Disponible en Consulta'
       },
-      distanciaEstimadaKm: `${distanceApprox} km`,
-      tiempoEstimadoVehiculo: `${travelTime} minutos`,
-      recomendacionLogistica: `La Dra. Aura Estudillo se encuentra a ${travelTime} minutos (${distanceApprox} km) de ti en la Sede ${doctorLoc.branchName}. Estamos verificando en el sistema y en su panel directo si puede atenderte hoy de emergencia o a primera hora. Por favor mantente en línea.`,
-      opcionesSedesDisponibles: [
-        'Sucursal Balbuena (Matriz) — Av. del Taller & Retorno 12, CDMX (Dra. Aura Estudillo presente)',
-        'Sucursal Guadalupe Chalma — Av. Guadalupe Victoria 45, GAM, CDMX (Red Audenti)',
-        'Sucursal Colonia Roma — Álvaro Obregón 180, Roma Norte (Próxima apertura)'
+      distanciaEstimada: `a unos ${travelTime} minutos de distancia (aprox. ${distanceApprox} km)`,
+      tiempoEstimadoVehiculo: `a unos ${travelTime} minutos de distancia`,
+      recomendacionLogistica: `La Dra. Aura Estudillo se encuentra a unos ${travelTime} minutos de distancia de ti en la ${doctorLoc.branchName}. Estamos verificando en el sistema y en su panel directo si puede atenderte hoy de emergencia o a primera hora. Por favor mantente en línea.`,
+      redSedesAudenti: [
+        'Sede Balbuena (Dra. Aura Estudillo presente)',
+        'Sede Guadalupe Chalma (Red Audenti)',
+        'Sede Roma Norte (Próxima apertura)'
       ]
     }
   }

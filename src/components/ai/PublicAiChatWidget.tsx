@@ -18,7 +18,7 @@ export function PublicAiChatWidget() {
     {
       id: 'welcome',
       role: 'assistant',
-      content: '¡Hola! Soy el asistente virtual de la Dra. Aura Estudillo en Audenti. ¿Te gustaría conocer más sobre Diseño de Sonrisa, Carillas, Blanqueamiento LED o agendar una valoración?',
+      content: '¡Hola! Soy Aura AI, la asistente virtual de la Dra. Aura Estudillo en Audenti. ¿En qué te puedo ayudar?',
       time: 'Ahora'
     }
   ])
@@ -122,7 +122,7 @@ export function PublicAiChatWidget() {
       const botMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: data?.reply || 'Hola, ¿en qué podemos apoyarte con tu salud bucodental?',
+        content: data?.reply || '¡Hola! Soy Aura AI, ¿en qué te puedo ayudar?',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }
 
@@ -132,7 +132,7 @@ export function PublicAiChatWidget() {
       const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'Hubo una breve intermitencia al procesar tu consulta con la IA. Puedes consultarme nuevamente sobre precios, horarios o pulsar "Agendar Cita" para atención inmediata con la Dra. Aura.',
+        content: 'Hubo una breve intermitencia al procesar tu consulta con la IA. Puedes consultarme nuevamente sobre procedimientos, horarios o pulsar "Agendar Cita" para atención inmediata con la Dra. Aura.',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }
       setMessages(prev => [...prev, errorMsg])
@@ -151,15 +151,15 @@ export function PublicAiChatWidget() {
         <button
           onClick={() => setIsOpen(true)}
           className="group relative flex items-center gap-2.5 px-4 py-3 rounded-full bg-slate-900 text-white shadow-2xl border-2 border-amber-400 hover:bg-slate-800 transition-all hover:scale-105 active:scale-95 cursor-pointer"
-          aria-label="Abrir Asistente IA Dental"
+          aria-label="Abrir Aura AI"
         >
           <div className="relative">
             <Sparkles className="w-5 h-5 text-amber-400 animate-pulse" />
             <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full ring-2 ring-slate-900 animate-ping" />
           </div>
-          <span className="text-xs font-bold tracking-tight">Preguntar a la IA</span>
+          <span className="text-xs font-bold tracking-tight">Aura AI</span>
           <span className="hidden sm:inline text-[10px] px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 font-mono">
-            Groq Llama 3.1
+            En línea
           </span>
         </button>
       )}
@@ -176,7 +176,7 @@ export function PublicAiChatWidget() {
               </div>
               <div>
                 <h3 className="text-xs font-black text-white flex items-center gap-1.5 font-hanken">
-                  Audenti Concierge IA
+                  Aura AI
                   <span className="w-2 h-2 rounded-full bg-emerald-400" />
                 </h3>
                 <p className="text-[10px] text-slate-400">
@@ -206,7 +206,7 @@ export function PublicAiChatWidget() {
               <ShieldCheck className="w-3 h-3 text-amber-400" />
               Orientación Clínica Inmediata
             </span>
-            <span className="text-slate-400 font-mono text-[9px]">Llama 3.1 8B Ultra Fast</span>
+            <span className="text-slate-400 font-mono text-[9px]">Aura AI • Concierge</span>
           </div>
 
           {/* Cuerpo de Mensajes */}
@@ -258,7 +258,7 @@ export function PublicAiChatWidget() {
                 <div className="w-2 h-2 rounded-full bg-amber-400 animate-bounce" />
                 <div className="w-2 h-2 rounded-full bg-amber-400 animate-bounce [animation-delay:0.2s]" />
                 <div className="w-2 h-2 rounded-full bg-amber-400 animate-bounce [animation-delay:0.4s]" />
-                <span className="text-[10px]">Consultando a la Dra. Aura...</span>
+                <span className="text-[10px]">Aura AI consultando...</span>
               </div>
             )}
 
@@ -284,7 +284,7 @@ export function PublicAiChatWidget() {
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Pregunta sobre carillas, dolor, precios..."
+                placeholder="Escribe tu duda o síntoma aquí..."
                 className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 text-xs focus:outline-none focus:border-amber-400 transition-colors"
               />
               <button
