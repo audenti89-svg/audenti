@@ -84,19 +84,25 @@ export function PublicAiChatWidget() {
       })
 
       const data = await res.json()
+
+      if (!res.ok && data?.error) {
+        throw new Error(data.error)
+      }
+
       const botMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: data?.reply || 'Con gusto podemos agendar tu cita de valoración con la Dra. Aura Estudillo en Audenti.',
+        content: data?.reply || 'Hola, ¿en qué podemos apoyarte con tu salud bucodental?',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }
 
       setMessages(prev => [...prev, botMsg])
-    } catch {
+    } catch (err: any) {
+      console.warn('Chat interaction error:', err)
       const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'Para brindarte atención inmediata personalizada, puedes dar clic en "Agendar Cita" y nuestro equipo te atenderá con gusto.',
+        content: 'Hubo una breve intermitencia al procesar tu consulta con la IA. Puedes consultarme nuevamente sobre precios, horarios o pulsar "Agendar Cita" para atención inmediata con la Dra. Aura.',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }
       setMessages(prev => [...prev, errorMsg])

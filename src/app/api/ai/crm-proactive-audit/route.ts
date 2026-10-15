@@ -65,14 +65,14 @@ Genera un diagnóstico en JSON con la siguiente estructura:
     try {
       const groq = getGroqClient()
       const completion = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
+        model: 'openai/gpt-oss-120b',
         messages: [
           { role: 'system', content: 'Eres un analista de CRM dental de alta precisión. Responde solo con JSON estructurado.' },
           { role: 'user', content: analysisPrompt }
         ],
         temperature: 0.2,
         response_format: { type: 'json_object' },
-        max_tokens: 500
+        max_tokens: 450
       })
 
       const raw = completion.choices[0]?.message?.content

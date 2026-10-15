@@ -111,31 +111,47 @@ REGLAS DE SEGURIDAD Y GUARDRAILS INQUEBRANTABLES:
       }
     }
 
-    // 4. INFERENCIA CON EL SDK DE GROQ (LLAMA 3.3 70B VERSATILE)
+    // 4. INFERENCIA CON EL SDK DE GROQ (OPENAI/GPT-OSS-120B & QWEN 27B)
     let generatedText = ''
-    let provider = 'groq_llama-3.3-70b-versatile'
+    let provider = 'groq_gpt-oss-120b'
 
     try {
       const groq = getGroqClient()
       const completion = await groq.chat.completions.create({
-        model: model || 'llama-3.3-70b-versatile',
+        model: model || 'openai/gpt-oss-120b',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.2,
-        max_tokens: 800,
+        max_tokens: 500,
       })
 
       generatedText = completion.choices[0]?.message?.content?.trim() || ''
     } catch (groqErr: any) {
-      console.warn('Groq SDK error or key missing, falling back to safe clinical template:', groqErr?.message)
-      provider = 'audenti_clinical_safe_fallback'
+      console.warn('Groq 120b fallo, intentando con qwen3.8-27b:', groqErr?.message)
+      try {
+        const groq = getGroqClient()
+        const comp = await groq.chat.completions.create({
+          model: 'qwen/qwen3.8-27b',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: 0.2,
+          max_tokens: 450,
+        })
+        generatedText = comp.choices[0]?.message?.content?.trim() || ''
+        provider = 'groq_qwen3.8-27b'
+      } catch (err2: any) {
+        console.warn('Groq SDK error or key missing, falling back to safe clinical template:', err2?.message)
+        provider = 'audenti_clinical_safe_fallback'
 
-      if (taskType === 'soap') {
-        generatedText = `[NOTA SOAP AUDENTI — Dra. Aura Estudillo]\nS: Paciente acude a valoración odontológica de rutina. Refiere comodidad general sin dolor agudo espontáneo.\nO: Cavidad oral con higiene regular. Ausencia de fístulas visibles. Esmalte íntegro en cuadrantes explorados.\nA: Estado de salud dental estable. Candidato/a a profilaxis ultrasónica preventiva.\nP: Se programa sesión preventiva y control semestral.`
-      } else {
-        generatedText = `Estimado/a ${patientContext?.name || 'paciente'}, le saludamos del consultorio dental de la Dra. Aura Estudillo. Para dar seguimiento a su plan de salud bucodental, contamos con espacios disponibles para su próxima valoración preventiva.`
+        if (taskType === 'soap') {
+          generatedText = `[NOTA SOAP AUDENTI — Dra. Aura Estudillo]\nS: Paciente acude a valoración odontológica de rutina. Refiere comodidad general sin dolor agudo espontáneo.\nO: Cavidad oral con higiene regular. Ausencia de fístulas visibles. Esmalte íntegro en cuadrantes explorados.\nA: Estado de salud dental estable. Candidato/a a profilaxis ultrasónica preventiva.\nP: Se programa sesión preventiva y control semestral.`
+        } else {
+          generatedText = `Estimado/a ${patientContext?.name || 'paciente'}, le saludamos del consultorio dental de la Dra. Aura Estudillo. Para dar seguimiento a su plan de salud bucodental, contamos con espacios disponibles para su próxima valoración preventiva.`
+        }
       }
     }
 

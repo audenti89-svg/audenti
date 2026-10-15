@@ -66,7 +66,7 @@ Responde SIEMPRE en formato JSON válido con la siguiente estructura:
     try {
       const groq = getGroqClient()
       const completion = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
+        model: 'openai/gpt-oss-120b',
         messages: [
           { role: 'system', content: 'Eres un sistema de inteligencia clínica de élite. Responde únicamente con JSON estructurado.' },
           { role: 'user', content: prompt }

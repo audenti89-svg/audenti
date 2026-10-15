@@ -53,13 +53,14 @@ Genera un reporte de inventario predictivo en JSON con la siguiente estructura:
     try {
       const groq = getGroqClient()
       const completion = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
+        model: 'openai/gpt-oss-120b',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
         temperature: 0.1,
-        response_format: { type: 'json_object' }
+        response_format: { type: 'json_object' },
+        max_tokens: 450
       })
 
       const raw = completion.choices[0]?.message?.content?.trim() || '{}'
