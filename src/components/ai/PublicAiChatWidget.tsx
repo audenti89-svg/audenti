@@ -108,16 +108,46 @@ export function PublicAiChatWidget() {
       const history = messages.map(m => ({ role: m.role, content: m.content }))
       history.push({ role: 'user', content: userText })
 
+      // Extracción automática de teléfono y nombre del historial
+      let detectedPhone = ''
+      let detectedName = ''
+
+      const allUserText = [...messages.filter(m => m.role === 'user').map(m => m.content), userText].join(' ')
+      const phoneMatch = allUserText.match(/\b\d{10}\b/) || allUserText.match(/\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/)
+      if (phoneMatch) {
+        detectedPhone = phoneMatch[0].replace(/\D/g, '')
+      }
+
+      const nameMatch = allUserText.match(/(?:me llamo|mi nombre es|soy)\s+([a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,30})/i)
+      if (nameMatch) {
+        detectedName = nameMatch[1].trim()
+      }
+
       const res = await fetch('/api/ai/public-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history, role: 'public' })
+        body: JSON.stringify({
+          messages: history,
+          role: 'public',
+          sessionContext: {
+            phone: detectedPhone || undefined,
+            patientName: detectedName || undefined
+          }
+        })
       })
 
       const data = await res.json()
 
       if (!res.ok && data?.error) {
         throw new Error(data.error)
+      }
+
+      // Si la IA generó o confirmó una cita con folio, disparar evento para refrescar la agenda en tiempo real
+      if (data?.reply && (data.reply.includes('AUD-') || data.reply.includes('folio') || data.reply.includes('Folio'))) {
+        window.dispatchEvent(new Event('audenti_appointment_refresh'))
+        try {
+          localStorage.setItem('audenti_last_booking_sync', Date.now().toString())
+        } catch {}
       }
 
       const botMsg: Message = {

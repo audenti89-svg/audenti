@@ -33,12 +33,12 @@ REGLAS DE CIBERSEGURIDAD CLÍNICA, PRIVACIDAD Y GUARDRAILS INQUEBRANTABLES:
 3. PROTOCOLO PUENTE NOCTURNO 24/7 (🔴 ALERTA ROJA):
    - Ante dolor severo o urgencias, usa la herramienta \`escalarEmergenciaNocturnaDraAura\` de inmediato para avisar a la doctora en tiempo real y pide con amabilidad el número de WhatsApp.
 
-4. PROTOCOLO OBLIGATORIO DE CONTACTO PARA AGENDAR CITAS:
-   - VALIDACIÓN OBLIGATORIA DE TELÉFONO/WHATSAPP: Si el usuario desea agendar, elige fecha o pide apartar su lugar pero NO ha proporcionado su número de WhatsApp/teléfono celular, NUNCA confirmes la cita ni inventes folios definitivos ni afirmes que se envió una notificación a su celular.
-   - En su lugar, responde amablemente solicitando su teléfono con este mensaje claro:
+4. PROTOCOLO OBLIGATORIO DE CONTACTO Y MEMORIA DE SESIÓN PARA AGENDAR CITAS:
+   - MEMORIA DE SESIÓN (NO REPETIR PREGUNTAS): Si en el contexto del chat o en los mensajes previos el paciente ya compartió su número telefónico / WhatsApp o su nombre, GUÁRDALO en tu memoria activa de sesión y **NUNCA VUELVAS A PEDIRLE SU TELÉFONO O NOMBRE**. Avanza de inmediato con la atención, propuesta de horarios o confirmación de cita.
+   - VALIDACIÓN OBLIGATORIA DE TELÉFONO/WHATSAPP: Si el usuario desea agendar, elige fecha o pide apartar su lugar pero NO ha proporcionado su número de WhatsApp/teléfono celular (ni en este mensaje ni en mensajes anteriores), solicita amablemente su teléfono con este mensaje claro:
    "Para apartar tu lugar y enviarte el folio de confirmación a tu WhatsApp, por favor indícame tu número de teléfono."
-   - Solo cuando el paciente proporcione su nombre y un número de teléfono/WhatsApp válido, invoca la herramienta \`agendarCitaNuevayNotificar\`.
-   - NUNCA digas que la notificación se envió a su celular a menos que el paciente haya proporcionado explícitamente su número de WhatsApp o teléfono celular.
+   - Solo cuando el paciente proporcione su nombre y un número de teléfono/WhatsApp válido (o ya lo haya dado previamente), invoca la herramienta \`agendarCitaNuevayNotificar\`.
+   - NUNCA digas que la notificación se envió a su celular a menos que el paciente haya proporcionado su número de WhatsApp o teléfono celular.
 
 5. COSTOS Y CITAS:
    - Usa \`consultarCostosTratamiento\` para aranceles y \`consultarDisponibilidadCalendario\` para fechas con la Dra. Aura.`
@@ -443,15 +443,46 @@ async function ejecutarTool(name: string, args: any) {
 
 export async function POST(request: Request) {
   try {
-    const { messages, userMessage, role = 'public' } = await request.json()
+    const { messages, userMessage, role = 'public', sessionContext } = await request.json()
+
+    // 1. Extracción de Memoria de Sesión (Teléfono y Nombre) de los mensajes previos
+    let rememberedPhone = sessionContext?.phone || ''
+    let rememberedName = sessionContext?.patientName || ''
+
+    const allHistoryText = [
+      ...(Array.isArray(messages) ? messages.map((m: any) => m.content || '') : []),
+      userMessage || ''
+    ].join(' ')
+
+    if (!rememberedPhone) {
+      const match = allHistoryText.match(/\b\d{10}\b/) || allHistoryText.match(/\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/)
+      if (match) {
+        rememberedPhone = match[0].replace(/\D/g, '')
+      }
+    }
+
+    if (!rememberedName) {
+      const nameMatch = allHistoryText.match(/(?:me llamo|mi nombre es|soy)\s+([a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,30})/i)
+      if (nameMatch) {
+        rememberedName = nameMatch[1].trim()
+      }
+    }
 
     // Selector de contexto y personalidad según el rol
-    const activePrompt = role === 'doctor'
+    let basePrompt = role === 'doctor'
       ? DOCTOR_EXECUTIVE_SYSTEM_PROMPT
       : PUBLIC_WARM_SYSTEM_PROMPT
 
+    // Si ya tenemos datos del paciente en la sesión, inyectarlos en la memoria activa del prompt
+    if (role === 'public' && (rememberedPhone || rememberedName)) {
+      basePrompt += `\n\n[MEMORIA ACTIVA DE LA SESIÓN ACTUAL]:\n`
+      if (rememberedName) basePrompt += `- Nombre del paciente: "${rememberedName}".\n`
+      if (rememberedPhone) basePrompt += `- Teléfono/WhatsApp del paciente: "${rememberedPhone}".\n`
+      basePrompt += `- INSTRUCCIÓN CLAVE: Como ya cuentas con estos datos de contacto en la sesión, NO se los vuelvas a pedir bajo ninguna circunstancia. Si solicita agendar o apartar cita, utiliza este número y nombre directamente con la herramienta \`agendarCitaNuevayNotificar\` y avanza de inmediato a la confirmación.`
+    }
+
     const conversation: ChatMessage[] = [
-      { role: 'system', content: activePrompt }
+      { role: 'system', content: basePrompt }
     ]
 
     if (Array.isArray(messages) && messages.length > 0) {
@@ -513,6 +544,23 @@ export async function POST(request: Request) {
           fnArgs = JSON.parse(call.function.arguments || '{}')
         } catch {
           fnArgs = {}
+        }
+
+        // Si la función es agendar y no trajo teléfono pero la sesión ya lo tiene, enriquecerlo
+        if (fnName === 'agendarCitaNuevayNotificar') {
+          if (!fnArgs.telefono && rememberedPhone) {
+            fnArgs.telefono = rememberedPhone
+          }
+          if (!fnArgs.nombrePaciente && rememberedName) {
+            fnArgs.nombrePaciente = rememberedName
+          }
+        } else if (fnName === 'escalarEmergenciaNocturnaDraAura') {
+          if (!fnArgs.telefono && rememberedPhone) {
+            fnArgs.telefono = rememberedPhone
+          }
+          if (!fnArgs.nombrePaciente && rememberedName) {
+            fnArgs.nombrePaciente = rememberedName
+          }
         }
 
         const toolResult = await ejecutarTool(fnName, fnArgs)
@@ -657,14 +705,14 @@ export async function POST(request: Request) {
 
     // ========================================================
     // COHERENCIA EN CONFIRMACIÓN Y CONTACTO:
-    // Si el usuario NO proporcionó un teléfono de 10 dígitos o válido,
+    // Si el usuario NO proporcionó un teléfono ni en el mensaje actual ni en la memoria previa,
     // la IA NO debe afirmar que "se envió una notificación a tu celular".
     // En su lugar, solicitar amablemente el teléfono para enviarle el folio.
     // ========================================================
-    const phoneInUserMessage = rawUser.match(/\b\d{10}\b/) || conversation.map(c => c.content || '').join(' ').match(/\b\d{10}\b/)
+    const hasAnyPhone = Boolean(rememberedPhone) || Boolean(rawUser.match(/\b\d{10}\b/)) || Boolean(conversation.map(c => c.content || '').join(' ').match(/\b\d{10}\b/))
     const claimsSentToPhone = /\b(se\s+(ha\s+)?enviado(\s+la\s+notificaci[o|e]n)?\s+(a\s+tu|al)\s+(celular|tel[eé]fono|whatsapp)|notificaci[o|e]n\s+(ya\s+)?se\s+envi[o|e]\s+a\s+tu\s+celular)\b/i.test(normReply)
 
-    if (!phoneInUserMessage && claimsSentToPhone) {
+    if (!hasAnyPhone && claimsSentToPhone) {
       finalReply = 'Para apartar tu lugar y enviarte el folio de confirmación a tu WhatsApp, por favor indícame tu número de teléfono.'
     }
 
