@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import { AudentiLogo } from '@/components/ui/AudentiLogo'
 import { AuthModal } from '@/components/auth/AuthModal'
+import { QRCodeSVG } from 'qrcode.react'
 
 // ASSETS OFICIALES OBLIGATORIOS
 const ASSETS = {
@@ -128,7 +129,8 @@ export default function LandingPage() {
       name: 'Dra. Aura Estudillo',
       title: 'Directora Médica & Especialista en Estética Oral',
       reg: 'Céd. Prof. 8492019',
-      image: ASSETS.portraits[0],
+      image: ASSETS.portraits[0], // Doctora especialista femenina oficial
+      hoverImage: ASSETS.portraits[2], // Retrato con sonrisa clínica
       focus: 'Diseño de Sonrisas, Carillas y Cirugía Reconstructiva',
       experience: '14+ años de excelencia clínica',
     },
@@ -137,6 +139,7 @@ export default function LandingPage() {
       title: 'Cirujano Maxilofacial & Especialista en Implantes',
       reg: 'Céd. Prof. 9102834',
       image: ASSETS.portraits[1],
+      hoverImage: ASSETS.portraits[3],
       focus: 'Implantología Oseointegrada & Regeneración Ósea',
       experience: '11+ años en quirófano dental',
     },
@@ -145,6 +148,7 @@ export default function LandingPage() {
       title: 'Ortodoncista & Especialista en Alineadores',
       reg: 'Céd. Prof. 7481920',
       image: ASSETS.portraits[2],
+      hoverImage: ASSETS.portraits[0],
       focus: 'Alineación Invisible, Autoligado Pasivo & ATM',
       experience: '9+ años perfeccionando oclusiones',
     },
@@ -153,6 +157,7 @@ export default function LandingPage() {
       title: 'Endodoncista Clínico & Microscopía',
       reg: 'Céd. Prof. 8392011',
       image: ASSETS.portraits[3],
+      hoverImage: ASSETS.portraits[1],
       focus: 'Instrumentación Mecanizada & Salvamento Dental',
       experience: '8+ años en microcirugía endodóntica',
     },
@@ -277,8 +282,14 @@ export default function LandingPage() {
         ref={heroRef}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
+        onTouchStart={(e) => {
+          if (e.touches[0]) updateSplit(e.touches[0].clientX)
+        }}
+        onTouchMove={(e) => {
+          if (e.touches[0]) updateSplit(e.touches[0].clientX)
+        }}
         className="relative w-full h-[100svh] min-h-[640px] select-none touch-none outline-none overflow-hidden bg-slate-950 cursor-crosshair pt-16"
-        aria-label="Comparador interactivo de moldes dentales con seguimiento de cursor"
+        aria-label="Comparador interactivo de moldes dentales con seguimiento de cursor y táctil"
       >
         {/* CAPA 1: AFTER (Clean cast - Dientes 100% Blancos - 1.webp) */}
         <div className="absolute inset-0 w-full h-full overflow-hidden">
@@ -389,10 +400,11 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Hint de Interacción */}
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 pointer-events-none text-center">
-          <span className="text-[10px] font-semibold tracking-wider uppercase text-slate-400 bg-slate-950/60 backdrop-blur-xs px-3 py-1 rounded-full border border-white/10">
-            ← Desplaza el cursor o desliza tu dedo para revelar el cambio →
+        {/* Hint de Interacción Adaptativo (Mobile & Desktop) */}
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 pointer-events-none text-center px-4 w-full max-w-sm">
+          <span className="text-[10px] font-semibold tracking-wider uppercase text-slate-400 bg-slate-950/70 backdrop-blur-xs px-3.5 py-1 rounded-full border border-white/10 shadow-lg inline-block">
+            <span className="sm:hidden">Desliza el dedo para revelar el cambio →</span>
+            <span className="hidden sm:inline">← Desplaza el cursor o desliza tu dedo para revelar el cambio →</span>
           </span>
         </div>
       </section>
@@ -571,30 +583,47 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Carrusel con desplazamiento horizontal suave */}
+        {/* Contenedor Responsivo: Grid en pantallas grandes (sin cortes laterales) y carrusel fluido con scroll-snap en móvil */}
         <div
           ref={teamCarouselRef}
-          className="flex gap-6 overflow-x-auto pb-4 scrollbar-none snap-x snap-mandatory scroll-smooth"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full"
         >
           {specialists.map((doc, idx) => (
             <div
               key={idx}
-              className="shrink-0 w-[280px] sm:w-[320px] bg-white rounded-3xl border border-slate-200/90 overflow-hidden shadow-sm hover:shadow-xl transition-all snap-start flex flex-col justify-between"
+              className="w-full bg-white rounded-3xl border border-slate-200/90 overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 flex flex-col justify-between group"
             >
+              {/* Imagen con Hover Smile Effect (Transición suave al sonreír) */}
               <div className="relative aspect-3/4 overflow-hidden bg-slate-100">
+                {/* Imagen Base */}
                 <img
                   src={doc.image}
                   alt={doc.name}
-                  className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-500"
+                  className="w-full h-full object-cover object-top transition-all duration-700 ease-out group-hover:scale-105 group-hover:opacity-0"
                 />
-                <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-slate-950/70 backdrop-blur-md text-amber-300 text-[10px] font-bold border border-white/10 font-mono">
+                {/* Imagen Hover (Retrato con Sonrisa Clínica Radiante) */}
+                <img
+                  src={doc.hoverImage}
+                  alt={`${doc.name} - Sonrisa Clínica`}
+                  className="absolute inset-0 w-full h-full object-cover object-top opacity-0 group-hover:opacity-100 transition-all duration-700 ease-out group-hover:scale-105"
+                />
+                
+                {/* Badge de Cédula Profesional */}
+                <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-slate-950/75 backdrop-blur-md text-amber-300 text-[10px] font-bold border border-white/10 font-mono shadow-md z-10">
                   {doc.reg}
+                </div>
+
+                {/* Badge flotante animado de especialidad en hover */}
+                <div className="absolute bottom-3 left-3 right-3 py-1.5 px-3 rounded-xl bg-slate-950/85 backdrop-blur-md border border-amber-400/30 text-white text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-center">
+                  ✨ Sonrisa &amp; Perfeccionamiento Clínico
                 </div>
               </div>
 
               <div className="p-5 space-y-2">
-                <h3 className="text-base font-bold text-slate-900">{doc.name}</h3>
-                <p className="text-xs font-semibold text-amber-700">{doc.title}</p>
+                <h3 className="text-base font-bold text-slate-900 group-hover:text-amber-700 transition-colors">
+                  {doc.name}
+                </h3>
+                <p className="text-xs font-semibold text-amber-700 leading-snug">{doc.title}</p>
                 <p className="text-[11px] text-slate-500 leading-relaxed">{doc.focus}</p>
                 <div className="pt-2 border-t border-slate-100 flex items-center gap-1.5 text-[11px] text-slate-600 font-semibold">
                   <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
@@ -854,6 +883,45 @@ export default function LandingPage() {
               Portal de Especialistas
             </button>
           </div>
+        </div>
+
+        {/* Tarjeta QR con Psicología Inversa para PWA / Mobile Instant Access */}
+        <div className="max-w-xl mx-auto my-6 p-6 sm:p-8 rounded-3xl bg-slate-900/90 border-2 border-amber-400/80 shadow-2xl text-center space-y-4 relative overflow-hidden backdrop-blur-xl">
+          <div className="absolute -top-12 -right-12 w-32 h-32 bg-amber-400/10 rounded-full blur-2xl pointer-events-none" />
+          <div className="absolute -bottom-12 -left-12 w-32 h-32 bg-rose-500/10 rounded-full blur-2xl pointer-events-none" />
+
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 text-[10px] font-black uppercase tracking-widest">
+            Acceso Inmediato PWA
+          </div>
+
+          <h3 className="text-xl sm:text-2xl font-black text-white font-hanken tracking-tight">
+            NO ESCANEES ESTE CÓDIGO QR ⛔
+          </h3>
+
+          <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
+            A menos que quieras agendar citas en 3 segundos, recibir recordatorios de control clínico en tu celular y acceder a beneficios exclusivos en tu tratamiento.
+          </p>
+
+          <div className="p-3.5 bg-white rounded-2xl inline-block border-2 border-amber-400 shadow-xl transition-transform hover:scale-105 duration-300">
+            <QRCodeSVG
+              value="https://audenti.vercel.app"
+              size={160}
+              level="H"
+              includeMargin={true}
+              imageSettings={{
+                src: "https://media.kolpusites.com/dental_ad/1.webp",
+                x: undefined,
+                y: undefined,
+                height: 32,
+                width: 32,
+                excavate: true,
+              }}
+            />
+          </div>
+
+          <p className="text-[11px] sm:text-xs text-amber-300/90 font-bold tracking-wide">
+            App Web Cero Instalación — Escanea para agregar a tu Pantalla de Inicio.
+          </p>
         </div>
 
         {/* Monumental Wordmark adaptado */}
