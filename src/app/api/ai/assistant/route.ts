@@ -8,18 +8,18 @@ export async function POST(request: Request) {
     const baseUrl = process.env.AI_ROUTER_BASE_URL || 'http://localhost:20128/v1'
     const selectedModel = model || process.env.AI_MODEL_CLINICAL || 'gc/gemini-2.5-flash'
 
-    let systemPrompt = `Eres Audenti Intelligence, el copiloto médico dental del software AUDENTI (Clínica Dra. Sofía Valero). 
-Tu objetivo es redactar comunicaciones médicas profesionales, claras, empáticas y orientadas a la salud preventiva y seguimiento clínico.
+    let systemPrompt = `Eres Audenti Intelligence, el copiloto médico dental del software AUDENTI (Clínica de la Dra. Aura Estudillo, Cédula Profesional 8492019). 
+Tu objetivo es redactar comunicaciones médicas profesionales, claras, empáticas y orientadas a la salud preventiva, notas SOAP y seguimiento clínico.
 Responde de manera concisa y lista para ser enviada por WhatsApp o agregada a la ficha del paciente.`
 
     let userPrompt = prompt
     if (!userPrompt) {
       if (taskType === 'retention') {
-        userPrompt = `Genera un mensaje de recordatorio cordial para ${patientContext?.name || 'el paciente'} que no ha acudido a su profilaxis ultrasónica en 6 meses. Invítale a agendar cita matutina o vespertina.`
+        userPrompt = `Genera un mensaje de recordatorio cordial para ${patientContext?.name || 'el paciente'} que no ha acudido a su profilaxis ultrasónica en 6 meses. Invítale a agendar cita matutina o vespertina con la Dra. Aura Estudillo.`
       } else if (taskType === 'postop') {
         userPrompt = `Genera un mensaje de seguimiento postoperatorio para ${patientContext?.name || 'el paciente'} que tuvo un procedimiento de ${patientContext?.procedure || 'extracción dental'} hoy.`
       } else {
-        userPrompt = `Genera una recomendación de seguimiento clínico para el paciente ${patientContext?.name || 'Mariana Ruíz'} sobre su presupuesto de ${patientContext?.treatment || 'Alineadores dentales'}.`
+        userPrompt = `Genera una recomendación de seguimiento clínico para el paciente ${patientContext?.name || 'el paciente'} sobre su presupuesto de ${patientContext?.treatment || 'Alineadores dentales'}.`
       }
     }
 
@@ -51,16 +51,16 @@ Responde de manera concisa y lista para ser enviada por WhatsApp o agregada a la
         isLiveFromRouter = true
       }
     } catch {
-      // Si 9Router responde 503 por falta de saldo o proveedor inactivo, entra el fallback clínico local
+      // Fallback clínico local en caso de ausencia de gateway upstream
     }
 
     if (!generatedText) {
       if (taskType === 'retention') {
-        generatedText = `“Hola ${patientContext?.name || 'Mariana'}, esperamos que estés excelente. Notamos que se cumplen 6 meses desde tu última profilaxis ultrasónica. Mantener tu salud bucal previene caries y sarro. ¿Te gustaría agendar una cita de 30 min esta semana?”`
+        generatedText = `“Hola ${patientContext?.name || 'estimado/a paciente'}, esperamos que te encuentres muy bien. Te saluda el equipo de la Dra. Aura Estudillo de Audenti. Notamos que han transcurrido 6 meses desde tu última profilaxis. ¿Te gustaría agendar una valoración preventiva esta semana?”`
       } else if (taskType === 'postop') {
-        generatedText = `“Estimado/a ${patientContext?.name || 'Carlos'}, te saluda el equipo de la Dra. Sofía Valero. Queremos saber cómo vas con la recuperación de tu procedimiento. Recuerda colocar frío local y no realizar esfuerzos físicos hoy.”`
+        generatedText = `“Estimado/a ${patientContext?.name || 'paciente'}, te saluda el equipo de la Dra. Aura Estudillo. Deseamos saber cómo va tu recuperación tras el procedimiento de hoy. Recuerda seguir las indicaciones de reposo y medicación recetada.”`
       } else {
-        generatedText = `“Hola ${patientContext?.name || 'Mariana'}, te compartimos el plan de pagos diferidos para tu tratamiento de ortodoncia/alineadores que revisamos en tu última consulta. ¿Te gustaría agendar una llamada de 5 minutos con la Dra. Sofía para resolver dudas?”`
+        generatedText = `“Hola ${patientContext?.name || 'paciente'}, te compartimos el plan de tratamiento y facilidades de pago que revisamos en tu última consulta con la Dra. Aura Estudillo. ¿Te gustaría agendar una llamada breve para resolver tus dudas?”`
       }
     }
 

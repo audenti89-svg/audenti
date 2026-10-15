@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   CircleDollarSign,
   TrendingUp,
@@ -13,18 +13,48 @@ import {
   Banknote,
   Receipt,
   Download,
-  Plus
+  Plus,
+  RefreshCw,
+  Wallet
 } from 'lucide-react'
+import { createClient } from '@/utils/supabase/client'
 
 export default function FinanzasPage() {
-  const transactions = [
-    { id: 'TRX-101', date: 'Hoy 09:45', patient: 'Laura Patricia Vega', desc: 'Profilaxis Profunda', type: 'income', amount: 1200, method: 'Terminal BBVA', doctor: 'Dra. Sofía Valero' },
-    { id: 'TRX-102', date: 'Hoy 10:30', patient: 'Gasto Clínica', desc: 'Campos quirúrgicos estériles & Guantes nitrilo', type: 'expense', amount: 420, method: 'Caja Chica', doctor: 'Recepción' },
-    { id: 'TRX-103', date: 'Ayer 17:15', patient: 'Mateo Morales Ruiz', desc: 'Anticipo Biopulpectomía Pza 16', type: 'income', amount: 1900, method: 'Transferencia SPEI', doctor: 'Dr. Cortés' },
-    { id: 'TRX-104', date: 'Ayer 12:00', patient: 'Daniela Montes', desc: 'Mensualidad Ortodoncia', type: 'income', amount: 1500, method: 'Efectivo', doctor: 'Dr. Ramírez López' },
-    { id: 'TRX-105', date: '08/Oct 16:30', patient: 'Mariana Cordero', desc: 'Liquidación Corona Zirconio', type: 'income', amount: 7000, method: 'Terminal Santander', doctor: 'Dra. Sofía Valero' },
-    { id: 'TRX-106', date: '08/Oct 11:20', patient: 'Pago Laboratorio', desc: 'Laboratorio Dental ProArt (Guía #9921)', type: 'expense', amount: 2100, method: 'SPEI', doctor: 'Administración' },
-  ]
+  const [transactions, setTransactions] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const supabase = createClient()
+
+  const fetchTransactions = async () => {
+    setLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+      setTransactions(data || [])
+    } catch (err) {
+      console.warn('Nota en pagos (tabla limpia para producción):', err)
+      setTransactions([])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchTransactions()
+  }, [])
+
+  const totalIncome = transactions
+    .filter((t) => t.type === 'income' || !t.type)
+    .reduce((acc, t) => acc + (Number(t.amount) || 0), 0)
+
+  const totalExpense = transactions
+    .filter((t) => t.type === 'expense')
+    .reduce((acc, t) => acc + (Number(t.amount) || 0), 0)
+
+  const netBalance = totalIncome - totalExpense
 
   return (
     <div className="flex flex-col w-full space-y-6 pb-12">
@@ -32,13 +62,22 @@ export default function FinanzasPage() {
       <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-200 uppercase tracking-wide">
-            Caja &amp; Tesorería
+            Caja &amp; Tesorería Oficial
           </span>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">Módulo Financiero &amp; Arqueo de Caja</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Control de ingresos, cobros por terminal, transferencias y egresos de consultorio.</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Dra. Aura Estudillo • Céd. Prof. 8492019 | Control de ingresos, comisiones, pagos de pacientes y cortes de caja.
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={fetchTransactions}
+            className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors"
+            title="Sincronizar caja"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
           <a
             href="/api/export?format=excel"
             className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-50 text-slate-800 text-xs font-bold hover:bg-slate-100 transition-colors border border-slate-200 shadow-2xs"
@@ -51,103 +90,116 @@ export default function FinanzasPage() {
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold shadow-xs transition-colors"
           >
             <Plus className="w-4 h-4" />
-            + Registrar Transacción
+            + Registrar Cobro / Egreso
           </button>
         </div>
       </div>
 
-      {/* Tarjetas de Resumen Financiero */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Ingresos Totales (Mes)</span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
-              <ArrowUpRight className="w-4 h-4" />
+      {/* Tarjetas de Resumen Financiero con Fallback en Cero */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Ingresos Totales</span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <TrendingUp className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-3xl font-bold tracking-tight text-slate-900">$257,900 <span className="text-xs font-normal text-slate-500">MXN</span></p>
-          <span className="text-xs text-emerald-700 font-bold">▲ +18.4% vs mes anterior</span>
+          <p className="text-2xl font-black text-slate-900">
+            ${totalIncome.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+          </p>
+          <span className="text-[11px] text-slate-400 mt-1 block">Cobros aplicados en la plataforma</span>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Egresos / Gastos</span>
-            <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-700 flex items-center justify-center">
-              <ArrowDownRight className="w-4 h-4" />
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Egresos / Gastos</span>
+            <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+              <TrendingDown className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-3xl font-bold tracking-tight text-slate-900">$48,250 <span className="text-xs font-normal text-slate-500">MXN</span></p>
-          <span className="text-xs text-slate-500 font-medium">Insumos y laboratorio</span>
+          <p className="text-2xl font-black text-slate-900">
+            ${totalExpense.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+          </p>
+          <span className="text-[11px] text-slate-400 mt-1 block">Insumos y laboratorio clínico</span>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Comisiones Médicas</span>
-            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center">
-              <Receipt className="w-4 h-4" />
+        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Balance Neto en Caja</span>
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <Wallet className="w-4 h-4" />
             </div>
           </div>
-          <p className="text-3xl font-bold tracking-tight text-slate-900">$18,350 <span className="text-xs font-normal text-slate-500">MXN</span></p>
-          <span className="text-xs text-slate-500 font-medium">4 doctores en red</span>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Utilidad Operativa</span>
-            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-800 flex items-center justify-center">
-              <CircleDollarSign className="w-4 h-4" />
-            </div>
-          </div>
-          <p className="text-3xl font-bold tracking-tight text-amber-900">$191,300 <span className="text-xs font-normal text-slate-500">MXN</span></p>
-          <span className="text-xs text-amber-800 font-bold">Margen neto: 74.2%</span>
+          <p className={`text-2xl font-black ${netBalance >= 0 ? 'text-slate-900' : 'text-rose-600'}`}>
+            ${netBalance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+          </p>
+          <span className="text-[11px] text-slate-400 mt-1 block">Fondo líquido disponible</span>
         </div>
       </div>
 
-      {/* Historial de Transacciones */}
+      {/* Historial de Movimientos de Caja */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-          <h2 className="text-base font-bold text-slate-900 tracking-tight">Movimientos de Caja Recientes</h2>
-          <span className="text-xs text-slate-500">Mostrando últimas transacciones sincronizadas con RLS</span>
+        <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+          <h2 className="text-sm font-bold text-slate-900">Libro Diario de Transacciones</h2>
+          <span className="text-xs text-slate-400">{transactions.length} registros</span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              <tr>
-                <th className="px-6 py-3.5">Folio / Fecha</th>
-                <th className="px-6 py-3.5">Concepto / Paciente</th>
-                <th className="px-6 py-3.5">Método</th>
-                <th className="px-6 py-3.5">Responsable</th>
-                <th className="px-6 py-3.5 text-right">Monto</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-xs">
-              {transactions.map((tx) => (
-                <tr key={tx.id} className="hover:bg-slate-50/70 transition-colors">
-                  <td className="px-6 py-4">
-                    <span className="font-mono font-bold text-slate-900 block">{tx.id}</span>
-                    <span className="text-[11px] text-slate-400">{tx.date}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="font-bold text-slate-900 block">{tx.desc}</span>
-                    <span className="text-[11px] text-slate-500">{tx.patient}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-medium text-[11px]">
-                      {tx.method}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-slate-600 font-medium">{tx.doctor}</td>
-                  <td className="px-6 py-4 text-right">
-                    <span className={`text-sm font-bold ${tx.type === 'income' ? 'text-emerald-700' : 'text-rose-600'}`}>
-                      {tx.type === 'income' ? '+' : '-'}${tx.amount.toLocaleString('es-MX')} MXN
-                    </span>
-                  </td>
+        {loading ? (
+          <div className="p-12 text-center text-xs text-slate-500">
+            <div className="w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+            Cargando libro contable de Supabase...
+          </div>
+        ) : transactions.length === 0 ? (
+          <div className="p-12 text-center space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+              <Receipt className="w-6 h-6" />
+            </div>
+            <h3 className="text-sm font-bold text-slate-800">Caja limpia para el inicio de operaciones</h3>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              No hay transacciones registradas todavía. Los cobros de tratamientos y liquidaciones de pacientes se reflejarán aquí automáticamente.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">
+                <tr>
+                  <th className="px-6 py-3">Folio / Fecha</th>
+                  <th className="px-6 py-3">Concepto</th>
+                  <th className="px-6 py-3">Método de Pago</th>
+                  <th className="px-6 py-3">Monto</th>
+                  <th className="px-6 py-3">Estado</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {transactions.map((trx) => (
+                  <tr key={trx.id} className="hover:bg-slate-50">
+                    <td className="px-6 py-4">
+                      <span className="font-mono font-bold text-slate-900 block">{trx.id.slice(0, 8)}</span>
+                      <span className="text-[10px] text-slate-400">
+                        {new Date(trx.created_at).toLocaleDateString('es-MX')}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 font-medium text-slate-800">
+                      {trx.description || 'Cobro Odontológico'}
+                    </td>
+                    <td className="px-6 py-4 text-slate-600">
+                      {trx.payment_method || 'Terminal / Efectivo'}
+                    </td>
+                    <td className="px-6 py-4 font-bold text-slate-900">
+                      ${Number(trx.amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        {trx.status || 'Liquidado'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )
