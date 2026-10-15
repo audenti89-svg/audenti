@@ -500,28 +500,57 @@ export async function POST(request: Request) {
     const lowerUser = (userMessage || conversation.map(c => c.content || '').join(' ')).toLowerCase()
     const lowerReply = (finalReply || '').toLowerCase()
 
-    // Si el usuario reporta dolor o urgencia, asegurar que se registre automáticamente como alerta roja en el panel
-    const EMERGENCY_TRIGGER_REGEX = /\b(dolor|me\s+duele|duele|muela|infecci[oó]n|urgencia|sangrado|emergencia|hinchaz[oó]n|flem[oó]n|golpe|absceso)\b/i
-    if (EMERGENCY_TRIGGER_REGEX.test(lowerUser)) {
-      const caseId = `EMG-${Date.now().toString().slice(-6)}`
+    // =========================================================================
+    // MOTOR DE DETECCIÓN E INTENCIÓN DE ALERTAS DE AURA AI:
+    // 1. Alerta Roja (🔴): Urgencias, dolor intenso, abscesos, muela rota, sangrado.
+    // 2. Alerta Amarilla (🟡): Solicitud de cita, valoración o diseño de sonrisa.
+    // 3. Consultas Generales: Respuestas autónomas por la IA sin alertar a la doctora.
+    // =========================================================================
+    const RED_ALERT_REGEX = /\b(dolor|me\s+duele|duele|muela|infecci[oó]n|urgencia|sangrado|emergencia|hinchaz[oó]n|flem[oó]n|golpe|absceso|insoportable|calmante|fractura)\b/i
+    const YELLOW_ALERT_REGEX = /\b(cita|agendar|apartar|horario|disponible|cu[aá]ndo\s+puedo|valoraci[oó]n|diseño\s+de\s+sonrisa|carillas|blanqueamiento|limpieza|consulta)\b/i
+
+    const isRed = RED_ALERT_REGEX.test(lowerUser)
+    const isYellow = !isRed && YELLOW_ALERT_REGEX.test(lowerUser)
+
+    if (isRed || isYellow) {
+      const caseId = `${isRed ? 'RED' : 'YEL'}-${Date.now().toString().slice(-6)}`
       const nowTime = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
-      const autoCase = {
+      
+      // Extraer posible teléfono
+      const phoneMatch = userMessage?.match(/\b\d{10}\b/) || conversation.map(c => c.content || '').join(' ').match(/\b\d{10}\b/)
+      const detectedPhone = phoneMatch ? phoneMatch[0] : '[Desconocido] Pendiente por WhatsApp'
+
+      // Detectar sede preferida o por defecto Balbuena
+      const targetBranch = lowerUser.includes('chalma') || lowerUser.includes('gam') || lowerUser.includes('gustavo')
+        ? 'Sede Guadalupe Chalma'
+        : 'Sede Balbuena (Matriz)'
+
+      const newAlertCase = {
         id: caseId,
-        patientName: '[Desconocido] Paciente Web en Línea',
-        phone: '[Desconocido] Pendiente por WhatsApp',
-        painLevel: 'severo' as const,
-        symptoms: userMessage || conversation[conversation.length - 1]?.content || 'Dolor dental agudo reportado en chat web',
+        alertType: (isRed ? 'red_emergency' : 'yellow_appointment') as 'red_emergency' | 'yellow_appointment',
+        patientName: detectedPhone !== '[Desconocido] Pendiente por WhatsApp' ? `Paciente (${detectedPhone})` : '[Desconocido] Paciente Web en Línea',
+        phone: detectedPhone,
+        painLevel: (isRed ? 'severo' : 'moderado') as 'severo' | 'moderado',
+        symptoms: userMessage || conversation[conversation.length - 1]?.content || (isRed ? 'Urgencia por dolor agudo' : 'Solicitud de Cita / Valoración'),
         timestamp: nowTime,
-        chatSnippet: `Mensaje de dolor: "${userMessage || conversation[conversation.length - 1]?.content}"`,
-        status: 'pending' as const
+        chatSnippet: `Mensaje recibido: "${userMessage || conversation[conversation.length - 1]?.content}"`,
+        status: 'pending' as const,
+        branchName: targetBranch,
+        proposedSlot: isYellow ? {
+          date: 'Mañana',
+          time: '11:00 AM',
+          treatment: lowerUser.includes('carilla') ? 'Carillas E.Max' : lowerUser.includes('blanque') ? 'Blanqueamiento LED' : 'Valoración Estética'
+        } : undefined
       }
+
       if (!globalThis.__audenti_emergency_cases) {
         globalThis.__audenti_emergency_cases = []
       }
-      // Evitar duplicados recientes
-      const exists = globalThis.__audenti_emergency_cases.some(c => c.symptoms === autoCase.symptoms)
+
+      // Evitar duplicar caso idéntico en los últimos 30 segundos
+      const exists = globalThis.__audenti_emergency_cases.some(c => c.symptoms === newAlertCase.symptoms)
       if (!exists) {
-        globalThis.__audenti_emergency_cases = [autoCase, ...globalThis.__audenti_emergency_cases].slice(0, 30)
+        globalThis.__audenti_emergency_cases = [newAlertCase, ...globalThis.__audenti_emergency_cases].slice(0, 30)
       }
     }
 

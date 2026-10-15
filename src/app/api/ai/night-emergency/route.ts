@@ -5,13 +5,21 @@ export const runtime = 'nodejs'
 
 export interface EmergencyCase {
   id: string
+  alertType?: 'red_emergency' | 'yellow_appointment' | 'general'
   patientName: string
   phone: string
-  painLevel: 'severo' | 'critico' | 'moderado'
+  painLevel: 'severo' | 'critico' | 'moderado' | 'leve'
   symptoms: string
   timestamp: string
   chatSnippet: string
-  status: 'pending' | 'approved_exceptional' | 'scheduled_first_hour' | 'dismissed'
+  status: 'pending' | 'approved_exceptional' | 'scheduled_first_hour' | 'appointment_confirmed' | 'dismissed'
+  branchId?: 'balbuena' | 'guadalupe-chalma'
+  branchName?: string
+  proposedSlot?: {
+    date: string
+    time: string
+    treatment: string
+  }
   patientLocation?: {
     lat?: number
     lng?: number
@@ -101,13 +109,60 @@ export async function POST(request: Request) {
       })
     }
 
-    // 2. Decisión remota de la Doctora (Aprobar atención excepcional o derivar con prioridad)
+    // 2. Decisión remota de la Doctora (Aprobar atención excepcional, derivar a 1ª hora o Aprobar Cita)
     if (action === 'decide') {
       const list = globalThis.__audenti_emergency_cases || []
       const found = list.find(c => c.id === caseId)
 
       if (!found) {
         return NextResponse.json({ success: false, error: 'Caso de emergencia no encontrado' }, { status: 404 })
+      }
+
+      if (decision === 'confirm_appointment') {
+        const chosenSlot = body.slot || found.proposedSlot || {
+          date: 'Mañana',
+          time: '11:00 AM',
+          treatment: 'Valoración Diagnóstica / Diseño de Sonrisa'
+        }
+        const chosenBranch = body.branchName || found.branchName || 'Sede Balbuena'
+
+        found.status = 'appointment_confirmed'
+        found.doctorDecision = 'confirm_appointment'
+        found.doctorNotes = `¡Hola! La Dra. Aura Estudillo ha revisado tu caso. Tu cita ha quedado confirmada para el día ${chosenSlot.date} a las ${chosenSlot.time} en la ${chosenBranch}. Te esperamos con gusto en Audenti.`
+        found.resolvedAt = new Date().toISOString()
+
+        // Guardar cita oficial en Supabase si está disponible
+        try {
+          const supabase = await createClient()
+          const { data: patient } = await supabase
+            .from('patients')
+            .upsert({
+              full_name: found.patientName.replace('[Desconocido] ', ''),
+              phone: found.phone.replace('[Desconocido] ', ''),
+              notes: `Agendado automáticamente por Aura AI tras aprobación de Dra. Aura: ${found.symptoms}`
+            }, { onConflict: 'phone' })
+            .select('id')
+            .maybeSingle()
+
+          if (patient) {
+            await supabase.from('appointments').insert({
+              patient_id: patient.id,
+              title: `${chosenSlot.treatment} - ${found.patientName}`,
+              status: 'confirmed',
+              start_time: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+              end_time: new Date(Date.now() + 24 * 3600 * 1000 + 45 * 60 * 1000).toISOString(),
+              notes: `Sede: ${chosenBranch}. Confirmado por Dra. Aura Estudillo.`
+            })
+          }
+        } catch (dbErr) {
+          console.warn('Persistencia opcional en appointments Supabase:', dbErr)
+        }
+
+        return NextResponse.json({
+          success: true,
+          updatedCase: found,
+          officialMessageToPatient: found.doctorNotes
+        })
       }
 
       found.status = decision === 'approved_exceptional' ? 'approved_exceptional' : 'scheduled_first_hour'
