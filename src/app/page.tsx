@@ -496,9 +496,9 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Indicador Único y Limpio del consumo alimenticio dinámico */}
+        {/* Indicador Único y Limpio del consumo alimenticio dinámico (Solo Desktop para no encimar en móvil) */}
         {splitPercent > 5 && (
-          <div className="absolute top-16 sm:top-24 left-1/2 -translate-x-1/2 z-30 pointer-events-none transition-opacity duration-300">
+          <div className="hidden md:block absolute top-24 left-1/2 -translate-x-1/2 z-30 pointer-events-none transition-opacity duration-300">
             <span className="px-3.5 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-amber-950/90 text-amber-300 backdrop-blur-md border border-amber-500/40 shadow-lg whitespace-nowrap">
               🍽️ PLACA &amp; PIGMENTACIÓN — NIVEL ACTIVO {Math.round(splitPercent)}%
             </span>
@@ -561,13 +561,23 @@ export default function LandingPage() {
         {/* ======================================================== */}
         {/* ESTRUCTURA MÓVIL SECUENCIAL Y FLUIDA (block md:hidden) */}
         {/* ======================================================== */}
-        <div className="md:hidden relative z-20 px-4 flex flex-col gap-5 w-full max-w-lg mx-auto">
+        <div className="md:hidden relative z-20 px-4 flex flex-col gap-4 w-full max-w-lg mx-auto">
           {/* 1° Titular y Descripción */}
           <div className="text-center space-y-2">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-amber-300 text-[10px] font-bold uppercase tracking-wider">
               <Sparkles className="w-3 h-3 text-amber-400" />
               Lumen Clinical Aesthetics • Audenti Pro
             </div>
+            
+            {/* Indicador móvil limpio */}
+            {splitPercent > 5 && (
+              <div className="pt-1">
+                <span className="inline-block px-3 py-0.5 rounded-full text-[9px] font-bold uppercase bg-amber-950/90 text-amber-300 border border-amber-500/40">
+                  🍽️ Placa activa: {Math.round(splitPercent)}%
+                </span>
+              </div>
+            )}
+
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight font-hanken">
               La arquitectura de tu mejor sonrisa.
             </h1>
@@ -593,36 +603,35 @@ export default function LandingPage() {
             </a>
           </div>
 
-          {/* 3° Área del Modelo Dental Interactivo (+40% más grande, con comida Veo 3 integrada) */}
-          <div className="relative w-full h-[330px] rounded-3xl overflow-hidden border border-white/20 shadow-2xl bg-slate-950 my-1">
-            {/* Fondo de Comida Veo 3 dentro de la tarjeta móvil con opacidad suave */}
+          {/* 3° Área del Modelo Dental Interactivo con Comida Veo 3 Visible */}
+          <div className="relative w-full h-[340px] rounded-3xl overflow-hidden border border-white/20 shadow-2xl bg-slate-950 my-1">
+            {/* FONDO DE COMIDA VEO 3 CLARAMENTE VISIBLE */}
             <div 
               className="absolute inset-0 pointer-events-none z-10 overflow-hidden transition-all duration-300 ease-out"
               style={{
-                opacity: Math.max(0.12, 0.50 - (splitPercent / 100) * 0.40),
-                filter: `blur(${(splitPercent / 100) * 1.5}px)`,
+                opacity: Math.max(0.25, 0.85 - (splitPercent / 100) * 0.65),
               }}
             >
               <img
                 src={ASSETS.floatingFood}
                 alt="Alimentos pigmentantes flotantes"
-                className="w-full h-full object-cover object-center mix-blend-screen select-none"
+                className="w-full h-full object-cover object-center select-none"
               />
+              <div className="absolute inset-0 bg-slate-950/30" />
             </div>
 
-            {/* Capa After (Dientes Blancos - Tamaño Ampliado 40%) */}
-            <div className="absolute inset-0 w-full h-full overflow-hidden">
+            {/* Capa After (Dientes Blancos) */}
+            <div className="absolute inset-0 w-full h-full overflow-hidden z-20">
               <img
                 src={ASSETS.after}
                 alt="Dientes blancos después"
-                className="w-full h-full object-cover object-center scale-110 pointer-events-none"
+                className="w-full h-full object-cover object-center scale-110 pointer-events-none mix-blend-screen"
               />
-              <div className="absolute inset-0 bg-linear-to-t from-slate-950/60 via-transparent to-slate-950/20 pointer-events-none" />
             </div>
 
             {/* Capa Before interactiva (Dientes Manchados) */}
             <div
-              className="absolute inset-y-0 left-0 overflow-hidden transition-[width] duration-75 ease-out"
+              className="absolute inset-y-0 left-0 overflow-hidden transition-[width] duration-75 ease-out z-20"
               style={{ width: `${splitPercent}%` }}
             >
               <div
@@ -632,19 +641,18 @@ export default function LandingPage() {
                 <img
                   src={ASSETS.before}
                   alt="Dientes manchados antes"
-                  className="w-full h-full object-cover object-center scale-110 pointer-events-none"
+                  className="w-full h-full object-cover object-center scale-110 pointer-events-none mix-blend-screen"
                 />
-                <div className="absolute inset-0 bg-linear-to-t from-slate-950/70 via-transparent to-slate-950/30 pointer-events-none" />
               </div>
             </div>
 
             {/* Badges de fase en móvil */}
-            <div className="absolute top-3 left-3 z-20 pointer-events-none">
+            <div className="absolute top-3 left-3 z-30 pointer-events-none">
               <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-950/85 text-slate-200 border border-white/20 shadow-md">
                 Antes
               </span>
             </div>
-            <div className="absolute top-3 right-3 z-20 pointer-events-none">
+            <div className="absolute top-3 right-3 z-30 pointer-events-none">
               <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 border border-amber-300 shadow-md">
                 Después
               </span>
