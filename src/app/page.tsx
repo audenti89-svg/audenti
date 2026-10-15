@@ -449,16 +449,15 @@ export default function LandingPage() {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
-        className="relative w-full h-[100svh] min-h-[640px] select-none touch-pan-y outline-none overflow-hidden bg-slate-950 cursor-crosshair pt-16"
+        className="relative w-full min-h-[100svh] select-none touch-pan-y outline-none overflow-hidden bg-slate-950 cursor-crosshair pt-28 pb-12 md:pb-0 md:pt-16 flex flex-col justify-between md:block"
         aria-label="Comparador interactivo de moldes dentales con seguimiento de cursor y táctil"
       >
-        {/* ELEMENTOS DE COMIDA/BEBIDA FLOTANTES VEO 3 (Cazuela de guisado, plato gourmet, café espresso y copa de vino) */}
-        {/* EFECTO DE CONSUMO: Al deslizar a la derecha (splitPercent sube), la comida se desvanece suavemente como si fuera consumida */}
+        {/* ======================================================== */}
+        {/* FONDO DESKTOP & MÓVIL: COMIDA FLOTANTE VEO 3 CON CONSUMO DINÁMICO */}
+        {/* ======================================================== */}
         <div 
           className="absolute inset-0 pointer-events-none z-10 overflow-hidden transition-all duration-300 ease-out"
           style={{
-            // Con splitPercent = 0% (dientes limpios), opacidad 0.65 (comida intacta)
-            // Con splitPercent = 100% (dientes sucios), opacidad desciende hacia 0.05 (comida consumida)
             opacity: Math.max(0.04, 0.65 - (splitPercent / 100) * 0.58),
             filter: `blur(${(splitPercent / 100) * 2}px)`,
             transform: `scale(${1 - (splitPercent / 100) * 0.05})`,
@@ -468,27 +467,27 @@ export default function LandingPage() {
           <img
             src={ASSETS.floatingFood}
             alt="Alimentos pigmentantes flotantes: cazuela de guisado, plato gourmet, café y vino tinto"
-            className="w-full h-full object-cover object-center mix-blend-screen select-none"
+            className="w-full h-full object-cover md:object-cover object-center mix-blend-screen select-none"
             draggable={false}
           />
 
-          {/* Insignias sutiles contextuales de pigmentos */}
-          <div className="absolute top-28 left-[6%] sm:left-[10%] flex items-center gap-2 p-2 sm:p-2.5 rounded-2xl bg-slate-950/60 backdrop-blur-md border border-amber-500/30 text-amber-200 text-[10px] font-mono tracking-widest uppercase shadow-xl select-none">
+          {/* Insignias sutiles contextuales de pigmentos (visibles en desktop y tablet) */}
+          <div className="hidden sm:flex absolute top-28 left-[6%] sm:left-[10%] items-center gap-2 p-2 sm:p-2.5 rounded-2xl bg-slate-950/60 backdrop-blur-md border border-amber-500/30 text-amber-200 text-[10px] font-mono tracking-widest uppercase shadow-xl select-none">
             <Coffee className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden sm:inline">Taninos &amp; Café</span>
+            <span>Taninos &amp; Café</span>
           </div>
 
-          <div className="absolute top-36 right-[6%] sm:right-[12%] flex items-center gap-2 p-2 sm:p-2.5 rounded-2xl bg-slate-950/60 backdrop-blur-md border border-rose-500/30 text-rose-200 text-[10px] font-mono tracking-widest uppercase shadow-xl select-none">
+          <div className="hidden sm:flex absolute top-36 right-[6%] sm:right-[12%] items-center gap-2 p-2 sm:p-2.5 rounded-2xl bg-slate-950/60 backdrop-blur-md border border-rose-500/30 text-rose-200 text-[10px] font-mono tracking-widest uppercase shadow-xl select-none">
             <Wine className="w-3.5 h-3.5 text-rose-400" />
-            <span className="hidden sm:inline">Cromógenos &amp; Vino</span>
+            <span>Cromógenos &amp; Vino</span>
           </div>
         </div>
 
         {/* Micro-indicador del consumo alimenticio dinámico */}
         {splitPercent > 5 && (
-          <div className="absolute top-24 left-1/2 -translate-x-1/2 z-20 pointer-events-none transition-opacity duration-300">
-            <span className="px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-amber-950/80 text-amber-300 backdrop-blur-md border border-amber-500/40 shadow-lg">
-              🍽️ Placa &amp; Pigmentación Activa ({Math.round(splitPercent)}%)
+          <div className="absolute top-20 sm:top-24 left-1/2 -translate-x-1/2 z-30 pointer-events-none transition-opacity duration-300">
+            <span className="px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-amber-950/90 text-amber-300 backdrop-blur-md border border-amber-500/40 shadow-lg">
+              🍽️ Placa &amp; Pigmentación ({Math.round(splitPercent)}%)
             </span>
           </div>
         )}
@@ -499,53 +498,162 @@ export default function LandingPage() {
           className="absolute inset-0 w-full h-full pointer-events-none z-10"
         />
 
-        {/* CAPA 1: AFTER (Clean cast - Dientes 100% Blancos - 1.webp) */}
-        <div className="absolute inset-0 w-full h-full overflow-hidden">
-          <img
-            src={ASSETS.after}
-            alt="Molde dental después del tratamiento de estética dental de alta precisión"
-            className="w-full h-full object-cover object-center pointer-events-none"
-            draggable={false}
-          />
-          <div className="absolute inset-0 bg-linear-to-t from-slate-950/80 via-transparent to-slate-950/30 pointer-events-none" />
-        </div>
-
-        {/* CAPA 2: BEFORE (Stained cast - Dientes Manchados - 2.webp) */}
-        {/* Totalmente a la izquierda (0%) muestra dientes 100% blancos. */}
-        {/* Al mover el cursor a la derecha, se revela de izquierda a derecha. */}
-        <div
-          className="absolute inset-y-0 left-0 overflow-hidden transition-[width] duration-75 ease-out"
-          style={{ width: `${splitPercent}%` }}
-        >
-          <div
-            className="relative h-full"
-            style={{ width: heroRef.current ? `${heroRef.current.clientWidth}px` : '100vw' }}
-          >
+        {/* ======================================================== */}
+        {/* CAPA DE FONDOS DENTALES EN DESKTOP (Full-Screen) */}
+        {/* ======================================================== */}
+        <div className="hidden md:block absolute inset-0 w-full h-full">
+          {/* AFTER (Clean cast - 1.webp) */}
+          <div className="absolute inset-0 w-full h-full overflow-hidden">
             <img
-              src={ASSETS.before}
-              alt="Molde dental antes del tratamiento clínico"
+              src={ASSETS.after}
+              alt="Molde dental después del tratamiento de estética dental de alta precisión"
               className="w-full h-full object-cover object-center pointer-events-none"
               draggable={false}
             />
-            <div className="absolute inset-0 bg-linear-to-t from-slate-950/85 via-transparent to-slate-950/40 pointer-events-none" />
+            <div className="absolute inset-0 bg-linear-to-t from-slate-950/80 via-transparent to-slate-950/30 pointer-events-none" />
+          </div>
+
+          {/* BEFORE (Stained cast - 2.webp) */}
+          <div
+            className="absolute inset-y-0 left-0 overflow-hidden transition-[width] duration-75 ease-out"
+            style={{ width: `${splitPercent}%` }}
+          >
+            <div
+              className="relative h-full"
+              style={{ width: heroRef.current ? `${heroRef.current.clientWidth}px` : '100vw' }}
+            >
+              <img
+                src={ASSETS.before}
+                alt="Molde dental antes del tratamiento clínico"
+                className="w-full h-full object-cover object-center pointer-events-none"
+                draggable={false}
+              />
+              <div className="absolute inset-0 bg-linear-to-t from-slate-950/85 via-transparent to-slate-950/40 pointer-events-none" />
+            </div>
           </div>
         </div>
 
-        {/* ETIQUETAS FLOTANTES BEFORE / AFTER */}
-        <div className="absolute top-24 left-6 z-20 pointer-events-none">
+        {/* ETIQUETAS FLOTANTES BEFORE / AFTER (Desktop) */}
+        <div className="hidden md:block absolute top-24 left-6 z-20 pointer-events-none">
           <span className="px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase bg-slate-900/70 text-slate-300 backdrop-blur-md border border-white/10">
             Fase 01 • Estado Inicial
           </span>
         </div>
-        <div className="absolute top-24 right-6 z-20 pointer-events-none text-right">
+        <div className="hidden md:block absolute top-24 right-6 z-20 pointer-events-none text-right">
           <span className="px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase bg-amber-400/90 text-slate-950 backdrop-blur-md border border-amber-300 font-bold">
             Fase 02 • Escaneo &amp; Perfeccionamiento
           </span>
         </div>
 
-        {/* PÍLDORAS FLOTANTES DE ESTADÍSTICAS */}
+        {/* ======================================================== */}
+        {/* ESTRUCTURA MÓVIL SECUENCIAL Y FLUIDA (block md:hidden) */}
+        {/* ======================================================== */}
+        <div className="md:hidden relative z-20 px-5 flex flex-col gap-6 w-full max-w-lg mx-auto">
+          {/* 1° Titular y Descripción */}
+          <div className="text-center space-y-2.5">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-amber-300 text-[10px] font-bold uppercase tracking-wider">
+              <Sparkles className="w-3 h-3 text-amber-400" />
+              Lumen Clinical Aesthetics • Audenti Pro
+            </div>
+            <h1 className="text-3xl font-black text-white tracking-tight leading-tight font-hanken">
+              La arquitectura de tu mejor sonrisa.
+            </h1>
+            <p className="text-xs text-slate-300 leading-relaxed max-w-sm mx-auto">
+              Odontología de alta precisión, biocompatibilidad suiza y escaneo 3D con la Dra. Aura Estudillo (Céd. Prof. 8492019).
+            </p>
+          </div>
+
+          {/* 2° Botones de Acción */}
+          <div className="flex items-center justify-center gap-2.5">
+            <a
+              href="#reservar"
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shadow-lg transition-all active:scale-95"
+            >
+              Reservar Cita
+              <ArrowRight className="w-3.5 h-3.5" />
+            </a>
+            <a
+              href="#about"
+              className="inline-flex items-center justify-center px-4 py-2.5 rounded-full bg-white/15 hover:bg-white/25 text-white text-xs font-bold border border-white/20 backdrop-blur-md transition-all"
+            >
+              Conocer Estudio
+            </a>
+          </div>
+
+          {/* 3° Área del Modelo Dental Interactivo (Completamente visible) */}
+          <div className="relative w-full aspect-4/3 rounded-3xl overflow-hidden border border-white/15 shadow-2xl bg-slate-900/60 my-1">
+            {/* Capa After */}
+            <div className="absolute inset-0 w-full h-full">
+              <img
+                src={ASSETS.after}
+                alt="Dientes blancos después"
+                className="w-full h-full object-cover object-center pointer-events-none"
+              />
+            </div>
+            {/* Capa Before interactiva */}
+            <div
+              className="absolute inset-y-0 left-0 overflow-hidden transition-[width] duration-75 ease-out"
+              style={{ width: `${splitPercent}%` }}
+            >
+              <div
+                className="relative h-full"
+                style={{ width: heroRef.current ? `${heroRef.current.clientWidth - 40}px` : '90vw' }}
+              >
+                <img
+                  src={ASSETS.before}
+                  alt="Dientes manchados antes"
+                  className="w-full h-full object-cover object-center pointer-events-none"
+                />
+              </div>
+            </div>
+
+            {/* Badges de fase en móvil */}
+            <div className="absolute top-2.5 left-2.5 z-20 pointer-events-none">
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-slate-950/80 text-slate-300 border border-white/10">
+                Antes
+              </span>
+            </div>
+            <div className="absolute top-2.5 right-2.5 z-20 pointer-events-none">
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-amber-400 text-slate-950 font-black border border-amber-300">
+                Después
+              </span>
+            </div>
+          </div>
+
+          {/* 4° Píldoras de Estadísticas Debajo de la Dentadura */}
+          <div className="grid grid-cols-2 gap-2.5 w-full">
+            <div className="p-3 rounded-2xl bg-slate-950/75 backdrop-blur-md border border-white/15 text-white shadow-xl">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-xl font-black text-amber-400 font-hanken">07 tonos</span>
+              </div>
+              <p className="text-[10px] text-slate-300 mt-0.5 leading-tight">
+                Más blancos con tecnología LED.
+              </p>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-slate-950/75 backdrop-blur-md border border-white/15 text-white shadow-xl">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-xl font-black text-amber-400 font-hanken">4,200+</span>
+              </div>
+              <p className="text-[10px] text-slate-300 mt-0.5 leading-tight">
+                Sonrisas perfeccionadas.
+              </p>
+            </div>
+          </div>
+
+          {/* 5° Hint de Interacción Táctil */}
+          <div className="text-center pt-1 pb-2">
+            <span className="text-[10px] font-semibold tracking-wider uppercase text-slate-400 bg-slate-900/80 backdrop-blur-xs px-3.5 py-1 rounded-full border border-white/10 shadow-lg inline-block">
+              ← Desliza tu dedo en la imagen para ver el cambio →
+            </span>
+          </div>
+        </div>
+
+        {/* ======================================================== */}
+        {/* DESKTOP: PÍLDORAS Y HERO CALL TO ACTION (md:block) */}
+        {/* ======================================================== */}
         <div
-          className={`absolute bottom-32 sm:bottom-28 left-6 sm:left-12 z-20 space-y-2 pointer-events-auto transition-opacity duration-300 ${
+          className={`hidden md:block absolute bottom-32 sm:bottom-28 left-6 sm:left-12 z-20 space-y-2 pointer-events-auto transition-opacity duration-300 ${
             isOverText ? 'opacity-20' : 'opacity-100'
           }`}
           onMouseEnter={() => setIsOverText(true)}
@@ -572,9 +680,9 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* HERO TITLE & CALL TO ACTION */}
+        {/* HERO TITLE & CALL TO ACTION (Desktop) */}
         <div
-          className={`absolute bottom-8 right-6 sm:right-12 z-20 text-right pointer-events-auto max-w-xl transition-opacity duration-300 ${
+          className={`hidden md:block absolute bottom-8 right-6 sm:right-12 z-20 text-right pointer-events-auto max-w-xl transition-opacity duration-300 ${
             isOverText ? 'opacity-30' : 'opacity-100'
           }`}
           onMouseEnter={() => setIsOverText(true)}
@@ -608,11 +716,10 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Hint de Interacción Adaptativo (Mobile & Desktop) */}
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 pointer-events-none text-center px-4 w-full max-w-sm">
+        {/* Hint de Interacción en Desktop */}
+        <div className="hidden md:block absolute bottom-3 left-1/2 -translate-x-1/2 z-20 pointer-events-none text-center px-4 w-full max-w-sm">
           <span className="text-[10px] font-semibold tracking-wider uppercase text-slate-400 bg-slate-950/70 backdrop-blur-xs px-3.5 py-1 rounded-full border border-white/10 shadow-lg inline-block">
-            <span className="sm:hidden">Desliza el dedo para revelar el cambio →</span>
-            <span className="hidden sm:inline">← Desplaza el cursor o desliza tu dedo para revelar el cambio →</span>
+            ← Desplaza el cursor o desliza tu dedo para revelar el cambio →
           </span>
         </div>
       </section>
