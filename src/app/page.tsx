@@ -155,13 +155,13 @@ export default function LandingPage() {
     }
     window.addEventListener('resize', handleResize)
 
-    // Fuentes de emisión de partículas (posiciones relativas de los alimentos flotantes)
-    // Cazuela de guisado (arriba izq), Plato gourmet (arriba der), Café (abajo centro-izq), Copa de vino (abajo der)
+    // Fuentes de emisión de partículas (posiciones relativas armonizadas de los alimentos flotantes)
+    // Cazuela (extremo izq), Café espresso (inferior izq despejado), Plato gourmet (superior der), Vino (inferior der)
     const foodSources = [
-      { xPct: 0.18, yPct: 0.28, color: '#9a3412', name: 'Guisado' }, // pimentón / salsa oscura
-      { xPct: 0.78, yPct: 0.26, color: '#7c2d12', name: 'Gourmet' }, // reducción de carne
-      { xPct: 0.38, yPct: 0.72, color: '#b45309', name: 'Espresso' }, // café tostado
-      { xPct: 0.82, yPct: 0.74, color: '#881337', name: 'Vino' }, // taninos de vino tinto
+      { xPct: 0.10, yPct: 0.28, color: '#9a3412', name: 'Guisado' }, // pimentón / salsa oscura
+      { xPct: 0.88, yPct: 0.22, color: '#7c2d12', name: 'Gourmet' }, // reducción de carne
+      { xPct: 0.14, yPct: 0.78, color: '#b45309', name: 'Espresso' }, // taza de café desplazada a la izquierda
+      { xPct: 0.88, yPct: 0.75, color: '#881337', name: 'Vino' }, // taninos de vino tinto
     ]
 
     const PARTICLE_COUNT = 55
