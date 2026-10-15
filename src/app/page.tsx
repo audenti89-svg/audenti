@@ -398,28 +398,32 @@ export default function LandingPage() {
             <a href="#contacto" className="hover:text-slate-900 transition-colors">Ubicación</a>
           </nav>
 
-          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Botón Acceso Clínico (Visible en sm y superiores) */}
             <button
               onClick={() => openAuth('login')}
-              className="inline-flex items-center gap-1 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-full border border-slate-300 hover:border-slate-900 bg-white text-[11px] sm:text-xs font-bold text-slate-800 transition-all shadow-2xs cursor-pointer whitespace-nowrap"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-slate-300 hover:border-slate-900 bg-white text-xs font-bold text-slate-800 transition-all shadow-2xs cursor-pointer whitespace-nowrap"
             >
-              <Lock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-500" />
+              <Lock className="w-3.5 h-3.5 text-amber-500" />
               <span>Acceso Clínico</span>
             </button>
+
+            {/* Botón Principal Agendar Cita */}
             <a
               href="#reservar"
-              className="inline-flex items-center gap-1 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-slate-900 hover:bg-slate-800 text-[11px] sm:text-xs font-bold text-white transition-all shadow-xs whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full bg-slate-900 hover:bg-slate-800 text-xs font-bold text-white transition-all shadow-xs whitespace-nowrap"
             >
+              <Calendar className="w-3.5 h-3.5 text-amber-400" />
               <span>Agendar</span>
-              <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400 hidden xs:inline" />
             </a>
+
             {/* Botón Menú Móvil */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-1.5 sm:p-2 rounded-xl text-slate-700 hover:bg-slate-200 transition-colors"
+              className="md:hidden p-2 rounded-xl text-slate-700 hover:bg-slate-200 transition-colors"
               aria-label="Abrir menú"
             >
-              {mobileMenuOpen ? <X className="w-4 h-4 sm:w-5 sm:h-5" /> : <Menu className="w-4 h-4 sm:w-5 sm:h-5" />}
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
@@ -432,6 +436,15 @@ export default function LandingPage() {
             <a href="#tratamientos" onClick={() => setMobileMenuOpen(false)} className="block py-2">Tratamientos</a>
             <a href="#equipo" onClick={() => setMobileMenuOpen(false)} className="block py-2">Especialistas</a>
             <a href="#contacto" onClick={() => setMobileMenuOpen(false)} className="block py-2">Ubicación</a>
+            <div className="pt-2 border-t border-slate-100">
+              <button
+                onClick={() => openAuth('login')}
+                className="w-full py-2.5 rounded-xl bg-amber-400 text-slate-950 font-bold inline-flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+              >
+                <Lock className="w-4 h-4" />
+                Acceso Clínico Especialistas
+              </button>
+            </div>
           </div>
         )}
       </header>
