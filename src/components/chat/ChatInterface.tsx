@@ -191,8 +191,8 @@ export function ChatInterface() {
 
     const newMsg: Message = {
       id: Date.now().toString(),
-      senderName: 'Dra. Sofía Valero',
-      senderInitials: 'SV',
+      senderName: 'Dra. Aura Estudillo',
+      senderInitials: 'AE',
       content: inputMessage.trim(),
       time: new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date()),
       isOwn: true,
