@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { MessageSquare, Sparkles, X, Send, Bot, User, ArrowRight, Calendar, Volume2, VolumeX, ShieldCheck } from 'lucide-react'
 import { useAccessibility } from '@/context/AccessibilityContext'
+import { AuraHologram } from './AuraHologram'
 
 interface Message {
   id: string
@@ -110,7 +111,7 @@ export function PublicAiChatWidget() {
       const res = await fetch('/api/ai/public-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history })
+        body: JSON.stringify({ messages: history, role: 'public' })
       })
 
       const data = await res.json()
@@ -146,40 +147,40 @@ export function PublicAiChatWidget() {
 
   return (
     <div className="fixed bottom-5 right-5 z-50 select-none">
-      {/* Botón Flotante para Abrir Chat */}
+      {/* Botón Flotante para Abrir Chat con Avatar Holográfico */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="group relative flex items-center gap-2.5 px-4 py-3 rounded-full bg-slate-900 text-white shadow-2xl border-2 border-amber-400 hover:bg-slate-800 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+          className="group relative flex items-center gap-3 pl-2 pr-4 py-2 rounded-full bg-slate-900/95 text-white shadow-2xl border-2 border-amber-400 hover:border-cyan-400 hover:bg-slate-800 transition-all hover:scale-105 active:scale-95 cursor-pointer backdrop-blur-md"
           aria-label="Abrir Aura AI"
         >
-          <div className="relative">
-            <Sparkles className="w-5 h-5 text-amber-400 animate-pulse" />
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full ring-2 ring-slate-900 animate-ping" />
+          <AuraHologram isActive={false} size="sm" />
+          <div className="flex flex-col text-left">
+            <span className="text-xs font-black tracking-tight flex items-center gap-1.5">
+              Aura AI
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            </span>
+            <span className="text-[10px] text-amber-300 font-medium">Asistente Virtual</span>
           </div>
-          <span className="text-xs font-bold tracking-tight">Aura AI</span>
-          <span className="hidden sm:inline text-[10px] px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 font-mono">
-            En línea
-          </span>
         </button>
       )}
 
-      {/* Ventana de Chat Expandida */}
+      {/* Ventana de Chat Expandida con Holograma en Cabecera */}
       {isOpen && (
-        <div className="w-[92vw] sm:w-[380px] h-[520px] max-h-[85vh] bg-slate-950 text-white rounded-3xl border border-slate-800 shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="w-[92vw] sm:w-[390px] h-[540px] max-h-[85vh] bg-slate-950 text-white rounded-3xl border border-slate-800 shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
           
-          {/* Header del Chat */}
-          <div className="p-4 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
+          {/* Header del Chat con Holograma */}
+          <div className="p-3.5 bg-slate-900/95 border-b border-slate-800 flex items-center justify-between backdrop-blur-md">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-2xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 shadow-inner">
-                <Sparkles className="w-5 h-5" />
-              </div>
+              <AuraHologram isActive={isOpen} size="md" />
               <div>
-                <h3 className="text-xs font-black text-white flex items-center gap-1.5 font-hanken">
+                <h3 className="text-sm font-black text-white flex items-center gap-1.5 font-hanken">
                   Aura AI
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                  <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-cyan-950 text-cyan-300 font-mono border border-cyan-500/30">
+                    Hologram
+                  </span>
                 </h3>
-                <p className="text-[10px] text-slate-400">
+                <p className="text-[11px] text-slate-300">
                   Dra. Aura Estudillo • Céd. 8492019
                 </p>
               </div>
@@ -196,7 +197,7 @@ export function PublicAiChatWidget() {
               className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
               aria-label="Cerrar chat"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 

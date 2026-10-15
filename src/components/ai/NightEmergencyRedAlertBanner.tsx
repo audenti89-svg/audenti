@@ -45,7 +45,7 @@ export function NightEmergencyRedAlertBanner() {
   const [minimized, setMinimized] = useState(false)
   const { playTone } = useNotificationSound()
 
-  // Polling ligero cada 8 segundos para detectar emergencias nocturnas escaladas
+  // Sincronización rápida (3s) y escucha de eventos para tiempo real instantáneo
   const fetchEmergencies = async () => {
     try {
       const res = await fetch('/api/ai/night-emergency')
@@ -68,9 +68,19 @@ export function NightEmergencyRedAlertBanner() {
 
   useEffect(() => {
     fetchEmergencies()
-    const interval = setInterval(fetchEmergencies, 7000)
-    return () => clearInterval(interval)
-  }, [])
+    const interval = setInterval(fetchEmergencies, 3000)
+
+    // Escuchar eventos locales en tiempo real
+    const handleStorageChange = () => fetchEmergencies()
+    window.addEventListener('storage', handleStorageChange)
+    window.addEventListener('audenti_emergency_refresh', handleStorageChange)
+
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('storage', handleStorageChange)
+      window.removeEventListener('audenti_emergency_refresh', handleStorageChange)
+    }
+  }, [activeCase])
 
   const handleDecision = async (decision: 'approved_exceptional' | 'scheduled_first_hour') => {
     if (!activeCase) return

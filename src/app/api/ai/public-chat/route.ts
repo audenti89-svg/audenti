@@ -12,30 +12,41 @@ interface ChatMessage {
   tool_calls?: any[]
 }
 
-const PUBLIC_SYSTEM_PROMPT = `Eres "Aura AI", la asistente virtual y concierge inteligente de la clínica dental de alta gama "Audenti — DentalCloud Pro", dirigida por la Dra. Aura Estudillo (Directora Médica & Especialista en Estética Oral, Cédula Profesional 8492019).
+const PUBLIC_WARM_SYSTEM_PROMPT = `Eres "Aura AI", la asistente virtual y concierge inteligente de la clínica dental de alta gama "Audenti — DentalCloud Pro", dirigida por la Dra. Aura Estudillo (Directora Médica & Especialista en Estética Oral, Cédula Profesional 8492019).
+
+PERSONALIDAD (ROL PÚBLICO - CÁLIDO, ACOGEDOR Y HUMANO):
+- Eres sumamente acogedora, empática, dulce, reconfortante y cercana. El paciente debe sentirse arropado, comprendido y en total confianza desde el primer segundo.
+- Escucha activamente sus inquietudes o miedos dentales con ternura y respeto.
 
 REGLAS DE CIBERSEGURIDAD CLÍNICA, PRIVACIDAD Y GUARDRAILS INQUEBRANTABLES:
 
-1. PROHIBICIÓN ABSOLUTA DE MEDICAMENTOS Y RECETAS:
-   - Queda TERMINANTEMENTE PROHIBIDO mencionar nombres de medicamentos (ej. ibuprofeno, paracetamol, amoxicilina, ketorolaco, clonixinato, naproxeno, aspirina, etc.), miligramos, dosis, gramos u horarios de ingesta.
-   - Si el usuario pregunta qué tomar, qué pastilla tomar o qué medicamento usar para el dolor, infección o cualquier síntoma, DEBES RESPONDER EXACTAMENTE CON ESTE MENSAJE OBLIGATORIO:
+1. PROHIBICIÓN ABSOLUTA DE MEDICAMENTOS, DOSIS Y DIAGNÓSTICOS:
+   - Queda TERMINANTEMENTE PROHIBIDO diagnosticar patologías invasivas o mencionar nombres de fármacos (ej. ibuprofeno, paracetamol, amoxicilina, ketorolaco, clonixinato, naproxeno, aspirina, etc.), miligramos, dosis u horarios.
+   - Si el usuario pregunta qué tomar, qué pastilla tomar o qué remedio usar para el dolor o síntoma, DEBES RESPONDER EXACTAMENTE CON ESTE MENSAJE OBLIGATORIO:
    "No tengo permitido recomendar ni recetar medicamentos. He enviado tu reporte directamente a la Dra. Aura Estudillo. Por favor ingresa tu número de WhatsApp y mantente en línea mientras la doctora evalúa tu caso para darte la indicación correspondiente."
 
 2. PRIVACIDAD DE GEOLOCALIZACIÓN Y TIEMPOS RELATIVOS:
-   - NUNCA reveles calles, números ni direcciones físicas exactas de las sedes ni del paciente, para resguardar la seguridad y privacidad.
-   - Limítate estrictamente a informar el nombre de la sede y el cálculo de tiempos relativos de traslado o distancia:
+   - NUNCA reveles calles, números ni direcciones físicas exactas de las sedes ni del paciente.
+   - Limítate estrictamente a informar el nombre de la sede y el cálculo de tiempos relativos de traslado:
    "La Dra. Aura Estudillo se encuentra a [X minutos / X km] de ti en la Sede [Nombre de Sede]. Estamos verificando en el sistema y en su panel directo si puede atenderte hoy de emergencia o a primera hora. Por favor mantente en línea."
 
-3. LIMITACIÓN DE RESPUESTAS A TEXTOS BREVES Y CONCRETOS:
-   - PROHIBIDO generar párrafos largos o guías extensas de primeros auxilios.
-   - Todas tus respuestas deben ser breves, directas, empáticas y enfocadas en mantener al paciente en línea en espera de la confirmación o decisión remota de la Dra. Aura.
+3. PROTOCOLO PUENTE NOCTURNO 24/7 (🔴 ALERTA ROJA):
+   - Ante dolor severo o urgencias, usa la herramienta \`escalarEmergenciaNocturnaDraAura\` de inmediato para avisar a la doctora en tiempo real y pide con amabilidad el número de WhatsApp.
 
-4. PROTOCOLO PUENTE NOCTURNO 24/7 (🔴 ALERTA ROJA):
-   - Ante dolor agudo o urgencias fuera de horario, usa de inmediato la herramienta \`escalarEmergenciaNocturnaDraAura\` y mantén la respuesta concisa solicitando su WhatsApp.
+4. COSTOS Y CITAS:
+   - Usa \`consultarCostosTratamiento\` para aranceles y \`consultarDisponibilidadCalendario\` para fechas con la Dra. Aura.`
 
-5. COSTOS Y CITAS:
-   - Usa \`consultarCostosTratamiento\` para aranceles y \`consultarDisponibilidadCalendario\` para fechas.
-   - NUNCA respondas con nombres de fármacos ni desgloses de automedicación.`
+const DOCTOR_EXECUTIVE_SYSTEM_PROMPT = `Eres "Aura AI Copilot", el copiloto clínico, operativo y analítico de máxima confianza para la Dra. Aura Estudillo (Directora Médica & Propietaria de Audenti, Cédula 8492019).
+
+PERSONALIDAD (ROL INTERNO / DOCTORA - EJECUTIVO Y PROFESIONAL):
+- 100% profesional, analítico, eficiente, quirúrgico y directo al grano.
+- Cero rodeos innecesarios. Proveer resúmenes ejecutivos, balances de sedes (Balbuena matriz vs Guadalupe Chalma), triaje clínico clasificado por severidad y sugerencias operativas de alto nivel.
+
+CAPACIDADES DEL COPILOTO:
+1. Resumen y clasificación instantánea de quejas, síntomas y pacientes en espera.
+2. Supervisión de alertas de emergencias nocturnas (🔴 Roja / 🟡 Amarilla).
+3. Recomendación de huecos en agenda y optimización del flujo en gabinete.
+4. Soporte en toma de decisiones de aranceles y tratamientos estéticos complejos.`
 
 // Definición de Tools para Groq (OpenAI Function Calling format)
 const TOOLS: any[] = [
@@ -383,10 +394,15 @@ async function ejecutarTool(name: string, args: any) {
 
 export async function POST(request: Request) {
   try {
-    const { messages, userMessage } = await request.json()
+    const { messages, userMessage, role = 'public' } = await request.json()
+
+    // Selector de contexto y personalidad según el rol
+    const activePrompt = role === 'doctor'
+      ? DOCTOR_EXECUTIVE_SYSTEM_PROMPT
+      : PUBLIC_WARM_SYSTEM_PROMPT
 
     const conversation: ChatMessage[] = [
-      { role: 'system', content: PUBLIC_SYSTEM_PROMPT }
+      { role: 'system', content: activePrompt }
     ]
 
     if (Array.isArray(messages) && messages.length > 0) {
@@ -406,7 +422,7 @@ export async function POST(request: Request) {
     // 1. Inferencia Inicial con Tool Calling en Groq
     // Usamos openai/gpt-oss-20b o qwen/qwen3.8-27b con fallback dinámico
     let firstChoice: any = null
-    const modelToUse = 'openai/gpt-oss-20b'
+    const modelToUse = role === 'doctor' ? 'openai/gpt-oss-120b' : 'openai/gpt-oss-20b'
 
     try {
       const completion = await groq.chat.completions.create({
@@ -481,6 +497,34 @@ export async function POST(request: Request) {
       finalReply = firstChoice?.content || ''
     }
 
+    const lowerUser = (userMessage || conversation.map(c => c.content || '').join(' ')).toLowerCase()
+    const lowerReply = (finalReply || '').toLowerCase()
+
+    // Si el usuario reporta dolor o urgencia, asegurar que se registre automáticamente como alerta roja en el panel
+    const EMERGENCY_TRIGGER_REGEX = /\b(dolor|me\s+duele|duele|muela|infecci[oó]n|urgencia|sangrado|emergencia|hinchaz[oó]n|flem[oó]n|golpe|absceso)\b/i
+    if (EMERGENCY_TRIGGER_REGEX.test(lowerUser)) {
+      const caseId = `EMG-${Date.now().toString().slice(-6)}`
+      const nowTime = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+      const autoCase = {
+        id: caseId,
+        patientName: '[Desconocido] Paciente Web en Línea',
+        phone: '[Desconocido] Pendiente por WhatsApp',
+        painLevel: 'severo' as const,
+        symptoms: userMessage || conversation[conversation.length - 1]?.content || 'Dolor dental agudo reportado en chat web',
+        timestamp: nowTime,
+        chatSnippet: `Mensaje de dolor: "${userMessage || conversation[conversation.length - 1]?.content}"`,
+        status: 'pending' as const
+      }
+      if (!globalThis.__audenti_emergency_cases) {
+        globalThis.__audenti_emergency_cases = []
+      }
+      // Evitar duplicados recientes
+      const exists = globalThis.__audenti_emergency_cases.some(c => c.symptoms === autoCase.symptoms)
+      if (!exists) {
+        globalThis.__audenti_emergency_cases = [autoCase, ...globalThis.__audenti_emergency_cases].slice(0, 30)
+      }
+    }
+
     // ========================================================
     // FILTRO DE CONTENCIÓN ESTRICTO Y CIBERSEGURIDAD CLÍNICA:
     // Queda ABSOLUTAMENTE PROHIBIDO que la IA mencione nombres de fármacos,
@@ -488,9 +532,6 @@ export async function POST(request: Request) {
     // ========================================================
     const PROHIBITED_MEDS_REGEX = /\b(ibuprofeno|paracetamol|acetaminof[eé]n|amoxicilina|ketorolaco|clonixinato|naproxeno|aspirina|tramadol|diclofenaco|dexametasona|ampicilina|azitromicina|clindamicina|analg[eé]sico|antibi[oó]tico|\d+\s*mg|\d+\s*miligramos|\d+\s*gramos|cada\s*\d+\s*horas)\b/i
     const ASKS_FOR_MEDS_REGEX = /\b(qu[eé]\s+(tomar|puedo\s+tomar|me\s+tomo|pastilla|medicamento|medicina|remedio|dosis)|receta|rec[eé]tame)\b/i
-
-    const lowerUser = (userMessage || conversation.map(c => c.content).join(' ')).toLowerCase()
-    const lowerReply = finalReply.toLowerCase()
 
     const mandatoryMedicationDenial = 'No tengo permitido recomendar ni recetar medicamentos. He enviado tu reporte directamente a la Dra. Aura Estudillo. Por favor ingresa tu número de WhatsApp y mantente en línea mientras la doctora evalúa tu caso para darte la indicación correspondiente.'
 
