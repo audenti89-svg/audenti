@@ -78,6 +78,42 @@ export default function CrmPage() {
     fetchCrmData()
   }, [])
 
+  const [isAiGenerating, setIsAiGenerating] = useState(false)
+  const [selectedPatientForAi, setSelectedPatientForAi] = useState<any | null>(null)
+  const [aiGeneratedMessage, setAiGeneratedMessage] = useState<string>('')
+  const [aiMeta, setAiMeta] = useState<any | null>(null)
+
+  const handleGenerateAiFollowup = async (patient?: any) => {
+    setIsAiGenerating(true)
+    const targetPatient = patient || selectedPatientForAi || patients[0]
+    const stage = targetPatient ? (patientStages[targetPatient.id] || 'contacto_inicial') : 'contacto_inicial'
+
+    try {
+      const res = await fetch('/api/ai/crm-assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: stage === 'presupuesto_enviado' ? 'budget_reminder' : 'followup',
+          patientName: targetPatient?.full_name || 'Paciente',
+          stage: stage,
+          treatment: targetPatient?.treatment || 'Valoración Integral Dental',
+          notes: targetPatient?.onboarding_completed ? 'Bioseguridad verificada' : 'Nuevo prospecto'
+        })
+      })
+
+      const data = await res.json()
+      if (data?.success && data?.data?.message) {
+        setAiGeneratedMessage(data.data.message)
+        setAiMeta(data.data)
+        if (targetPatient) setSelectedPatientForAi(targetPatient)
+      }
+    } catch (err) {
+      console.error('Error generating AI followup:', err)
+    } finally {
+      setIsAiGenerating(false)
+    }
+  }
+
   const handleChangeStage = (patientId: string, newStage: CrmStage) => {
     setPatientStages(prev => ({
       ...prev,
@@ -398,6 +434,17 @@ export default function CrmPage() {
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleGenerateAiFollowup(p)}
+                        disabled={isAiGenerating}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-xs bg-amber-400 hover:bg-amber-300 text-slate-950 cursor-pointer disabled:opacity-50"
+                        title="Generar mensaje personalizado con Groq IA"
+                      >
+                        <Sparkles className={`w-3.5 h-3.5 ${isAiGenerating ? 'animate-spin' : ''}`} />
+                        Generar Seguimiento IA
+                      </button>
+
                       <div className="flex items-center gap-1.5">
                         <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Etapa:</span>
                         <select
@@ -431,16 +478,16 @@ export default function CrmPage() {
           </div>
         </div>
 
-        {/* Panel Audenti Intelligence (Conectado a 9Router) */}
+        {/* Panel Audenti Intelligence (Groq Llama 3.3 Engine) */}
         <div className="lg:col-span-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
           <div className="flex items-start justify-between border-b border-slate-100 pb-3">
             <div>
               <div className="flex items-center gap-1.5 mb-1">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[10px] font-bold tracking-wider text-amber-700 uppercase">Motor 9Router Activo</span>
+                <span className="text-[10px] font-bold tracking-wider text-amber-700 uppercase">Motor Groq Llama 3.3</span>
               </div>
               <h3 className="text-base font-bold text-slate-900 tracking-tight">Audenti Intelligence</h3>
-              <p className="text-xs text-slate-500">Asistente de Retención y Copiloto Dental</p>
+              <p className="text-xs text-slate-500">Asistente de Retención y Conversión Dental</p>
             </div>
             <div className="p-2 rounded-xl bg-amber-100/60 text-slate-900 border border-amber-200">
               <Sparkles className="w-5 h-5 text-amber-600" />
@@ -449,22 +496,60 @@ export default function CrmPage() {
 
           <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/70 text-xs text-slate-600 flex items-start gap-2">
             <Info className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
-            <span>Soporte decisional clínico. Toda sugerencia requiere aprobación médica antes del envío.</span>
+            <span>Respuestas clínicas asistidas en milisegundos con Groq SDK. Diseñado para la Dra. Aura Estudillo.</span>
           </div>
 
           {/* Borrador Generado por IA */}
           <div className="p-4 rounded-xl bg-amber-50/50 border border-amber-200/80 space-y-3">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-amber-900">Plantilla Oficial: Recordatorio Clínico</span>
+              <span className="font-bold text-amber-900">
+                {selectedPatientForAi ? `Para: ${selectedPatientForAi.full_name}` : 'Plantilla Oficial: Recordatorio Clínico'}
+              </span>
               <span className="text-slate-500">Canal: WhatsApp</span>
             </div>
-            <p className="p-3 bg-white rounded-xl border border-slate-200/80 text-xs italic text-slate-700 leading-relaxed shadow-2xs">
-              “Hola, te saludamos del consultorio de la Dra. Aura Estudillo. Esperamos que te encuentres muy bien. Te compartimos el esquema y citas disponibles para tu atención odontológica. ¿Te gustaría agendar una valoración?”
+
+            {aiMeta && (
+              <div className="flex items-center justify-between text-[11px] bg-amber-100/60 px-2.5 py-1 rounded-lg text-amber-900 font-semibold border border-amber-200/70">
+                <span>Acción: {aiMeta.recommendedAction || 'Seguimiento'}</span>
+                <span className="uppercase text-[9px] px-1.5 py-0.5 rounded bg-white font-bold text-amber-800">
+                  Urgencia: {aiMeta.urgency || 'Media'}
+                </span>
+              </div>
+            )}
+
+            <p className="p-3 bg-white rounded-xl border border-slate-200/80 text-xs italic text-slate-700 leading-relaxed shadow-2xs whitespace-pre-line">
+              {aiGeneratedMessage || (
+                selectedPatientForAi
+                  ? `“Hola ${selectedPatientForAi.full_name}, te saludamos del consultorio de la Dra. Aura Estudillo. Te compartimos los horarios y opciones para tu valoración odontológica. ¿Te gustaría agendar una cita esta semana?”`
+                  : `“Hola, te saludamos del consultorio de la Dra. Aura Estudillo. Esperamos que te encuentres muy bien. Te compartimos el esquema y citas disponibles para tu atención odontológica. ¿Te gustaría agendar una valoración?”`
+              )}
             </p>
+
             <div className="flex flex-col gap-2 pt-1">
               <button
                 type="button"
-                onClick={copyMessage}
+                onClick={() => handleGenerateAiFollowup()}
+                disabled={isAiGenerating}
+                className="w-full py-2 px-3 rounded-xl bg-amber-400 text-slate-950 text-xs font-bold hover:bg-amber-300 transition-colors flex items-center justify-center gap-2 shadow-2xs cursor-pointer disabled:opacity-50"
+              >
+                <Sparkles className={`w-3.5 h-3.5 ${isAiGenerating ? 'animate-spin' : ''}`} />
+                {isAiGenerating ? 'Generando con Groq...' : 'Generar Seguimiento IA'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const text = aiGeneratedMessage || (
+                    selectedPatientForAi
+                      ? `Hola ${selectedPatientForAi.full_name}, te saludamos del consultorio de la Dra. Aura Estudillo. Te compartimos los horarios y opciones para tu valoración odontológica. ¿Te gustaría agendar una cita esta semana?`
+                      : 'Hola, te saludamos del consultorio de la Dra. Aura Estudillo. Esperamos que te encuentres muy bien. Te compartimos el esquema y citas disponibles para tu atención odontológica. ¿Te gustaría agendar una valoración?'
+                  )
+                  if (typeof navigator !== 'undefined' && navigator.clipboard) {
+                    navigator.clipboard.writeText(text)
+                    setCopied(true)
+                    setTimeout(() => setCopied(false), 2000)
+                  }
+                }}
                 className="w-full py-2 px-3 rounded-xl bg-white border border-slate-200 text-slate-800 text-xs font-bold hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 shadow-2xs cursor-pointer"
               >
                 <Copy className="w-3.5 h-3.5" />
