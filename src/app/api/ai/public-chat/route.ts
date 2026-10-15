@@ -497,38 +497,62 @@ export async function POST(request: Request) {
       finalReply = firstChoice?.content || ''
     }
 
-    const lowerUser = (userMessage || conversation.map(c => c.content || '').join(' ')).toLowerCase()
-    const lowerReply = (finalReply || '').toLowerCase()
+    // Normalización semántica para tolerancia a acentos, mayúsculas y caracteres especiales
+    const normalizeText = (str: string) =>
+      str
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+
+    const rawUser = userMessage || conversation[conversation.length - 1]?.content || ''
+    const normUser = normalizeText(rawUser)
+    const normReply = normalizeText(finalReply)
 
     // =========================================================================
-    // MOTOR DE CALIBRACIÓN DE TRIAJE ESTRICTO (SEVERITY THRESHOLDS):
-    // 1. 🔴 NIVEL ROJO (Urgencia Médica Real 24/7):
-    //    Triggers ÚNICOS: dolor insoportable, dolor muy fuerte, sangrado, se cayó un diente,
-    //    infección severa, hinchazón severa, absceso agudo, accidente / golpe.
-    // 2. 🟡 NIVEL AMARILLO (Cita Prioritaria / Valoración Especializada):
-    //    Triggers: diseño de sonrisa, carillas, ortodoncia, molestia leve, sensibilidad.
-    // 3. 🟢 NIVEL VERDE (Standard Booking / Cita de Rutina):
-    //    Triggers: cita, revisión, limpieza, agendar, costos, información.
-    //    Acción: NO dispara alertas rojas. Responde con calidez y orienta a agendar.
+    // MOTOR DE TRIAJE SEMÁNTICO MULTINIVEL (NLP):
+    // Tolera errores ortográficos, lenguaje coloquial y ausencia de tildes.
+    //
+    // 🟢 NIVEL VERDE (Consultas y Citas de Rutina / Información):
+    //    Triggers: "podria darme una cita", "que dia me atienden", "horario",
+    //              "limpieza", "revision", "costo", "precio", "agendar", "saludo".
+    //    Acción: Responde amablemente sin disparar modales invasivos de urgencia 24/7.
+    //
+    // 🟡 NIVEL AMARILLO / ORANGE (Cita Prioritaria / Molestia Leve o Estética de Alta Gama):
+    //    Triggers: "molestia", "dolor leve", "sensibilidad", "me duele al masticar",
+    //              "diseno de sonrisa", "carillas", "ortodoncia", "alineadores", "implante".
+    //    Acción: Registro con prioridad media en el CRM para agendar en las próximas 24-48 hrs.
+    //
+    // 🔴 NIVEL ROJO (Urgencia Médica Real 24/7 - Dispara Alerta Roja):
+    //    Triggers ÚNICOS de dolor insoportable, trauma o infección severa:
+    //    "dolor insoportable", "dolor muy fuerte", "no aguanto el dolor", "sangrado",
+    //    "se me cayo un diente", "se me rompio el diente", "flemon", "absceso",
+    //    "hinchazon de cara", "hinchado", "infeccion severa", "golpe en la boca".
     // =========================================================================
-    const RED_ALERT_STRICT_REGEX = /\b(dolor\s+(insoportable|muy\s+fuerte|intenso|agudo|severo)|sangrado|se\s+me\s+cay[oó]\s+un\s+diente|se\s+cay[oó]\s+el\s+diente|infecci[oó]n|hinchaz[oó]n\s+severa|flem[oó]n|absceso|accidente|golpe\s+en\s+la\s+boca)\b/i
-    const YELLOW_PRIORITY_REGEX = /\b(diseño\s+de\s+sonrisa|carillas|ortodoncia|alineadores|sensibilidad|molestia\s+leve|implante)\b/i
 
-    const isRoutineBookingOrGeneral = /\b(revisi[oó]n|limpieza|profilaxis|agendar|cita|costos|precios|informaci[oó]n|horario)\b/i.test(lowerUser)
+    // 1. Red Alert Check (Extrema urgencia médica)
+    const RED_REGEX = /\b(dolor\s+(insoportable|muy\s+fuerte|intenso|agudo|severo|horrible|demasiado)|no\s+aguanto\s+(el\s+)?dolor|sangrado(\s+abundante|\s+constante)?|se\s+me\s+cay[o|e]\s+(un\s+)?diente|se\s+cay[o|e]\s+(el|un)\s+diente|se\s+me\s+rompi[o|e]\s+(el|un)\s+diente|diente\s+roto\s+por\s+golpe|infecci[o|e]n\s+severa|flemon|absceso|hinchaz[o|e]n\s+severa|cara\s+hinchada|se\s+me\s+hincho|accidente|trauma)\b/i
 
-    const isRed = RED_ALERT_STRICT_REGEX.test(lowerUser)
-    const isYellow = !isRed && !isRoutineBookingOrGeneral && YELLOW_PRIORITY_REGEX.test(lowerUser)
+    // 2. Yellow Alert Check (Molestia persistente moderada o estética de alta gama)
+    const YELLOW_REGEX = /\b(molestia|sensibil(idad|e)|me\s+duele\s+al\s+masticar|dolor\s+(leve|moderado|ocasional)|carilla(s)?|diseno\s+de\s+sonrisa|ortodoncia|alineador(es)?|invisalign|implante(s)?)\b/i
 
-    // Solo se registra en el panel de alertas si es una Urgencia Roja real o una Solicitud Amarilla de alta especialidad
+    // 3. Green Alert Check (Consultas de rutina, agendamiento ordinario, costos o información general)
+    const GREEN_REGEX = /\b(cita|agendar|apartar|revision|chequeo|limpieza|profilaxis|costo(s)?|precio(s)?|informaci[o|e]n|horario(s)?|que\s+dia|cuando\s+abren|donde\s+estan|saludos|hola|buen(as|os)?)\b/i
+
+    const isRed = RED_REGEX.test(normUser)
+    // Solo es amarillo si NO es rojo y presenta triggers amarillos sin ser una solicitud de rutina pura
+    const isYellow = !isRed && YELLOW_REGEX.test(normUser)
+
+    // Solo se registra en el panel de alertas si es una Urgencia Roja real o una Solicitud Amarilla prioritaria
     if (isRed || isYellow) {
       const caseId = `${isRed ? 'RED' : 'YEL'}-${Date.now().toString().slice(-6)}`
       const nowTime = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
       
       // Extraer posible teléfono
-      const phoneMatch = userMessage?.match(/\b\d{10}\b/) || conversation.map(c => c.content || '').join(' ').match(/\b\d{10}\b/)
+      const phoneMatch = rawUser.match(/\b\d{10}\b/) || conversation.map(c => c.content || '').join(' ').match(/\b\d{10}\b/)
       const detectedPhone = phoneMatch ? phoneMatch[0] : '[Desconocido] Pendiente por WhatsApp'
 
-      const targetBranch = lowerUser.includes('chalma') || lowerUser.includes('gam') || lowerUser.includes('gustavo')
+      const targetBranch = normUser.includes('chalma') || normUser.includes('gam') || normUser.includes('gustavo')
         ? 'Sede Guadalupe Chalma'
         : 'Sede Balbuena (Matriz)'
 
@@ -538,15 +562,15 @@ export async function POST(request: Request) {
         patientName: detectedPhone !== '[Desconocido] Pendiente por WhatsApp' ? `Paciente (${detectedPhone})` : '[Desconocido] Paciente Web en Línea',
         phone: detectedPhone,
         painLevel: (isRed ? 'severo' : 'moderado') as 'severo' | 'moderado',
-        symptoms: userMessage || conversation[conversation.length - 1]?.content || (isRed ? 'Urgencia por dolor agudo' : 'Valoración Estética Especializada'),
+        symptoms: rawUser || conversation[conversation.length - 1]?.content || (isRed ? 'Urgencia por dolor agudo' : 'Valoración Estética Especializada'),
         timestamp: nowTime,
-        chatSnippet: `Mensaje recibido: "${userMessage || conversation[conversation.length - 1]?.content}"`,
+        chatSnippet: `Mensaje recibido: "${rawUser || conversation[conversation.length - 1]?.content}"`,
         status: 'pending' as const,
         branchName: targetBranch,
         proposedSlot: isYellow ? {
           date: 'Próxima fecha disponible',
           time: '11:00 AM o 16:00 PM',
-          treatment: lowerUser.includes('carilla') ? 'Carillas E.Max' : 'Diseño de Sonrisa'
+          treatment: normUser.includes('carilla') ? 'Carillas E.Max' : 'Diseño de Sonrisa'
         } : undefined
       }
 
@@ -567,19 +591,19 @@ export async function POST(request: Request) {
     // SOLO se activa cuando el usuario EXPLICITAMENTE pide qué fármaco/pastilla tomar,
     // o si el bot generó por error nombres de medicamentos.
     // ========================================================
-    const PROHIBITED_MEDS_REGEX = /\b(ibuprofeno|paracetamol|acetaminof[eé]n|amoxicilina|ketorolaco|clonixinato|naproxeno|aspirina|tramadol|diclofenaco|dexametasona|ampicilina|azitromicina|clindamicina|\d+\s*mg|\d+\s*miligramos|\d+\s*gramos)\b/i
-    const ASKS_EXPLICIT_PRESCRIPTION_REGEX = /\b(qu[eé]\s+(me\s+tomo|puedo\s+tomar|pastilla|medicamento|medicina|f[aá]rmaco)|rec[eé]tame|dame\s+una\s+receta|qu[eé]\s+dosis|qu[eé]\s+tomar)\b/i
+    const PROHIBITED_MEDS_REGEX = /\b(ibuprofeno|paracetamol|acetaminofen|amoxicilina|ketorolaco|clonixinato|naproxeno|aspirina|tramadol|diclofenaco|dexametasona|ampicilina|azitromicina|clindamicina|\d+\s*mg|\d+\s*miligramos|\d+\s*gramos)\b/i
+    const ASKS_EXPLICIT_PRESCRIPTION_REGEX = /\b(que\s+(me\s+tomo|puedo\s+tomar|pastilla|medicamento|medicina|farmaco)|recetame|dame\s+una\s+receta|que\s+dosis|que\s+tomar|algun\s+analgesico)\b/i
 
     const mandatoryMedicationDenial = 'No tengo permitido recomendar ni recetar medicamentos. He enviado tu reporte directamente a la Dra. Aura Estudillo. Por favor ingresa tu número de WhatsApp y mantente en línea mientras la doctora evalúa tu caso para darte la indicación correspondiente.'
 
     // Si el usuario simplemente pide cita o saluda, NUNCA bloquear con negativa de medicamentos
-    const isAskingForAppointmentOrGreeting = /\b(cita|agendar|apartar|hora|horario|consulta|hola|buen|buenos|buenas|precio|costo|cu[aá]nto)\b/i.test(lowerUser)
+    const isAskingForAppointmentOrGreeting = /\b(cita|agendar|apartar|hora|horario|consulta|hola|buen|buenos|buenas|precio|costo|cuanto|podria|dia)\b/i.test(normUser)
 
-    if (!isAskingForAppointmentOrGreeting && (ASKS_EXPLICIT_PRESCRIPTION_REGEX.test(lowerUser) || PROHIBITED_MEDS_REGEX.test(lowerReply))) {
+    if (!isAskingForAppointmentOrGreeting && (ASKS_EXPLICIT_PRESCRIPTION_REGEX.test(normUser) || PROHIBITED_MEDS_REGEX.test(normReply))) {
       finalReply = mandatoryMedicationDenial
-    } else if (isAskingForAppointmentOrGreeting && PROHIBITED_MEDS_REGEX.test(lowerReply)) {
+    } else if (isAskingForAppointmentOrGreeting && PROHIBITED_MEDS_REGEX.test(normReply)) {
       // Si la respuesta del bot contenía un fármaco por error mientras el usuario pedía cita, limpiarlo con mensaje de cita
-      finalReply = '¡Con mucho gusto! La Dra. Aura Estudillo (Céd. Prof. 8492019) cuenta con espacios disponibles para tu valoración y diseño de sonrisa en Sede Balbuena y Guadalupe Chalma. ¿Prefieres un horario matutino o vespertino?'
+      finalReply = '¡Con mucho gusto! La Dra. Aura Estudillo (Céd. Prof. 8492019) cuenta con espacios disponibles para tu valoración y consulta en Sede Balbuena y Guadalupe Chalma. ¿Prefieres un horario matutino o vespertino?'
     }
 
     // Si por alguna razón vino vacío
