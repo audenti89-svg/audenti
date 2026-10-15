@@ -304,13 +304,23 @@ export function AudentiQRCodeCard() {
   )
 }
 
+import { AuthModal } from '@/components/auth/AuthModal'
+
 // ==========================================
 // 3. LANDING PAGE PRINCIPAL (src/app/page.tsx)
 // ==========================================
 export default function LandingPage() {
   const [activeBranchTab, setActiveBranchTab] = useState<'balbuena' | 'guadalupe' | 'roma'>('balbuena')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [authModalOpen, setAuthModalOpen] = useState(false)
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
   const isMobile = useIsMobile()
+
+  const openAuth = (mode: 'login' | 'register' = 'login') => {
+    setAuthMode(mode)
+    setAuthModalOpen(true)
+    setMobileMenuOpen(false)
+  }
 
   const specialties = [
     {
@@ -403,14 +413,15 @@ export default function LandingPage() {
           </nav>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md transition-all active:scale-95"
+            <button
+              type="button"
+              onClick={() => openAuth('login')}
+              className="inline-flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md transition-all active:scale-95 cursor-pointer"
             >
               <span className="hidden sm:inline">Acceso al Sistema</span>
               <span className="sm:hidden">Acceso</span>
               <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            </Link>
+            </button>
 
             {/* Botón Menú Hamburguesa en Móvil */}
             <button
@@ -695,13 +706,14 @@ export default function LandingPage() {
             Acceso diferenciado para Dirección General, Especialistas, Recepción y Pacientes.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md"
+            <button
+              type="button"
+              onClick={() => openAuth('login')}
+              className="inline-flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md active:scale-95 cursor-pointer transition-all"
             >
               Ingresar al Sistema Clínico
               <ArrowRight className="w-4 h-4" />
-            </Link>
+            </button>
           </div>
         </div>
       </section>
@@ -724,6 +736,13 @@ export default function LandingPage() {
 
       {/* 9. BANNER PWA FLOTANTE INTELIGENTE */}
       <FloatingPWABanner />
+
+      {/* 10. MODAL FLOTANTE DE ACCESO CLÍNICO GLASSMORPHISM */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        defaultMode={authMode}
+      />
 
     </div>
   )
