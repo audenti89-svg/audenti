@@ -25,6 +25,8 @@ export function PublicAiChatWidget() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [speaking, setSpeaking] = useState(false)
+  const [lastEmergencyId, setLastEmergencyId] = useState<string | null>(null)
+  const receivedDecisions = useRef<Set<string>>(new Set())
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
@@ -34,6 +36,34 @@ export function PublicAiChatWidget() {
   useEffect(() => {
     if (isOpen) scrollToBottom()
   }, [messages, isOpen])
+
+  // Escuchar si la Dra. Aura Estudillo tomó una decisión remota para transmitirla en vivo al chat
+  useEffect(() => {
+    const checkDoctorDecision = async () => {
+      try {
+        const res = await fetch('/api/ai/night-emergency')
+        const data = await res.json()
+        if (data?.success && Array.isArray(data.cases)) {
+          data.cases.forEach((c: any) => {
+            if ((c.status === 'approved_exceptional' || c.status === 'scheduled_first_hour') && !receivedDecisions.current.has(c.id)) {
+              receivedDecisions.current.add(c.id)
+              const decisionMsg: Message = {
+                id: `decision-${Date.now()}`,
+                role: 'assistant',
+                content: `🩺 **COMUNICADO OFICIAL DE LA DRA. AURA ESTUDILLO:**\n\n${c.doctorNotes}\n\n*Folio de seguimiento: ${c.id}*. Nuestro equipo médico ya está coordinando la apertura/ingreso prioritario.`,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              }
+              setMessages(prev => [...prev, decisionMsg])
+              setIsOpen(true)
+            }
+          })
+        }
+      } catch {}
+    }
+
+    const timer = setInterval(checkDoctorDecision, 5000)
+    return () => clearInterval(timer)
+  }, [])
 
   const handleSpeak = (text: string) => {
     if ('speechSynthesis' in window) {

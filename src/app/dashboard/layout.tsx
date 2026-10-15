@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Header } from '@/components/layout/Header'
+import { NightEmergencyRedAlertBanner } from '@/components/ai/NightEmergencyRedAlertBanner'
 
 export default function DashboardLayout({
   children,
@@ -20,6 +21,9 @@ export default function DashboardLayout({
           {children}
         </main>
       </div>
+
+      {/* Panel Flotante de Alerta Roja 24/7 para la Dra. Aura Estudillo */}
+      <NightEmergencyRedAlertBanner />
     </div>
   )
 }

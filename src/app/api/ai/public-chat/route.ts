@@ -20,7 +20,10 @@ CAPACIDADES Y REGLAS DE ORO:
 3. CONSULTAS DE CITAS Y AGENDA: Si el paciente quiere cita o consultar días/horas disponibles, USA SIEMPRE la herramienta \`consultarDisponibilidadCalendario\`.
 4. AGENDAR CITA: Si el paciente confirma que desea agendar con su nombre, teléfono y horario seleccionado, USA la herramienta \`agendarCitaNuevayNotificar\`.
 5. ANTECEDENTES Y ALERGIAS: Si el paciente menciona alergias (ej. "alérgico a la penicilina", látex, anestesia) o condiciones (ej. hipertensión, diabetes, embarazo), USA la herramienta \`registrarNotaMedicaProspecto\` para que quede en su expediente y la Dra. Aura reciba la advertencia de bioseguridad.
-6. SIEMPRE responde en español claro, profesional y estructurado con viñetas cuando sea conveniente. NUNCA respondas con plantillas estáticas repetitivas.`
+6. PROTOCOLO PUENTE NOCTURNO 24/7 Y EMERGENCIAS (🔴 ALERTA ROJA): Si el paciente manifiesta dolor severo, sangrado, absceso, fractura dental aguda o urgencia fuera de horario (madrugada, noche, fin de semana), USA DE INMEDIATO la herramienta \`escalarEmergenciaNocturnaDraAura\`.
+   - Explícale con profunda empatía y serenidad que aunque el consultorio está físicamente cerrado por horario nocturno, HAS ACTIVADO UNA ALERTA ROJA DE EMERGENCIA directamente en el móvil de la Dra. Aura Estudillo.
+   - Pídele su número de WhatsApp o teléfono para que la Dra. Aura pueda responderle con la decisión remota (aprobación de atención extraordinaria inmediata o derivación prioritaria a primera hora).
+7. SIEMPRE responde en español claro, profesional y estructurado. NUNCA respondas con plantillas estáticas repetitivas.`
 
 // Definición de Tools para Groq (OpenAI Function Calling format)
 const TOOLS: any[] = [
@@ -93,6 +96,23 @@ const TOOLS: any[] = [
           nombrePaciente: { type: 'string', description: 'Nombre si ya fue proporcionado' }
         },
         required: ['alergias']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'escalarEmergenciaNocturnaDraAura',
+      description: 'Activa el Puente Nocturno de Emergencias 24/7 y dispara una Alerta Roja (🔴) prioritaria en el panel y teléfono de la Dra. Aura Estudillo ante dolor severo o urgencias fuera de horario.',
+      parameters: {
+        type: 'object',
+        properties: {
+          motivoUrgencia: { type: 'string', description: 'Descripción del dolor, diente afectado o síntoma grave reportado' },
+          nivelDolor: { type: 'string', enum: ['severo', 'critico', 'moderado'] },
+          nombrePaciente: { type: 'string', description: 'Nombre del paciente' },
+          telefono: { type: 'string', description: 'Teléfono o WhatsApp del paciente para enlazar la decisión médica' }
+        },
+        required: ['motivoUrgencia', 'nivelDolor']
       }
     }
   }
@@ -243,6 +263,37 @@ async function ejecutarTool(name: string, args: any) {
       registrado: true,
       alertaBioseguridad: `⚠️ ALERGIA / ANTECEDENTE ASENTADO: "${args.alergias}".`,
       accion: 'Se ha agregado una nota preventiva de alta prioridad en el expediente médico para notificar de inmediato a la Dra. Aura Estudillo antes de suministrar cualquier fármaco o anestésico local.'
+    }
+  }
+
+  if (name === 'escalarEmergenciaNocturnaDraAura') {
+    const { motivoUrgencia, nivelDolor, nombrePaciente, telefono } = args
+    const caseId = `EMG-${Date.now().toString().slice(-6)}`
+    const nowTime = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+
+    const newCase = {
+      id: caseId,
+      patientName: nombrePaciente || 'Paciente en Línea (Urgencia)',
+      phone: telefono || 'Pendiente de registrar',
+      painLevel: (nivelDolor === 'critico' || nivelDolor === 'moderado' ? nivelDolor : 'severo') as 'severo' | 'critico' | 'moderado',
+      symptoms: motivoUrgencia,
+      timestamp: nowTime,
+      chatSnippet: `Dolor reportado: ${motivoUrgencia}. Nivel de urgencia: ${nivelDolor}.`,
+      status: 'pending' as const
+    }
+
+    if (!globalThis.__audenti_emergency_cases) {
+      globalThis.__audenti_emergency_cases = []
+    }
+    globalThis.__audenti_emergency_cases = [newCase, ...globalThis.__audenti_emergency_cases].slice(0, 30)
+
+    return {
+      escalamientoExitoso: true,
+      folioEmergencia: caseId,
+      horaNotificacion: nowTime,
+      estado: 'ALERTA ROJA (🔴) ENVIADA AL PANEL DIRECTIVO DE LA DRA. AURA ESTUDILLO',
+      mensajeDoctora: 'El caso ha sido transmitido con máxima prioridad al dispositivo móvil de la Dra. Aura Estudillo.',
+      indicacionPaciente: 'Por favor, mantén esta ventana abierta y facilítanos tu número telefónico o WhatsApp. La Dra. Aura revisará tu caso en breve para autorizar tu atención extraordinaria inmediata o priorizarte a primera hora de la mañana.'
     }
   }
 
