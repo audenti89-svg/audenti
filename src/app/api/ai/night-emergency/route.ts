@@ -12,6 +12,14 @@ export interface EmergencyCase {
   timestamp: string
   chatSnippet: string
   status: 'pending' | 'approved_exceptional' | 'scheduled_first_hour' | 'dismissed'
+  patientLocation?: {
+    lat?: number
+    lng?: number
+    zone?: string
+    distanceKm?: number
+    travelMinutes?: number
+    targetBranch?: string
+  }
   doctorDecision?: string
   doctorNotes?: string
   resolvedAt?: string
@@ -47,7 +55,7 @@ export async function POST(request: Request) {
 
     // 1. Crear nuevo reporte de emergencia nocturna (escalamiento)
     if (action === 'report') {
-      const { patientName, phone, painLevel, symptoms, chatSnippet } = body
+      const { patientName, phone, painLevel, symptoms, chatSnippet, patientLocation } = body
 
       const newCase: EmergencyCase = {
         id: `EMG-${Date.now().toString().slice(-6)}`,
@@ -57,7 +65,8 @@ export async function POST(request: Request) {
         symptoms: symptoms || 'Dolor dental agudo / Urgencia nocturna',
         timestamp: new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
         chatSnippet: chatSnippet || 'El paciente reportó dolor agudo en horario nocturno.',
-        status: 'pending'
+        status: 'pending',
+        patientLocation: patientLocation || undefined
       }
 
       globalThis.__audenti_emergency_cases = [newCase, ...(globalThis.__audenti_emergency_cases || [])].slice(0, 30)
@@ -67,12 +76,16 @@ export async function POST(request: Request) {
         const supabase = await createClient()
         const { data: director } = await supabase.from('users').select('id, tenant_id').limit(1).maybeSingle()
         if (director) {
+          const locText = patientLocation?.distanceKm
+            ? ` • Distancia: ${patientLocation.distanceKm} km (~${patientLocation.travelMinutes} min a ${patientLocation.targetBranch || 'Balbuena'})`
+            : ''
+
           await supabase.from('in_app_notifications').insert({
             tenant_id: director.tenant_id,
             user_id: director.id,
             type: 'emergency',
             title: `🔴 ALERTA ROJA: Urgencia Dental Nocturna (${newCase.painLevel.toUpperCase()})`,
-            message: `${newCase.patientName}: ${newCase.symptoms} • Tel: ${newCase.phone}`,
+            message: `${newCase.patientName}: ${newCase.symptoms} • Tel: ${newCase.phone}${locText}`,
             data: newCase,
             is_read: false
           })

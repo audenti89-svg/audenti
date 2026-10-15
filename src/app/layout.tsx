@@ -4,6 +4,7 @@ import Script from 'next/script'
 import './globals.css'
 import { SmartPwaFloatingBanner } from '@/components/ui/SmartPwaFloatingBanner'
 import { AccessibilityProvider } from '@/context/AccessibilityContext'
+import { LocationPermissionBanner } from '@/components/ui/LocationPermissionBanner'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -117,6 +118,7 @@ export default function RootLayout({
         <AccessibilityProvider>
           {children}
           <SmartPwaFloatingBanner />
+          <LocationPermissionBanner />
         </AccessibilityProvider>
       </body>
     </html>

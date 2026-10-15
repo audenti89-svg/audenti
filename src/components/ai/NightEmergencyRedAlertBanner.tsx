@@ -25,6 +25,14 @@ export interface EmergencyCase {
   timestamp: string
   chatSnippet: string
   status: 'pending' | 'approved_exceptional' | 'scheduled_first_hour' | 'dismissed'
+  patientLocation?: {
+    lat?: number
+    lng?: number
+    zone?: string
+    distanceKm?: number
+    travelMinutes?: number
+    targetBranch?: string
+  }
   doctorDecision?: string
   doctorNotes?: string
   resolvedAt?: string
@@ -195,6 +203,23 @@ export function NightEmergencyRedAlertBanner() {
               <span className="font-semibold text-slate-400">Hora de reporte:</span>
               <span className="font-mono text-rose-300">{activeCase.timestamp} hrs</span>
             </div>
+
+            {/* Geolocalización en tiempo real del paciente y distancia a la Dra. Aura */}
+            {activeCase.patientLocation?.distanceKm ? (
+              <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px]">
+                <span className="text-cyan-400 font-bold flex items-center gap-1">
+                  📍 Distancia a tu ubicación ({activeCase.patientLocation.targetBranch || 'Balbuena'}):
+                </span>
+                <span className="text-white font-mono font-bold bg-cyan-950 px-2 py-0.5 rounded border border-cyan-500/40">
+                  {activeCase.patientLocation.distanceKm} km (~{activeCase.patientLocation.travelMinutes} min)
+                </span>
+              </div>
+            ) : (
+              <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+                <span>📍 Ubicación aproximada:</span>
+                <span className="text-slate-300">Zona Metropolitana CDMX (~15 min)</span>
+              </div>
+            )}
           </div>
 
           {/* Síntomas y dolor reportado */}

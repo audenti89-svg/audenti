@@ -24,10 +24,25 @@ export function Header({ onMenuToggle }: HeaderProps) {
   const currentBranch = getCurrentBranch()
   const { playTone } = useNotificationSound()
 
-  const handleBranchChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleBranchChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newId = e.target.value as BranchId
     setBranchId(newId)
     playTone('arrival')
+
+    // Sincronizar en tiempo real la ubicación y sede activa de la Dra. Aura para la IA
+    try {
+      await fetch('/api/geolocation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_doctor_location',
+          branchId: newId,
+          status: 'en_gabinete'
+        })
+      })
+    } catch (err) {
+      console.warn('Error sincronizando geolocalización de Dra. Aura:', err)
+    }
   }
 
   return (
