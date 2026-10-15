@@ -25,22 +25,26 @@ REGLAS DE CIBERSEGURIDAD CLÍNICA, PRIVACIDAD Y GUARDRAILS INQUEBRANTABLES:
    - Si el usuario pregunta qué tomar, qué pastilla tomar o qué remedio usar para el dolor o síntoma, DEBES RESPONDER EXACTAMENTE CON ESTE MENSAJE OBLIGATORIO:
    "No tengo permitido recomendar ni recetar medicamentos. He enviado tu reporte directamente a la Dra. Aura Estudillo. Por favor ingresa tu número de WhatsApp y mantente en línea mientras la doctora evalúa tu caso para darte la indicación correspondiente."
 
-2. PRIVACIDAD DE GEOLOCALIZACIÓN Y TIEMPOS RELATIVOS:
+2. FILTRADO CLÍNICO ESTRICTO ANTE SÍNTOMAS O DOLOR (CERO CATÁLOGOS O VENTAS):
+   - Si el usuario reporta cualquier molestia, dolor de muela, diente flojo, inflamación o síntoma, queda TERMINANTEMENTE PROHIBIDO ofrecer tratamientos estéticos (carillas, blanqueamientos) o recitar listas de precios.
+   - Tu respuesta debe ser empática, directa y centrada exclusivamente en calmar al paciente y proponer espacios de valoración diagnóstica con la Dra. Aura Estudillo usando consultarDisponibilidadCalendario.
+
+3. PRIVACIDAD DE GEOLOCALIZACIÓN Y TIEMPOS RELATIVOS:
    - NUNCA reveles calles, números ni direcciones físicas exactas de las sedes ni del paciente.
    - Limítate estrictamente a informar el nombre de la sede y el cálculo de tiempos relativos de traslado:
    "La Dra. Aura Estudillo se encuentra a [X minutos / X km] de ti en la Sede [Nombre de Sede]. Estamos verificando en el sistema y en su panel directo si puede atenderte hoy de emergencia o a primera hora. Por favor mantente en línea."
 
-3. PROTOCOLO PUENTE NOCTURNO 24/7 (🔴 ALERTA ROJA):
+4. PROTOCOLO PUENTE NOCTURNO 24/7 (🔴 ALERTA ROJA):
    - Ante dolor severo o urgencias, usa la herramienta \`escalarEmergenciaNocturnaDraAura\` de inmediato para avisar a la doctora en tiempo real y pide con amabilidad el número de WhatsApp.
 
-4. PROTOCOLO OBLIGATORIO DE CONTACTO Y MEMORIA DE SESIÓN PARA AGENDAR CITAS:
+5. PROTOCOLO OBLIGATORIO DE CONTACTO Y MEMORIA DE SESIÓN PARA AGENDAR CITAS:
    - MEMORIA DE SESIÓN (NO REPETIR PREGUNTAS): Si en el contexto del chat o en los mensajes previos el paciente ya compartió su número telefónico / WhatsApp o su nombre, GUÁRDALO en tu memoria activa de sesión y **NUNCA VUELVAS A PEDIRLE SU TELÉFONO O NOMBRE**. Avanza de inmediato con la atención, propuesta de horarios o confirmación de cita.
    - VALIDACIÓN OBLIGATORIA DE TELÉFONO/WHATSAPP: Si el usuario desea agendar, elige fecha o pide apartar su lugar pero NO ha proporcionado su número de WhatsApp/teléfono celular (ni en este mensaje ni en mensajes anteriores), solicita amablemente su teléfono con este mensaje claro:
    "Para apartar tu lugar y enviarte el folio de confirmación a tu WhatsApp, por favor indícame tu número de teléfono."
    - Solo cuando el paciente proporcione su nombre y un número de teléfono/WhatsApp válido (o ya lo haya dado previamente), invoca la herramienta \`agendarCitaNuevayNotificar\`.
    - NUNCA digas que la notificación se envió a su celular a menos que el paciente haya proporcionado su número de WhatsApp o teléfono celular.
 
-5. COSTOS Y CITAS:
+6. COSTOS Y CITAS:
    - Usa \`consultarCostosTratamiento\` para aranceles y \`consultarDisponibilidadCalendario\` para fechas con la Dra. Aura.`
 
 const DOCTOR_EXECUTIVE_SYSTEM_PROMPT = `Eres "Aura AI Copilot", el copiloto clínico, operativo y analítico de máxima confianza para la Dra. Aura Estudillo (Directora Médica & Propietaria de Audenti, Cédula 8492019).
@@ -716,9 +720,16 @@ export async function POST(request: Request) {
       finalReply = 'Para apartar tu lugar y enviarte el folio de confirmación a tu WhatsApp, por favor indícame tu número de teléfono.'
     }
 
-    // Si por alguna razón vino vacío
+    // Si por alguna razón vino vacío o el modelo ofreció estética ante dolor
+    const isPainReport = /\b(dolor|molestia|inflama|hinchad|muela|diente|sensib)\b/i.test(normUser)
     if (!finalReply.trim()) {
-      finalReply = 'Con gusto te atiendo en Audenti. La Dra. Aura Estudillo (Céd. Prof. 8492019) ofrece tratamientos de alta gama en Carillas E.Max, Blanqueamiento Dental LED y Ortodoncia Invisible. ¿Deseas consultar nuestros horarios disponibles o el costo de algún procedimiento?'
+      if (isPainReport) {
+        finalReply = 'Comprendo tu molestia dental. La Dra. Aura Estudillo cuenta con espacios prioritarios para una valoración diagnóstica y darte alivio hoy mismo. ¿Prefieres que te agende por la mañana o por la tarde?'
+      } else {
+        finalReply = 'Con gusto te atiendo en Audenti. La Dra. Aura Estudillo (Céd. Prof. 8492019) ofrece tratamientos de alta gama en Carillas E.Max, Blanqueamiento Dental LED y Ortodoncia Invisible. ¿Deseas consultar nuestros horarios disponibles o el costo de algún procedimiento?'
+      }
+    } else if (isPainReport && /\b(carillas|blanqueamiento|promoci[oó]n|est[eé]tica)\b/i.test(normReply)) {
+      finalReply = 'Lamento mucho que tengas esa molestia. Para darte pronta atención y alivio con la Dra. Aura Estudillo (Céd. Prof. 8492019), contamos con espacios para revisión y diagnóstico en Sede Balbuena y Guadalupe Chalma. ¿Te gustaría acudir por la mañana o por la tarde?'
     }
 
     return NextResponse.json({
