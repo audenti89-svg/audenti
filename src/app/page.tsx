@@ -36,6 +36,7 @@ const ASSETS = {
   after: 'https://media.kolpusites.com/dental_ad/1.webp',     // Clean cast
   before: 'https://media.kolpusites.com/dental_ad/2.webp',    // Stained cast
   interior: 'https://media.kolpusites.com/dental_ad/3.webp',  // Clinic interior
+  draAuraQuirifano: '/images/dra-aura-estudillo.jpg',         // Cirujana en quirófano con luz azul, cofia, filipina y gafas
   portraits: [
     'https://media.kolpusites.com/dental_ad/4.webp',
     'https://media.kolpusites.com/dental_ad/5.webp',
@@ -258,41 +259,42 @@ export default function LandingPage() {
     }, 4500)
   }
 
+  // EQUIPO CLÍNICO OFICIAL - ASIGNACIÓN FIJA DE DATOS E IMÁGENES
   const specialists = [
     {
       name: 'Dra. Aura Estudillo',
       title: 'Directora Médica & Especialista en Estética Oral',
       reg: 'Céd. Prof. 8492019',
-      image: ASSETS.portraits[0], // Doctora especialista femenina oficial
-      hoverImage: ASSETS.portraits[2], // Retrato con sonrisa clínica
-      focus: 'Diseño de Sonrisas, Carillas y Cirugía Reconstructiva',
+      image: ASSETS.draAuraQuirifano, // Cirujana en quirófano con luz azul, cofia, filipina y gafas
+      hoverImage: ASSETS.portraits[0], // Retrato sonriente de alta resolución
+      focus: 'Diseño de Sonrisas, Carillas Cerámicas y Cirugía Reconstructiva',
       experience: '14+ años de excelencia clínica',
     },
     {
       name: 'Dr. Alejandro Ramírez',
       title: 'Cirujano Maxilofacial & Especialista en Implantes',
       reg: 'Céd. Prof. 9102834',
-      image: ASSETS.portraits[1],
-      hoverImage: ASSETS.portraits[3],
-      focus: 'Implantología Oseointegrada & Regeneración Ósea',
+      image: ASSETS.portraits[1], // Retrato formal masculino con bata blanca
+      hoverImage: ASSETS.portraits[3], // Retrato alterno con sonrisa clínica
+      focus: 'Implantología Oseointegrada & Regeneración Tisular Guiada',
       experience: '11+ años en quirófano dental',
     },
     {
       name: 'Dra. Sofía Gutiérrez',
       title: 'Ortodoncista & Especialista en Alineadores',
       reg: 'Céd. Prof. 7481920',
-      image: ASSETS.portraits[2],
-      hoverImage: ASSETS.portraits[0],
-      focus: 'Alineación Invisible, Autoligado Pasivo & ATM',
+      image: ASSETS.portraits[2], // Retrato formal de especialista femenina con bata blanca
+      hoverImage: ASSETS.portraits[0], // Retrato alterno con sonrisa clínica
+      focus: 'Alineación Invisible, Autoligado Pasivo & Armonización Facial',
       experience: '9+ años perfeccionando oclusiones',
     },
     {
       name: 'Dr. Mateo Morales',
       title: 'Endodoncista Clínico & Microscopía',
       reg: 'Céd. Prof. 8392011',
-      image: ASSETS.portraits[3],
-      hoverImage: ASSETS.portraits[1],
-      focus: 'Instrumentación Mecanizada & Salvamento Dental',
+      image: ASSETS.portraits[3], // Retrato formal de especialista masculino con bata blanca
+      hoverImage: ASSETS.portraits[1], // Retrato alterno con sonrisa clínica
+      focus: 'Instrumentación Mecanizada, Sellado Biocerámico & Microcirugía',
       experience: '8+ años en microcirugía endodóntica',
     },
   ]
