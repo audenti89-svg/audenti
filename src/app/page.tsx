@@ -760,29 +760,17 @@ export default function LandingPage() {
               key={idx}
               className="w-full bg-white rounded-3xl border border-slate-200/90 overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 flex flex-col justify-between group"
             >
-              {/* Imagen con Hover Smile Effect (Transición suave al sonreír) */}
+              {/* Imagen Fija del Especialista */}
               <div className="relative aspect-3/4 overflow-hidden bg-slate-100">
-                {/* Imagen Base */}
                 <img
                   src={doc.image}
                   alt={doc.name}
-                  className="w-full h-full object-cover object-top transition-all duration-700 ease-out group-hover:scale-105 group-hover:opacity-0"
-                />
-                {/* Imagen Hover (Retrato con Sonrisa Clínica Radiante) */}
-                <img
-                  src={doc.hoverImage}
-                  alt={`${doc.name} - Sonrisa Clínica`}
-                  className="absolute inset-0 w-full h-full object-cover object-top opacity-0 group-hover:opacity-100 transition-all duration-700 ease-out group-hover:scale-105"
+                  className="w-full h-full object-cover object-top transition-transform duration-500 ease-out group-hover:scale-105"
                 />
                 
                 {/* Badge de Cédula Profesional */}
                 <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-slate-950/75 backdrop-blur-md text-amber-300 text-[10px] font-bold border border-white/10 font-mono shadow-md z-10">
                   {doc.reg}
-                </div>
-
-                {/* Badge flotante animado de especialidad en hover */}
-                <div className="absolute bottom-3 left-3 right-3 py-1.5 px-3 rounded-xl bg-slate-950/85 backdrop-blur-md border border-amber-400/30 text-white text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-center">
-                  ✨ Sonrisa &amp; Perfeccionamiento Clínico
                 </div>
               </div>
 
