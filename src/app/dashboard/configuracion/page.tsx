@@ -211,22 +211,22 @@ export default function ConfiguracionPage() {
                 )}
               </div>
 
-              {/* Modelo 9Router */}
+              {/* Motor de Inteligencia Artificial (Groq SDK & Gateway) */}
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                  Modelo de Inteligencia Artificial (9Router Gateway)
+                  Motor de Inteligencia Artificial Oficial (Groq SDK Cloud)
                 </label>
                 <select
                   value={aiModel}
                   onChange={e => setAiModel(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400 font-medium"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400 font-medium cursor-pointer"
                 >
-                  <option value="gc/gemini-2.5-flash">gc/gemini-2.5-flash (Ultra Rápido • Odontología General)</option>
-                  <option value="ag/claude-sonnet-4-6">ag/claude-sonnet-4-6 (Razonamiento Clínico Complejo)</option>
-                  <option value="kr/deepseek-3.2">kr/deepseek-3.2 (Optimización de Presupuestos)</option>
-                  <option value="openrouter/free">openrouter/free (Plan Básico)</option>
+                  <option value="llama-3.3-70b-versatile">Groq llama-3.3-70b-versatile (Recomendado • Ultra Rápido Oficial)</option>
+                  <option value="mixtral-8x7b-32768">Groq mixtral-8x7b-32768 (Alta Capacidad de Contexto)</option>
+                  <option value="llama-3.1-8b-instant">Groq llama-3.1-8b-instant (Inferencia Instantánea)</option>
+                  <option value="gc/gemini-2.5-flash">9Router Local (gc/gemini-2.5-flash)</option>
                 </select>
-                <span className="text-[10px] text-slate-400 mt-1 block">Conectado a http://localhost:20128/v1 con cifrado activo.</span>
+                <span className="text-[10px] text-slate-400 mt-1 block">Conectado a Groq Cloud con Guardrails Temáticos Odontológicos y RBAC activo.</span>
               </div>
             </div>
           )}
