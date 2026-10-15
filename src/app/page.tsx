@@ -31,6 +31,7 @@ import { AudentiLogo } from '@/components/ui/AudentiLogo'
 import { AuthModal } from '@/components/auth/AuthModal'
 import { QRCodeSVG } from 'qrcode.react'
 import { PublicAiChatWidget } from '@/components/ai/PublicAiChatWidget'
+import { SmileAuditTool } from '@/components/landing/SmileAuditTool'
 
 // ASSETS OFICIALES OBLIGATORIOS
 const ASSETS = {
@@ -1177,6 +1178,9 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* Herramienta Interactiva de Conversión / Auditoría Digital de Sonrisa */}
+      <SmileAuditTool />
 
       {/* ======================================================== */}
       {/* 8. FOOTER MONUMENTAL CON WORDMARK EDITORIAL */}

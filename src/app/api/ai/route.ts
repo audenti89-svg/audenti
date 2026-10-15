@@ -5,23 +5,24 @@ import { getGroqClient } from '@/lib/groq'
 export const runtime = 'nodejs'
 
 /**
- * Control de Acceso Basado en Roles (RBAC) para el Motor de IA:
- * - full: Acceso total (CRM, finanzas, métricas, SOAP, diagnóstico, auditorías, director médico).
- * - clinical: Notas SOAP, odontograma, recomendaciones de higiene, interacciones farmacológicas dentales.
- * - none: Acceso denegado a funciones de IA médica.
+ * GOBERNANZA ESTRICTA Y CONTROL DE ACCESO BASADO EN ROLES (RBAC):
+ * - Propietaria / Dirección Médica (Dra. Aura Estudillo - admin/director):
+ *   Acceso SOBERANO y TOTAL a chat analítico, diagnósticos financieros, predictivos y auditorías ejecutivas.
+ * - Personal Operativo (Doctores, Recepción, Finanzas, Staff):
+ *   CERO ACCESO a prompts o razonamiento de la IA. Solo reciben alertas operativas unidireccionales y transcripción de notas clínicas vía Whisper.
  */
-type AiScope = 'general' | 'soap_notes' | 'clinical_diagnosis' | 'crm_financial' | 'audit_master'
+type AiScope = 'sovereign_director' | 'soap_transcription' | 'operational_alerts'
 
 const ROLE_PERMISSIONS: Record<string, AiScope[]> = {
-  admin: ['general', 'soap_notes', 'clinical_diagnosis', 'crm_financial', 'audit_master'],
-  director: ['general', 'soap_notes', 'clinical_diagnosis', 'crm_financial', 'audit_master'],
-  technician: ['general', 'soap_notes', 'clinical_diagnosis', 'crm_financial', 'audit_master'],
-  doctor: ['general', 'soap_notes', 'clinical_diagnosis'],
-  dentist: ['general', 'soap_notes', 'clinical_diagnosis'],
-  clinical_staff: ['general', 'soap_notes'],
-  receptionist: ['general'], // Solo mensajes cordiales de bienvenida o citas básicas
-  administrative: [], // Sin acceso a IA médica
-  staff: [],
+  admin: ['sovereign_director', 'soap_transcription', 'operational_alerts'],
+  director: ['sovereign_director', 'soap_transcription', 'operational_alerts'],
+  technician: ['sovereign_director', 'soap_transcription', 'operational_alerts'],
+  doctor: ['soap_transcription', 'operational_alerts'], // Sin acceso a razonamiento financiero o prompts analíticos
+  dentist: ['soap_transcription', 'operational_alerts'],
+  clinical_staff: ['soap_transcription', 'operational_alerts'],
+  receptionist: ['operational_alerts'], // Solo alertas operativas unidireccionales
+  administrative: ['operational_alerts'],
+  staff: ['operational_alerts'],
 }
 
 /**
