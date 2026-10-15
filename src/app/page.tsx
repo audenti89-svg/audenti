@@ -207,7 +207,7 @@ export function FloatingPWABanner() {
 // ==========================================
 export function AudentiQRCodeCard() {
   const [copied, setCopied] = useState(false)
-  const currentUrl = 'https://audenti-pwa.vercel.app/'
+  const currentUrl = 'https://audenti-dra-aura-estudillo.vercel.app/'
 
   const handleCopy = () => {
     if (typeof navigator !== 'undefined') {
