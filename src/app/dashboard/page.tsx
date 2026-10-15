@@ -48,7 +48,30 @@ export default function DashboardPage() {
 
       if (appErr) console.warn('Error en appointments fetch:', appErr)
 
-      const appList = appointments || []
+      let appList = appointments || []
+
+      // Complementar con citas persistentes de /api/appointments
+      try {
+        const appRes = await fetch('/api/appointments')
+        const appJson = await appRes.json()
+        if (appJson?.success && Array.isArray(appJson.appointments) && appJson.appointments.length > 0) {
+          const apiMapped = appJson.appointments.map((a: any) => ({
+            id: a.id,
+            start_time: `${a.appointment_date}T${a.appointment_time}`,
+            end_time: `${a.appointment_date}T${a.appointment_time}`,
+            status: a.status || 'scheduled',
+            treatment_type: a.treatment || 'Consulta / Valoración Estética Oral',
+            patients: { full_name: a.patient_name }
+          }))
+          // Unir y desduplicar por ID o nombre/hora
+          const existingIds = new Set(appList.map((x: any) => x.id))
+          const additional = apiMapped.filter((x: any) => !existingIds.has(x.id))
+          appList = [...additional, ...appList]
+        }
+      } catch (apiErr) {
+        // Ignorar si falla endpoint
+      }
+
       const inChairAppointment = appList.find((a: any) => a.status === 'in_chair')
       const inWaitingCount = appList.filter((a: any) => a.status === 'in_waiting').length
 
@@ -97,7 +120,16 @@ export default function DashboardPage() {
       })
       .subscribe()
 
+    // Polling reactivo cada 3 segundos y escucha de eventos locales
+    const interval = setInterval(fetchDashboardData, 3000)
+    const handleRefresh = () => fetchDashboardData()
+    window.addEventListener('storage', handleRefresh)
+    window.addEventListener('audenti_appointment_refresh', handleRefresh)
+
     return () => {
+      clearInterval(interval)
+      window.removeEventListener('storage', handleRefresh)
+      window.removeEventListener('audenti_appointment_refresh', handleRefresh)
       supabase.removeChannel(channel)
     }
   }, [])

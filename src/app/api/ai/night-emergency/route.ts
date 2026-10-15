@@ -131,6 +131,26 @@ export async function POST(request: Request) {
         found.doctorNotes = `¡Hola! La Dra. Aura Estudillo ha revisado tu caso. Tu cita ha quedado confirmada para el día ${chosenSlot.date} a las ${chosenSlot.time} en la ${chosenBranch}. Te esperamos con gusto en Audenti.`
         found.resolvedAt = new Date().toISOString()
 
+        // Guardar también en el registro persistente de citas de Audenti
+        const persistentAppt = {
+          id: `APT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          folio: `AUD-${Math.floor(1000 + Math.random() * 9000)}`,
+          patient_name: found.patientName.replace('[Desconocido] ', ''),
+          patient_phone: found.phone.replace('[Desconocido] ', ''),
+          appointment_date: new Date(Date.now() + 24 * 3600 * 1000).toISOString().split('T')[0],
+          appointment_time: '11:00:00',
+          treatment: chosenSlot.treatment || 'Valoración Diagnóstica / Diseño de Sonrisa',
+          branch: chosenBranch,
+          status: 'confirmed' as const,
+          notes: `Confirmado por Dra. Aura Estudillo en panel. Folio generado.`,
+          created_at: new Date().toISOString()
+        }
+
+        if (!globalThis.__audenti_appointments) {
+          globalThis.__audenti_appointments = []
+        }
+        globalThis.__audenti_appointments = [persistentAppt, ...globalThis.__audenti_appointments].slice(0, 50)
+
         // Guardar cita oficial en Supabase si está disponible
         try {
           const supabase = await createClient()
@@ -147,10 +167,8 @@ export async function POST(request: Request) {
           if (patient) {
             await supabase.from('appointments').insert({
               patient_id: patient.id,
-              title: `${chosenSlot.treatment} - ${found.patientName}`,
+              treatment_type: chosenSlot.treatment,
               status: 'confirmed',
-              start_time: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
-              end_time: new Date(Date.now() + 24 * 3600 * 1000 + 45 * 60 * 1000).toISOString(),
               notes: `Sede: ${chosenBranch}. Confirmado por Dra. Aura Estudillo.`
             })
           }

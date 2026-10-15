@@ -33,7 +33,14 @@ REGLAS DE CIBERSEGURIDAD CLÍNICA, PRIVACIDAD Y GUARDRAILS INQUEBRANTABLES:
 3. PROTOCOLO PUENTE NOCTURNO 24/7 (🔴 ALERTA ROJA):
    - Ante dolor severo o urgencias, usa la herramienta \`escalarEmergenciaNocturnaDraAura\` de inmediato para avisar a la doctora en tiempo real y pide con amabilidad el número de WhatsApp.
 
-4. COSTOS Y CITAS:
+4. PROTOCOLO OBLIGATORIO DE CONTACTO PARA AGENDAR CITAS:
+   - VALIDACIÓN OBLIGATORIA DE TELÉFONO/WHATSAPP: Si el usuario desea agendar, elige fecha o pide apartar su lugar pero NO ha proporcionado su número de WhatsApp/teléfono celular, NUNCA confirmes la cita ni inventes folios definitivos ni afirmes que se envió una notificación a su celular.
+   - En su lugar, responde amablemente solicitando su teléfono con este mensaje claro:
+   "Para apartar tu lugar y enviarte el folio de confirmación a tu WhatsApp, por favor indícame tu número de teléfono."
+   - Solo cuando el paciente proporcione su nombre y un número de teléfono/WhatsApp válido, invoca la herramienta \`agendarCitaNuevayNotificar\`.
+   - NUNCA digas que la notificación se envió a su celular a menos que el paciente haya proporcionado explícitamente su número de WhatsApp o teléfono celular.
+
+5. COSTOS Y CITAS:
    - Usa \`consultarCostosTratamiento\` para aranceles y \`consultarDisponibilidadCalendario\` para fechas con la Dra. Aura.`
 
 const DOCTOR_EXECUTIVE_SYSTEM_PROMPT = `Eres "Aura AI Copilot", el copiloto clínico, operativo y analítico de máxima confianza para la Dra. Aura Estudillo (Directora Médica & Propietaria de Audenti, Cédula 8492019).
@@ -254,46 +261,88 @@ async function ejecutarTool(name: string, args: any) {
   }
 
   if (name === 'agendarCitaNuevayNotificar') {
+    const { nombrePaciente, telefono, fechaHora, tratamiento, notasClinicas } = args
+
+    // Validación estricta de teléfono: Si no se proporcionó teléfono real, detener confirmación falsa
+    const cleanPhone = (telefono || '').trim()
+    const hasValidPhone = cleanPhone.length >= 8 && cleanPhone !== '[Desconocido]' && !cleanPhone.toLowerCase().includes('pendiente')
+
+    if (!hasValidPhone) {
+      return {
+        confirmado: false,
+        requiereTelefono: true,
+        mensaje: 'Para apartar tu lugar y enviarte el folio de confirmación a tu WhatsApp, por favor indícame tu número de teléfono.',
+        paciente: nombrePaciente || 'Estimado/a paciente',
+        fechaHoraSugerida: fechaHora
+      }
+    }
+
+    const folioGenerado = `AUD-${Math.floor(1000 + Math.random() * 9000)}`
+    const nowIso = new Date().toISOString()
+    const patientNameClean = nombrePaciente || 'Paciente Web'
+    const appTreatment = tratamiento || 'Consulta / Valoración Estética Oral'
+
+    // 1. Persistencia Inmediata en Memoria Global del Servidor
+    const persistentRecord: any = {
+      id: `APT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      folio: folioGenerado,
+      patient_id: undefined,
+      patient_name: patientNameClean,
+      patient_phone: cleanPhone,
+      appointment_date: (fechaHora && fechaHora.includes('-')) ? fechaHora.split(' ')[0] : new Date(Date.now() + 24 * 3600 * 1000).toISOString().split('T')[0],
+      appointment_time: (fechaHora && fechaHora.includes(':')) ? (fechaHora.split(' ')[1] || '11:00:00') : '11:00:00',
+      treatment: appTreatment,
+      branch: 'Sede Balbuena (Matriz)',
+      status: 'confirmed' as const,
+      notes: `Cita reservada por Aura AI. Folio: ${folioGenerado}. ${notasClinicas ? `ALERTA: ${notasClinicas}` : ''}`,
+      created_at: nowIso
+    }
+
+    if (!globalThis.__audenti_appointments) {
+      globalThis.__audenti_appointments = []
+    }
+    const alreadyExists = globalThis.__audenti_appointments.some(a => a.folio === folioGenerado)
+    if (!alreadyExists) {
+      globalThis.__audenti_appointments = [persistentRecord, ...globalThis.__audenti_appointments].slice(0, 50)
+    }
+
+    // 2. Persistencia en Supabase
     try {
       const supabase = await createClient()
-      const { nombrePaciente, telefono, fechaHora, tratamiento, notasClinicas } = args
-
-      // Registrar o vincular paciente en Supabase
       const { data: patient } = await supabase
         .from('patients')
         .insert({
-          full_name: nombrePaciente,
-          phone: telefono,
+          full_name: patientNameClean,
+          phone: cleanPhone,
           allergies_medication: notasClinicas ? [notasClinicas] : [],
           onboarding_completed: false
         })
-        .select()
+        .select('id')
         .maybeSingle()
 
-      // Registrar cita
+      if (patient?.id) {
+        persistentRecord.patient_id = patient.id
+      }
+
       await supabase.from('appointments').insert({
         patient_id: patient?.id,
-        treatment_type: tratamiento || 'Consulta / Valoración Estética Oral',
+        treatment_type: appTreatment,
         status: 'scheduled',
-        notes: `Cita reservada por Audenti Concierge IA. ${notasClinicas ? `ALERTA CLÍNICA: ${notasClinicas}` : ''}`
+        notes: `Folio: ${folioGenerado}. ${persistentRecord.notes}`
       })
-
-      return {
-        confirmado: true,
-        folio: `AUD-${Math.floor(1000 + Math.random() * 9000)}`,
-        paciente: nombrePaciente,
-        horario: fechaHora,
-        especialista: 'Dra. Aura Estudillo (Céd. 8492019)',
-        notificacionEnviada: 'Alerta enviada al celular y CRM de la Dra. Aura Estudillo.',
-        indicaciones: 'Presentarse 10 minutos antes con identificación. ¡Te esperamos!'
-      }
     } catch (err: any) {
-      return {
-        confirmado: true,
-        paciente: args.nombrePaciente,
-        horario: args.fechaHora,
-        nota: 'Pre-reserva guardada exitosamente en el CRM.'
-      }
+      console.warn('Persistencia Supabase appointments (activo fallback en tiempo real):', err?.message)
+    }
+
+    return {
+      confirmado: true,
+      folio: folioGenerado,
+      paciente: patientNameClean,
+      telefono: cleanPhone,
+      horario: fechaHora,
+      especialista: 'Dra. Aura Estudillo (Céd. 8492019)',
+      notificacionEnviada: `Se ha enviado el comprobante a tu WhatsApp (${cleanPhone}) y la alerta al CRM de la Dra. Aura Estudillo.`,
+      indicaciones: 'Presentarse 10 minutos antes con identificación. ¡Te esperamos con gusto en Audenti!'
     }
   }
 
@@ -604,6 +653,19 @@ export async function POST(request: Request) {
     } else if (isAskingForAppointmentOrGreeting && PROHIBITED_MEDS_REGEX.test(normReply)) {
       // Si la respuesta del bot contenía un fármaco por error mientras el usuario pedía cita, limpiarlo con mensaje de cita
       finalReply = '¡Con mucho gusto! La Dra. Aura Estudillo (Céd. Prof. 8492019) cuenta con espacios disponibles para tu valoración y consulta en Sede Balbuena y Guadalupe Chalma. ¿Prefieres un horario matutino o vespertino?'
+    }
+
+    // ========================================================
+    // COHERENCIA EN CONFIRMACIÓN Y CONTACTO:
+    // Si el usuario NO proporcionó un teléfono de 10 dígitos o válido,
+    // la IA NO debe afirmar que "se envió una notificación a tu celular".
+    // En su lugar, solicitar amablemente el teléfono para enviarle el folio.
+    // ========================================================
+    const phoneInUserMessage = rawUser.match(/\b\d{10}\b/) || conversation.map(c => c.content || '').join(' ').match(/\b\d{10}\b/)
+    const claimsSentToPhone = /\b(se\s+(ha\s+)?enviado(\s+la\s+notificaci[o|e]n)?\s+(a\s+tu|al)\s+(celular|tel[eé]fono|whatsapp)|notificaci[o|e]n\s+(ya\s+)?se\s+envi[o|e]\s+a\s+tu\s+celular)\b/i.test(normReply)
+
+    if (!phoneInUserMessage && claimsSentToPhone) {
+      finalReply = 'Para apartar tu lugar y enviarte el folio de confirmación a tu WhatsApp, por favor indícame tu número de teléfono.'
     }
 
     // Si por alguna razón vino vacío

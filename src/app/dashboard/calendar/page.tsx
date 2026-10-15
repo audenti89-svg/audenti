@@ -86,6 +86,50 @@ export default function CalendarPage() {
     { name: 'DOM', day: '11', fullDate: '2026-10-11' },
   ]
 
+  // Cargar citas persistentes en el calendario estilo Google Calendar
+  const fetchCalendarAppointments = async () => {
+    try {
+      const res = await fetch('/api/appointments')
+      const json = await res.json()
+      if (json?.success && Array.isArray(json.appointments)) {
+        const mapped: CalendarAppointment[] = json.appointments.map((a: any) => ({
+          id: a.id,
+          title: a.treatment || 'Consulta / Valoración Estética Oral',
+          patientName: a.patient_name,
+          doctor: 'Dra. Aura Estudillo',
+          chair: a.branch || 'Gabinete 1 (Principal)',
+          specialty: 'Odontología Integral & Estética',
+          date: a.appointment_date,
+          startTime: (a.appointment_time || '11:00').substring(0, 5),
+          endTime: '12:00',
+          durationMin: 45,
+          status: a.status || 'confirmed',
+          color: 'bg-amber-100 text-amber-950 border-l-4 border-amber-500'
+        }))
+        setAppointments(prev => {
+          const manual = prev.filter(p => !p.id.startsWith('APT-'))
+          return [...manual, ...mapped]
+        })
+      }
+    } catch {
+      // Ignorar errores transitorios
+    }
+  }
+
+  useEffect(() => {
+    fetchCalendarAppointments()
+    const interval = setInterval(fetchCalendarAppointments, 3000)
+    const handleRefresh = () => fetchCalendarAppointments()
+    window.addEventListener('storage', handleRefresh)
+    window.addEventListener('audenti_appointment_refresh', handleRefresh)
+
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('storage', handleRefresh)
+      window.removeEventListener('audenti_appointment_refresh', handleRefresh)
+    }
+  }, [])
+
   // Abrir modal de creación al hacer clic en un slot
   const handleSlotClick = (date: string, time: string) => {
     setModalSlot({ date, time })
