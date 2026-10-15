@@ -36,6 +36,7 @@ const ASSETS = {
   after: 'https://media.kolpusites.com/dental_ad/1.webp',     // Clean cast
   before: 'https://media.kolpusites.com/dental_ad/2.webp',    // Stained cast
   interior: 'https://media.kolpusites.com/dental_ad/3.webp',  // Clinic interior
+  floatingFood: '/images/floating-food-veo.png',              // Comida flotante Veo 3 (cazuela de guisado, plato gourmet, café y vino)
   draAuraQuirifano: '/images/dra-aura-estudillo.jpg',         // Cirujana en quirófano con luz azul, cofia, filipina y gafas
   portraits: [
     'https://media.kolpusites.com/dental_ad/4.webp',
@@ -136,7 +137,7 @@ export default function LandingPage() {
     isHorizontalGesture.current = null
   }
 
-  // CANVAS DE PARTÍCULAS INTERACTIVAS (TINCIÓN DINÁMICA DE DIENTES / REPELENCIA CLÍNICA)
+  // CANVAS DE PARTÍCULAS INTERACTIVAS (COMIDA QUE SE CONSUME -> FORMACIÓN DINÁMICA DE PLACA EN DIENTES)
   useEffect(() => {
     const canvas = particleCanvasRef.current
     if (!canvas) return
@@ -154,61 +155,87 @@ export default function LandingPage() {
     }
     window.addEventListener('resize', handleResize)
 
-    // Generador de partículas orgánicas (café, pigmentos, taninos)
-    const PARTICLE_COUNT = 36
-    const particles = Array.from({ length: PARTICLE_COUNT }, () => ({
-      x: Math.random() * width,
-      y: Math.random() * height,
-      vx: (Math.random() - 0.25) * 0.9,
-      vy: (Math.random() - 0.4) * 0.8,
-      size: Math.random() * 2.8 + 1.2,
-      opacity: Math.random() * 0.6 + 0.2,
-      color: Math.random() > 0.45 ? '#b45309' : Math.random() > 0.5 ? '#7f1d1d' : '#d97706', // café, vino tinto, azúcares
-      seed: Math.random() * 100,
-    }))
+    // Fuentes de emisión de partículas (posiciones relativas de los alimentos flotantes)
+    // Cazuela de guisado (arriba izq), Plato gourmet (arriba der), Café (abajo centro-izq), Copa de vino (abajo der)
+    const foodSources = [
+      { xPct: 0.18, yPct: 0.28, color: '#9a3412', name: 'Guisado' }, // pimentón / salsa oscura
+      { xPct: 0.78, yPct: 0.26, color: '#7c2d12', name: 'Gourmet' }, // reducción de carne
+      { xPct: 0.38, yPct: 0.72, color: '#b45309', name: 'Espresso' }, // café tostado
+      { xPct: 0.82, yPct: 0.74, color: '#881337', name: 'Vino' }, // taninos de vino tinto
+    ]
+
+    const PARTICLE_COUNT = 55
+    const particles = Array.from({ length: PARTICLE_COUNT }, (_, idx) => {
+      const src = foodSources[idx % foodSources.length]
+      return {
+        srcIdx: idx % foodSources.length,
+        x: src.xPct * width + (Math.random() - 0.5) * 60,
+        y: src.yPct * height + (Math.random() - 0.5) * 60,
+        targetX: width * 0.5 + (Math.random() - 0.5) * 180, // centro de los dientes
+        targetY: height * 0.52 + (Math.random() - 0.5) * 140,
+        progress: Math.random(),
+        speed: 0.005 + Math.random() * 0.008,
+        size: Math.random() * 2.8 + 1.2,
+        color: src.color,
+        seed: Math.random() * 100,
+      }
+    })
 
     const render = () => {
       ctx.clearRect(0, 0, width, height)
 
-      // Línea divisoria actual basada en splitPercent
+      // splitPercent (0 a 100):
+      // 0 = Dientes 100% limpios (comida intacta, sin partículas)
+      // 100 = Dientes completamente sucios (comida consumida, flujo máximo de placa hacia dientes)
+      const stainFactor = splitPercent / 100 // 0 a 1
       const currentSplitX = (splitPercent / 100) * width
 
-      particles.forEach((p) => {
-        p.seed += 0.02
-        p.x += p.vx + Math.sin(p.seed) * 0.35
-        p.y += p.vy + Math.cos(p.seed) * 0.35
+      // Solo si el usuario desliza hacia la derecha (consumiendo comida) las partículas viajan
+      if (stainFactor > 0.05) {
+        particles.forEach((p) => {
+          p.seed += 0.03
+          p.progress += p.speed * (0.6 + stainFactor * 1.2)
+          if (p.progress > 1) {
+            p.progress = 0
+            const src = foodSources[p.srcIdx]
+            p.x = src.xPct * width + (Math.random() - 0.5) * 40
+            p.y = src.yPct * height + (Math.random() - 0.5) * 40
+          }
 
-        // Rebote o reaparición en bordes
-        if (p.x < 0) p.x = width
-        if (p.x > width) p.x = 0
-        if (p.y < 0) p.y = height
-        if (p.y > height) p.y = 0
+          const src = foodSources[p.srcIdx]
+          const startX = src.xPct * width
+          const startY = src.yPct * height
+          // Curva suave hacia los dientes centrales
+          const currentX = startX + (p.targetX - startX) * p.progress + Math.sin(p.seed) * 15
+          const currentY = startY + (p.targetY - startY) * p.progress + Math.cos(p.seed) * 15
 
-        // Si la partícula está en la zona AFTER (dientes limpios), se repele / disipa
-        const isInBeforeSide = p.x <= currentSplitX
+          // Verificar si cruza la frontera de los dientes BEFORE o AFTER
+          const isInBeforeSide = currentX <= currentSplitX
 
-        ctx.save()
-        if (isInBeforeSide) {
-          // Zona sucia: partículas atraídas a la estructura dental, pigmentando
-          ctx.globalAlpha = p.opacity
-          ctx.fillStyle = p.color
-          ctx.shadowBlur = 6
-          ctx.shadowColor = p.color
-          ctx.beginPath()
-          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2)
-          ctx.fill()
-        } else {
-          // Zona limpia: escudo de brillo clínico refractivo (repelencia)
-          ctx.globalAlpha = p.opacity * 0.25
-          ctx.fillStyle = '#38bdf8' // Destello celeste / blanco de protección
-          ctx.shadowBlur = 8
-          ctx.shadowColor = '#38bdf8'
-          ctx.beginPath()
-          ctx.arc(p.x, p.y, p.size * 0.7, 0, Math.PI * 2)
-          ctx.fill()
-        }
-        ctx.restore()
-      })
+          ctx.save()
+          if (isInBeforeSide) {
+            // Se adhiere y tiñe el esmalte en la zona BEFORE
+            const opacity = Math.min(1, stainFactor * 1.2) * (0.4 + Math.sin(p.progress * Math.PI) * 0.6)
+            ctx.globalAlpha = opacity
+            ctx.fillStyle = p.color
+            ctx.shadowBlur = 6
+            ctx.shadowColor = p.color
+            ctx.beginPath()
+            ctx.arc(currentX, currentY, p.size, 0, Math.PI * 2)
+            ctx.fill()
+          } else {
+            // Escudo de repelencia y desinfección en la zona AFTER (dientes limpios)
+            ctx.globalAlpha = 0.15 * (1 - p.progress)
+            ctx.fillStyle = '#38bdf8'
+            ctx.shadowBlur = 8
+            ctx.shadowColor = '#38bdf8'
+            ctx.beginPath()
+            ctx.arc(currentX, currentY, p.size * 0.6, 0, Math.PI * 2)
+            ctx.fill()
+          }
+          ctx.restore()
+        })
+      }
 
       animFrame = requestAnimationFrame(render)
     }
@@ -425,32 +452,46 @@ export default function LandingPage() {
         className="relative w-full h-[100svh] min-h-[640px] select-none touch-pan-y outline-none overflow-hidden bg-slate-950 cursor-crosshair pt-16"
         aria-label="Comparador interactivo de moldes dentales con seguimiento de cursor y táctil"
       >
-        {/* ELEMENTOS DE COMIDA/BEBIDA SEMITRANSPARENTES FLOTANTES (Pigmentos alimenticios) */}
-        <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden">
-          {/* Café y Taninos (Arriba Izquierda) */}
-          <div className="absolute top-28 left-[8%] sm:left-[12%] flex items-center gap-2 p-2.5 sm:p-3 rounded-2xl bg-amber-950/20 backdrop-blur-md border border-amber-500/20 shadow-lg text-amber-200/60 animate-bounce duration-1000 select-none">
-            <Coffee className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500/70" />
-            <span className="text-[10px] font-mono tracking-widest uppercase hidden sm:inline">Taninos • Café</span>
+        {/* ELEMENTOS DE COMIDA/BEBIDA FLOTANTES VEO 3 (Cazuela de guisado, plato gourmet, café espresso y copa de vino) */}
+        {/* EFECTO DE CONSUMO: Al deslizar a la derecha (splitPercent sube), la comida se desvanece suavemente como si fuera consumida */}
+        <div 
+          className="absolute inset-0 pointer-events-none z-10 overflow-hidden transition-all duration-300 ease-out"
+          style={{
+            // Con splitPercent = 0% (dientes limpios), opacidad 0.65 (comida intacta)
+            // Con splitPercent = 100% (dientes sucios), opacidad desciende hacia 0.05 (comida consumida)
+            opacity: Math.max(0.04, 0.65 - (splitPercent / 100) * 0.58),
+            filter: `blur(${(splitPercent / 100) * 2}px)`,
+            transform: `scale(${1 - (splitPercent / 100) * 0.05})`,
+          }}
+        >
+          {/* Imagen cinematográfica Veo 3 de alimentos gourmet flotantes */}
+          <img
+            src={ASSETS.floatingFood}
+            alt="Alimentos pigmentantes flotantes: cazuela de guisado, plato gourmet, café y vino tinto"
+            className="w-full h-full object-cover object-center mix-blend-screen select-none"
+            draggable={false}
+          />
+
+          {/* Insignias sutiles contextuales de pigmentos */}
+          <div className="absolute top-28 left-[6%] sm:left-[10%] flex items-center gap-2 p-2 sm:p-2.5 rounded-2xl bg-slate-950/60 backdrop-blur-md border border-amber-500/30 text-amber-200 text-[10px] font-mono tracking-widest uppercase shadow-xl select-none">
+            <Coffee className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden sm:inline">Taninos &amp; Café</span>
           </div>
 
-          {/* Vino Tinto y Cromógenos (Arriba Derecha) */}
-          <div className="absolute top-36 right-[6%] sm:right-[15%] flex items-center gap-2 p-2.5 sm:p-3 rounded-2xl bg-rose-950/20 backdrop-blur-md border border-rose-500/20 shadow-lg text-rose-200/60 animate-pulse select-none">
-            <Wine className="w-4 h-4 sm:w-5 sm:h-5 text-rose-400/70" />
-            <span className="text-[10px] font-mono tracking-widest uppercase hidden sm:inline">Cromógenos • Vino</span>
-          </div>
-
-          {/* Azúcares y Almidones Adherentes (Centro Izquierda) */}
-          <div className="absolute top-[48%] left-[4%] sm:left-[7%] flex items-center gap-2 p-2 sm:p-2.5 rounded-2xl bg-orange-950/20 backdrop-blur-md border border-orange-500/20 shadow-lg text-orange-200/50 select-none">
-            <div className="w-2.5 h-2.5 rounded-full bg-amber-400/50 animate-ping" />
-            <span className="text-[10px] font-mono tracking-widest uppercase">Biofilm • Sacarosa</span>
-          </div>
-
-          {/* Ácidos y Placa Bacteriana (Centro Derecha) */}
-          <div className="absolute top-[52%] right-[4%] sm:right-[8%] flex items-center gap-2 p-2 sm:p-2.5 rounded-2xl bg-yellow-950/20 backdrop-blur-md border border-yellow-500/20 shadow-lg text-yellow-200/50 select-none">
-            <div className="w-2 h-2 rounded-sm bg-yellow-400/50 rotate-45" />
-            <span className="text-[10px] font-mono tracking-widest uppercase">Pigmento Orgánico</span>
+          <div className="absolute top-36 right-[6%] sm:right-[12%] flex items-center gap-2 p-2 sm:p-2.5 rounded-2xl bg-slate-950/60 backdrop-blur-md border border-rose-500/30 text-rose-200 text-[10px] font-mono tracking-widest uppercase shadow-xl select-none">
+            <Wine className="w-3.5 h-3.5 text-rose-400" />
+            <span className="hidden sm:inline">Cromógenos &amp; Vino</span>
           </div>
         </div>
+
+        {/* Micro-indicador del consumo alimenticio dinámico */}
+        {splitPercent > 5 && (
+          <div className="absolute top-24 left-1/2 -translate-x-1/2 z-20 pointer-events-none transition-opacity duration-300">
+            <span className="px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase bg-amber-950/80 text-amber-300 backdrop-blur-md border border-amber-500/40 shadow-lg">
+              🍽️ Placa &amp; Pigmentación Activa ({Math.round(splitPercent)}%)
+            </span>
+          </div>
+        )}
 
         {/* CANVAS DE PARTÍCULAS DINÁMICAS (Flujo hacia BEFORE / Repelencia en AFTER) */}
         <canvas
