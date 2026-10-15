@@ -558,14 +558,22 @@ export async function POST(request: Request) {
     // FILTRO DE CONTENCIÓN ESTRICTO Y CIBERSEGURIDAD CLÍNICA:
     // Queda ABSOLUTAMENTE PROHIBIDO que la IA mencione nombres de fármacos,
     // dosis, miligramos o pautas de automedicación.
+    // SOLO se activa cuando el usuario EXPLICITAMENTE pide qué fármaco/pastilla tomar,
+    // o si el bot generó por error nombres de medicamentos.
     // ========================================================
-    const PROHIBITED_MEDS_REGEX = /\b(ibuprofeno|paracetamol|acetaminof[eé]n|amoxicilina|ketorolaco|clonixinato|naproxeno|aspirina|tramadol|diclofenaco|dexametasona|ampicilina|azitromicina|clindamicina|analg[eé]sico|antibi[oó]tico|\d+\s*mg|\d+\s*miligramos|\d+\s*gramos|cada\s*\d+\s*horas)\b/i
-    const ASKS_FOR_MEDS_REGEX = /\b(qu[eé]\s+(tomar|puedo\s+tomar|me\s+tomo|pastilla|medicamento|medicina|remedio|dosis)|receta|rec[eé]tame)\b/i
+    const PROHIBITED_MEDS_REGEX = /\b(ibuprofeno|paracetamol|acetaminof[eé]n|amoxicilina|ketorolaco|clonixinato|naproxeno|aspirina|tramadol|diclofenaco|dexametasona|ampicilina|azitromicina|clindamicina|\d+\s*mg|\d+\s*miligramos|\d+\s*gramos)\b/i
+    const ASKS_EXPLICIT_PRESCRIPTION_REGEX = /\b(qu[eé]\s+(me\s+tomo|puedo\s+tomar|pastilla|medicamento|medicina|f[aá]rmaco)|rec[eé]tame|dame\s+una\s+receta|qu[eé]\s+dosis|qu[eé]\s+tomar)\b/i
 
     const mandatoryMedicationDenial = 'No tengo permitido recomendar ni recetar medicamentos. He enviado tu reporte directamente a la Dra. Aura Estudillo. Por favor ingresa tu número de WhatsApp y mantente en línea mientras la doctora evalúa tu caso para darte la indicación correspondiente.'
 
-    if (ASKS_FOR_MEDS_REGEX.test(lowerUser) || PROHIBITED_MEDS_REGEX.test(lowerReply)) {
+    // Si el usuario simplemente pide cita o saluda, NUNCA bloquear con negativa de medicamentos
+    const isAskingForAppointmentOrGreeting = /\b(cita|agendar|apartar|hora|horario|consulta|hola|buen|buenos|buenas|precio|costo|cu[aá]nto)\b/i.test(lowerUser)
+
+    if (!isAskingForAppointmentOrGreeting && (ASKS_EXPLICIT_PRESCRIPTION_REGEX.test(lowerUser) || PROHIBITED_MEDS_REGEX.test(lowerReply))) {
       finalReply = mandatoryMedicationDenial
+    } else if (isAskingForAppointmentOrGreeting && PROHIBITED_MEDS_REGEX.test(lowerReply)) {
+      // Si la respuesta del bot contenía un fármaco por error mientras el usuario pedía cita, limpiarlo con mensaje de cita
+      finalReply = '¡Con mucho gusto! La Dra. Aura Estudillo (Céd. Prof. 8492019) cuenta con espacios disponibles para tu valoración y diseño de sonrisa en Sede Balbuena y Guadalupe Chalma. ¿Prefieres un horario matutino o vespertino?'
     }
 
     // Si por alguna razón vino vacío
