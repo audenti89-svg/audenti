@@ -48,8 +48,34 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  // 2. Si hay usuario autenticado, verificar su registro médico en la tabla `patients`
+  // 2. Si hay usuario autenticado, verificar su rol y registro
   if (user) {
+    // Lista de correos administradores / dueños del sistema (Dra. Aura Estudillo)
+    const isSuperAdmin = user.email === 'audenti89@gmail.com';
+
+    // Verificar si el usuario es staff/doctor/owner en la tabla `users`
+    const { data: userProfile } = await supabase
+      .from('users')
+      .select('role, onboarding_completed')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    const isStaffOrOwner =
+      isSuperAdmin ||
+      userProfile?.role === 'owner' ||
+      userProfile?.role === 'admin' ||
+      userProfile?.role === 'doctor';
+
+    if (isStaffOrOwner) {
+      // Dueña / Doctora / Administrador tiene acceso total directo al dashboard
+      if (isAuthRoute || isOnboardingRoute) {
+        redirectUrl.pathname = '/dashboard';
+        return NextResponse.redirect(redirectUrl);
+      }
+      return supabaseResponse;
+    }
+
+    // Para pacientes: verificar registro médico en la tabla `patients`
     const { data: patient } = await supabase
       .from('patients')
       .select('onboarding_completed')
@@ -58,7 +84,7 @@ export async function updateSession(request: NextRequest) {
 
     const hasCompletedOnboarding = patient?.onboarding_completed === true;
 
-    // Si no ha completado el onboarding e intenta entrar al dashboard -> redirigir a /onboarding
+    // Si es paciente y no ha completado el onboarding e intenta entrar al dashboard -> redirigir a /onboarding
     if (!hasCompletedOnboarding && isDashboardRoute) {
       redirectUrl.pathname = '/onboarding';
       return NextResponse.redirect(redirectUrl);
