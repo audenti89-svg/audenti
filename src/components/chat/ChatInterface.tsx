@@ -74,56 +74,22 @@ interface Message {
   isCascadeNotice?: boolean
 }
 
-const PATIENTS_MOCK: PatientDetails[] = [
-  {
-    id: 'p-1',
-    name: 'Mateo Morales Ruiz',
-    phone: '+52 55 4444 8821',
-    referrer: {
-      name: 'Ricardo Pérez Gómez',
-      code: 'RP-8812',
-      avatar: 'RP'
-    },
-    referralsMade: [
-      { id: 'ref-1', name: 'Roberto Garza', code: 'RG-6419', ltvContributed: 18500, status: 'in_treatment' },
-      { id: 'ref-2', name: 'Laura Patricia Vega', code: 'LV-9921', ltvContributed: 12500, status: 'completed' },
-      { id: 'ref-3', name: 'Daniela Montes', code: 'DM-1104', ltvContributed: 7000, status: 'active' },
-    ],
-    familyMembers: [
-      { id: 'f-1', name: 'Sofía Hernández', relationship: 'Cónyuge / Esposa', lastVisit: 'Hace 2 semanas', age: 31 },
-      { id: 'f-2', name: 'Mateo Morales Jr.', relationship: 'Hijo', lastVisit: 'Hace 1 mes', age: 8 },
-      { id: 'f-3', name: 'Elena Ruiz', relationship: 'Madre', lastVisit: 'Hace 6 meses', age: 58 },
-      { id: 'f-4', name: 'Javier Morales', relationship: 'Hermano', lastVisit: 'Hace 3 meses', age: 35 },
-    ]
-  },
-  {
-    id: 'p-2',
-    name: 'Mariana Ruíz',
-    phone: '+52 55 9821 4455',
-    referrer: {
-      name: 'Campaña QR Instagram (Sede Roma)',
-      code: 'QR-IG-ROMA',
-      avatar: 'QR'
-    },
-    referralsMade: [
-      { id: 'ref-4', name: 'Valeria López', code: 'VL-5502', ltvContributed: 8400, status: 'active' }
-    ],
-    familyMembers: [
-      { id: 'f-5', name: 'Patricia Vega Ruíz', relationship: 'Hermana', lastVisit: 'Ayer', age: 29 },
-      { id: 'f-6', name: 'Dr. Alberto Ruíz', relationship: 'Padre', lastVisit: 'Hace 4 meses', age: 62 },
-    ]
-  }
-]
+import { createClient } from '@/utils/supabase/client'
 
 export function ChatInterface() {
   const { soundEnabled, setSoundEnabled, playTone } = useNotificationSound()
+  const supabase = createClient()
 
   // Tabs y Navegación
   const [mainTab, setMainTab] = useState<ChatTab>('external')
   const [internalTab, setInternalTab] = useState<InternalSubTab>('peer')
 
+  // Pacientes reales cargados de Supabase
+  const [patients, setPatients] = useState<PatientDetails[]>([])
+  const [loadingPatients, setLoadingPatients] = useState(true)
+
   // Paciente seleccionado
-  const [selectedPatientId, setSelectedPatientId] = useState('p-1')
+  const [selectedPatientId, setSelectedPatientId] = useState<string>('')
   const [searchTerm, setSearchTerm] = useState('')
 
   // Selección múltiple para envíos en conjunto (Familiares + Referidos)
@@ -131,29 +97,59 @@ export function ChatInterface() {
   const [broadcastTarget, setBroadcastTarget] = useState<'all' | 'family_only' | 'referrals_only' | 'custom'>('custom')
 
   // Canal interno seleccionado
-  const [selectedInternalTarget, setSelectedInternalTarget] = useState('Dr. Ramírez (Ortodoncista)')
+  const [selectedInternalTarget, setSelectedInternalTarget] = useState('Interconsulta Médica')
 
-  // Mensajería
+  // Mensajería dinámica
   const [inputMessage, setInputMessage] = useState('')
-  const [messages, setMessages] = useState<Record<string, Message[]>>({
-    'p-1': [
-      { id: '1', senderName: 'Mateo Morales Ruiz', senderInitials: 'MM', content: 'Buenas tardes Dra. Sofía, ¿cómo vamos con el reporte de la endodoncia?', time: '10:00 AM', isOwn: false },
-      { id: '2', senderName: 'Dra. Sofía Valero', senderInitials: 'SV', content: 'Hola Mateo, la instrumentación de los dos primeros conductos quedó perfecta. La próxima cita sellamos con termoplástica.', time: '10:04 AM', isOwn: true },
-    ],
-    'internal-peer': [
-      { id: '3', senderName: 'Dr. Ramírez (Ortodoncista)', senderInitials: 'DR', content: 'Dra. Sofía, ¿revisaste el caso de la mordida cruzada de Mariana Ruíz? Creo que podemos alinear sin extracciones.', time: '09:30 AM', isOwn: false },
-      { id: '4', senderName: 'Dra. Sofía Valero', senderInitials: 'SV', content: 'Coincido colega. Con los aditamentos interproximales ganamos los 3.5mm necesarios sin tocar premolares.', time: '09:35 AM', isOwn: true },
-    ],
-    'internal-reception': [
-      { id: '5', senderName: 'Recepción Central', senderInitials: 'RC', content: 'Dra. Valero: Mateo Morales ya se encuentra en sala de espera. Firmó su consentimiento digital.', time: '09:50 AM', isOwn: false },
-    ],
-    'internal-management': [
-      { id: '6', senderName: 'Administración & Dueño', senderInitials: 'AD', content: 'Se aprobó la compra del lote de fresas piezoeléctricas para cirugías complejas de fin de mes.', time: 'Ayer', isOwn: false },
-    ]
-  })
+  const [messages, setMessages] = useState<Record<string, Message[]>>({})
+
+  useEffect(() => {
+    async function loadChatPatients() {
+      setLoadingPatients(true)
+      try {
+        const { data, error } = await supabase
+          .from('patients')
+          .select('id, full_name, phone, emergency_contact_name, emergency_contact_phone')
+          .order('created_at', { ascending: false })
+
+        if (error) throw error
+
+        if (data && data.length > 0) {
+          const mapped: PatientDetails[] = data.map(p => ({
+            id: p.id,
+            name: p.full_name || 'Paciente sin nombre',
+            phone: p.phone || 'Sin teléfono',
+            referrer: undefined,
+            referralsMade: [],
+            familyMembers: p.emergency_contact_name ? [
+              {
+                id: `fam-${p.id}`,
+                name: p.emergency_contact_name,
+                relationship: 'Contacto de Emergencia',
+                lastVisit: p.emergency_contact_phone || 'Registrado en ficha',
+              }
+            ] : []
+          }))
+          setPatients(mapped)
+          setSelectedPatientId(mapped[0].id)
+        } else {
+          setPatients([])
+          setSelectedPatientId('')
+        }
+      } catch (err) {
+        console.warn('Nota en chat pacientes:', err)
+        setPatients([])
+        setSelectedPatientId('')
+      } finally {
+        setLoadingPatients(false)
+      }
+    }
+
+    loadChatPatients()
+  }, [])
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const activePatient = PATIENTS_MOCK.find(p => p.id === selectedPatientId) || PATIENTS_MOCK[0]
+  const activePatient = patients.find(p => p.id === selectedPatientId) || null
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -167,12 +163,14 @@ export function ChatInterface() {
   }
 
   const selectAllFamily = () => {
+    if (!activePatient) return
     const famNames = activePatient.familyMembers.map(m => m.name)
     setSelectedRecipients(famNames)
     setBroadcastTarget('family_only')
   }
 
   const selectAllReferrals = () => {
+    if (!activePatient) return
     const refNames = activePatient.referralsMade.map(r => r.name)
     setSelectedRecipients(refNames)
     setBroadcastTarget('referrals_only')
@@ -288,36 +286,53 @@ export function ChatInterface() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                {PATIENTS_MOCK.map(p => {
-                  const isSelected = selectedPatientId === p.id
-                  const totalReferralLtv = p.referralsMade.reduce((sum, r) => sum + r.ltvContributed, 0)
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => { setSelectedPatientId(p.id); setSelectedRecipients([]); }}
-                      className={`w-full flex items-start gap-3 p-3 rounded-xl text-left transition-all ${
-                        isSelected ? 'bg-amber-100/70 border border-amber-300 shadow-2xs' : 'hover:bg-white border border-transparent'
-                      }`}
-                    >
-                      <div className="w-10 h-10 rounded-xl bg-[#202D4C] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
-                        {p.name.substring(0, 2).toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-900 truncate">{p.name}</span>
-                          <span className="text-[10px] text-amber-800 font-bold bg-amber-50 px-1.5 rounded">
-                            {p.familyMembers.length} familiares
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-slate-500 block">{p.phone}</span>
-                        <div className="flex items-center gap-1.5 mt-1 text-[10px] text-emerald-700 font-bold">
-                          <TrendingUp className="w-3 h-3" />
-                          <span>LTV Red: ${totalReferralLtv.toLocaleString('es-MX')} MXN</span>
-                        </div>
-                      </div>
-                    </button>
-                  )
-                })}
+                {loadingPatients ? (
+                  <div className="p-8 text-center text-xs text-slate-400">
+                    Cargando pacientes de Supabase...
+                  </div>
+                ) : patients.length === 0 ? (
+                  <div className="p-8 text-center space-y-2">
+                    <Users className="w-8 h-8 text-slate-300 mx-auto" />
+                    <p className="text-xs font-bold text-slate-700">Sin pacientes en la base</p>
+                    <p className="text-[11px] text-slate-500">
+                      No hay pacientes registrados todavía. El canal omni-canal iniciará en cuanto registres un paciente.
+                    </p>
+                  </div>
+                ) : (
+                  patients
+                    .filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.phone.includes(searchTerm))
+                    .map(p => {
+                      const isSelected = selectedPatientId === p.id
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => { setSelectedPatientId(p.id); setSelectedRecipients([]); }}
+                          className={`w-full flex items-start gap-3 p-3 rounded-xl text-left transition-all ${
+                            isSelected ? 'bg-amber-100/70 border border-amber-300 shadow-2xs' : 'hover:bg-white border border-transparent'
+                          }`}
+                        >
+                          <div className="w-10 h-10 rounded-xl bg-[#202D4C] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                            {p.name.substring(0, 2).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-slate-900 truncate">{p.name}</span>
+                              {p.familyMembers.length > 0 && (
+                                <span className="text-[10px] text-amber-800 font-bold bg-amber-50 px-1.5 rounded">
+                                  {p.familyMembers.length} contactos
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[11px] text-slate-500 block">{p.phone}</span>
+                            <div className="flex items-center gap-1.5 mt-1 text-[10px] text-emerald-700 font-bold">
+                              <TrendingUp className="w-3 h-3" />
+                              <span>Expediente Activo</span>
+                            </div>
+                          </div>
+                        </button>
+                      )
+                    })
+                )}
               </div>
             </>
           ) : (
@@ -372,17 +387,24 @@ export function ChatInterface() {
           <div className="h-16 px-6 border-b border-slate-200/80 flex items-center justify-between shrink-0 bg-slate-50/30">
             <div>
               {mainTab === 'external' ? (
-                <>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-bold text-slate-900">{activePatient.name}</h3>
-                    {selectedRecipients.length > 0 && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
-                        Envío en conjunto a {selectedRecipients.length} personas
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-slate-500">{activePatient.phone} • Trazabilidad activa</p>
-                </>
+                activePatient ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-slate-900">{activePatient.name}</h3>
+                      {selectedRecipients.length > 0 && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                          Envío en conjunto a {selectedRecipients.length} personas
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-500">{activePatient.phone} • Trazabilidad activa</p>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="text-sm font-bold text-slate-900">Canal de Pacientes</h3>
+                    <p className="text-[11px] text-slate-500">Selecciona o da de alta un paciente para iniciar conversación</p>
+                  </>
+                )
               ) : (
                 <>
                   <h3 className="text-sm font-bold text-slate-900">
@@ -407,38 +429,54 @@ export function ChatInterface() {
 
           {/* Mensajes */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/20">
-            {(messages[mainTab === 'external' ? selectedPatientId : `internal-${internalTab}`] || []).map(msg => (
-              <div key={msg.id} className={`flex gap-3 ${msg.isOwn ? 'flex-row-reverse' : ''}`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 shadow-2xs ${
-                  msg.isOwn ? 'bg-amber-400 text-slate-950' : 'bg-[#202D4C] text-white'
-                }`}>
-                  {msg.senderInitials}
+            {((mainTab === 'external' ? messages[selectedPatientId] : messages[`internal-${internalTab}`]) || []).length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
+                  <MessageSquare className="w-6 h-6" />
                 </div>
-                <div className={`max-w-[75%] space-y-1 ${msg.isOwn ? 'items-end' : ''}`}>
-                  <div className="flex items-center gap-2">
-                    {!msg.isOwn && (
-                      <span className="text-[11px] font-bold text-slate-700 pl-1">{msg.senderName}</span>
-                    )}
-                    {msg.isCascadeNotice && (
-                      <span className="text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-200 px-1.5 py-0.2 rounded-md">
-                        Difusión en Conjunto
-                      </span>
-                    )}
-                  </div>
-                  <div className={`px-4 py-2.5 rounded-2xl text-xs leading-relaxed shadow-2xs ${
-                    msg.isOwn
-                      ? 'bg-slate-900 text-white rounded-tr-xs'
-                      : 'bg-white text-slate-900 border border-slate-200/80 rounded-tl-xs'
-                  }`}>
-                    {msg.content}
-                  </div>
-                  <div className={`flex items-center gap-1 text-[10px] text-slate-400 ${msg.isOwn ? 'justify-end pr-1' : 'pl-1'}`}>
-                    <span>{msg.time}</span>
-                    {msg.isOwn && <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />}
-                  </div>
-                </div>
+                <h4 className="text-sm font-bold text-slate-800">Canal en Blanco (Sin Mensajes)</h4>
+                <p className="text-xs text-slate-500 max-w-sm">
+                  {mainTab === 'external'
+                    ? activePatient
+                      ? `Inicia la conversación clínica directa con ${activePatient.name}. Los mensajes se sincronizan en tiempo real.`
+                      : 'No hay paciente seleccionado. Elige un paciente del directorio izquierdo o da de alta uno nuevo.'
+                    : 'Canal interno de comunicación clínica. Escribe un mensaje para coordinar con el equipo dental.'}
+                </p>
               </div>
-            ))}
+            ) : (
+              (messages[mainTab === 'external' ? selectedPatientId : `internal-${internalTab}`] || []).map(msg => (
+                <div key={msg.id} className={`flex gap-3 ${msg.isOwn ? 'flex-row-reverse' : ''}`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 shadow-2xs ${
+                    msg.isOwn ? 'bg-amber-400 text-slate-950' : 'bg-[#202D4C] text-white'
+                  }`}>
+                    {msg.senderInitials}
+                  </div>
+                  <div className={`max-w-[75%] space-y-1 ${msg.isOwn ? 'items-end' : ''}`}>
+                    <div className="flex items-center gap-2">
+                      {!msg.isOwn && (
+                        <span className="text-[11px] font-bold text-slate-700 pl-1">{msg.senderName}</span>
+                      )}
+                      {msg.isCascadeNotice && (
+                        <span className="text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-200 px-1.5 py-0.2 rounded-md">
+                          Difusión en Conjunto
+                        </span>
+                      )}
+                    </div>
+                    <div className={`px-4 py-2.5 rounded-2xl text-xs leading-relaxed shadow-2xs ${
+                      msg.isOwn
+                        ? 'bg-slate-900 text-white rounded-tr-xs'
+                        : 'bg-white text-slate-900 border border-slate-200/80 rounded-tl-xs'
+                    }`}>
+                      {msg.content}
+                    </div>
+                    <div className={`flex items-center gap-1 text-[10px] text-slate-400 ${msg.isOwn ? 'justify-end pr-1' : 'pl-1'}`}>
+                      <span>{msg.time}</span>
+                      {msg.isOwn && <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
             <div ref={messagesEndRef} />
           </div>
 
@@ -470,7 +508,9 @@ export function ChatInterface() {
                 placeholder={
                   selectedRecipients.length > 0
                     ? `Enviar mensaje grupal a ${selectedRecipients.length} personas...`
-                    : `Escribe un mensaje para ${activePatient.name}...`
+                    : activePatient
+                    ? `Escribe un mensaje para ${activePatient.name}...`
+                    : 'Escribe un mensaje para el canal...'
                 }
                 className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-white placeholder:text-slate-400"
               />
@@ -498,112 +538,80 @@ export function ChatInterface() {
               <h4 className="text-sm font-bold text-slate-900">Selección Dinámica de Destinatarios</h4>
             </div>
 
-            {/* Quién lo Recomendó */}
-            <div className="p-4 rounded-xl bg-white border border-slate-200/80 space-y-1.5 shadow-2xs">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Origen / Embajador</span>
-              {activePatient.referrer ? (
-                <div className="flex items-center gap-2.5 pt-0.5">
-                  <div className="w-8 h-8 rounded-lg bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center">
-                    {activePatient.referrer.avatar}
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold text-slate-900 block">{activePatient.referrer.name}</span>
-                    <span className="text-[10px] text-slate-500 font-mono">Folio: {activePatient.referrer.code}</span>
+            {!activePatient ? (
+              <div className="p-6 text-center space-y-2 bg-white rounded-xl border border-slate-200">
+                <Users className="w-8 h-8 text-slate-300 mx-auto" />
+                <p className="text-xs font-bold text-slate-700">Sin paciente activo</p>
+                <p className="text-[11px] text-slate-500">
+                  Selecciona un paciente del directorio para visualizar sus contactos de emergencia o familiares asociados.
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Origen / Embajador */}
+                <div className="p-4 rounded-xl bg-white border border-slate-200/80 space-y-1.5 shadow-2xs">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Origen / Registro</span>
+                  <div className="flex items-center gap-2.5 pt-0.5">
+                    <div className="w-8 h-8 rounded-lg bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center">
+                      {activePatient.name.substring(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 block">{activePatient.name}</span>
+                      <span className="text-[10px] text-slate-500 font-mono">Folio: AUD-{activePatient.id.slice(0, 6).toUpperCase()}</span>
+                    </div>
                   </div>
                 </div>
-              ) : (
-                <span className="text-xs text-slate-500">Sin referidor registrado</span>
-              )}
-            </div>
 
-            {/* 1. Núcleo Familiar con Checkboxes */}
-            <div className="p-4 rounded-xl bg-white border border-slate-200/80 space-y-3 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-900">Núcleo Familiar ({activePatient.familyMembers.length})</span>
-                <button
-                  type="button"
-                  onClick={selectAllFamily}
-                  className="text-[11px] font-bold text-amber-800 hover:underline"
-                >
-                  Seleccionar Todo
-                </button>
-              </div>
+                {/* 1. Contacto Familiar / Emergencia con Checkboxes */}
+                <div className="p-4 rounded-xl bg-white border border-slate-200/80 space-y-3 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-900">Contactos Registrados ({activePatient.familyMembers.length})</span>
+                    {activePatient.familyMembers.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={selectAllFamily}
+                        className="text-[11px] font-bold text-amber-800 hover:underline"
+                      >
+                        Seleccionar Todo
+                      </button>
+                    )}
+                  </div>
 
-              <div className="space-y-2">
-                {activePatient.familyMembers.map(m => {
-                  const isChecked = selectedRecipients.includes(m.name)
-                  return (
-                    <div
-                      key={m.id}
-                      onClick={() => toggleRecipient(m.name)}
-                      className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2 ${
-                        isChecked ? 'bg-amber-50/70 border-amber-300' : 'bg-slate-50 border-slate-200 hover:bg-slate-100/60'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        {isChecked ? (
-                          <CheckSquare className="w-4 h-4 text-amber-600" />
-                        ) : (
-                          <Square className="w-4 h-4 text-slate-400" />
-                        )}
-                        <div>
-                          <span className="text-xs font-bold text-slate-900 block">{m.name}</span>
-                          <span className="text-[10px] text-slate-500">{m.relationship} • {m.lastVisit}</span>
-                        </div>
-                      </div>
-                      {m.age && <span className="text-[10px] text-slate-400 font-medium">{m.age}a</span>}
+                  {activePatient.familyMembers.length === 0 ? (
+                    <div className="p-3 bg-slate-50 rounded-lg text-slate-400 text-xs text-center">
+                      Sin familiares o contacto de emergencia registrado
                     </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* 2. Red de Referidos que él ha Traído */}
-            <div className="p-4 rounded-xl bg-white border border-slate-200/80 space-y-3 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-xs font-bold text-slate-900 block">Amistades Recomendadas ({activePatient.referralsMade.length})</span>
-                  <span className="text-[10px] text-slate-500">Traídos por su código QR</span>
+                  ) : (
+                    <div className="space-y-2">
+                      {activePatient.familyMembers.map(m => {
+                        const isChecked = selectedRecipients.includes(m.name)
+                        return (
+                          <div
+                            key={m.id}
+                            onClick={() => toggleRecipient(m.name)}
+                            className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                              isChecked ? 'bg-amber-50/70 border-amber-300' : 'bg-slate-50 border-slate-200 hover:bg-slate-100/60'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              {isChecked ? (
+                                <CheckSquare className="w-4 h-4 text-amber-600" />
+                              ) : (
+                                <Square className="w-4 h-4 text-slate-400" />
+                              )}
+                              <div>
+                                <span className="text-xs font-bold text-slate-900 block">{m.name}</span>
+                                <span className="text-[10px] text-slate-500">{m.relationship} • {m.lastVisit}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
-                <button
-                  type="button"
-                  onClick={selectAllReferrals}
-                  className="text-[11px] font-bold text-amber-800 hover:underline"
-                >
-                  Seleccionar Todo
-                </button>
-              </div>
-
-              <div className="space-y-2">
-                {activePatient.referralsMade.map(r => {
-                  const isChecked = selectedRecipients.includes(r.name)
-                  return (
-                    <div
-                      key={r.id}
-                      onClick={() => toggleRecipient(r.name)}
-                      className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2 ${
-                        isChecked ? 'bg-amber-50/70 border-amber-300' : 'bg-slate-50 border-slate-200 hover:bg-slate-100/60'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        {isChecked ? (
-                          <CheckSquare className="w-4 h-4 text-amber-600" />
-                        ) : (
-                          <Square className="w-4 h-4 text-slate-400" />
-                        )}
-                        <div>
-                          <span className="text-xs font-bold text-slate-900 block">{r.name}</span>
-                          <span className="text-[10px] text-emerald-700 font-bold">LTV: ${r.ltvContributed.toLocaleString('es-MX')}</span>
-                        </div>
-                      </div>
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 uppercase">
-                        {r.status}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
+              </>
+            )}
           </div>
         )}
       </div>

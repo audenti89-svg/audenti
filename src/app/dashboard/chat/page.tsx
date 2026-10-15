@@ -30,7 +30,7 @@ export default function ComunicacionPage() {
         <div className="flex items-center gap-3">
           <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            6 miembros del staff en línea
+            Canal Clínico Conectado
           </span>
         </div>
       </div>
