@@ -1,163 +1,58 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import {
-  Calendar,
-  FileText,
-  Activity,
-  Users,
-  MessageSquare,
-  ShieldCheck,
-  Building2,
   Sparkles,
-  Download,
-  Smartphone,
-  Monitor,
-  Printer,
-  ChevronRight,
-  CheckCircle2,
-  QrCode,
-  HeartHandshake,
-  Stethoscope,
   ArrowRight,
-  TrendingUp,
-  Cpu,
-  Smile,
-  Zap,
-  MapPin,
-  Phone,
+  Calendar,
   Clock,
-  Award,
+  Phone,
+  MapPin,
+  CheckCircle2,
   Lock,
-  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ShieldCheck,
+  Stethoscope,
+  Smile,
   Layers,
+  Activity,
+  Zap,
+  ArrowUpRight,
   Star,
-  Copy,
-  Check,
-  Share2,
-  X,
-  Menu
+  Menu,
+  X
 } from 'lucide-react'
 import { AudentiLogo } from '@/components/ui/AudentiLogo'
-import { QRCodeSVG } from 'qrcode.react'
-import { useIsMobile } from '@/hooks/useIsMobile'
-
-
-
-// ==========================================
-// 2. COMPONENTE TARJETA QR CON LOGO AUDENTI
-// ==========================================
-export function AudentiQRCodeCard() {
-  const [copied, setCopied] = useState(false)
-  const currentUrl = 'https://audenti-dra-aura-estudillo.vercel.app/'
-
-  const handleCopy = () => {
-    if (typeof navigator !== 'undefined') {
-      navigator.clipboard.writeText(currentUrl)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
-  }
-
-  const handleShare = () => {
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      navigator.share({
-        title: 'Audenti — Dra. Aura Estudillo',
-        text: 'Escanea o ingresa para agendar o acceder a la app de la Dra. Aura Estudillo:',
-        url: currentUrl,
-      }).catch(() => {})
-    } else {
-      handleCopy()
-    }
-  }
-
-  return (
-    <div className="bg-slate-900/90 border-2 border-amber-400/80 rounded-3xl p-5 sm:p-8 max-w-xl mx-auto shadow-2xl relative overflow-hidden text-center space-y-4 sm:space-y-6 modal-landscape-scroll">
-      <div className="absolute top-0 right-0 w-40 h-40 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
-
-      {/* Header */}
-      <div className="space-y-2">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold uppercase tracking-wider">
-          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-          Código QR Institucional Oficial
-        </div>
-        <h3 className="text-2xl font-black text-white tracking-tight">
-          Acceso Rápido &amp; Red de Referidos
-        </h3>
-        <p className="text-xs text-slate-300 max-w-md mx-auto leading-relaxed">
-          Escanea para compartir o instalar la app de la <strong>Dra. Aura Estudillo</strong> de forma instantánea en cualquier smartphone o tablet.
-        </p>
-      </div>
-
-      {/* Código QR Dinámico con Isotipo Central */}
-      <div className="p-4 bg-white rounded-3xl border-4 border-amber-400 inline-block shadow-2xl relative group mx-auto">
-        <div className="relative inline-flex items-center justify-center p-2">
-          <QRCodeSVG
-            value={currentUrl}
-            size={210}
-            level="H"
-            includeMargin={true}
-            bgColor="#FFFFFF"
-            fgColor="#0F172A"
-          />
-
-          {/* Contenedor blanco flotante en el centro del QR con isotipo Audenti */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-14 h-14 rounded-2xl bg-white p-1 border-2 border-amber-400 shadow-xl flex items-center justify-center">
-              <AudentiLogo variant="icon" size={44} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* URL de Acceso Directo */}
-      <div className="bg-slate-950/80 rounded-xl p-3 border border-slate-800 text-xs flex items-center justify-between gap-3 text-left">
-        <div className="min-w-0">
-          <span className="text-[10px] uppercase font-bold text-slate-400 block">URL de Acceso Universal</span>
-          <span className="font-mono font-bold text-amber-300 truncate block text-[11px]">{currentUrl}</span>
-        </div>
-        <button
-          onClick={handleCopy}
-          className="shrink-0 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-colors border border-slate-700"
-        >
-          {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-          {copied ? 'Copiado' : 'Copiar'}
-        </button>
-      </div>
-
-      {/* Acciones */}
-      <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
-        <button
-          onClick={handleShare}
-          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md transition-all active:scale-95"
-        >
-          <Share2 className="w-4 h-4" />
-          Compartir Ficha &amp; QR
-        </button>
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition-colors"
-        >
-          Ingresar al Sistema
-          <ArrowRight className="w-4 h-4" />
-        </Link>
-      </div>
-    </div>
-  )
-}
-
 import { AuthModal } from '@/components/auth/AuthModal'
 
-// ==========================================
-// 3. LANDING PAGE PRINCIPAL (src/app/page.tsx)
-// ==========================================
+// ASSETS OFICIALES OBLIGATORIOS
+const ASSETS = {
+  after: 'https://media.kolpusites.com/dental_ad/1.webp',     // Clean cast
+  before: 'https://media.kolpusites.com/dental_ad/2.webp',    // Stained cast
+  interior: 'https://media.kolpusites.com/dental_ad/3.webp',  // Clinic interior
+  portraits: [
+    'https://media.kolpusites.com/dental_ad/4.webp',
+    'https://media.kolpusites.com/dental_ad/5.webp',
+    'https://media.kolpusites.com/dental_ad/6.webp',
+    'https://media.kolpusites.com/dental_ad/7.webp',
+  ],
+}
+
 export default function LandingPage() {
-  const [activeBranchTab, setActiveBranchTab] = useState<'balbuena' | 'guadalupe' | 'roma'>('balbuena')
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  // Modal de Login / Registro
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login')
-  const isMobile = useIsMobile()
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  // ESTADO DEL COMPARADOR BEFORE / AFTER CON requestAnimationFrame
+  const [splitPercent, setSplitPercent] = useState(50)
+  const [isDragging, setIsDragging] = useState(false)
+  const [isOverText, setIsOverText] = useState(false)
+  const heroRef = useRef<HTMLDivElement>(null)
+  const rafId = useRef<number | null>(null)
 
   const openAuth = (mode: 'login' | 'register' = 'login') => {
     setAuthMode(mode)
@@ -165,426 +60,853 @@ export default function LandingPage() {
     setMobileMenuOpen(false)
   }
 
-  const specialties = [
+  // Actualizar posición de la barra con rAF para 60fps sin stutter
+  const updateSplit = useCallback((clientX: number) => {
+    if (!heroRef.current) return
+    const rect = heroRef.current.getBoundingClientRect()
+    const offsetX = clientX - rect.left
+    const rawPct = (offsetX / rect.width) * 100
+    const clamped = Math.max(5, Math.min(95, rawPct))
+
+    if (rafId.current) cancelAnimationFrame(rafId.current)
+    rafId.current = requestAnimationFrame(() => {
+      setSplitPercent(clamped)
+    })
+  }, [])
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    setIsDragging(true)
+    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    updateSplit(e.clientX)
+  }
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDragging) return
+    updateSplit(e.clientX)
+  }
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    setIsDragging(false)
+    try {
+      ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
+    } catch {}
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowLeft') {
+      setSplitPercent((prev) => Math.max(5, prev - 4))
+    } else if (e.key === 'ArrowRight') {
+      setSplitPercent((prev) => Math.min(95, prev + 4))
+    }
+  }
+
+  // Carrusel de Especialistas
+  const teamCarouselRef = useRef<HTMLDivElement>(null)
+  const scrollTeam = (direction: 'left' | 'right') => {
+    if (!teamCarouselRef.current) return
+    const scrollAmount = 340
+    teamCarouselRef.current.scrollBy({
+      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      behavior: 'smooth',
+    })
+  }
+
+  // Estado del Formulario de Reserva
+  const [bookingForm, setBookingForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    service: 'Blanqueamiento Dental LED',
+    preferredTime: 'Matutino (09:00 - 14:00)',
+    notes: '',
+  })
+  const [bookingSent, setBookingSent] = useState(false)
+
+  const handleBookingSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    setBookingSent(true)
+    setTimeout(() => {
+      setBookingSent(false)
+      setBookingForm({
+        name: '',
+        phone: '',
+        email: '',
+        service: 'Blanqueamiento Dental LED',
+        preferredTime: 'Matutino (09:00 - 14:00)',
+        notes: '',
+      })
+    }, 4500)
+  }
+
+  const specialists = [
     {
-      title: 'Odontología Preventiva & Profilaxis',
-      desc: 'Detartraje ultrasónico de alta precisión, profilaxis profunda, selladores de fosetas y fisuras, y diseño de planes preventivos.',
-      icon: Smile,
-      color: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
-      tag: 'Cuidado Primario',
+      name: 'Dra. Aura Estudillo',
+      title: 'Directora Médica & Especialista en Estética Oral',
+      reg: 'Céd. Prof. 8492019',
+      image: ASSETS.portraits[0],
+      focus: 'Diseño de Sonrisas, Carillas y Cirugía Reconstructiva',
+      experience: '14+ años de excelencia clínica',
     },
     {
-      title: 'Ortodoncia Avanzada & Ortopedia Maxilar',
-      desc: 'Sistemas de autoligado estético y metálico, microtornillos de anclaje, ortopedia funcional y alineadores invisibles transparentes.',
-      icon: Zap,
-      color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-      tag: 'Estética & Oclusión',
+      name: 'Dr. Alejandro Ramírez',
+      title: 'Cirujano Maxilofacial & Especialista en Implantes',
+      reg: 'Céd. Prof. 9102834',
+      image: ASSETS.portraits[1],
+      focus: 'Implantología Oseointegrada & Regeneración Ósea',
+      experience: '11+ años en quirófano dental',
     },
     {
-      title: 'Endodoncia Mecanizada Rotatoria',
-      desc: 'Tratamientos de conductos con instrumentación reciprocante, irrigación ultrasónica pasiva y obturación biocerámica.',
-      icon: Stethoscope,
-      color: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
-      tag: 'Conservación Dental',
+      name: 'Dra. Sofía Gutiérrez',
+      title: 'Ortodoncista & Especialista en Alineadores',
+      reg: 'Céd. Prof. 7481920',
+      image: ASSETS.portraits[2],
+      focus: 'Alineación Invisible, Autoligado Pasivo & ATM',
+      experience: '9+ años perfeccionando oclusiones',
     },
     {
-      title: 'Rehabilitación Oral & Prótesis Fija / Removible',
-      desc: 'Coronas y carillas de zirconio monolítico translúcido y disilicato de litio E.Max, incrustaciones estéticas y prótesis sobre implantes.',
-      icon: Layers,
-      color: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
-      tag: 'Restauración Estética',
-    },
-    {
-      title: 'Cirugía Bucal & Implantología Dental',
-      desc: 'Extracción atraumática de terceros molares, injertos óseos con fibrina rica en plaquetas (PRF) e implantes de titanio oseointegrados.',
-      icon: Activity,
-      color: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
-      tag: 'Alta Especialidad',
+      name: 'Dr. Mateo Morales',
+      title: 'Endodoncista Clínico & Microscopía',
+      reg: 'Céd. Prof. 8392011',
+      image: ASSETS.portraits[3],
+      focus: 'Instrumentación Mecanizada & Salvamento Dental',
+      experience: '8+ años en microcirugía endodóntica',
     },
   ]
 
-  const branchesData = {
-    balbuena: {
-      name: 'Sucursal Balbuena (Sede Matriz)',
-      doctor: 'Dra. Aura Estudillo — Dirección General',
-      address: 'Av. del Taller & Retorno 12, Jardín Balbuena, Venustiano Carranza, CDMX',
-      phone: '+52 55 5764 8810',
-      hours: 'Lunes a Sábado: 09:00 - 19:30 hrs',
-      facilities: '2 Gabinetes Dentales Equipados • Área de Esterilización Grado Hospitalario • Sala de Espera VIP',
-      badge: 'Sede Principal Activa',
-      mapUrl: 'https://maps.google.com/?q=Jardin+Balbuena+CDMX',
+  const treatments = [
+    {
+      title: 'Diseño de Sonrisa Digital (DSD)',
+      category: 'Estética de Alta Gama',
+      desc: 'Simulación tridimensional y carillas ultrafinas de disilicato de litio E.Max para una armonía facial milimétrica.',
+      icon: Smile,
+      duration: '2 - 3 citas',
+      guarantee: 'Certificación de laboratorio ProArt',
     },
-    guadalupe: {
-      name: 'Sucursal Guadalupe Chalma',
-      doctor: 'Dr. Ramírez López — Especialista en Turno',
-      address: 'Av. Morelos 144, Guadalupe Chalma, Gustavo A. Madero, CDMX',
-      phone: '+52 55 5306 9920',
-      hours: 'Lunes a Viernes: 10:00 - 18:30 hrs | Sábados: 09:00 - 15:00 hrs',
-      facilities: 'Quirófano Odontológico Esterilizado • Gabinete Quirúrgico para Cirugías e Implantes',
-      badge: 'Unidad Quirúrgica Activa',
-      mapUrl: 'https://maps.google.com/?q=Guadalupe+Chalma+Gustavo+A+Madero',
+    {
+      title: 'Alineación Invisible & Ortodoncia',
+      category: 'Ortodoncia Preventiva y Correctiva',
+      desc: 'Planes computarizados con alineadores invisibles de memoria elástica y microtornillos para corrección sin brackets.',
+      icon: Zap,
+      duration: '6 - 14 meses',
+      guarantee: 'Escaneo intraoral 3D incluido',
     },
-    roma: {
-      name: 'Sucursal Colonia Roma',
-      doctor: 'Dra. Gutiérrez Morales — Dirección Clínica Local',
-      address: 'Álvaro Obregón / Insurgentes Sur, Col. Roma Norte, Cuauhtémoc, CDMX',
-      phone: '+52 55 5922 4110',
-      hours: 'Lunes a Sábado: 08:30 - 20:00 hrs',
-      facilities: '3 Sillones Ergonómicos de Última Generación • Escáner Intraoral 3D • Centro de Estética',
-      badge: 'Próxima Apertura • Preventa VIP',
-      mapUrl: 'https://maps.google.com/?q=Roma+Norte+CDMX',
+    {
+      title: 'Implantología Guiada por Computadora',
+      category: 'Cirugía & Rehabilitación',
+      desc: 'Fijaciones de titanio grado quirúrgico con coronas de zirconio monolítico y regeneración tisular con PRF.',
+      icon: Activity,
+      duration: 'Plan quirúrgico guiado',
+      guarantee: 'Garantía biológica de oseointegración',
     },
-  }
+    {
+      title: 'Endodoncia Mecanizada Biocerámica',
+      category: 'Conservación & Salud Pulpar',
+      desc: 'Terapia de conductos con limas rotatorias de níquel-titanio, sellado biocerámico biocompatible y microscopía.',
+      icon: Stethoscope,
+      duration: 'Sesión única (90% de casos)',
+      guarantee: 'Cero dolor transoperatorio',
+    },
+    {
+      title: 'Profilaxis Profunda & Terapia Periodontal',
+      category: 'Prevención e Higiene',
+      desc: 'Detartraje ultrasónico piezoeléctrico no invasivo, pulido de esmalte y remoción de biofilm bacteriano.',
+      icon: ShieldCheck,
+      duration: '45 minutos',
+      guarantee: 'Salud gingival recuperada',
+    },
+    {
+      title: 'Rehabilitación Integral & Zirconio CAD/CAM',
+      category: 'Prótesis & Oclusión',
+      desc: 'Incrustaciones estéticas Onlay/Overlay y puentes cerámicos fresados por robótica dental de máxima resistencia.',
+      icon: Layers,
+      duration: '2 citas',
+      guarantee: 'Ajuste marginal de 20 micras',
+    },
+  ]
 
   return (
-    <div className="min-h-[100dvh] bg-[#0b1120] text-slate-100 flex flex-col selection:bg-amber-400 selection:text-slate-950 relative">
+    <div className="min-h-screen bg-[#F6F6F6] text-slate-900 font-sans antialiased overflow-x-hidden selection:bg-amber-400 selection:text-slate-950">
       
-      {/* 1. NAVBAR INSTITUCIONAL */}
-      <header className="sticky top-0 z-40 backdrop-blur-md bg-[#0b1120]/90 border-b border-slate-800/80 px-4 sm:px-6 lg:px-12 py-3.5">
+      {/* ======================================================== */}
+      {/* 1. NAVBAR MINIMALISTA FLOTANTE */}
+      {/* ======================================================== */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-[#F6F6F6]/85 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-8 lg:px-12 py-3.5 transition-all">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <Link href="/" className="hover:opacity-90 transition-opacity">
-            <AudentiLogo size={isMobile ? 34 : 42} doctorName="Dra. Aura Estudillo" />
+            <AudentiLogo size={38} doctorName="Dra. Aura Estudillo" />
           </Link>
 
-          {/* Menú de Navegación Escritorio */}
-          <nav className="hidden md:flex items-center gap-6 text-xs font-semibold text-slate-400">
-            <a href="#filosofia" className="hover:text-amber-400 transition-colors">¿Quiénes Somos?</a>
-            <a href="#especialidades" className="hover:text-amber-400 transition-colors">Especialidades</a>
-            <a href="#qr-section" className="hover:text-amber-400 transition-colors text-amber-300 font-bold">Código QR</a>
-            <a href="#sucursales" className="hover:text-amber-400 transition-colors">Sucursales</a>
-            <a href="#portal" className="hover:text-amber-400 transition-colors">Portal PWA</a>
+          {/* Menú Desktop */}
+          <nav className="hidden md:flex items-center gap-7 text-xs font-semibold uppercase tracking-wider text-slate-600">
+            <a href="#hero" className="hover:text-slate-900 transition-colors">Estudio</a>
+            <a href="#about" className="hover:text-slate-900 transition-colors">Nosotros</a>
+            <a href="#tratamientos" className="hover:text-slate-900 transition-colors">Tratamientos</a>
+            <a href="#equipo" className="hover:text-slate-900 transition-colors">Especialistas</a>
+            <a href="#contacto" className="hover:text-slate-900 transition-colors">Ubicación</a>
           </nav>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2.5">
             <button
-              type="button"
               onClick={() => openAuth('login')}
-              className="inline-flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md transition-all active:scale-95 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-slate-300 hover:border-slate-900 bg-white text-xs font-bold text-slate-800 transition-all shadow-2xs cursor-pointer"
             >
-              <span className="hidden sm:inline">Acceso al Sistema</span>
-              <span className="sm:hidden">Acceso</span>
-              <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <Lock className="w-3.5 h-3.5 text-amber-500" />
+              Acceso Clínico
             </button>
-
-            {/* Botón Menú Hamburguesa en Móvil */}
+            <a
+              href="#reservar"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-slate-900 hover:bg-slate-800 text-xs font-bold text-white transition-all shadow-xs"
+            >
+              Agendar Cita
+              <ArrowRight className="w-3.5 h-3.5 text-amber-400" />
+            </a>
+            {/* Botón Móvil */}
             <button
-              type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-xl text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors"
-              aria-label="Abrir Menú de Navegación"
+              className="md:hidden p-2 rounded-xl text-slate-700 hover:bg-slate-200 transition-colors"
+              aria-label="Abrir menú"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
 
-        {/* Menú Desplegable Responsivo para Teléfono */}
+        {/* Drawer móvil */}
         {mobileMenuOpen && (
-          <div className="md:hidden mt-3 pt-3 border-t border-slate-800 space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
-            <nav className="flex flex-col gap-1 text-sm font-semibold text-slate-300">
-              <a
-                href="#filosofia"
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-amber-400 transition-colors"
-              >
-                ¿Quiénes Somos?
-              </a>
-              <a
-                href="#especialidades"
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-amber-400 transition-colors"
-              >
-                Especialidades
-              </a>
-              <a
-                href="#qr-section"
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-3 py-2 rounded-lg hover:bg-slate-800 text-amber-300 font-bold transition-colors"
-              >
-                Código QR Institucional
-              </a>
-              <a
-                href="#sucursales"
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-amber-400 transition-colors"
-              >
-                Sucursales
-              </a>
-              <a
-                href="#portal"
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-3 py-2 rounded-lg hover:bg-slate-800 hover:text-amber-400 transition-colors"
-              >
-                Portal PWA
-              </a>
-            </nav>
+          <div className="md:hidden pt-4 pb-3 border-t border-slate-200 mt-3 space-y-2 text-center text-xs font-bold uppercase tracking-wider text-slate-700 animate-in fade-in duration-150">
+            <a href="#hero" onClick={() => setMobileMenuOpen(false)} className="block py-2">Estudio</a>
+            <a href="#about" onClick={() => setMobileMenuOpen(false)} className="block py-2">Nosotros</a>
+            <a href="#tratamientos" onClick={() => setMobileMenuOpen(false)} className="block py-2">Tratamientos</a>
+            <a href="#equipo" onClick={() => setMobileMenuOpen(false)} className="block py-2">Especialistas</a>
+            <a href="#contacto" onClick={() => setMobileMenuOpen(false)} className="block py-2">Ubicación</a>
           </div>
         )}
       </header>
 
-      {/* 2. HERO SECTION */}
-      <section className="relative px-4 sm:px-6 lg:px-12 pt-12 sm:pt-20 pb-16 sm:pb-24 overflow-hidden border-b border-slate-800">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute top-1/3 left-1/4 w-[450px] h-[450px] bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
+      {/* ======================================================== */}
+      {/* 2. HERO INTERACTIVO BEFORE / AFTER (100svh) */}
+      {/* Inspirado en Lumen Dental Studio con rAF + Slider de Precisión */}
+      {/* ======================================================== */}
+      <section
+        id="hero"
+        ref={heroRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        tabIndex={0}
+        onKeyDown={handleKeyDown}
+        className="relative w-full h-[100svh] min-h-[640px] select-none touch-none outline-none overflow-hidden bg-slate-950 cursor-ew-resize pt-16"
+        aria-label="Comparador interactivo de moldes dentales antes y después"
+      >
+        {/* CAPA 1: AFTER (Clean cast - 1.webp) */}
+        <div className="absolute inset-0 w-full h-full overflow-hidden">
+          <img
+            src={ASSETS.after}
+            alt="Molde dental después del tratamiento de estética dental de alta precisión"
+            className="w-full h-full object-cover object-center pointer-events-none"
+            draggable={false}
+          />
+          <div className="absolute inset-0 bg-linear-to-t from-slate-950/80 via-transparent to-slate-950/30 pointer-events-none" />
+        </div>
 
-        <div className="max-w-5xl mx-auto text-center space-y-5 sm:space-y-7 relative z-10">
-          <div className="inline-flex items-center gap-2 px-3.5 sm:px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] sm:text-xs font-bold">
-            <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
-            <span>Clínica Dental &amp; Plataforma Tecnológica de Vanguardia</span>
+        {/* CAPA 2: BEFORE (Stained cast - 2.webp) recortada con splitPercent */}
+        <div
+          className="absolute inset-y-0 left-0 overflow-hidden"
+          style={{ width: `${splitPercent}%` }}
+        >
+          <div
+            className="relative h-full"
+            style={{ width: heroRef.current ? `${heroRef.current.clientWidth}px` : '100vw' }}
+          >
+            <img
+              src={ASSETS.before}
+              alt="Molde dental antes del tratamiento clínico"
+              className="w-full h-full object-cover object-center pointer-events-none"
+              draggable={false}
+            />
+            <div className="absolute inset-0 bg-linear-to-t from-slate-950/85 via-transparent to-slate-950/40 pointer-events-none" />
+          </div>
+        </div>
+
+        {/* LÍNEA DIVISORIA DRAGGABLE */}
+        <div
+          className="absolute top-0 bottom-0 z-30 pointer-events-none flex items-center justify-center -translate-x-1/2"
+          style={{ left: `${splitPercent}%` }}
+        >
+          {/* Línea vertical */}
+          <div className="w-[2px] h-full bg-white/90 shadow-[0_0_12px_rgba(255,255,255,0.8)]" />
+
+          {/* Manija táctil central */}
+          <div className="absolute top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white/95 text-slate-900 border-2 border-slate-900/10 shadow-2xl flex items-center justify-center pointer-events-auto cursor-grab active:cursor-grabbing backdrop-blur-md transition-transform active:scale-110">
+            <div className="flex items-center gap-0.5 text-xs font-bold">
+              <ChevronLeft className="w-3.5 h-3.5" />
+              <ChevronRight className="w-3.5 h-3.5" />
+            </div>
+          </div>
+        </div>
+
+        {/* ETIQUETAS FLOTANTES BEFORE / AFTER */}
+        <div className="absolute top-24 left-6 z-20 pointer-events-none">
+          <span className="px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase bg-slate-900/70 text-slate-300 backdrop-blur-md border border-white/10">
+            Fase 01 • Estado Inicial
+          </span>
+        </div>
+        <div className="absolute top-24 right-6 z-20 pointer-events-none text-right">
+          <span className="px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase bg-amber-400/90 text-slate-950 backdrop-blur-md border border-amber-300 font-bold">
+            Fase 02 • Escaneo &amp; Perfeccionamiento
+          </span>
+        </div>
+
+        {/* PÍLDORAS FLOTANTES DE ESTADÍSTICAS */}
+        <div
+          className={`absolute bottom-32 sm:bottom-28 left-6 sm:left-12 z-20 space-y-2 pointer-events-auto transition-opacity duration-300 ${
+            isOverText ? 'opacity-20' : 'opacity-100'
+          }`}
+          onMouseEnter={() => setIsOverText(true)}
+          onMouseLeave={() => setIsOverText(false)}
+        >
+          <div className="p-3 sm:p-4 rounded-2xl bg-slate-950/75 backdrop-blur-md border border-white/15 text-white max-w-xs shadow-2xl">
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl sm:text-3xl font-black text-amber-400 font-hanken">07 tonos</span>
+              <span className="text-[11px] uppercase tracking-wider text-slate-300 font-semibold">más blancos</span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+              Tecnología de fotoactivación dental LED que preserva íntegramente la microestructura del esmalte.
+            </p>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-tight">
-            Excelencia en Odontología &amp; Innovación Clínica <br className="hidden sm:block" />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-amber-200 to-amber-500">
-              Dra. Aura Estudillo
-            </span>
-          </h1>
+          <div className="p-3 sm:p-4 rounded-2xl bg-slate-950/75 backdrop-blur-md border border-white/15 text-white max-w-xs shadow-2xl">
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl sm:text-3xl font-black text-amber-400 font-hanken">4,200+</span>
+              <span className="text-[11px] uppercase tracking-wider text-slate-300 font-semibold">sonrisas</span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+              Casos rehabilitados exitosamente en la sede matriz Balbuena y franquicias de la Dra. Aura Estudillo.
+            </p>
+          </div>
+        </div>
 
-          <p className="text-sm sm:text-base lg:text-lg text-slate-400 max-w-3xl mx-auto leading-relaxed px-2">
-            Excelencia en salud bucal, odontología integral y especializada con tecnología de punta y atención personalizada para toda la familia.
+        {/* HERO TITLE & CALL TO ACTION */}
+        <div
+          className={`absolute bottom-8 right-6 sm:right-12 z-20 text-right pointer-events-auto max-w-xl transition-opacity duration-300 ${
+            isOverText ? 'opacity-30' : 'opacity-100'
+          }`}
+          onMouseEnter={() => setIsOverText(true)}
+          onMouseLeave={() => setIsOverText(false)}
+        >
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-amber-300 text-[10px] font-bold uppercase tracking-wider mb-2">
+            <Sparkles className="w-3 h-3 text-amber-400" />
+            Lumen Clinical Aesthetics • Audenti Pro
+          </div>
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-[1.05] font-hanken">
+            La arquitectura de tu mejor sonrisa.
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-300 mt-2.5 max-w-md ml-auto leading-relaxed">
+            Odontología de alta precisión, biocompatibilidad suiza y escaneo 3D bajo la dirección médica de la Dra. Aura Estudillo (Céd. Prof. 8492019).
           </p>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4 pt-2 sm:pt-4 max-w-md sm:max-w-none mx-auto">
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center justify-center gap-2.5 px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-400/20 transition-all hover:scale-105 active:scale-95"
-            >
-              Acceder al Sistema / Dashboard
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-
+          <div className="flex items-center justify-end gap-3 mt-4">
             <a
-              href="#qr-section"
-              className="inline-flex items-center justify-center gap-2.5 px-6 sm:px-7 py-3.5 sm:py-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs sm:text-sm border border-slate-700 shadow-lg transition-all"
+              href="#reservar"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shadow-lg transition-all active:scale-95 cursor-pointer"
             >
-              <QrCode className="w-4 h-4 text-amber-400" />
-              Ver Código QR Institucional
+              Reservar Valoración
+              <ArrowRight className="w-4 h-4" />
+            </a>
+            <a
+              href="#about"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-white/15 hover:bg-white/25 text-white text-xs font-bold border border-white/20 backdrop-blur-md transition-all"
+            >
+              Conocer Estudio
             </a>
           </div>
+        </div>
 
-
-          <div className="pt-6 flex flex-wrap items-center justify-center gap-4 sm:gap-8 text-xs text-slate-400 border-t border-slate-800/80 max-w-2xl mx-auto">
-            <span className="flex items-center gap-2 font-medium">
-              <Monitor className="w-4 h-4 text-emerald-400" /> Windows / macOS / Linux
-            </span>
-            <span className="flex items-center gap-2 font-medium">
-              <Smartphone className="w-4 h-4 text-emerald-400" /> iOS &amp; Android PWA
-            </span>
-            <span className="flex items-center gap-2 font-medium">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" /> Céd. Prof. 8492019
-            </span>
-          </div>
+        {/* Hint de Interacción */}
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 pointer-events-none text-center">
+          <span className="text-[10px] font-semibold tracking-wider uppercase text-slate-400 bg-slate-950/60 backdrop-blur-xs px-3 py-1 rounded-full border border-white/10">
+            ← Arrastra la barra para comparar resultados →
+          </span>
         </div>
       </section>
 
-      {/* 3. SECCIÓN DEDICADA: CÓDIGO QR INSTITUCIONAL CON LOGO AUDENTI */}
-      <section id="qr-section" className="px-4 sm:px-6 lg:px-12 py-14 sm:py-20 lg:py-24 bg-slate-950/70 border-b border-slate-800">
-        <div className="max-w-4xl mx-auto space-y-6">
-          <AudentiQRCodeCard />
+      {/* ======================================================== */}
+      {/* 3. MARQUEE EDITORIAL CONTINUO EN BUCLE */}
+      {/* ======================================================== */}
+      <div className="w-full bg-slate-900 text-white border-y border-slate-800 py-3.5 overflow-hidden">
+        <div className="animate-marquee whitespace-nowrap text-xs font-bold uppercase tracking-widest flex items-center gap-8">
+          <span className="flex items-center gap-2 text-amber-400">★ AUDENTI CLINICAL STUDIO</span>
+          <span>• ESCANEO INTRAORAL 3D</span>
+          <span>• CIRUGÍA GUIADA POR COMPUTADORA</span>
+          <span>• BIOCOMPATIBILIDAD GRADO QUIRÚRGICO</span>
+          <span className="flex items-center gap-2 text-amber-400">★ DRA. AURA ESTUDILLO (CÉD. 8492019)</span>
+          <span>• REHABILITACIÓN ORAL ZIRCONIO</span>
+          <span>• ORTODONCIA INVISIBLE</span>
+          <span>• SEDE MATRIZ JARDÍN BALBUENA CDMX</span>
+          <span className="flex items-center gap-2 text-amber-400">★ AUDENTI CLINICAL STUDIO</span>
+          <span>• ESCANEO INTRAORAL 3D</span>
+          <span>• CIRUGÍA GUIADA POR COMPUTADORA</span>
+          <span>• BIOCOMPATIBILIDAD GRADO QUIRÚRGICO</span>
+          <span className="flex items-center gap-2 text-amber-400">★ DRA. AURA ESTUDILLO (CÉD. 8492019)</span>
+          <span>• REHABILITACIÓN ORAL ZIRCONIO</span>
+          <span>• ORTODONCIA INVISIBLE</span>
+          <span>• SEDE MATRIZ JARDÍN BALBUENA CDMX</span>
         </div>
-      </section>
+      </div>
 
-      {/* 4. ¿QUIÉNES SOMOS & FILOSOFÍA? */}
-      <section id="filosofia" className="px-4 sm:px-6 lg:px-12 py-14 sm:py-20 lg:py-24 max-w-7xl mx-auto w-full border-b border-slate-800">
+      {/* ======================================================== */}
+      {/* 4. SECCIÓN ABOUT: MISIÓN & INSTALACIONES CLÍNICAS */}
+      {/* ======================================================== */}
+      <section id="about" className="py-20 lg:py-28 px-4 sm:px-8 lg:px-12 max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          <div className="lg:col-span-5 bg-gradient-to-b from-slate-800/80 to-slate-900 border border-slate-700/80 rounded-3xl p-8 space-y-6 shadow-2xl relative overflow-hidden">
-            <div className="flex items-center gap-4">
-              <AudentiLogo variant="icon" size={60} />
-              <div>
-                <h3 className="text-xl font-black text-white">Dra. Aura Estudillo</h3>
-                <p className="text-xs font-bold text-amber-400 mt-0.5">Cirujano Dentista • Dirección General</p>
-                <p className="text-[11px] font-mono text-slate-400">Cédula Profesional: 8492019</p>
+          <div className="lg:col-span-6 space-y-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold uppercase tracking-wider">
+              <Stethoscope className="w-3.5 h-3.5 text-amber-700" />
+              Filosofía Clínica &amp; Excelencia
+            </div>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.1] font-hanken">
+              Donde la ciencia biomédica se encuentra con el arte dental.
+            </h2>
+            <p className="text-sm text-slate-600 leading-relaxed">
+              En Audenti Studio, bajo el liderazgo de la <strong>Dra. Aura Estudillo</strong>, concebimos cada tratamiento como una obra personalizada. No creemos en soluciones estándar: combinamos tomografía Cone Beam de haz cónico, planificación virtual 3D y materiales cerámicos alemanes para devolver función masticatoria y armonía estética con mínima invasión.
+            </p>
+
+            <div className="grid grid-cols-2 gap-4 pt-2">
+              <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-1">
+                <span className="text-2xl font-black text-slate-900 font-hanken">100%</span>
+                <p className="text-xs font-bold text-slate-700">Esterilización Hospitalaria</p>
+                <p className="text-[11px] text-slate-500">Autoclaves clase B y trazabilidad de instrumental médico.</p>
+              </div>
+              <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-1">
+                <span className="text-2xl font-black text-slate-900 font-hanken">20 µm</span>
+                <p className="text-xs font-bold text-slate-700">Ajuste de Precisión</p>
+                <p className="text-[11px] text-slate-500">Margen microscópico que evita filtraciones bacterianas.</p>
               </div>
             </div>
 
-            <div className="space-y-3 pt-3 border-t border-slate-700/60 text-xs text-slate-300 leading-relaxed">
-              <p>
-                Lidera una práctica clínica enfocada en la <strong>humanización de la odontología</strong>, combinando diagnósticos de máxima precisión con bioseguridad certificada bajo normas COFEPRIS y SSA.
+            <div className="flex items-center gap-3 pt-2">
+              <a
+                href="#reservar"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-xs"
+              >
+                Conocer Instalaciones
+                <ArrowRight className="w-4 h-4 text-amber-400" />
+              </a>
+              <span className="text-xs text-slate-500 font-semibold">• Sede Balbuena &amp; Franquicias</span>
+            </div>
+          </div>
+
+          {/* Imagen de la Clínica (Interior 3.webp) */}
+          <div className="lg:col-span-6 relative">
+            <div className="relative rounded-3xl overflow-hidden border-2 border-slate-200 shadow-2xl bg-slate-900 aspect-4/3">
+              <img
+                src={ASSETS.interior}
+                alt="Instalaciones del consultorio y gabinete dental de la Dra. Aura Estudillo"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-linear-to-t from-slate-950/70 via-transparent to-transparent" />
+              <div className="absolute bottom-6 left-6 right-6 text-white p-4 rounded-2xl bg-slate-950/80 backdrop-blur-md border border-white/10">
+                <p className="text-xs font-bold uppercase tracking-wider text-amber-400">Gabinete Clínico Sede Matriz</p>
+                <p className="text-xs text-slate-300 mt-0.5">Sillones Sirona ergonométricos con cámara intraoral y radiovisiografía digital inmediata.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ======================================================== */}
+      {/* 5. SECCIÓN TRATAMIENTOS: CUADRÍCULA EDITORIAL LIMPIA */}
+      {/* ======================================================== */}
+      <section id="tratamientos" className="py-20 bg-white border-y border-slate-200/80 px-4 sm:px-8 lg:px-12">
+        <div className="max-w-7xl mx-auto space-y-12">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+                Catálogo de Especialidades Odontológicas
+              </span>
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight mt-3 font-hanken">
+                Precisión que transforma vidas.
+              </h2>
+            </div>
+            <p className="text-xs text-slate-500 max-w-md leading-relaxed">
+              Tratamientos avalados por la Asociación Dental Mexicana (ADM) y diseñados bajo normas oficiales NOM-013-SSA2 para una salud bucodental de clase mundial.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {treatments.map((t, idx) => {
+              const Icon = t.icon
+              return (
+                <div
+                  key={idx}
+                  className="bg-[#F6F6F6] hover:bg-white p-6 rounded-3xl border border-slate-200/80 hover:border-amber-400/80 shadow-2xs hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
+                >
+                  <div className="space-y-3">
+                    <div className="w-12 h-12 rounded-2xl bg-white group-hover:bg-amber-400 text-slate-900 flex items-center justify-center border border-slate-200 group-hover:border-amber-400 transition-colors shadow-2xs">
+                      <Icon className="w-6 h-6" />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 block">
+                      {t.category}
+                    </span>
+                    <h3 className="text-lg font-bold text-slate-900 group-hover:text-amber-700 transition-colors">
+                      {t.title}
+                    </h3>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      {t.desc}
+                    </p>
+                  </div>
+
+                  <div className="mt-6 pt-4 border-t border-slate-200 space-y-1.5 text-[11px] text-slate-500">
+                    <div className="flex justify-between">
+                      <span>Tiempo estimado:</span>
+                      <strong className="text-slate-800">{t.duration}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Garantía clínica:</span>
+                      <strong className="text-slate-800">{t.guarantee}</strong>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ======================================================== */}
+      {/* 6. MEET THE TEAM: CARRUSEL DE ESPECIALISTAS */}
+      {/* ======================================================== */}
+      <section id="equipo" className="py-20 lg:py-28 px-4 sm:px-8 lg:px-12 max-w-7xl mx-auto space-y-8">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Cuerpo Médico Acreditado
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight mt-1 font-hanken">
+              Especialistas con vocación de arte.
+            </h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => scrollTeam('left')}
+              className="p-3 rounded-full bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors shadow-2xs"
+              title="Anterior"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => scrollTeam('right')}
+              className="p-3 rounded-full bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors shadow-2xs"
+              title="Siguiente"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Carrusel con desplazamiento horizontal suave */}
+        <div
+          ref={teamCarouselRef}
+          className="flex gap-6 overflow-x-auto pb-4 scrollbar-none snap-x snap-mandatory scroll-smooth"
+        >
+          {specialists.map((doc, idx) => (
+            <div
+              key={idx}
+              className="shrink-0 w-[280px] sm:w-[320px] bg-white rounded-3xl border border-slate-200/90 overflow-hidden shadow-sm hover:shadow-xl transition-all snap-start flex flex-col justify-between"
+            >
+              <div className="relative aspect-3/4 overflow-hidden bg-slate-100">
+                <img
+                  src={doc.image}
+                  alt={doc.name}
+                  className="w-full h-full object-cover object-top hover:scale-105 transition-transform duration-500"
+                />
+                <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-slate-950/70 backdrop-blur-md text-amber-300 text-[10px] font-bold border border-white/10 font-mono">
+                  {doc.reg}
+                </div>
+              </div>
+
+              <div className="p-5 space-y-2">
+                <h3 className="text-base font-bold text-slate-900">{doc.name}</h3>
+                <p className="text-xs font-semibold text-amber-700">{doc.title}</p>
+                <p className="text-[11px] text-slate-500 leading-relaxed">{doc.focus}</p>
+                <div className="pt-2 border-t border-slate-100 flex items-center gap-1.5 text-[11px] text-slate-600 font-semibold">
+                  <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                  <span>{doc.experience}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ======================================================== */}
+      {/* 7. BOOK ONLINE & MAPA CONCEPTUAL ESTILIZADO */}
+      {/* ======================================================== */}
+      <section id="reservar" className="py-20 bg-slate-900 text-white px-4 sm:px-8 lg:px-12 border-t border-slate-800">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+          
+          {/* Formulario de Reserva */}
+          <div className="lg:col-span-6 bg-slate-950/70 p-6 sm:p-8 rounded-3xl border border-slate-800 shadow-2xl space-y-6">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
+                Agenda de Consulta Presencial
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1 font-hanken">
+                Agenda tu diagnóstico de alta precisión.
+              </h2>
+              <p className="text-xs text-slate-400 mt-1">
+                Recibirás confirmación directa por WhatsApp y correo electrónico con las indicaciones previas para tu consulta.
               </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 pt-2 text-center">
-              <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800">
-                <span className="text-base font-black text-white block">+12</span>
-                <span className="text-[10px] text-slate-400">Años de Trayectoria</span>
+            {bookingSent ? (
+              <div className="p-6 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-center space-y-3 animate-in zoom-in-95">
+                <CheckCircle2 className="w-10 h-10 text-emerald-400 mx-auto" />
+                <h3 className="text-base font-bold text-white">¡Solicitud recibida con éxito!</h3>
+                <p className="text-xs text-slate-300">
+                  Nuestro equipo de recepción en Balbuena se pondrá en contacto contigo para confirmar el horario exacto.
+                </p>
               </div>
-              <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800">
-                <span className="text-base font-black text-amber-400 block">+6,500</span>
-                <span className="text-[10px] text-slate-400">Pacientes Atendidos</span>
-              </div>
-              <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800">
-                <span className="text-base font-black text-emerald-400 block">100%</span>
-                <span className="text-[10px] text-slate-400">Bioseguridad SSA</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="lg:col-span-7 space-y-6">
-            <span className="px-3.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 uppercase tracking-widest border border-amber-500/20">
-              Nuestra Filosofía
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight leading-tight">
-              Odontología basada en evidencia, empatía y bioseguridad absoluta
-            </h2>
-            <p className="text-sm text-slate-400 leading-relaxed">
-              Prevención, estética dental avanzada, confort del paciente y bioseguridad hospitalaria en cada tratamiento.
-            </p>
-
-            <div className="space-y-4 pt-2">
-              <div className="flex items-start gap-4 p-4 rounded-2xl bg-slate-800/40 border border-slate-800">
-                <ShieldCheck className="w-6 h-6 text-blue-400 shrink-0" />
+            ) : (
+              <form onSubmit={handleBookingSubmit} className="space-y-4 text-xs">
                 <div>
-                  <h4 className="text-sm font-bold text-white">Bioseguridad Grado Hospitalario</h4>
-                  <p className="text-xs text-slate-400 mt-1">Esterilización de instrumental en autoclave con testigos biológicos y desinfección estricta.</p>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                    Nombre Completo *
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    placeholder="Ej. Carolina Martínez Soto"
+                    value={bookingForm.name}
+                    onChange={(e) => setBookingForm({ ...bookingForm, name: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  />
                 </div>
-              </div>
 
-              <div className="flex items-start gap-4 p-4 rounded-2xl bg-slate-800/40 border border-slate-800">
-                <HeartHandshake className="w-6 h-6 text-emerald-400 shrink-0" />
-                <div>
-                  <h4 className="text-sm font-bold text-white">Confort del Paciente &amp; Odontología Sin Dolor</h4>
-                  <p className="text-xs text-slate-400 mt-1">Técnicas anestésicas computarizadas y ambientes climatizados diseñados para evitar el estrés dental.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. ESPECIALIDADES */}
-      <section id="especialidades" className="px-4 sm:px-6 lg:px-12 py-14 sm:py-20 lg:py-24 max-w-7xl mx-auto w-full border-b border-slate-800 space-y-8 sm:space-y-12">
-        <div className="text-center space-y-3">
-          <span className="px-3.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 uppercase tracking-widest border border-amber-500/20">
-            Servicios Clínicos
-          </span>
-          <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
-            Especialidades Odontológicas Integradas
-          </h2>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {specialties.map((spec) => {
-            const Icon = spec.icon
-            return (
-              <div
-                key={spec.title}
-                className="bg-slate-800/50 rounded-2xl border border-slate-700/60 p-6 space-y-4 hover:border-amber-400/50 transition-all"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center text-amber-400">
-                    <Icon className="w-6 h-6" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      Teléfono Móvil (WhatsApp) *
+                    </label>
+                    <input
+                      required
+                      type="tel"
+                      placeholder="+52 55..."
+                      value={bookingForm.phone}
+                      onChange={(e) => setBookingForm({ ...bookingForm, phone: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
                   </div>
-                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${spec.color}`}>
-                    {spec.tag}
-                  </span>
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      Correo Electrónico
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="paciente@correo.com"
+                      value={bookingForm.email}
+                      onChange={(e) => setBookingForm({ ...bookingForm, email: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                  </div>
                 </div>
-                <h3 className="text-base font-bold text-white">{spec.title}</h3>
-                <p className="text-xs text-slate-400 leading-relaxed">{spec.desc}</p>
-              </div>
-            )
-          })}
-        </div>
-      </section>
 
-      {/* 6. SUCURSALES */}
-      <section id="sucursales" className="px-4 sm:px-6 lg:px-12 py-14 sm:py-20 lg:py-24 bg-slate-950/60 border-b border-slate-800">
-        <div className="max-w-7xl mx-auto space-y-8 sm:space-y-12">
-          <div className="text-center space-y-3">
-            <span className="px-3.5 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 uppercase tracking-widest border border-amber-500/20">
-              Sedes Clínicas
-            </span>
-            <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
-              Ubicaciones de la Red Dra. Aura Estudillo
-            </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      Tratamiento de Interés
+                    </label>
+                    <select
+                      value={bookingForm.service}
+                      onChange={(e) => setBookingForm({ ...bookingForm, service: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer"
+                    >
+                      <option value="Diseño de Sonrisa Digital">Diseño de Sonrisa Digital</option>
+                      <option value="Blanqueamiento Dental LED">Blanqueamiento Dental LED</option>
+                      <option value="Alineadores Invisibles">Alineadores Invisibles</option>
+                      <option value="Implante Dental">Implante Dental de Titanio</option>
+                      <option value="Profilaxis & Limpieza">Profilaxis &amp; Limpieza Ultrasónica</option>
+                      <option value="Valoración General">Valoración Diagnóstica Integral</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                      Horario Preferente
+                    </label>
+                    <select
+                      value={bookingForm.preferredTime}
+                      onChange={(e) => setBookingForm({ ...bookingForm, preferredTime: e.target.value })}
+                      className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer"
+                    >
+                      <option value="Matutino (09:00 - 14:00)">Matutino (09:00 - 14:00)</option>
+                      <option value="Vespertino (14:00 - 19:30)">Vespertino (14:00 - 19:30)</option>
+                      <option value="Sábado (09:00 - 15:00)">Sábado (09:00 - 15:00)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                    Observaciones o Motivo de Consulta
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="Describe si tienes alguna molestia, dolor o tratamiento previo..."
+                    value={bookingForm.notes}
+                    onChange={(e) => setBookingForm({ ...bookingForm, notes: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                >
+                  Confirmar Solicitud de Cita
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </form>
+            )}
           </div>
 
-          <div className="flex justify-center gap-2 flex-wrap">
-            <button
-              onClick={() => setActiveBranchTab('balbuena')}
-              className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all ${
-                activeBranchTab === 'balbuena' ? 'bg-amber-400 text-slate-950 shadow-md' : 'bg-slate-800 text-slate-300'
-              }`}
-            >
-              Balbuena (Matriz)
-            </button>
-            <button
-              onClick={() => setActiveBranchTab('guadalupe')}
-              className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all ${
-                activeBranchTab === 'guadalupe' ? 'bg-amber-400 text-slate-950 shadow-md' : 'bg-slate-800 text-slate-300'
-              }`}
-            >
-              Guadalupe Chalma
-            </button>
-            <button
-              onClick={() => setActiveBranchTab('roma')}
-              className={`px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all ${
-                activeBranchTab === 'roma' ? 'bg-amber-400 text-slate-950 shadow-md' : 'bg-slate-800 text-slate-300'
-              }`}
-            >
-              Colonia Roma
-            </button>
-          </div>
-
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-8 max-w-4xl mx-auto space-y-4">
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase">
-              {branchesData[activeBranchTab].badge}
-            </span>
-            <h3 className="text-xl sm:text-2xl font-black text-white">{branchesData[activeBranchTab].name}</h3>
-            <p className="text-xs font-semibold text-amber-400">{branchesData[activeBranchTab].doctor}</p>
-            <p className="text-xs text-slate-300">{branchesData[activeBranchTab].address}</p>
-            <p className="text-xs font-bold text-white">Tel: {branchesData[activeBranchTab].phone}</p>
-            <p className="text-xs text-slate-400 border-t border-slate-800 pt-3">{branchesData[activeBranchTab].facilities}</p>
-          </div>
-        </div>
-      </section>
-
-      {/* 7. PORTAL DE ACCESO TECNOLÓGICO */}
-      <section id="portal" className="px-4 sm:px-6 lg:px-12 py-14 sm:py-20 lg:py-24 max-w-7xl mx-auto w-full border-b border-slate-800 space-y-8 sm:space-y-12">
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 max-w-4xl mx-auto text-center space-y-6">
-          <div className="w-14 h-14 rounded-2xl bg-amber-400/10 border border-amber-400/30 text-amber-400 flex items-center justify-center mx-auto">
-            <Lock className="w-7 h-7" />
-          </div>
-          <h3 className="text-xl sm:text-2xl font-black text-white">Inicio de Sesión Seguro por Roles</h3>
-          <p className="text-xs text-slate-400 max-w-md mx-auto">
-            Acceso diferenciado para Dirección General, Especialistas, Recepción y Pacientes.
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <button
-              type="button"
-              onClick={() => openAuth('login')}
-              className="inline-flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-md active:scale-95 cursor-pointer transition-all"
-            >
-              Ingresar al Sistema Clínico
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* 8. FOOTER */}
-      <footer className="mt-auto px-6 lg:px-12 py-10 bg-[#080d19] text-xs text-slate-500 border-t border-slate-800">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-3">
-            <AudentiLogo variant="icon" size={36} />
+          {/* Mapa Conceptual Estilizado en CSS Puro & Sedes */}
+          <div id="contacto" className="lg:col-span-6 space-y-6">
             <div>
-              <p className="font-bold text-slate-200">AUDENTI CLINICAL SUITE</p>
-              <p className="text-[11px] text-slate-500">Dra. Aura Estudillo • Céd. Prof. 8492019</p>
+              <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
+                Red Clínica &amp; Cobertura
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-1 font-hanken">
+                Ubicaciones Estratégicas CDMX
+              </h2>
+              <p className="text-xs text-slate-400 mt-1">
+                Instalaciones certificadas con fácil acceso, estacionamiento y tecnología interconectada por Audenti Cloud.
+              </p>
+            </div>
+
+            {/* Mapa visual conceptual estilizado */}
+            <div className="relative rounded-3xl bg-slate-950 border border-slate-800 p-6 h-64 overflow-hidden flex flex-col justify-between shadow-2xl">
+              {/* Grilla de radar / mapa */}
+              <div className="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:16px_16px] opacity-40" />
+
+              {/* Punto Balbuena (Matriz) */}
+              <div className="relative z-10 flex items-center gap-3">
+                <div className="w-3.5 h-3.5 rounded-full bg-amber-400 ring-4 ring-amber-400/20 animate-pulse" />
+                <div>
+                  <h4 className="text-xs font-bold text-white">Sede Matriz — Jardín Balbuena</h4>
+                  <p className="text-[11px] text-slate-400">Av. del Taller &amp; Retorno 12, Venustiano Carranza</p>
+                </div>
+              </div>
+
+              {/* Punto Guadalupe Chalma */}
+              <div className="relative z-10 flex items-center gap-3">
+                <div className="w-3.5 h-3.5 rounded-full bg-blue-400 ring-4 ring-blue-400/20" />
+                <div>
+                  <h4 className="text-xs font-bold text-white">Sede Norte — Guadalupe Chalma</h4>
+                  <p className="text-[11px] text-slate-400">Av. Morelos 144, Gustavo A. Madero</p>
+                </div>
+              </div>
+
+              {/* Punto Roma */}
+              <div className="relative z-10 flex items-center gap-3">
+                <div className="w-3.5 h-3.5 rounded-full bg-emerald-400 ring-4 ring-emerald-400/20" />
+                <div>
+                  <h4 className="text-xs font-bold text-white">Sede Poniente — Colonia Roma Norte</h4>
+                  <p className="text-[11px] text-slate-400">Álvaro Obregón 180, Cuauhtémoc (Próxima Apertura)</p>
+                </div>
+              </div>
+
+              <div className="relative z-10 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+                <span>Teléfono directo: <strong>+52 55 5764 8810</strong></span>
+                <span className="text-amber-400 font-bold">Lunes a Sábado</span>
+              </div>
+            </div>
+
+            {/* Portal Institucional Banner */}
+            <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold text-white">¿Eres odontólogo o personal de Audenti?</p>
+                <p className="text-[11px] text-slate-400">Accede a la plataforma para expedientes, odontograma e IA.</p>
+              </div>
+              <button
+                onClick={() => openAuth('login')}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold transition-all shrink-0 cursor-pointer"
+              >
+                Ingresar al Sistema
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
-          <p className="text-[11px]">
-            &copy; 2026 Audenti / DentalCloud Pro. Todos los derechos reservados.
-          </p>
+        </div>
+      </section>
+
+      {/* ======================================================== */}
+      {/* 8. FOOTER MONUMENTAL CON WORDMARK EDITORIAL */}
+      {/* ======================================================== */}
+      <footer className="bg-slate-950 text-slate-400 px-4 sm:px-8 lg:px-12 pt-16 pb-12 border-t border-slate-800 space-y-12">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+          
+          <div className="md:col-span-5 space-y-4">
+            <AudentiLogo size={42} doctorName="Dra. Aura Estudillo" />
+            <p className="text-xs text-slate-400 max-w-sm leading-relaxed">
+              Plataforma odontológica integral y estudio de estética dental de alta precisión. Innovación biomédica, bioseguridad quirúrgica y calidez humana.
+            </p>
+            <p className="text-xs text-slate-500 font-mono">
+              Dirección Médica Oficial • Cédula Profesional 8492019
+            </p>
+          </div>
+
+          <div className="md:col-span-2 space-y-2 text-xs">
+            <h4 className="font-bold text-white uppercase tracking-wider text-[11px]">Tratamientos</h4>
+            <ul className="space-y-1.5 text-slate-400">
+              <li><a href="#tratamientos" className="hover:text-white transition-colors">Diseño de Sonrisa</a></li>
+              <li><a href="#tratamientos" className="hover:text-white transition-colors">Alineadores 3D</a></li>
+              <li><a href="#tratamientos" className="hover:text-white transition-colors">Implantes Titanio</a></li>
+              <li><a href="#tratamientos" className="hover:text-white transition-colors">Profilaxis LED</a></li>
+            </ul>
+          </div>
+
+          <div className="md:col-span-2 space-y-2 text-xs">
+            <h4 className="font-bold text-white uppercase tracking-wider text-[11px]">Estudio</h4>
+            <ul className="space-y-1.5 text-slate-400">
+              <li><a href="#about" className="hover:text-white transition-colors">Filosofía</a></li>
+              <li><a href="#equipo" className="hover:text-white transition-colors">Especialistas</a></li>
+              <li><a href="#contacto" className="hover:text-white transition-colors">Sedes CDMX</a></li>
+              <li><a href="#reservar" className="hover:text-white transition-colors">Citas Online</a></li>
+            </ul>
+          </div>
+
+          <div className="md:col-span-3 space-y-3 text-xs">
+            <h4 className="font-bold text-white uppercase tracking-wider text-[11px]">Atención &amp; Contacto</h4>
+            <p className="text-slate-400">Sede Matriz Balbuena: Av. del Taller &amp; Retorno 12, CDMX</p>
+            <p className="text-amber-400 font-bold">Tel: +52 55 5764 8810</p>
+            <button
+              onClick={() => openAuth('login')}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs hover:bg-slate-800 transition-colors"
+            >
+              <Lock className="w-3.5 h-3.5 text-amber-400" />
+              Portal de Especialistas
+            </button>
+          </div>
+        </div>
+
+        {/* Monumental Wordmark adaptado */}
+        <div className="max-w-7xl mx-auto border-t border-slate-800/80 pt-10 text-center">
+          <span className="font-hanken font-black text-5xl sm:text-7xl lg:text-9xl text-slate-800/50 tracking-tighter uppercase select-none block leading-none">
+            AUDENTI
+          </span>
+          <div className="flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-500 mt-6 gap-3">
+            <p>© 2026 Audenti — DentalCloud Pro. Dra. Aura Estudillo. Todos los derechos reservados.</p>
+            <p>Diseño Editorial &amp; Arquitectura Clínica</p>
+          </div>
         </div>
       </footer>
 
-
-      {/* 10. MODAL FLOTANTE DE ACCESO CLÍNICO GLASSMORPHISM */}
+      {/* Modal Flotante de Acceso Clínico */}
       <AuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
         defaultMode={authMode}
       />
-
     </div>
   )
 }

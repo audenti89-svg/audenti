@@ -69,6 +69,14 @@ export default function RootLayout({
         <meta name="msapplication-tap-highlight" content="no" />
         <meta name="theme-color" content="#202D4C" />
 
+        {/* Google Fonts: Hanken Grotesk & Inter */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:ital,wght@0,300..900;1,300..900&family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+          rel="stylesheet"
+        />
+
         {/* Tailwind CSS CDN de Respaldo Inmediato para Garantizar Renderizado 100% de Clases y Colores */}
         <Script src="https://cdn.tailwindcss.com" strategy="beforeInteractive" />
         <link
