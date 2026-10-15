@@ -167,16 +167,16 @@ export function PublicAiChatWidget() {
 
       {/* Ventana de Chat Expandida con Holograma en Cabecera */}
       {isOpen && (
-        <div className="w-[92vw] sm:w-[390px] h-[540px] max-h-[85vh] bg-slate-950 text-white rounded-3xl border border-slate-800 shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className="w-[92vw] sm:w-[390px] h-[540px] max-h-[85vh] bg-[#0B0F19] text-white rounded-3xl border border-slate-800 shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
           
           {/* Header del Chat con Holograma */}
-          <div className="p-3.5 bg-slate-900/95 border-b border-slate-800 flex items-center justify-between backdrop-blur-md">
+          <div className="p-3.5 bg-[#111827]/95 border-b border-slate-800/80 flex items-center justify-between backdrop-blur-md">
             <div className="flex items-center gap-3">
               <AuraHologram isActive={isOpen} size="md" />
               <div>
                 <h3 className="text-sm font-black text-white flex items-center gap-1.5 font-hanken">
                   Aura AI
-                  <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-cyan-950 text-cyan-300 font-mono border border-cyan-500/30">
+                  <span className="px-1.5 py-0.5 rounded-full text-[9px] bg-amber-400/20 text-amber-300 font-mono border border-amber-400/30">
                     Hologram
                   </span>
                 </h3>
@@ -211,15 +211,19 @@ export function PublicAiChatWidget() {
           </div>
 
           {/* Cuerpo de Mensajes */}
-          <div className="flex-1 p-4 overflow-y-auto space-y-3 text-xs">
+          <div className="flex-1 p-4 overflow-y-auto space-y-3 text-xs bg-[#0B0F19]">
             {messages.map((m) => (
               <div
                 key={m.id}
                 className={`flex gap-2.5 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 {m.role === 'assistant' && (
-                  <div className="w-7 h-7 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center shrink-0 text-amber-400">
-                    <Bot className="w-3.5 h-3.5" />
+                  <div className="relative w-7 h-7 rounded-full overflow-hidden bg-slate-900 border border-amber-400/50 shrink-0 shadow-sm">
+                    <img
+                      src="/images/aura-ai-avatar-transp.png"
+                      alt="Aura AI"
+                      className="w-full h-full object-cover object-top scale-110"
+                    />
                   </div>
                 )}
 
@@ -227,7 +231,7 @@ export function PublicAiChatWidget() {
                   className={`max-w-[80%] p-3 rounded-2xl leading-relaxed text-xs ${
                     m.role === 'user'
                       ? 'bg-amber-400 text-slate-950 font-medium rounded-br-xs'
-                      : 'bg-slate-900/90 text-slate-200 border border-slate-800/80 rounded-bl-xs'
+                      : 'bg-[#111827] text-slate-100 border border-slate-800/80 rounded-bl-xs shadow-sm'
                   }`}
                 >
                   <p>{m.content}</p>
@@ -247,7 +251,7 @@ export function PublicAiChatWidget() {
                 </div>
 
                 {m.role === 'user' && (
-                  <div className="w-7 h-7 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center shrink-0">
+                  <div className="w-7 h-7 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 font-bold text-[10px]">
                     <User className="w-3.5 h-3.5" />
                   </div>
                 )}

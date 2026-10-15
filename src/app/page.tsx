@@ -381,49 +381,49 @@ export default function LandingPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-[#F6F6F6] text-slate-900 font-sans antialiased overflow-x-hidden selection:bg-amber-400 selection:text-slate-950">
+    <div className="min-h-screen bg-[#0B0F19] text-slate-100 font-sans antialiased overflow-x-hidden selection:bg-amber-400 selection:text-slate-950">
       
       {/* ======================================================== */}
       {/* 1. NAVBAR MINIMALISTA FLOTANTE */}
       {/* ======================================================== */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-[#F6F6F6]/90 backdrop-blur-md border-b border-slate-200/80 px-3 sm:px-8 lg:px-12 py-2.5 sm:py-3.5 transition-all">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-[#0B0F19]/90 backdrop-blur-md border-b border-slate-800/80 px-3 sm:px-8 lg:px-12 py-2.5 sm:py-3.5 transition-all">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
           <Link href="/" className="hover:opacity-90 transition-opacity shrink-0">
             <AudentiLogo size={32} doctorName="Dra. Aura Estudillo" />
           </Link>
 
           {/* Menú Desktop */}
-          <nav className="hidden md:flex items-center gap-7 text-xs font-semibold uppercase tracking-wider text-slate-600">
-            <a href="#hero" className="hover:text-slate-900 transition-colors">Estudio</a>
-            <a href="#about" className="hover:text-slate-900 transition-colors">Nosotros</a>
-            <a href="#tratamientos" className="hover:text-slate-900 transition-colors">Tratamientos</a>
-            <a href="#equipo" className="hover:text-slate-900 transition-colors">Especialistas</a>
-            <a href="#contacto" className="hover:text-slate-900 transition-colors">Ubicación</a>
+          <nav className="hidden md:flex items-center gap-7 text-xs font-semibold uppercase tracking-wider text-slate-300">
+            <a href="#hero" className="hover:text-amber-400 transition-colors">Estudio</a>
+            <a href="#about" className="hover:text-amber-400 transition-colors">Nosotros</a>
+            <a href="#tratamientos" className="hover:text-amber-400 transition-colors">Tratamientos</a>
+            <a href="#equipo" className="hover:text-amber-400 transition-colors">Especialistas</a>
+            <a href="#contacto" className="hover:text-amber-400 transition-colors">Ubicación</a>
           </nav>
 
           <div className="flex items-center gap-2 shrink-0">
             {/* Botón Acceso Clínico (Visible en sm y superiores) */}
             <button
               onClick={() => openAuth('login')}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-slate-300 hover:border-slate-900 bg-white text-xs font-bold text-slate-800 transition-all shadow-2xs cursor-pointer whitespace-nowrap"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-slate-700 hover:border-amber-400 bg-slate-900 text-xs font-bold text-slate-200 transition-all shadow-2xs cursor-pointer whitespace-nowrap"
             >
-              <Lock className="w-3.5 h-3.5 text-amber-500" />
+              <Lock className="w-3.5 h-3.5 text-amber-400" />
               <span>Acceso Clínico</span>
             </button>
 
             {/* Botón Principal Agendar Cita */}
             <a
               href="#reservar"
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full bg-slate-900 hover:bg-slate-800 text-xs font-bold text-white transition-all shadow-xs whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full bg-amber-400 hover:bg-amber-300 text-xs font-bold text-slate-950 transition-all shadow-xs whitespace-nowrap font-hanken"
             >
-              <Calendar className="w-3.5 h-3.5 text-amber-400" />
+              <Calendar className="w-3.5 h-3.5 text-slate-950" />
               <span>Agendar</span>
             </a>
 
             {/* Botón Menú Móvil */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-xl text-slate-700 hover:bg-slate-200 transition-colors"
+              className="md:hidden p-2 rounded-xl text-slate-300 hover:bg-slate-800 transition-colors"
               aria-label="Abrir menú"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -796,52 +796,52 @@ export default function LandingPage() {
       <section id="about" className="py-20 lg:py-28 px-4 sm:px-8 lg:px-12 max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           <div className="lg:col-span-6 space-y-6">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold uppercase tracking-wider">
-              <Stethoscope className="w-3.5 h-3.5 text-amber-700" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/10 text-amber-300 border border-amber-400/30 text-xs font-bold uppercase tracking-wider">
+              <Stethoscope className="w-3.5 h-3.5 text-amber-400" />
               Filosofía Clínica &amp; Excelencia
             </div>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.1] font-hanken">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-[1.1] font-hanken">
               Donde la ciencia biomédica se encuentra con el arte dental.
             </h2>
-            <p className="text-sm text-slate-600 leading-relaxed">
-              En Audenti Studio, bajo el liderazgo de la <strong>Dra. Aura Estudillo</strong>, concebimos cada tratamiento como una obra personalizada. No creemos en soluciones estándar: combinamos tomografía Cone Beam de haz cónico, planificación virtual 3D y materiales cerámicos alemanes para devolver función masticatoria y armonía estética con mínima invasión.
+            <p className="text-sm text-slate-300 leading-relaxed">
+              En Audenti Studio, bajo el liderazgo de la <strong className="text-white">Dra. Aura Estudillo</strong>, concebimos cada tratamiento como una obra personalizada. No creemos en soluciones estándar: combinamos tomografía Cone Beam de haz cónico, planificación virtual 3D y materiales cerámicos alemanes para devolver función masticatoria y armonía estética con mínima invasión.
             </p>
 
             <div className="grid grid-cols-2 gap-4 pt-2">
-              <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-1">
-                <span className="text-2xl font-black text-slate-900 font-hanken">100%</span>
-                <p className="text-xs font-bold text-slate-700">Esterilización Hospitalaria</p>
-                <p className="text-[11px] text-slate-500">Autoclaves clase B y trazabilidad de instrumental médico.</p>
+              <div className="p-4 rounded-2xl bg-[#111827] border border-slate-800 shadow-2xs space-y-1">
+                <span className="text-2xl font-black text-amber-400 font-hanken">100%</span>
+                <p className="text-xs font-bold text-slate-200">Esterilización Hospitalaria</p>
+                <p className="text-[11px] text-slate-400">Autoclaves clase B y trazabilidad de instrumental médico.</p>
               </div>
-              <div className="p-4 rounded-2xl bg-white border border-slate-200/90 shadow-2xs space-y-1">
-                <span className="text-2xl font-black text-slate-900 font-hanken">20 µm</span>
-                <p className="text-xs font-bold text-slate-700">Ajuste de Precisión</p>
-                <p className="text-[11px] text-slate-500">Margen microscópico que evita filtraciones bacterianas.</p>
+              <div className="p-4 rounded-2xl bg-[#111827] border border-slate-800 shadow-2xs space-y-1">
+                <span className="text-2xl font-black text-amber-400 font-hanken">20 µm</span>
+                <p className="text-xs font-bold text-slate-200">Ajuste de Precisión</p>
+                <p className="text-[11px] text-slate-400">Margen microscópico que evita filtraciones bacterianas.</p>
               </div>
             </div>
 
             <div className="flex items-center gap-3 pt-2">
               <a
                 href="#reservar"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-xs"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold transition-all shadow-xs"
               >
                 Conocer Instalaciones
-                <ArrowRight className="w-4 h-4 text-amber-400" />
+                <ArrowRight className="w-4 h-4 text-slate-950" />
               </a>
-              <span className="text-xs text-slate-500 font-semibold">• Sede Balbuena &amp; Franquicias</span>
+              <span className="text-xs text-slate-400 font-semibold">• Sede Balbuena &amp; Franquicias</span>
             </div>
           </div>
 
           {/* Imagen de la Clínica (Interior 3.webp) */}
           <div className="lg:col-span-6 relative">
-            <div className="relative rounded-3xl overflow-hidden border-2 border-slate-200 shadow-2xl bg-slate-900 aspect-4/3">
+            <div className="relative rounded-3xl overflow-hidden border-2 border-slate-800 shadow-2xl bg-slate-900 aspect-4/3">
               <img
                 src={ASSETS.interior}
                 alt="Instalaciones del consultorio y gabinete dental de la Dra. Aura Estudillo"
                 className="w-full h-full object-cover"
               />
-              <div className="absolute inset-0 bg-linear-to-t from-slate-950/70 via-transparent to-transparent" />
-              <div className="absolute bottom-6 left-6 right-6 text-white p-4 rounded-2xl bg-slate-950/80 backdrop-blur-md border border-white/10">
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
+              <div className="absolute bottom-6 left-6 right-6 text-white p-4 rounded-2xl bg-[#0B0F19]/90 backdrop-blur-md border border-slate-800">
                 <p className="text-xs font-bold uppercase tracking-wider text-amber-400">Gabinete Clínico Sede Matriz</p>
                 <p className="text-xs text-slate-300 mt-0.5">Sillones Sirona ergonométricos con cámara intraoral y radiovisiografía digital inmediata.</p>
               </div>
@@ -853,18 +853,18 @@ export default function LandingPage() {
       {/* ======================================================== */}
       {/* 5. SECCIÓN TRATAMIENTOS: CUADRÍCULA EDITORIAL LIMPIA */}
       {/* ======================================================== */}
-      <section id="tratamientos" className="py-20 bg-white border-y border-slate-200/80 px-4 sm:px-8 lg:px-12">
+      <section id="tratamientos" className="py-20 bg-[#111827] border-y border-slate-800/80 px-4 sm:px-8 lg:px-12">
         <div className="max-w-7xl mx-auto space-y-12">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+              <span className="text-xs font-bold uppercase tracking-wider text-amber-300 bg-amber-400/10 px-3 py-1 rounded-full border border-amber-400/20">
                 Catálogo de Especialidades Odontológicas
               </span>
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight mt-3 font-hanken">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight mt-3 font-hanken">
                 Precisión que transforma vidas.
               </h2>
             </div>
-            <p className="text-xs text-slate-500 max-w-md leading-relaxed">
+            <p className="text-xs text-slate-400 max-w-md leading-relaxed">
               Tratamientos avalados por la Asociación Dental Mexicana (ADM) y diseñados bajo normas oficiales NOM-013-SSA2 para una salud bucodental de clase mundial.
             </p>
           </div>
@@ -875,31 +875,31 @@ export default function LandingPage() {
               return (
                 <div
                   key={idx}
-                  className="bg-[#F6F6F6] hover:bg-white p-6 rounded-3xl border border-slate-200/80 hover:border-amber-400/80 shadow-2xs hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
+                  className="bg-[#0B0F19] hover:bg-slate-900/90 p-6 rounded-3xl border border-slate-800 hover:border-amber-400/80 shadow-2xs hover:shadow-2xl transition-all duration-300 flex flex-col justify-between group"
                 >
                   <div className="space-y-3">
-                    <div className="w-12 h-12 rounded-2xl bg-white group-hover:bg-amber-400 text-slate-900 flex items-center justify-center border border-slate-200 group-hover:border-amber-400 transition-colors shadow-2xs">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-900 group-hover:bg-amber-400 text-amber-400 group-hover:text-slate-950 flex items-center justify-center border border-slate-800 group-hover:border-amber-400 transition-colors shadow-2xs">
                       <Icon className="w-6 h-6" />
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 block">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400 block">
                       {t.category}
                     </span>
-                    <h3 className="text-lg font-bold text-slate-900 group-hover:text-amber-700 transition-colors">
+                    <h3 className="text-lg font-bold text-white group-hover:text-amber-400 transition-colors">
                       {t.title}
                     </h3>
-                    <p className="text-xs text-slate-600 leading-relaxed">
+                    <p className="text-xs text-slate-300 leading-relaxed">
                       {t.desc}
                     </p>
                   </div>
 
-                  <div className="mt-6 pt-4 border-t border-slate-200 space-y-1.5 text-[11px] text-slate-500">
+                  <div className="mt-6 pt-4 border-t border-slate-800 space-y-1.5 text-[11px] text-slate-400">
                     <div className="flex justify-between">
                       <span>Tiempo estimado:</span>
-                      <strong className="text-slate-800">{t.duration}</strong>
+                      <strong className="text-slate-200">{t.duration}</strong>
                     </div>
                     <div className="flex justify-between">
                       <span>Garantía clínica:</span>
-                      <strong className="text-slate-800">{t.guarantee}</strong>
+                      <strong className="text-slate-200">{t.guarantee}</strong>
                     </div>
                   </div>
                 </div>
@@ -915,24 +915,24 @@ export default function LandingPage() {
       <section id="equipo" className="py-20 lg:py-28 px-4 sm:px-8 lg:px-12 max-w-7xl mx-auto space-y-8">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
               Cuerpo Médico Acreditado
             </span>
-            <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight mt-1 font-hanken">
+            <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight mt-1 font-hanken">
               Especialistas con vocación de arte.
             </h2>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => scrollTeam('left')}
-              className="p-3 rounded-full bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors shadow-2xs"
+              className="p-3 rounded-full bg-[#111827] border border-slate-800 hover:bg-slate-800 text-slate-200 transition-colors shadow-2xs cursor-pointer"
               title="Anterior"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button
               onClick={() => scrollTeam('right')}
-              className="p-3 rounded-full bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors shadow-2xs"
+              className="p-3 rounded-full bg-[#111827] border border-slate-800 hover:bg-slate-800 text-slate-200 transition-colors shadow-2xs cursor-pointer"
               title="Siguiente"
             >
               <ChevronRight className="w-4 h-4" />
@@ -948,10 +948,10 @@ export default function LandingPage() {
           {specialists.map((doc, idx) => (
             <div
               key={idx}
-              className="w-full bg-white rounded-3xl border border-slate-200/90 overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 flex flex-col justify-between group"
+              className="w-full bg-[#111827] rounded-3xl border border-slate-800 overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 flex flex-col justify-between group hover:border-amber-400/50"
             >
               {/* Imagen Fija del Especialista */}
-              <div className="relative aspect-3/4 overflow-hidden bg-slate-100">
+              <div className="relative aspect-3/4 overflow-hidden bg-slate-900">
                 <img
                   src={doc.image}
                   alt={doc.name}
@@ -959,19 +959,19 @@ export default function LandingPage() {
                 />
                 
                 {/* Badge de Cédula Profesional */}
-                <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-slate-950/75 backdrop-blur-md text-amber-300 text-[10px] font-bold border border-white/10 font-mono shadow-md z-10">
+                <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-[#0B0F19]/90 backdrop-blur-md text-amber-300 text-[10px] font-bold border border-amber-400/30 font-mono shadow-md z-10">
                   {doc.reg}
                 </div>
               </div>
 
               <div className="p-5 space-y-2">
-                <h3 className="text-base font-bold text-slate-900 group-hover:text-amber-700 transition-colors">
+                <h3 className="text-base font-bold text-white group-hover:text-amber-400 transition-colors">
                   {doc.name}
                 </h3>
-                <p className="text-xs font-semibold text-amber-700 leading-snug">{doc.title}</p>
-                <p className="text-[11px] text-slate-500 leading-relaxed">{doc.focus}</p>
-                <div className="pt-2 border-t border-slate-100 flex items-center gap-1.5 text-[11px] text-slate-600 font-semibold">
-                  <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                <p className="text-xs font-semibold text-amber-400 leading-snug">{doc.title}</p>
+                <p className="text-[11px] text-slate-300 leading-relaxed">{doc.focus}</p>
+                <div className="pt-2 border-t border-slate-800 flex items-center gap-1.5 text-[11px] text-slate-400 font-semibold">
+                  <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
                   <span>{doc.experience}</span>
                 </div>
               </div>
