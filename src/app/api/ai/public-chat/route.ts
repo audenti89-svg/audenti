@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getGroqClient } from '@/lib/groq'
 import { createClient } from '@/utils/supabase/server'
+import { createAppointmentAction } from '@/actions/appointments'
 
 export const runtime = 'nodejs'
 
@@ -282,60 +283,30 @@ async function ejecutarTool(name: string, args: any) {
     }
 
     const folioGenerado = `AUD-${Math.floor(1000 + Math.random() * 9000)}`
-    const nowIso = new Date().toISOString()
     const patientNameClean = nombrePaciente || 'Paciente Web'
     const appTreatment = tratamiento || 'Consulta / Valoración Estética Oral'
+    const appDate = (fechaHora && fechaHora.includes('-')) ? fechaHora.split(' ')[0] : new Date(Date.now() + 24 * 3600 * 1000).toISOString().split('T')[0]
+    const appTime = (fechaHora && fechaHora.includes(':')) ? (fechaHora.split(' ')[1] || '11:00:00') : '11:00:00'
 
-    // 1. Persistencia Inmediata en Memoria Global del Servidor
-    const persistentRecord: any = {
-      id: `APT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    // Ejecución Síncrona de Server Action de Persistencia
+    const actionResult = await createAppointmentAction({
       folio: folioGenerado,
-      patient_id: undefined,
       patient_name: patientNameClean,
       patient_phone: cleanPhone,
-      appointment_date: (fechaHora && fechaHora.includes('-')) ? fechaHora.split(' ')[0] : new Date(Date.now() + 24 * 3600 * 1000).toISOString().split('T')[0],
-      appointment_time: (fechaHora && fechaHora.includes(':')) ? (fechaHora.split(' ')[1] || '11:00:00') : '11:00:00',
+      appointment_date: appDate,
+      appointment_time: appTime,
       treatment: appTreatment,
       branch: 'Sede Balbuena (Matriz)',
-      status: 'confirmed' as const,
-      notes: `Cita reservada por Aura AI. Folio: ${folioGenerado}. ${notasClinicas ? `ALERTA: ${notasClinicas}` : ''}`,
-      created_at: nowIso
-    }
+      status: 'confirmed',
+      notes: `Cita reservada por Aura AI. Folio: ${folioGenerado}. ${notasClinicas ? `ALERTA: ${notasClinicas}` : ''}`
+    })
 
-    if (!globalThis.__audenti_appointments) {
-      globalThis.__audenti_appointments = []
-    }
-    const alreadyExists = globalThis.__audenti_appointments.some(a => a.folio === folioGenerado)
-    if (!alreadyExists) {
-      globalThis.__audenti_appointments = [persistentRecord, ...globalThis.__audenti_appointments].slice(0, 50)
-    }
-
-    // 2. Persistencia en Supabase
-    try {
-      const supabase = await createClient()
-      const { data: patient } = await supabase
-        .from('patients')
-        .insert({
-          full_name: patientNameClean,
-          phone: cleanPhone,
-          allergies_medication: notasClinicas ? [notasClinicas] : [],
-          onboarding_completed: false
-        })
-        .select('id')
-        .maybeSingle()
-
-      if (patient?.id) {
-        persistentRecord.patient_id = patient.id
+    if (!actionResult.success) {
+      return {
+        confirmado: false,
+        error: true,
+        mensaje: 'Hubo un inconveniente al registrar la cita en la base de datos de la clínica. Por favor, reintenta o comunícate directamente con recepción.'
       }
-
-      await supabase.from('appointments').insert({
-        patient_id: patient?.id,
-        treatment_type: appTreatment,
-        status: 'scheduled',
-        notes: `Folio: ${folioGenerado}. ${persistentRecord.notes}`
-      })
-    } catch (err: any) {
-      console.warn('Persistencia Supabase appointments (activo fallback en tiempo real):', err?.message)
     }
 
     return {
@@ -730,6 +701,24 @@ export async function POST(request: Request) {
       }
     } else if (isPainReport && /\b(carillas|blanqueamiento|promoci[oó]n|est[eé]tica)\b/i.test(normReply)) {
       finalReply = 'Lamento mucho que tengas esa molestia. Para darte pronta atención y alivio con la Dra. Aura Estudillo (Céd. Prof. 8492019), contamos con espacios para revisión y diagnóstico en Sede Balbuena y Guadalupe Chalma. ¿Te gustaría acudir por la mañana o por la tarde?'
+    }
+
+    // Sincronización de seguridad: Si la respuesta contiene un folio AUD-XXXX que el modelo haya generado,
+    // persistirlo de forma inmediata con createAppointmentAction para garantizar que exista en BD
+    const folioMatches = finalReply.match(/AUD-\d{4,6}/i)
+    if (folioMatches && folioMatches[0]) {
+      const detectedFolio = folioMatches[0].toUpperCase()
+      const cleanPhone = rememberedPhone || (rawUser.match(/\b\d{10}\b/) ? rawUser.match(/\b\d{10}\b/)![0] : 'WhatsApp')
+      const patientNameClean = rememberedName || 'Paciente Web'
+
+      createAppointmentAction({
+        folio: detectedFolio,
+        patient_name: patientNameClean,
+        patient_phone: cleanPhone,
+        treatment: isPainReport ? 'Consulta / Alivio de Dolor Dental' : 'Consulta / Valoración Estética Oral',
+        branch: normUser.includes('chalma') ? 'Sede Guadalupe Chalma' : 'Sede Balbuena (Matriz)',
+        status: 'confirmed'
+      }).catch(e => console.warn('Sync fallback error:', e?.message))
     }
 
     return NextResponse.json({
