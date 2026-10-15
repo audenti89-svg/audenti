@@ -32,6 +32,7 @@ import { AuthModal } from '@/components/auth/AuthModal'
 import { QRCodeSVG } from 'qrcode.react'
 import { PublicAiChatWidget } from '@/components/ai/PublicAiChatWidget'
 import { SmileAuditTool } from '@/components/landing/SmileAuditTool'
+import { SeniorAccessibilityBanner } from '@/components/ui/SeniorAccessibilityBanner'
 
 // ASSETS OFICIALES OBLIGATORIOS
 const ASSETS = {
@@ -1292,6 +1293,9 @@ export default function LandingPage() {
 
       {/* Widget de Conversión IA Pública (Llama 3.1 8B Groq) */}
       <PublicAiChatWidget />
+
+      {/* Banner y Control de Modo Accesibilidad 50+ */}
+      <SeniorAccessibilityBanner />
     </div>
   )
 }

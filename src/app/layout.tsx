@@ -3,6 +3,7 @@ import { Inter, Outfit } from 'next/font/google'
 import Script from 'next/script'
 import './globals.css'
 import { SmartPwaFloatingBanner } from '@/components/ui/SmartPwaFloatingBanner'
+import { AccessibilityProvider } from '@/context/AccessibilityContext'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -113,8 +114,10 @@ export default function RootLayout({
         />
       </head>
       <body className="bg-[#f8fafc] font-sans text-[#0f172a] antialiased">
-        {children}
-        <SmartPwaFloatingBanner />
+        <AccessibilityProvider>
+          {children}
+          <SmartPwaFloatingBanner />
+        </AccessibilityProvider>
       </body>
     </html>
   )

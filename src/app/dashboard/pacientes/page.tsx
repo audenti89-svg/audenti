@@ -165,6 +165,7 @@ export default function PacientesPage() {
               <thead className="bg-slate-50 border-b border-slate-200/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 <tr>
                   <th className="px-6 py-3.5">Paciente</th>
+                  <th className="px-6 py-3.5">Edad / Modo</th>
                   <th className="px-6 py-3.5">Contacto</th>
                   <th className="px-6 py-3.5">Contacto Emergencia</th>
                   <th className="px-6 py-3.5">Bioseguridad</th>
@@ -193,6 +194,20 @@ export default function PacientesPage() {
                             <p className="text-[11px] text-slate-500 font-mono">ID: {p.id.slice(0, 8)}</p>
                           </div>
                         </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {p.age ? (
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-bold text-slate-900 text-xs">{p.age} años</span>
+                            {Number(p.age) >= 50 && (
+                              <span className="inline-flex items-center w-fit px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                                Modo 50+ Senior
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 text-[11px]">No especificada</span>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <p className="font-medium text-slate-800">{p.phone || 'Sin teléfono'}</p>

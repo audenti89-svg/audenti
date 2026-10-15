@@ -35,6 +35,7 @@ import {
   Layers,
   Star
 } from 'lucide-react'
+import { SeniorAccessibilityBanner } from '@/components/ui/SeniorAccessibilityBanner'
 
 export default function LandingPresentationPage() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
@@ -649,6 +650,8 @@ export default function LandingPresentationPage() {
         </div>
       </footer>
 
+      {/* Banner de Accesibilidad Senior (Modo 50+) */}
+      <SeniorAccessibilityBanner />
     </div>
   )
 }

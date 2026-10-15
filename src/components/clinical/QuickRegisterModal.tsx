@@ -27,6 +27,8 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
 
   const [formData, setFormData] = useState({
     fullName: '',
+    age: '',
+    birthYear: '',
     phone: '',
     email: '',
     emergencyContact: '',
@@ -46,8 +48,11 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
       const { data: defaultTenant } = await supabase.from('tenants').select('id').limit(1).maybeSingle()
       const { data: defaultBranch } = await supabase.from('branches').select('id').limit(1).maybeSingle()
 
+      const parsedAge = formData.age ? parseInt(formData.age, 10) : (formData.birthYear ? new Date().getFullYear() - parseInt(formData.birthYear, 10) : null)
+
       const patientPayload: any = {
         full_name: formData.fullName.trim(),
+        age: parsedAge,
         phone: formData.phone.trim(),
         email: formData.email.trim() || null,
         emergency_contact_name: formData.emergencyContact.trim() || null,
@@ -136,6 +141,59 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
               onChange={e => setFormData({ ...formData, fullName: e.target.value })}
               className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#202D4C] focus:bg-white transition-all"
             />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-[11px] font-bold uppercase text-slate-600">
+                  Edad Cumplida *
+                </label>
+                {(parseInt(formData.age, 10) >= 50 || (formData.birthYear && new Date().getFullYear() - parseInt(formData.birthYear, 10) >= 50)) && (
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                    Modo Accesibilidad 50+ Activo
+                  </span>
+                )}
+              </div>
+              <input
+                type="number"
+                min="1"
+                max="120"
+                required
+                placeholder="Ej. 54"
+                value={formData.age}
+                onChange={e => {
+                  const val = e.target.value
+                  setFormData({
+                    ...formData,
+                    age: val,
+                    birthYear: val ? String(new Date().getFullYear() - parseInt(val, 10)) : ''
+                  })
+                }}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#202D4C] focus:bg-white transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">
+                Año de Nacimiento
+              </label>
+              <input
+                type="number"
+                min="1900"
+                max={new Date().getFullYear()}
+                placeholder="Ej. 1972"
+                value={formData.birthYear}
+                onChange={e => {
+                  const val = e.target.value
+                  setFormData({
+                    ...formData,
+                    birthYear: val,
+                    age: val ? String(new Date().getFullYear() - parseInt(val, 10)) : formData.age
+                  })
+                }}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#202D4C] focus:bg-white transition-all"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

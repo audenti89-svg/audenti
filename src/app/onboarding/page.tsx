@@ -13,6 +13,8 @@ export default function OnboardingPage() {
 
   const [formData, setFormData] = useState({
     full_name: '',
+    age: '',
+    birth_year: '',
     phone: '',
     emergency_contact_name: '',
     emergency_contact_phone: '',
@@ -33,11 +35,14 @@ export default function OnboardingPage() {
       const { data: defaultTenant } = await supabase.from('tenants').select('id').limit(1).maybeSingle();
       const { data: defaultBranch } = await supabase.from('branches').select('id').limit(1).maybeSingle();
 
+      const parsedAge = formData.age ? parseInt(formData.age, 10) : (formData.birth_year ? new Date().getFullYear() - parseInt(formData.birth_year, 10) : null);
+
       // 2. Insertar o actualizar paciente en `patients` vinculando por id y user_id
       const patientPayload: any = {
         id: user.id,
         user_id: user.id,
         full_name: formData.full_name.trim(),
+        age: parsedAge,
         phone: formData.phone.trim(),
         email: user.email,
         emergency_contact_name: formData.emergency_contact_name.trim(),
@@ -154,6 +159,59 @@ export default function OnboardingPage() {
               value={formData.full_name}
               onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
             />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                  Edad Cumplida *
+                </label>
+                {(parseInt(formData.age, 10) >= 50 || (formData.birth_year && new Date().getFullYear() - parseInt(formData.birth_year, 10) >= 50)) && (
+                  <span className="text-[10px] font-bold text-amber-300 bg-amber-950/60 px-2 py-0.5 rounded-md border border-amber-500/40">
+                    Accesibilidad 50+
+                  </span>
+                )}
+              </div>
+              <input
+                type="number"
+                min="1"
+                max="120"
+                required
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700/80 text-white placeholder-slate-500 focus:outline-none focus:border-[#E3A033] focus:ring-1 focus:ring-[#E3A033] transition-all"
+                placeholder="Ej. 56"
+                value={formData.age}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFormData({
+                    ...formData,
+                    age: val,
+                    birth_year: val ? String(new Date().getFullYear() - parseInt(val, 10)) : ''
+                  });
+                }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                Año de Nacimiento
+              </label>
+              <input
+                type="number"
+                min="1900"
+                max={new Date().getFullYear()}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700/80 text-white placeholder-slate-500 focus:outline-none focus:border-[#E3A033] focus:ring-1 focus:ring-[#E3A033] transition-all"
+                placeholder="Ej. 1970"
+                value={formData.birth_year}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setFormData({
+                    ...formData,
+                    birth_year: val,
+                    age: val ? String(new Date().getFullYear() - parseInt(val, 10)) : formData.age
+                  });
+                }}
+              />
+            </div>
           </div>
 
           <div>

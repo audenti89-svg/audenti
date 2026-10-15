@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import { MessageSquare, Sparkles, X, Send, Bot, User, ArrowRight, Calendar, Volume2, VolumeX, ShieldCheck } from 'lucide-react'
+import { useAccessibility } from '@/context/AccessibilityContext'
 
 interface Message {
   id: string
@@ -11,6 +12,7 @@ interface Message {
 }
 
 export function PublicAiChatWidget() {
+  const { isSeniorMode } = useAccessibility()
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -102,6 +104,9 @@ export function PublicAiChatWidget() {
       setLoading(false)
     }
   }
+
+  // Ocultar widget de chat complejo en Modo Senior para priorizar botones grandes y asistencia directa
+  if (isSeniorMode) return null
 
   return (
     <div className="fixed bottom-5 right-5 z-50 select-none">
