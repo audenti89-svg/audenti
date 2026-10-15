@@ -1,11 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Calendar,
   Clock,
-  ChevronLeft,
-  ChevronRight,
   Plus,
   User,
   CheckCircle2,
@@ -20,9 +18,12 @@ import {
   CalendarDays,
   Sparkles,
   AlertTriangle,
-  UserCheck
+  UserCheck,
+  RefreshCw
 } from 'lucide-react'
 import { useNotificationSound } from '@/hooks/useNotificationSound'
+import { createClient } from '@/utils/supabase/client'
+import Link from 'next/link'
 
 type TimeHorizon = 'present' | 'past' | 'future'
 
@@ -43,316 +44,240 @@ interface ClinicalAppointment {
 
 export default function CalendarPage() {
   const { soundEnabled, setSoundEnabled, playTone } = useNotificationSound()
-
   const [horizon, setHorizon] = useState<TimeHorizon>('present')
   const [chairFilter, setChairFilter] = useState('all')
   const [doctorFilter, setDoctorFilter] = useState('all')
+  const [appointments, setAppointments] = useState<ClinicalAppointment[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // Citas agrupadas por Horizonte Temporal
-  const appointments: ClinicalAppointment[] = [
-    // PRESENTE (Hoy - Sillón en tiempo real)
-    {
-      id: 'app-now-1',
-      date: 'Hoy (10 Oct 2026)',
-      time: '10:00 - 11:15',
-      duration: '75 min',
-      patientName: 'Mateo Morales Ruiz',
-      phone: '+52 55 4444 8821',
-      treatment: 'Biopulpectomía Pza 16 (Endodoncia mecanizada)',
-      doctor: 'Dr. Cortés',
-      chair: 'Gabinete 1',
-      status: 'in_chair',
-      notes: 'Instrumentación rotatoria con limas NiTi. Paciente con anestesia tópica e infiltrativa.',
-      commissionDue: 266,
-    },
-    {
-      id: 'app-now-2',
-      date: 'Hoy (10 Oct 2026)',
-      time: '11:30 - 12:15',
-      duration: '45 min',
-      patientName: 'Daniela Montes',
-      phone: '+52 55 9988 1122',
-      treatment: 'Revisión Brackets / Cambio de arcos NiTi .016',
-      doctor: 'Dr. Ramírez López',
-      chair: 'Gabinete 2',
-      status: 'in_waiting',
-      notes: 'Llegó a recepción hace 10 min. Consentimiento firmado.',
-      commissionDue: 90,
-    },
-    {
-      id: 'app-now-3',
-      date: 'Hoy (10 Oct 2026)',
-      time: '09:00 - 09:45',
-      duration: '45 min',
-      patientName: 'Laura Patricia Vega',
-      phone: '+52 55 1234 5678',
-      treatment: 'Profilaxis Profunda Ultrasónica',
-      doctor: 'Dra. Sofía Valero',
-      chair: 'Gabinete 1',
-      status: 'completed',
-      notes: 'Procedimiento finalizado sin incidencias. Pagado vía Terminal.',
-      commissionDue: 96,
-    },
+  const supabase = createClient()
 
-    // PASADO (Historial Inmutable & Comisiones)
-    {
-      id: 'app-past-1',
-      date: 'Ayer (09 Oct 2026)',
-      time: '16:00 - 17:30',
-      duration: '90 min',
-      patientName: 'Roberto Garza',
-      phone: '+52 55 6419 7788',
-      treatment: 'Fase Quirúrgica Implante Pza 36',
-      doctor: 'Dra. Gutiérrez',
-      chair: 'Quirófano',
-      status: 'completed',
-      notes: 'Oseointegración en curso. Rx de control periapical archivada.',
-      commissionDue: 1295,
-    },
-    {
-      id: 'app-past-2',
-      date: '08 Oct 2026',
-      time: '11:00 - 11:45',
-      duration: '45 min',
-      patientName: 'Jorge Palomino',
-      phone: '+52 55 2231 9900',
-      treatment: 'Ajuste de Prótesis Removible',
-      doctor: 'Dra. Sofía Valero',
-      chair: 'Gabinete 2',
-      status: 'no_show',
-      notes: 'Inasistencia sin previo aviso. Registrado en el expediente clínico para penalización preventiva.',
-      commissionDue: 0,
-    },
+  const fetchAppointments = async () => {
+    setLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('appointments')
+        .select(`
+          id,
+          start_time,
+          end_time,
+          status,
+          treatment_type,
+          notes,
+          patients (
+            full_name,
+            phone
+          ),
+          users:doctor_id (
+            full_name
+          )
+        `)
+        .order('start_time', { ascending: true })
 
-    // FUTURO (Programación & Citas Recurrentes)
-    {
-      id: 'app-future-1',
-      date: 'Lunes (12 Oct 2026)',
-      time: '09:30 - 10:30',
-      duration: '60 min',
-      patientName: 'Mariana Cordero',
-      phone: '+52 55 8811 2233',
-      treatment: 'Cementación Corona Zirconio Monolítico Pza 25',
-      doctor: 'Dra. Sofía Valero',
-      chair: 'Gabinete 1',
-      status: 'scheduled',
-      notes: 'Pieza de laboratorio en tránsito confirmada por mensajería.',
-      commissionDue: 490,
-    },
-    {
-      id: 'app-future-2',
-      date: 'Martes (13 Oct 2026)',
-      time: '15:00 - 16:00',
-      duration: '60 min',
-      patientName: 'Carlos Mendoza',
-      phone: '+52 55 3104 6677',
-      treatment: 'Retiro de Puntos & Control Post-Extracción',
-      doctor: 'Dra. Gutiérrez',
-      chair: 'Gabinete 2',
-      status: 'scheduled',
-      notes: 'Llamada postoperatoria de 48 hrs con evolución favorable.',
-      commissionDue: 0,
-    },
-  ]
+      if (error) throw error
 
-  // Filtrado de citas
-  const filteredAppointments = appointments.filter(app => {
-    const matchesChair = chairFilter === 'all' || app.chair === chairFilter
-    const matchesDoctor = doctorFilter === 'all' || app.doctor.includes(doctorFilter)
+      if (data && data.length > 0) {
+        const mapped: ClinicalAppointment[] = data.map((item: any) => {
+          const startDate = new Date(item.start_time)
+          const endDate = new Date(item.end_time || item.start_time)
+          const timeStr = `${startDate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })} - ${endDate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}`
+          const dateStr = startDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
+          const durationMin = Math.round((endDate.getTime() - startDate.getTime()) / 60000) || 45
 
-    if (horizon === 'present') {
-      return (app.status === 'in_chair' || app.status === 'in_waiting' || app.id.startsWith('app-now')) && matchesChair && matchesDoctor
-    } else if (horizon === 'past') {
-      return (app.status === 'completed' || app.status === 'no_show' || app.status === 'canceled' || app.id.startsWith('app-past')) && matchesChair && matchesDoctor
-    } else {
-      return (app.status === 'scheduled' || app.id.startsWith('app-future')) && matchesChair && matchesDoctor
+          return {
+            id: item.id,
+            date: dateStr,
+            time: timeStr,
+            duration: `${durationMin} min`,
+            patientName: item.patients?.full_name || 'Paciente Sin Nombre',
+            phone: item.patients?.phone || 'Sin teléfono',
+            treatment: item.treatment_type || 'Consulta Odontológica General',
+            doctor: item.users?.full_name || 'Dra. Aura Estudillo',
+            chair: 'Gabinete Principal',
+            status: (item.status as any) || 'scheduled',
+            notes: item.notes || 'Cita clínica en plataforma Audenti',
+            commissionDue: 0,
+          }
+        })
+        setAppointments(mapped)
+      } else {
+        setAppointments([])
+      }
+    } catch (err) {
+      console.warn('Nota en appointments sync (tabla limpia o sin datos aún):', err)
+      setAppointments([])
+    } finally {
+      setLoading(false)
     }
-  })
+  }
 
-  // Simular llamado de paciente con alerta sonora
+  useEffect(() => {
+    fetchAppointments()
+
+    // Suscripción Realtime a citas
+    const channel = supabase
+      .channel('realtime_appointments')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'appointments' },
+        () => {
+          fetchAppointments()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
+
   const handleCallToChair = (patientName: string) => {
     playTone('arrival')
-    alert(`📢 Alerta enviada: ${patientName} ha sido llamado a Gabinete.`)
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(`Paciente ${patientName}, favor de pasar al gabinete de la Doctora Aura Estudillo.`)
+      utterance.lang = 'es-MX'
+      utterance.rate = 0.95
+      window.speechSynthesis.speak(utterance)
+    }
   }
 
   return (
     <div className="flex flex-col w-full space-y-6 pb-12">
-      {/* Header y Control de Alertas Sonoras */}
+      {/* Header */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-200 uppercase tracking-wide">
-              Calendario Médico Clínico
+              Agenda &amp; Sillón Dental en Tiempo Real
             </span>
-            <span className="text-slate-500 text-xs">• Control Temporal Tridimensional</span>
+            <span className="text-[11px] font-semibold text-slate-400">
+              Dra. Aura Estudillo • Céd. Prof. 8492019
+            </span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Gestión de Citas (Pasado, Presente &amp; Futuro)</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Control de sillón en tiempo real, historial inmutable de auditoría y agendamiento sin colisiones.</p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Control Clínico de Citas</h1>
+          <p className="text-xs text-slate-500 mt-0.5">Gestión de tiempos, llamado por voz a gabinete y sincronización con Supabase.</p>
         </div>
 
-        {/* Botón de Sonido Web Audio & Crear Cita */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
-            type="button"
-            onClick={() => {
-              setSoundEnabled(!soundEnabled)
-              if (!soundEnabled) playTone('arrival')
-            }}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors ${
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            className={`p-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-colors ${
               soundEnabled
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                : 'bg-rose-50 text-rose-800 border-rose-200'
+                ? 'bg-amber-50 text-amber-900 border-amber-300'
+                : 'bg-slate-50 text-slate-400 border-slate-200'
             }`}
+            title="Llamado auditivo a sillón"
           >
-            {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-            <span>Tono de Notificación: {soundEnabled ? 'Activo' : 'Silencio'}</span>
+            {soundEnabled ? <Volume2 className="w-4 h-4 text-amber-600" /> : <VolumeX className="w-4 h-4" />}
+            <span className="hidden sm:inline">{soundEnabled ? 'Audio Activo' : 'Audio Silenciado'}</span>
           </button>
 
           <button
-            type="button"
+            onClick={fetchAppointments}
+            className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors"
+            title="Sincronizar Citas"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+
+          <Link
+            href="/dashboard/agenda"
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold shadow-xs transition-colors"
           >
             <Plus className="w-4 h-4" />
-            + Agendar Cita
-          </button>
+            + Nueva Cita
+          </Link>
         </div>
       </div>
 
-      {/* Selector de Horizontes Temporales (Pasado, Presente, Futuro) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {/* Presente */}
+      {/* Selector de Horizonte Temporal */}
+      <div className="flex flex-wrap gap-2 p-1.5 bg-slate-100 rounded-2xl w-fit border border-slate-200/70">
         <button
-          type="button"
           onClick={() => setHorizon('present')}
-          className={`p-4 rounded-2xl border text-left transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
             horizon === 'present'
-              ? 'bg-white border-amber-400 ring-2 ring-amber-400/40 shadow-sm'
-              : 'bg-slate-50/70 border-slate-200 hover:bg-white'
+              ? 'bg-white text-slate-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800">1. Tiempo Presente</span>
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-          </div>
-          <h3 className="text-base font-bold text-slate-900">Sillón en Vivo &amp; Recepción</h3>
-          <p className="text-xs text-slate-500 mt-1">Pacientes en gabinete ahora, llamados de sala de espera y cierres de turno.</p>
+          <Activity className="w-4 h-4 text-emerald-600" />
+          <span>Presente (Hoy)</span>
         </button>
 
-        {/* Pasado */}
         <button
-          type="button"
-          onClick={() => setHorizon('past')}
-          className={`p-4 rounded-2xl border text-left transition-all ${
-            horizon === 'past'
-              ? 'bg-white border-amber-400 ring-2 ring-amber-400/40 shadow-sm'
-              : 'bg-slate-50/70 border-slate-200 hover:bg-white'
-          }`}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">2. Tiempo Pasado</span>
-            <History className="w-4 h-4 text-slate-600" />
-          </div>
-          <h3 className="text-base font-bold text-slate-900">Historial Inmutable &amp; Logs</h3>
-          <p className="text-xs text-slate-500 mt-1">Procedimientos completados, penalización de No-Shows y cálculo de comisiones.</p>
-        </button>
-
-        {/* Futuro */}
-        <button
-          type="button"
           onClick={() => setHorizon('future')}
-          className={`p-4 rounded-2xl border text-left transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
             horizon === 'future'
-              ? 'bg-white border-amber-400 ring-2 ring-amber-400/40 shadow-sm'
-              : 'bg-slate-50/70 border-slate-200 hover:bg-white'
+              ? 'bg-white text-slate-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-blue-700">3. Tiempo Futuro</span>
-            <CalendarDays className="w-4 h-4 text-blue-600" />
-          </div>
-          <h3 className="text-base font-bold text-slate-900">Agendamiento &amp; Recurrencia</h3>
-          <p className="text-xs text-slate-500 mt-1">Programación preventiva, detección de colisiones de horario y citas de laboratorio.</p>
+          <CalendarDays className="w-4 h-4 text-blue-600" />
+          <span>Próximas Citas</span>
+        </button>
+
+        <button
+          onClick={() => setHorizon('past')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            horizon === 'past'
+              ? 'bg-white text-slate-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <History className="w-4 h-4 text-slate-500" />
+          <span>Historial Clínico</span>
         </button>
       </div>
 
-      {/* Barra de Filtros por Doctor y Gabinete */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-bold text-slate-500 mr-1">Filtrar Gabinete:</span>
-          {['all', 'Gabinete 1', 'Gabinete 2', 'Quirófano'].map(g => (
-            <button
-              key={g}
-              onClick={() => setChairFilter(g)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
-                chairFilter === g
-                  ? 'bg-slate-900 text-white border-slate-900'
-                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-              }`}
-            >
-              {g === 'all' ? 'Todos los Gabinetes' : g}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-slate-500">Especialista:</span>
-          <select
-            value={doctorFilter}
-            onChange={e => setDoctorFilter(e.target.value)}
-            className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800 focus:outline-none"
-          >
-            <option value="all">Todos los Especialistas</option>
-            <option value="Valero">Dra. Sofía Valero</option>
-            <option value="Ramírez">Dr. Ramírez (Ortodoncia)</option>
-            <option value="Cortés">Dr. Cortés (Endodoncia)</option>
-            <option value="Gutiérrez">Dra. Gutiérrez (Cirugía)</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Lista de Citas del Horizonte Seleccionado */}
+      {/* Lista de Citas en Tiempo Real */}
       <div className="space-y-3">
-        {filteredAppointments.map(app => {
-          return (
+        {loading ? (
+          <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center shadow-xs">
+            <div className="w-8 h-8 border-3 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-xs font-bold text-slate-600">Consultando agenda clínica de Supabase...</p>
+          </div>
+        ) : appointments.length === 0 ? (
+          <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center shadow-xs space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mx-auto">
+              <Calendar className="w-6 h-6" />
+            </div>
+            <h3 className="text-sm font-bold text-slate-800">No hay citas programadas en este momento</h3>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              La agenda de la Dra. Aura Estudillo está lista para recibir citas reales en tiempo real. Los pacientes pueden agendar desde el portal o el equipo de recepción.
+            </p>
+          </div>
+        ) : (
+          appointments.map((app) => (
             <div
               key={app.id}
-              className={`p-5 rounded-2xl border transition-all bg-white flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-sm hover:shadow-md ${
+              className={`p-5 rounded-2xl border transition-all bg-white flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-2xs ${
                 app.status === 'in_chair'
-                  ? 'border-amber-300 ring-2 ring-amber-400/50 bg-amber-50/20'
-                  : app.status === 'no_show'
-                  ? 'border-rose-200 bg-rose-50/20'
-                  : 'border-slate-200/80'
+                  ? 'border-emerald-400 ring-2 ring-emerald-400/20'
+                  : app.status === 'in_waiting'
+                  ? 'border-amber-300 ring-2 ring-amber-300/20'
+                  : 'border-slate-200/90 hover:border-slate-300'
               }`}
             >
               <div className="flex items-start gap-4">
-                <div className="w-28 text-center shrink-0">
-                  <span className="text-xs font-bold text-slate-500 block">{app.date}</span>
-                  <span className="text-sm font-bold text-slate-900 block font-mono">{app.time}</span>
-                  <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
-                    {app.chair}
-                  </span>
+                <div className="w-12 h-12 rounded-2xl bg-slate-100 flex flex-col items-center justify-center font-bold text-slate-900 shrink-0 border border-slate-200">
+                  <span className="text-[10px] text-slate-500 uppercase">{app.date.split(' ')[1] || 'Cita'}</span>
+                  <span className="text-sm leading-none">{app.date.split(' ')[0] || '01'}</span>
                 </div>
 
-                <div className="h-14 w-px bg-slate-100 hidden lg:block" />
-
-                <div className="space-y-1 max-w-xl">
-                  <div className="flex items-center gap-2 flex-wrap">
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-sm font-bold text-slate-900">{app.patientName}</h3>
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                    <span className="text-xs text-slate-400">• {app.time} ({app.duration})</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
                       app.status === 'in_chair'
-                        ? 'bg-amber-400 text-slate-950 border-amber-500 animate-pulse'
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
                         : app.status === 'in_waiting'
-                        ? 'bg-blue-100 text-blue-900 border-blue-200'
-                        : app.status === 'completed'
-                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                        : app.status === 'no_show'
-                        ? 'bg-rose-100 text-rose-900 border-rose-200'
+                        ? 'bg-amber-50 text-amber-900 border-amber-300'
                         : 'bg-slate-100 text-slate-700 border-slate-200'
                     }`}>
-                      {app.status === 'in_chair' ? '⚡ En Sillón Ahora' :
-                       app.status === 'in_waiting' ? '⏳ En Sala de Espera' :
-                       app.status === 'completed' ? '✓ Completada' :
-                       app.status === 'no_show' ? '✕ No-Show (Inasistencia)' : '📅 Programada'}
+                      {app.status === 'in_chair' ? '⚡ En Sillón' :
+                       app.status === 'in_waiting' ? '⏳ En Espera' :
+                       app.status === 'completed' ? '✓ Completada' : '📅 Programada'}
                     </span>
                   </div>
 
@@ -363,15 +288,7 @@ export default function CalendarPage() {
                 </div>
               </div>
 
-              {/* Acciones y Métricas */}
-              <div className="flex items-center gap-2.5 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
-                {app.commissionDue !== undefined && app.commissionDue > 0 && (
-                  <div className="text-right pr-2">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Comisión Doctor</span>
-                    <span className="text-xs font-bold text-emerald-700">+${app.commissionDue} MXN</span>
-                  </div>
-                )}
-
+              <div className="flex items-center gap-2 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
                 {app.status === 'in_waiting' && (
                   <button
                     type="button"
@@ -383,25 +300,16 @@ export default function CalendarPage() {
                   </button>
                 )}
 
-                {app.status === 'in_chair' && (
-                  <a
-                    href="/dashboard/expediente"
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold shadow-xs transition-colors"
-                  >
-                    Abrir Odontograma
-                  </a>
-                )}
-
-                <a
+                <Link
                   href="/dashboard/expediente"
                   className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors"
                 >
                   Expediente
-                </a>
+                </Link>
               </div>
             </div>
-          )
-        })}
+          ))
+        )}
       </div>
     </div>
   )
