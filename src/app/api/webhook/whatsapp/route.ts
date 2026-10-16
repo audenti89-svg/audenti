@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getGroqClient } from '@/lib/groq'
 
 export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
 
 /**
  * Webhook Receptor Universal para Pasarela QR de WhatsApp (Evolution API, Z-API, Baileys)
