@@ -34,10 +34,11 @@ REGLAS DE CIBERSEGURIDAD CLÍNICA, PRIVACIDAD Y GUARDRAILS INQUEBRANTABLES:
      * Solo requerir Nombre y WhatsApp/Teléfono celular para enlazar la decisión médica de la Dra. Aura Estudillo.
      * Ejecuta inmediatamente la herramienta escalarEmergenciaNocturnaDraAura para emitir el folio provisional de emergencia y disparar la Alerta Roja al panel directivo.
 
-2. PROTOCOLO ELECTIVO (CONSULTAS DE RUTINA / ESTÉTICA DENTAL / INFORMACIÓN):
-   - Si el usuario solicita valoración general, limpieza, ortodoncia, carillas, etc. (sin dolor agudo):
-     * Exige siempre nombre y teléfono/WhatsApp antes de emitir la confirmación formal de la cita con agendarCitaNuevayNotificar.
-     * Guía al paciente cordialmente y consulta la agenda con consultarDisponibilidadCalendario.
+2. PROTOCOLO ELECTIVO (CONSULTAS DE RUTINA / AGENDAR CITA / VALORACIÓN GENERAL):
+   - CERO CATÁLOGOS COMERCIALES NO SOLICITADOS: Si el usuario dice "quiero una cita", "sacar una cita", "agendar", "revisión", o proporciona su nombre y teléfono (ej. "ricardo 5522427769 para sacar una cita"):
+     * Queda TERMINANTEMENTE PROHIBIDO responder con listas publicitarias o catálogos de carillas, blanqueamientos u ortodoncia. Actúa como una recepcionista humana de primer nivel, no como un folleto comercial.
+     * Si el usuario proporciona su nombre y teléfono en el mensaje: Agradécele cordialmente por su nombre (ej. "¡Con mucho gusto, Ricardo! Ya registré tu contacto."), pregúntale brevemente qué tipo de atención o molestia presenta (revisión de rutina, limpieza o valoración general), y consulta y ofrécele de inmediato los horarios disponibles con consultarDisponibilidadCalendario.
+     * NUNCA le vuelvas a pedir su nombre ni su teléfono si ya los proporcionó.
 
 3. PROHIBICIÓN ABSOLUTA DE MEDICAMENTOS, DOSIS Y DIAGNÓSTICOS:
    - Queda TERMINANTEMENTE PROHIBIDO diagnosticar patologías invasivas o mencionar nombres de fármacos (ej. ibuprofeno, paracetamol, amoxicilina, ketorolaco, clonixinato, naproxeno, aspirina, etc.), miligramos, dosis u horarios.
@@ -474,10 +475,31 @@ export async function POST(request: Request) {
     }
 
     if (!rememberedName) {
+      // 1. Patrones explícitos: "me llamo Juan", "mi nombre es Juan", "soy Juan"
       const nameMatch = allHistoryText.match(/(?:me llamo|mi nombre es|soy)\s+([a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,30})/i)
       if (nameMatch) {
         rememberedName = nameMatch[1].trim()
+      } else {
+        // 2. Patrón común directo: "ricardo 5522427769" o "ricardo gomez 5522427769"
+        const directNamePhoneMatch = allHistoryText.match(/^([a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,25})\s+\b\d{10}\b/i) ||
+                                     userMessage?.match(/^([a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,25})\s+\b\d{10}\b/i)
+        if (directNamePhoneMatch) {
+          const candidate = directNamePhoneMatch[1].trim()
+          // Evitar palabras de parada
+          const stopWords = ['hola', 'buen', 'buenas', 'buenos', 'cita', 'agendar', 'quiero', 'podria', 'para']
+          if (!stopWords.some(w => candidate.toLowerCase().startsWith(w))) {
+            rememberedName = candidate
+          }
+        }
       }
+    }
+
+    // Capitalizar nombre si existe
+    if (rememberedName) {
+      rememberedName = rememberedName
+        .split(' ')
+        .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(' ')
     }
 
     // Selector de contexto y personalidad según el rol
@@ -749,13 +771,29 @@ export async function POST(request: Request) {
       finalReply = 'Para apartar tu lugar y enviarte el folio de confirmación a tu WhatsApp, por favor indícame tu número de teléfono.'
     }
 
+    // ========================================================
+    // SANITIZACIÓN DE CATÁLOGOS COMERCIALES NO SOLICITADOS:
+    // Si el usuario simplemente pide cita o dio sus datos (nombre/teléfono) sin pedir estética,
+    // queda terminantemente prohibido escupir catálogo de carillas/blanqueamiento.
+    // ========================================================
+    const mentionsCosmeticExplicitly = /\b(carilla|blanque|alineador|invisalign|diseño\s+de\s+sonrisa)\b/i.test(normUser)
+    const isAppointmentIntent = /\b(cita|agendar|apartar|hora|horario|consulta|sacar\s+una\s+cita)\b/i.test(normUser) || Boolean(rememberedPhone)
+    const containsCosmeticCatalog = /\b(carillas\s+e\.max|blanqueamiento\s+dental\s+led|ortodoncia\s+invisible|alta\s+gama\s+en\s+carillas)\b/i.test(finalReply)
+
+    if (isAppointmentIntent && !mentionsCosmeticExplicitly && containsCosmeticCatalog) {
+      const greetingName = rememberedName ? `¡Con mucho gusto, ${rememberedName}! ` : '¡Con mucho gusto! '
+      const contactNote = rememberedPhone ? `Ya registré tu WhatsApp (${rememberedPhone}). ` : ''
+      finalReply = `${greetingName}${contactNote}La Dra. Aura Estudillo (Céd. Prof. 8492019) cuenta con espacios disponibles para tu valoración y consulta en Sede Balbuena (Matriz) y Guadalupe Chalma. ¿Qué tipo de atención requieres (revisión de rutina, limpieza o valoración general) y qué horario prefieres (matutino o vespertino)?`
+    }
+
     // Si por alguna razón vino vacío o el modelo ofreció estética ante dolor
     const isPainReport = /\b(dolor|molestia|inflama|hinchad|muela|diente|sensib)\b/i.test(normUser)
     if (!finalReply.trim()) {
       if (isPainReport) {
         finalReply = 'Comprendo tu molestia dental. La Dra. Aura Estudillo cuenta con espacios prioritarios para una valoración diagnóstica y darte alivio hoy mismo. ¿Prefieres que te agende por la mañana o por la tarde?'
       } else {
-        finalReply = 'Con gusto te atiendo en Audenti. La Dra. Aura Estudillo (Céd. Prof. 8492019) ofrece tratamientos de alta gama en Carillas E.Max, Blanqueamiento Dental LED y Ortodoncia Invisible. ¿Deseas consultar nuestros horarios disponibles o el costo de algún procedimiento?'
+        const greetingName = rememberedName ? `¡Hola ${rememberedName}! ` : '¡Hola! '
+        finalReply = `${greetingName}Con gusto te atiendo en Audenti con la Dra. Aura Estudillo. ¿Te gustaría agendar una cita de valoración diagnóstica o consultar nuestros horarios disponibles?`
       }
     } else if (isPainReport && /\b(carillas|blanqueamiento|promoci[oó]n|est[eé]tica)\b/i.test(normReply)) {
       finalReply = 'Lamento mucho que tengas esa molestia. Para darte pronta atención y alivio con la Dra. Aura Estudillo (Céd. Prof. 8492019), contamos con espacios para revisión y diagnóstico en Sede Balbuena y Guadalupe Chalma. ¿Te gustaría acudir por la mañana o por la tarde?'
