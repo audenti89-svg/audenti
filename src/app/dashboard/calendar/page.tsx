@@ -132,7 +132,15 @@ export default function CalendarPage() {
         }))
         setAppointments(prev => {
           const manual = prev.filter(p => !p.id.startsWith('APT-'))
-          return [...manual, ...mapped]
+          const combined = [...manual, ...mapped]
+          const seen = new Set<string>()
+          return combined.filter(item => {
+            const cleanName = (item.patientName || '').toLowerCase().trim()
+            const key = `${cleanName}_${item.date}`
+            if (!cleanName || seen.has(key)) return false
+            seen.add(key)
+            return true
+          })
         })
       }
     } catch {

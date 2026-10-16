@@ -92,67 +92,141 @@ export async function POST(request: Request) {
       created_at: nowIso
     }
 
-    // 1. Guardar en memoria global de alta velocidad
+    // 1. Guardar o Actualizar en memoria global de alta velocidad (Upsert por Teléfono / Folio / Fecha +-30 min)
     if (!globalThis.__audenti_appointments) {
       globalThis.__audenti_appointments = []
     }
-    // Evitar duplicados por folio o por mismo paciente y teléfono en la misma fecha
-    const exists = globalThis.__audenti_appointments.some(
-      a => a.folio === newAppointment.folio ||
-           (a.patient_phone && a.patient_phone === newAppointment.patient_phone && a.appointment_date === newAppointment.appointment_date)
-    )
-    if (!exists) {
-      globalThis.__audenti_appointments = [newAppointment, ...globalThis.__audenti_appointments].slice(0, 50)
+
+    // Función auxiliar para parsear minutos desde HH:mm(:ss)
+    const parseMinutes = (timeStr: string) => {
+      const parts = (timeStr || '').split(':').map(Number)
+      return (parts[0] || 0) * 60 + (parts[1] || 0)
+    }
+    const newMinutes = parseMinutes(appTime)
+
+    // Buscar si ya existe una cita activa para el mismo paciente (mismo phone o folio o fecha +-30 min)
+    const existingIndex = globalThis.__audenti_appointments.findIndex(a => {
+      if (a.folio === generatedFolio) return true
+      if (a.patient_phone && patient_phone && a.patient_phone === patient_phone) {
+        if (a.appointment_date === appDate) {
+          const aMinutes = parseMinutes(a.appointment_time)
+          // Rango de +-30 minutos o estados activos in_chair / pending_review / confirmed / scheduled
+          if (Math.abs(aMinutes - newMinutes) <= 30 || ['in_chair', 'pending_review', 'confirmed', 'scheduled'].includes(a.status)) {
+            return true
+          }
+        }
+      }
+      return false
+    })
+
+    let resolvedAppointment: PersistentAppointment
+
+    if (existingIndex !== -1) {
+      // Lógica de Actualización Continua (UPDATE): actualizar nombre, notas, hora o tratamiento
+      const target = globalThis.__audenti_appointments[existingIndex]
+      const updatedName = (patient_name && !patient_name.includes('Paciente Web') && !patient_name.includes('Paciente WhatsApp'))
+        ? patient_name
+        : (target.patient_name || patient_name)
+
+      resolvedAppointment = {
+        ...target,
+        patient_name: updatedName,
+        patient_phone: patient_phone || target.patient_phone,
+        treatment: treatment || target.treatment,
+        branch: branch || target.branch,
+        notes: notes || target.notes,
+        status: (status as any) || target.status
+      }
+      globalThis.__audenti_appointments[existingIndex] = resolvedAppointment
     } else {
-      // Si ya existía, retornar la cita existente sin crear una segunda
-      const existingAppt = globalThis.__audenti_appointments.find(
-        a => a.folio === newAppointment.folio ||
-             (a.patient_phone && a.patient_phone === newAppointment.patient_phone && a.appointment_date === newAppointment.appointment_date)
-      )
-      return NextResponse.json({
-        success: true,
-        appointment: existingAppt || newAppointment,
-        folio: existingAppt?.folio || generatedFolio,
-        message: 'Cita ya registrada previamente en la agenda.'
-      })
+      resolvedAppointment = newAppointment
+      globalThis.__audenti_appointments = [resolvedAppointment, ...globalThis.__audenti_appointments].slice(0, 50)
     }
 
-    // 2. Intentar inserción en base de datos Supabase si la sesión/privilegios lo permiten
+    // 2. Intentar Upsert / Actualización en base de datos Supabase
     let supabasePersisted = false
     try {
       const supabase = await createClient()
-      const { data: patient } = await supabase
-        .from('patients')
-        .insert({
-          full_name: patient_name,
-          phone: patient_phone || 'Pendiente por WhatsApp',
-          onboarding_completed: false
-        })
-        .select('id')
-        .maybeSingle()
 
-      if (patient?.id) {
-        newAppointment.patient_id = patient.id
+      // Buscar paciente por teléfono para no duplicar registros de pacientes
+      let patientId = resolvedAppointment.patient_id
+      if (patient_phone) {
+        const { data: existingPatient } = await supabase
+          .from('patients')
+          .select('id, full_name')
+          .eq('phone', patient_phone)
+          .maybeSingle()
+
+        if (existingPatient) {
+          patientId = existingPatient.id
+          // Si el nombre mejoró, actualizarlo
+          if (patient_name && patient_name !== existingPatient.full_name && !patient_name.includes('Paciente Web')) {
+            await supabase
+              .from('patients')
+              .update({ full_name: patient_name })
+              .eq('id', existingPatient.id)
+          }
+        } else {
+          const { data: newPat } = await supabase
+            .from('patients')
+            .insert({
+              full_name: patient_name,
+              phone: patient_phone || 'Pendiente por WhatsApp',
+              onboarding_completed: false
+            })
+            .select('id')
+            .maybeSingle()
+          patientId = newPat?.id
+        }
+      }
+
+      if (patientId) {
+        resolvedAppointment.patient_id = patientId
       }
 
       const timePart = appTime.length === 5 ? `${appTime}:00` : appTime
       const startDateTime = new Date(`${appDate}T${timePart}-06:00`)
       const endDateTime = new Date(startDateTime.getTime() + 45 * 60000)
 
-      const { error: apptError } = await supabase.from('appointments').insert({
-        patient_id: patient?.id,
-        treatment_type: appTreatment,
-        status: status === 'confirmed' ? 'confirmed' : 'scheduled',
-        start_time: startDateTime.toISOString(),
-        end_time: endDateTime.toISOString(),
-        notes: `Folio: ${generatedFolio}. Sede: ${appBranch}. Tel: ${patient_phone}`
-      })
+      // Verificar si ya existe una cita en Supabase para el paciente en rango del día
+      if (patientId) {
+        const dayStart = new Date(`${appDate}T00:00:00-06:00`).toISOString()
+        const dayEnd = new Date(`${appDate}T23:59:59-06:00`).toISOString()
 
-      if (!apptError) {
-        supabasePersisted = true
+        const { data: existingDbAppt } = await supabase
+          .from('appointments')
+          .select('id, start_time, notes')
+          .eq('patient_id', patientId)
+          .gte('start_time', dayStart)
+          .lte('start_time', dayEnd)
+          .maybeSingle()
+
+        if (existingDbAppt) {
+          // UPDATE continuo sobre la cita existente
+          const { error: updateErr } = await supabase
+            .from('appointments')
+            .update({
+              treatment_type: appTreatment,
+              status: status === 'confirmed' ? 'confirmed' : 'scheduled',
+              notes: notes ? `${existingDbAppt.notes || ''} | ${notes}` : existingDbAppt.notes
+            })
+            .eq('id', existingDbAppt.id)
+
+          if (!updateErr) supabasePersisted = true
+        } else {
+          // INSERT nuevo solo si no existía cita previa hoy
+          const { error: apptError } = await supabase.from('appointments').insert({
+            patient_id: patientId,
+            treatment_type: appTreatment,
+            status: status === 'confirmed' ? 'confirmed' : 'scheduled',
+            start_time: startDateTime.toISOString(),
+            end_time: endDateTime.toISOString(),
+            notes: `Folio: ${resolvedAppointment.folio}. Sede: ${appBranch}. Tel: ${patient_phone}`
+          })
+          if (!apptError) supabasePersisted = true
+        }
       }
     } catch (dbErr) {
-      // Usar persistencia en memoria y realtime sin romper el flujo
       console.warn('Nota en persistencia Supabase appointments (activo fallback en tiempo real):', dbErr)
     }
 
@@ -167,10 +241,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      appointment: newAppointment,
-      folio: generatedFolio,
+      appointment: resolvedAppointment,
+      folio: resolvedAppointment.folio,
       supabasePersisted,
-      message: 'Cita persistida exitosamente y sincronizada con el Dashboard.'
+      message: existingIndex !== -1 ? 'Cita existente actualizada exitosamente (Upsert continuo).' : 'Cita registrada exitosamente.'
     })
   } catch (error: any) {
     console.error('Error en /api/appointments:', error)
