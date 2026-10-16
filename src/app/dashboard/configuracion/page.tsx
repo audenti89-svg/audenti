@@ -16,6 +16,7 @@ import {
   Key
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
+import { StaffDepartment, resolveAutomaticRolePermissions } from '@/lib/auth/roleProvisioning'
 
 export default function ConfiguracionPage() {
   const supabase = createClient()
@@ -27,6 +28,10 @@ export default function ConfiguracionPage() {
   const [defaultCommission, setDefaultCommission] = useState(7)
   const [whatsappNotifications, setWhatsappNotifications] = useState(true)
   const [aiModel, setAiModel] = useState('gc/gemini-2.5-flash')
+  const [activeDepartment, setActiveDepartment] = useState<StaffDepartment>('DENTISTS')
+
+  // Permisos dinámicos automáticos según departamento
+  const provisionedPerms = resolveAutomaticRolePermissions(activeDepartment)
 
   // Control RBAC
   const [currentUser, setCurrentUser] = useState<any>(null)
@@ -135,6 +140,50 @@ export default function ConfiguracionPage() {
                   value="MXN (Pesos Mexicanos)"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-xs text-slate-600 font-medium"
                 />
+              </div>
+            </div>
+
+            {/* Aprovisionamiento Automático de Roles por Departamento */}
+            <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-2 mt-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-amber-950 block">Aprovisionamiento Automático de Roles (RBAC)</span>
+                  <span className="text-[11px] text-amber-800">
+                    Permisos de sistema asignados según el departamento clínico del empleado.
+                  </span>
+                </div>
+                <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase bg-amber-400 text-slate-950 shadow-xs">
+                  {provisionedPerms.departmentLabel}
+                </span>
+              </div>
+              <div className="pt-1">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-amber-900 mb-1">
+                  Departamento del Empleado
+                </label>
+                <select
+                  value={activeDepartment}
+                  onChange={e => setActiveDepartment(e.target.value as StaffDepartment)}
+                  className="w-full px-3 py-2 rounded-lg bg-white border border-amber-300 text-xs text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
+                >
+                  <option value="MANAGEMENT">Dirección &amp; Gerencia (Acceso Total)</option>
+                  <option value="DENTISTS">Cuerpo Médico &amp; Odontólogos (Agenda + Expedientes + Comisiones)</option>
+                  <option value="ANESTHESIA">Especialistas en Anestesiología (Expedientes + Insumos)</option>
+                  <option value="RECEPTION">Recepción &amp; Atención al Paciente (Agenda + Mensajería)</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5 pt-1 text-[10px] text-slate-700">
+                <span className={`inline-flex items-center gap-1 ${provisionedPerms.canManageAgenda ? 'text-emerald-700 font-bold' : 'text-slate-400 line-through'}`}>
+                  • Agenda Clínica
+                </span>
+                <span className={`inline-flex items-center gap-1 ${provisionedPerms.canViewFinancials ? 'text-emerald-700 font-bold' : 'text-slate-400 line-through'}`}>
+                  • Auditoría Financiera
+                </span>
+                <span className={`inline-flex items-center gap-1 ${provisionedPerms.canEditMedicalRecords ? 'text-emerald-700 font-bold' : 'text-slate-400 line-through'}`}>
+                  • Expedientes Clínicos
+                </span>
+                <span className={`inline-flex items-center gap-1 ${provisionedPerms.canSendBroadCastMessages ? 'text-emerald-700 font-bold' : 'text-slate-400 line-through'}`}>
+                  • Comunicados Internos
+                </span>
               </div>
             </div>
 
