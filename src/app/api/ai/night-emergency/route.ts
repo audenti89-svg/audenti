@@ -190,6 +190,30 @@ export async function POST(request: Request) {
         : 'Dra. Aura Estudillo ha priorizado su turno como el Primer Paciente de las 08:30 AM garantizando gabinete disponible.')
       found.resolvedAt = new Date().toISOString()
 
+      // Guardar también en el registro de citas persistentes de Audenti para que aparezca en Agenda y Dashboard
+      const emergencyTime = decision === 'approved_exceptional'
+        ? new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        : '08:30:00'
+
+      const emergencyAppointment = {
+        id: `APT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        folio: `EMG-${Math.floor(1000 + Math.random() * 9000)}`,
+        patient_name: found.patientName.replace('[Desconocido] ', ''),
+        patient_phone: found.phone.replace('[Desconocido] ', ''),
+        appointment_date: new Date().toISOString().split('T')[0],
+        appointment_time: emergencyTime,
+        treatment: `🔴 Urgencia Dental: ${found.symptoms}`,
+        branch: found.branchName || 'Sede Balbuena (Matriz)',
+        status: (decision === 'approved_exceptional' ? 'in_chair' : 'confirmed') as any,
+        notes: `Atención de Urgencia Aprobada por Dra. Aura Estudillo. ${found.doctorNotes}`,
+        created_at: new Date().toISOString()
+      }
+
+      if (!globalThis.__audenti_appointments) {
+        globalThis.__audenti_appointments = []
+      }
+      globalThis.__audenti_appointments = [emergencyAppointment, ...globalThis.__audenti_appointments].slice(0, 50)
+
       return NextResponse.json({
         success: true,
         updatedCase: found,

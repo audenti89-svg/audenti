@@ -125,6 +125,14 @@ export function NightEmergencyRedAlertBanner() {
         playTone('message')
         // Actualizar estado local
         setCases(prev => prev.map(c => c.id === activeCase.id ? { ...c, status: decision === 'confirm_appointment' ? 'appointment_confirmed' : decision, doctorNotes: notes } : c))
+        
+        // Notificar y sincronizar con Dashboard y Calendario inmediatamente
+        window.dispatchEvent(new Event('audenti_appointment_refresh'))
+        window.dispatchEvent(new Event('audenti_emergency_refresh'))
+        try {
+          localStorage.setItem('audenti_emergency_last_resolved', Date.now().toString())
+        } catch {}
+
         setActiveCase(null)
       }
     } catch (err) {
@@ -291,20 +299,38 @@ export function NightEmergencyRedAlertBanner() {
                   type="button"
                   disabled={isProcessing}
                   onClick={() => handleDecision('approved_exceptional')}
-                  className="p-3 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-rose-600/30 transition active:scale-95 disabled:opacity-50 cursor-pointer"
+                  className="p-3 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-rose-600/30 transition active:scale-95 disabled:opacity-60 cursor-pointer"
                 >
-                  <Zap className="w-4 h-4 text-amber-300" />
-                  <span>Aprobar Urgencia Inmediata</span>
+                  {isProcessing ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Procesando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-4 h-4 text-amber-300" />
+                      <span>Aprobar Urgencia Inmediata</span>
+                    </>
+                  )}
                 </button>
 
                 <button
                   type="button"
                   disabled={isProcessing}
                   onClick={() => handleDecision('scheduled_first_hour')}
-                  className="p-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-400/30 transition active:scale-95 disabled:opacity-50 cursor-pointer"
+                  className="p-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-amber-400/30 transition active:scale-95 disabled:opacity-60 cursor-pointer"
                 >
-                  <Clock className="w-4 h-4 text-slate-950" />
-                  <span>Derivar a 1ª Hora</span>
+                  {isProcessing ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                      <span>Agendando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Clock className="w-4 h-4 text-slate-950" />
+                      <span>Derivar a 1ª Hora</span>
+                    </>
+                  )}
                 </button>
               </div>
             ) : (
@@ -313,10 +339,19 @@ export function NightEmergencyRedAlertBanner() {
                   type="button"
                   disabled={isProcessing}
                   onClick={() => handleDecision('confirm_appointment')}
-                  className="w-full p-3.5 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-xl shadow-amber-400/20 transition active:scale-95 disabled:opacity-50 cursor-pointer"
+                  className="w-full p-3.5 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-xl shadow-amber-400/20 transition active:scale-95 disabled:opacity-60 cursor-pointer"
                 >
-                  <CheckCircle className="w-4 h-4 text-slate-950" />
-                  <span>Aprobar Cita / Asignar Horario Oficial</span>
+                  {isProcessing ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                      <span>Guardando Cita en Agenda...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4 text-slate-950" />
+                      <span>Aprobar Cita / Asignar Horario Oficial</span>
+                    </>
+                  )}
                 </button>
               </div>
             )}
