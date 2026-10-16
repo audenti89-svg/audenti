@@ -29,6 +29,37 @@ export default function ConfiguracionPage() {
   const [whatsappNotifications, setWhatsappNotifications] = useState(true)
   const [aiModel, setAiModel] = useState('gc/gemini-2.5-flash')
   const [activeDepartment, setActiveDepartment] = useState<StaffDepartment>('DENTISTS')
+  const [isResetting, setIsResetting] = useState(false)
+  const appMode = process.env.NEXT_PUBLIC_APP_MODE || 'sandbox'
+
+  const handleResetDatabase = async () => {
+    const enteredKey = prompt('Ingrese la Clave de Superadministrador para confirmar el reseteo de datos de prueba:')
+    if (!enteredKey) return
+
+    if (!confirm('¿Está seguro de que desea eliminar todas las citas y pacientes de prueba? Esta acción es irreversible.')) {
+      return
+    }
+
+    setIsResetting(true)
+    try {
+      const res = await fetch('/api/admin/reset-db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmationKey: enteredKey }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        alert('✅ Base de datos reseteada con éxito para fase de pruebas.')
+        window.location.reload()
+      } else {
+        alert(`❌ Error al resetear: ${data.error}`)
+      }
+    } catch (e: any) {
+      alert(`❌ Error de conexión: ${e?.message}`)
+    } finally {
+      setIsResetting(false)
+    }
+  }
 
   // Permisos dinámicos automáticos según departamento
   const provisionedPerms = resolveAutomaticRolePermissions(activeDepartment)
@@ -276,6 +307,45 @@ export default function ConfiguracionPage() {
                   <option value="gc/gemini-2.5-flash">9Router Local (gc/gemini-2.5-flash)</option>
                 </select>
                 <span className="text-[10px] text-slate-400 mt-1 block">Conectado a Groq Cloud con Guardrails Temáticos Odontológicos y RBAC activo.</span>
+              </div>
+
+              {/* Zona de Peligro: Reseteo de Pruebas vs Producción Bloqueada */}
+              <div className="p-4 rounded-xl border border-rose-200 bg-rose-50/60 space-y-3 mt-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert className="w-4 h-4 text-rose-600" />
+                    <span className="text-xs font-bold text-rose-950">
+                      Entorno del Sistema: {appMode === 'production' ? 'PRODUCCIÓN BLOQUEADA' : 'MODO DE PRUEBAS (SANDBOX)'}
+                    </span>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
+                    appMode === 'production' ? 'bg-emerald-600 text-white' : 'bg-amber-400 text-slate-950'
+                  }`}>
+                    {appMode === 'production' ? 'Protección Activa' : 'Fase de Pruebas'}
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-rose-800 leading-relaxed">
+                  {appMode === 'production'
+                    ? 'La base de datos se encuentra blindada. Ningún usuario ni administrador puede purgar citas históricas, garantizando la persistencia permanente y auditoría legal clínica.'
+                    : 'Permite purgar citas, chats y pacientes de prueba acumulados antes de iniciar operaciones formales con pacientes reales.'}
+                </p>
+
+                {appMode !== 'production' && (
+                  <div className="pt-2 border-t border-rose-200/80 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <span className="text-[10px] text-rose-700 font-semibold">
+                      Requiere clave de superadministrador.
+                    </span>
+                    <button
+                      type="button"
+                      disabled={isResetting}
+                      onClick={handleResetDatabase}
+                      className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                    >
+                      {isResetting ? 'Purgando Base de Datos...' : '⚠️ Resetear Datos de Prueba'}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}

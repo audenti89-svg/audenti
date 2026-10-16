@@ -35,6 +35,8 @@ type TimeHorizon = 'present' | 'past' | 'future'
 interface ClinicalAppointment {
   id: string
   date: string
+  rawDate: string // YYYY-MM-DD
+  isoStart: string
   time: string
   duration: string
   patientName: string
@@ -50,7 +52,10 @@ interface ClinicalAppointment {
 export default function CalendarPage() {
   const { soundEnabled, setSoundEnabled, playTone } = useNotificationSound()
   const [viewMode, setViewMode] = useState<'flow' | 'units'>('flow')
-  const [horizon, setHorizon] = useState<TimeHorizon>('present')
+  const [horizon, setHorizon] = useState<TimeHorizon | 'all'>('present')
+  const [dateFilter, setDateFilter] = useState<string>('') // Filtro específico por fecha
+  const [monthFilter, setMonthFilter] = useState<string>('all') // Filtro por mes (01-12)
+  const [yearFilter, setYearFilter] = useState<string>('all') // Filtro por año (2025, 2026, etc)
   const [chairFilter, setChairFilter] = useState('all')
   const [doctorFilter, setDoctorFilter] = useState('all')
   const [appointments, setAppointments] = useState<ClinicalAppointment[]>([])
@@ -112,11 +117,14 @@ export default function CalendarPage() {
           const endDate = new Date(item.end_time || item.start_time)
           const timeStr = `${startDate.toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit' })} - ${endDate.toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit' })}`
           const dateStr = startDate.toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City', day: '2-digit', month: 'short', year: 'numeric' })
+          const rawDate = item.start_time ? item.start_time.split('T')[0] : ''
           const durationMin = Math.round((endDate.getTime() - startDate.getTime()) / 60000) || 45
 
           return {
             id: item.id,
             date: dateStr,
+            rawDate,
+            isoStart: item.start_time,
             time: timeStr,
             duration: `${durationMin} min`,
             patientName: item.patients?.full_name || 'Paciente Sin Nombre',
@@ -141,6 +149,8 @@ export default function CalendarPage() {
               return {
                 id: a.id,
                 date: prettyDate,
+                rawDate: a.appointment_date || '',
+                isoStart: `${a.appointment_date}T${a.appointment_time || '11:00:00'}`,
                 time: `${a.appointment_time} (45 min)`,
                 duration: '45 min',
                 patientName: a.patient_name,
@@ -174,6 +184,8 @@ export default function CalendarPage() {
               return {
                 id: a.id,
                 date: prettyDate,
+                rawDate: a.appointment_date || '',
+                isoStart: `${a.appointment_date}T${a.appointment_time || '11:00:00'}`,
                 time: `${a.appointment_time} (45 min)`,
                 duration: '45 min',
                 patientName: a.patient_name,
@@ -203,6 +215,8 @@ export default function CalendarPage() {
           const apiMapped: ClinicalAppointment[] = apiData.appointments.map((a: any) => ({
             id: a.id,
             date: a.appointment_date,
+            rawDate: a.appointment_date || '',
+            isoStart: `${a.appointment_date}T${a.appointment_time || '11:00:00'}`,
             time: `${a.appointment_time} (45 min)`,
             duration: '45 min',
             patientName: a.patient_name,
@@ -393,6 +407,73 @@ export default function CalendarPage() {
             <History className="w-4 h-4 text-slate-500" />
             <span>Historial Clínico</span>
           </button>
+
+          <button
+            onClick={() => setHorizon('all')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              horizon === 'all'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Filter className="w-4 h-4 text-amber-500" />
+            <span>Ver Todo el Archivo</span>
+          </button>
+        </div>
+
+        {/* Filtros Históricos por Fecha, Mes y Año */}
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <input
+            type="date"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-amber-400"
+            title="Filtrar por fecha exacta"
+          />
+
+          <select
+            value={monthFilter}
+            onChange={(e) => setMonthFilter(e.target.value)}
+            className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer"
+          >
+            <option value="all">Todos los Meses</option>
+            <option value="01">Enero</option>
+            <option value="02">Febrero</option>
+            <option value="03">Marzo</option>
+            <option value="04">Abril</option>
+            <option value="05">Mayo</option>
+            <option value="06">Junio</option>
+            <option value="07">Julio</option>
+            <option value="08">Agosto</option>
+            <option value="09">Septiembre</option>
+            <option value="10">Octubre</option>
+            <option value="11">Noviembre</option>
+            <option value="12">Diciembre</option>
+          </select>
+
+          <select
+            value={yearFilter}
+            onChange={(e) => setYearFilter(e.target.value)}
+            className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer"
+          >
+            <option value="all">Todos los Años</option>
+            <option value="2025">2025</option>
+            <option value="2026">2026</option>
+            <option value="2027">2027</option>
+          </select>
+
+          {(dateFilter || monthFilter !== 'all' || yearFilter !== 'all') && (
+            <button
+              onClick={() => {
+                setDateFilter('')
+                setMonthFilter('all')
+                setYearFilter('all')
+              }}
+              className="text-[11px] font-bold text-amber-600 hover:underline px-1"
+            >
+              Limpiar Filtros
+            </button>
+          )}
         </div>
 
         {/* Alternador de Modo de Vista */}
@@ -428,25 +509,60 @@ export default function CalendarPage() {
         <StableCalendarView />
       ) : (
         <>
-          {/* Lista de Citas en Tiempo Real */}
-          <div className="space-y-3">
-        {loading ? (
-          <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center shadow-xs">
-            <div className="w-8 h-8 border-3 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-xs font-bold text-slate-600">Consultando agenda clínica de Supabase...</p>
-          </div>
-        ) : appointments.length === 0 ? (
-          <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center shadow-xs space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mx-auto">
-              <Calendar className="w-6 h-6" />
-            </div>
-            <h3 className="text-sm font-bold text-slate-800">No hay citas programadas en este momento</h3>
-            <p className="text-xs text-slate-500 max-w-sm mx-auto">
-              La agenda de la Dra. Aura Estudillo está lista para recibir citas reales en tiempo real. Los pacientes pueden agendar desde el portal o el equipo de recepción.
-            </p>
-          </div>
-        ) : (
-          appointments.map((app) => (
+          {/* Lista de Citas en Tiempo Real Filtradas sin pérdida histórica */}
+          {(() => {
+            const todayStr = new Date().toISOString().split('T')[0]
+            const filtered = appointments.filter((app) => {
+              // 1. Filtro específico de fecha
+              if (dateFilter && app.rawDate && app.rawDate !== dateFilter) return false
+
+              // 2. Filtro de mes
+              if (monthFilter !== 'all' && app.rawDate) {
+                const appMonth = app.rawDate.split('-')[1]
+                if (appMonth !== monthFilter) return false
+              }
+
+              // 3. Filtro de año
+              if (yearFilter !== 'all' && app.rawDate) {
+                const appYear = app.rawDate.split('-')[0]
+                if (appYear !== yearFilter) return false
+              }
+
+              // 4. Filtro de horizonte temporal (si no se seleccionó fecha manual)
+              if (!dateFilter && horizon !== 'all') {
+                if (horizon === 'present') {
+                  return app.rawDate === todayStr || ['in_chair', 'in_waiting'].includes(app.status)
+                }
+                if (horizon === 'future') {
+                  return app.rawDate > todayStr
+                }
+                if (horizon === 'past') {
+                  return app.rawDate < todayStr || app.status === 'completed'
+                }
+              }
+
+              return true
+            })
+
+            return (
+              <div className="space-y-3">
+                {loading ? (
+                  <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center shadow-xs">
+                    <div className="w-8 h-8 border-3 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                    <p className="text-xs font-bold text-slate-600">Consultando agenda clínica de Supabase...</p>
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center shadow-xs space-y-3">
+                    <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 mx-auto">
+                      <Calendar className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-800">No hay citas en este periodo seleccionado</h3>
+                    <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                      Todas las citas pasadas, presentes y futuras se conservan de forma permanente en la base de datos histórica.
+                    </p>
+                  </div>
+                ) : (
+                  filtered.map((app) => (
             <div
               key={app.id}
               className={`p-5 rounded-2xl border transition-all bg-white flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-2xs ${
@@ -510,7 +626,9 @@ export default function CalendarPage() {
           ))
         )}
       </div>
-      </>
+    )
+  })()}
+        </>
       )}
 
       {/* Modal Flotante de Agendar Cita */}
