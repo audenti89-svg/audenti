@@ -515,37 +515,37 @@ export default function LandingPage() {
         />
 
         {/* ======================================================== */}
-        {/* CAPA DE FONDOS DENTALES EN DESKTOP (Full-Screen) */}
-        {/* Subida obligatoria forzada: transform -translate-y-24 md:-translate-y-36 relative z-10 my-auto */}
         {/* ======================================================== */}
-        <div className="hidden md:block absolute inset-0 w-full h-full transform -translate-y-24 md:-translate-y-36 relative z-10 my-auto">
+        {/* CAPA DE FONDOS DENTALES EN DESKTOP (Full-Screen) */}
+        {/* Ajuste final: z-20, centrada y elevada con pointer-events-auto */}
+        {/* ======================================================== */}
+        <div className="hidden md:flex relative z-20 w-full max-w-lg mx-auto -translate-y-16 md:-translate-y-28 justify-center items-center pointer-events-auto">
           {/* AFTER (Clean cast - 1.webp) */}
-          <div className="absolute inset-0 w-full h-full overflow-hidden">
+          <div className="absolute inset-0 w-full h-[580px] lg:h-[640px] overflow-hidden -top-24">
             <img
               src={ASSETS.after}
               alt="Molde dental después del tratamiento de estética dental de alta precisión"
-              className="w-full h-full object-cover object-[center_36%] scale-105 pointer-events-none transition-transform duration-700 drop-shadow-[0_20px_50px_rgba(234,179,8,0.2)]"
+              className="w-full h-full object-contain object-center scale-105 pointer-events-none transition-transform duration-700 drop-shadow-[0_20px_50px_rgba(234,179,8,0.25)]"
               draggable={false}
             />
-            <div className="absolute inset-0 bg-linear-to-t from-slate-950/85 via-slate-950/20 to-slate-950/40 pointer-events-none" />
+            <div className="absolute inset-0 bg-linear-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none" />
           </div>
 
           {/* BEFORE (Stained cast - 2.webp) */}
           <div
-            className="absolute inset-y-0 left-0 overflow-hidden transition-[width] duration-75 ease-out"
+            className="absolute inset-y-0 left-0 overflow-hidden transition-[width] duration-75 ease-out h-[580px] lg:h-[640px] -top-24"
             style={{ width: `${splitPercent}%` }}
           >
             <div
-              className="relative h-full"
-              style={{ width: heroRef.current ? `${heroRef.current.clientWidth}px` : '100vw' }}
+              className="relative h-full w-[512px]"
             >
               <img
                 src={ASSETS.before}
                 alt="Molde dental antes del tratamiento clínico"
-                className="w-full h-full object-cover object-[center_36%] scale-105 pointer-events-none transition-transform duration-700"
+                className="w-full h-full object-contain object-center scale-105 pointer-events-none transition-transform duration-700"
                 draggable={false}
               />
-              <div className="absolute inset-0 bg-linear-to-t from-slate-950/90 via-slate-950/25 to-slate-950/45 pointer-events-none" />
+              <div className="absolute inset-0 bg-linear-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none" />
             </div>
           </div>
         </div>
@@ -607,8 +607,8 @@ export default function LandingPage() {
             </a>
           </div>
 
-          {/* 3° Área del Modelo Dental Interactivo con Comida Veo 3 Visible Forzadamente Elevada */}
-          <div className="relative w-full h-[340px] rounded-3xl overflow-hidden border border-white/20 shadow-2xl bg-slate-950 my-1 transform -translate-y-8 sm:-translate-y-12">
+          {/* 3° Área del Modelo Dental Interactivo con Comida Veo 3 Visible Elevada (z-20) */}
+          <div className="relative z-20 w-full max-w-lg mx-auto h-[340px] -translate-y-16 md:-translate-y-28 flex justify-center items-center pointer-events-auto rounded-3xl overflow-hidden border border-white/20 shadow-2xl bg-slate-950 my-1">
             {/* FONDO DE COMIDA VEO 3 CLARAMENTE VISIBLE */}
             <div 
               className="absolute inset-0 pointer-events-none z-10 overflow-hidden transition-all duration-300 ease-out"
