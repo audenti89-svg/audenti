@@ -40,10 +40,7 @@ interface CalendarAppointment {
 }
 
 const DOCTORS = [
-  { id: 'doc-1', name: 'Dra. Aura Estudillo', specialty: 'Dirección Médica & Especialista', color: 'border-l-amber-500 bg-amber-50 text-amber-950' },
-  { id: 'doc-2', name: 'Dr. Ramírez López', specialty: 'Ortodoncia & Alineadores', color: 'border-l-blue-500 bg-blue-50 text-blue-950' },
-  { id: 'doc-3', name: 'Dr. Cortés', specialty: 'Endodoncia Mecanizada', color: 'border-l-emerald-500 bg-emerald-50 text-emerald-950' },
-  { id: 'doc-4', name: 'Dra. Gutiérrez', specialty: 'Cirugía & Implantología', color: 'border-l-purple-500 bg-purple-50 text-purple-950' },
+  { id: 'doc-1', name: 'Dra. Aura Estudillo', specialty: 'Dirección Médica & Cirujana Dentista', color: 'border-l-amber-500 bg-amber-50 text-amber-950' },
 ]
 
 const CHAIRS = ['Gabinete 1 (Principal)', 'Gabinete 2', 'Quirófano Quirúrgico']
