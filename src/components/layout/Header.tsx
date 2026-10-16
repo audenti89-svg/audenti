@@ -201,18 +201,18 @@ export function Header({ onMenuToggle }: HeaderProps) {
           <ChevronDown className="w-3 h-3 absolute right-1 pointer-events-none text-slate-400" />
         </div>
 
-        {/* Botón Triage Fast-Track Urgencias */}
+        {/* Botón Triage Urgencias Inmediatas */}
         <button
           type="button"
           onClick={() => {
             setIsEmergencyModalOpen(true);
             playTone('urgent');
           }}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition shadow-xs cursor-pointer"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition shadow-xs cursor-pointer whitespace-nowrap"
           title="Triage de Urgencia Inmediata"
         >
-          <ShieldAlert className="w-3.5 h-3.5 animate-pulse" />
-          <span className="hidden sm:inline">Triage Fast-Track</span>
+          <ShieldAlert className="w-3.5 h-3.5 animate-pulse shrink-0" />
+          <span className="hidden sm:inline">Triage Urgencias</span>
         </button>
 
         {/* Menú Flotante de Notificaciones en Vivo */}

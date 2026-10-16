@@ -77,7 +77,7 @@ export function FastTrackEmergencyModal({ isOpen = true, onClose }: FastTrackEme
                 Triage Clínico Prioritario
               </span>
               <h3 className="text-xl font-bold tracking-tight text-white">
-                Admisión de Urgencia (Fast-Track)
+                Admisión de Urgencia Inmediata
               </h3>
             </div>
           </div>
