@@ -453,7 +453,7 @@ export default function LandingPage() {
       </header>
 
       {/* ======================================================== */}
-      {/* 2. HERO INTERACTIVO BEFORE / AFTER (100svh) */}
+      {/* 2. HERO INTERACTIVO BEFORE / AFTER */}
       {/* Inspirado en Lumen Dental Studio con rAF + Slider de Precisión */}
       {/* ======================================================== */}
       <section
@@ -465,7 +465,7 @@ export default function LandingPage() {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
-        className="relative w-full min-h-[100svh] select-none touch-pan-y outline-none overflow-hidden bg-slate-950 cursor-crosshair pt-28 pb-24 md:pb-32 md:pt-16 flex flex-col justify-between md:block"
+        className="relative w-full min-h-[85vh] select-none touch-pan-y outline-none overflow-hidden bg-slate-950 cursor-crosshair pt-24 pb-36 md:pt-16 flex flex-col justify-between md:block"
         aria-label="Comparador interactivo de moldes dentales con seguimiento de cursor y táctil"
       >
         {/* ======================================================== */}
@@ -516,9 +516,9 @@ export default function LandingPage() {
 
         {/* ======================================================== */}
         {/* CAPA DE FONDOS DENTALES EN DESKTOP (Full-Screen) */}
-        {/* Elevado con traslación para centrado protagónico y espacio visual */}
+        {/* Subida obligatoria forzada: transform -translate-y-24 md:-translate-y-36 relative z-10 my-auto */}
         {/* ======================================================== */}
-        <div className="hidden md:block absolute inset-0 w-full h-full transform -translate-y-6 lg:-translate-y-10">
+        <div className="hidden md:block absolute inset-0 w-full h-full transform -translate-y-24 md:-translate-y-36 relative z-10 my-auto">
           {/* AFTER (Clean cast - 1.webp) */}
           <div className="absolute inset-0 w-full h-full overflow-hidden">
             <img
@@ -607,8 +607,8 @@ export default function LandingPage() {
             </a>
           </div>
 
-          {/* 3° Área del Modelo Dental Interactivo con Comida Veo 3 Visible Elevada */}
-          <div className="relative w-full h-[340px] rounded-3xl overflow-hidden border border-white/20 shadow-2xl bg-slate-950 my-1 transform -translate-y-2.5 sm:-translate-y-4">
+          {/* 3° Área del Modelo Dental Interactivo con Comida Veo 3 Visible Forzadamente Elevada */}
+          <div className="relative w-full h-[340px] rounded-3xl overflow-hidden border border-white/20 shadow-2xl bg-slate-950 my-1 transform -translate-y-8 sm:-translate-y-12">
             {/* FONDO DE COMIDA VEO 3 CLARAMENTE VISIBLE */}
             <div 
               className="absolute inset-0 pointer-events-none z-10 overflow-hidden transition-all duration-300 ease-out"
