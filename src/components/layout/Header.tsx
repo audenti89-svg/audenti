@@ -164,15 +164,15 @@ export function Header({ onMenuToggle }: HeaderProps) {
         </div>
 
         {/* Badge Dinámico de Estado de la Sucursal */}
-        <div className={`hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold transition-all ${
+        <div className={`hidden xl:inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold shrink-0 whitespace-nowrap transition-all ${
           currentBranch.isUpcoming
             ? 'bg-purple-50 text-purple-900 border-purple-200'
             : 'bg-emerald-50 text-emerald-800 border-emerald-200'
         }`}>
-          <span className={`w-2 h-2 rounded-full ${
+          <span className={`w-2 h-2 rounded-full shrink-0 ${
             currentBranch.isUpcoming ? 'bg-purple-500 animate-pulse' : 'bg-emerald-500 animate-pulse'
           }`} />
-          <span className="text-[11px] font-bold">{currentBranch.statusBadge}</span>
+          <span className="text-[11px] font-bold whitespace-nowrap">{currentBranch.statusBadge}</span>
         </div>
       </div>
 
