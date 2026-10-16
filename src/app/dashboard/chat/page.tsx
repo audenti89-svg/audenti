@@ -1,15 +1,20 @@
 'use client'
 
+import { useState } from 'react'
 import { ChatInterface } from '@/components/chat/ChatInterface'
+import { InternalMessagingCenter } from '@/components/InternalMessagingCenter'
 import {
   MessageSquare,
   Users,
   ShieldCheck,
   Radio,
-  Share2
+  Share2,
+  Megaphone
 } from 'lucide-react'
 
 export default function ComunicacionPage() {
+  const [activeTab, setActiveTab] = useState<'chat' | 'circulars'>('chat')
+
   return (
     <div className="flex flex-col w-full space-y-6 pb-12">
       {/* Header */}
@@ -21,9 +26,9 @@ export default function ComunicacionPage() {
             </span>
             <span className="text-slate-500 text-xs">• Sincronización Realtime Activa</span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Comunicación Omni-Canal &amp; Redes Familiares</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Comunicación Omni-Canal &amp; Directrices</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Canales segmentados para el equipo médico y mensajería en cascada para pacientes y grupos familiares.
+            Canales segmentados para el equipo médico, mensajería familiar en cascada y emisión de directivas por departamento.
           </p>
         </div>
 
@@ -35,8 +40,41 @@ export default function ComunicacionPage() {
         </div>
       </div>
 
-      {/* Componente Central de Mensajería Omni-Canal */}
-      <ChatInterface />
+      {/* Selector de Pestañas de Comunicación */}
+      <div className="flex gap-2 p-1.5 bg-slate-100 rounded-2xl w-fit border border-slate-200/70">
+        <button
+          type="button"
+          onClick={() => setActiveTab('chat')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'chat'
+              ? 'bg-white text-slate-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <MessageSquare className="w-4 h-4 text-amber-600" />
+          <span>Chat Omni-Canal &amp; Redes Familiares</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('circulars')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'circulars'
+              ? 'bg-white text-slate-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Megaphone className="w-4 h-4 text-purple-600" />
+          <span>Emisión de Directrices al Personal</span>
+        </button>
+      </div>
+
+      {/* Renderizado de Módulo */}
+      {activeTab === 'chat' ? (
+        <ChatInterface />
+      ) : (
+        <InternalMessagingCenter />
+      )}
     </div>
   )
 }

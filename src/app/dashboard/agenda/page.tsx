@@ -20,12 +20,15 @@ import {
   AlertTriangle,
   UserCheck,
   RefreshCw,
-  X
+  X,
+  LayoutGrid,
+  List
 } from 'lucide-react'
 import { useNotificationSound } from '@/hooks/useNotificationSound'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
 import { QuickRegisterModal } from '@/components/clinical/QuickRegisterModal'
+import { StableCalendarView } from '@/components/StableCalendarView'
 
 type TimeHorizon = 'present' | 'past' | 'future'
 
@@ -46,6 +49,7 @@ interface ClinicalAppointment {
 
 export default function CalendarPage() {
   const { soundEnabled, setSoundEnabled, playTone } = useNotificationSound()
+  const [viewMode, setViewMode] = useState<'flow' | 'units'>('flow')
   const [horizon, setHorizon] = useState<TimeHorizon>('present')
   const [chairFilter, setChairFilter] = useState('all')
   const [doctorFilter, setDoctorFilter] = useState('all')
@@ -351,47 +355,81 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* Selector de Horizonte Temporal */}
-      <div className="flex flex-wrap gap-2 p-1.5 bg-slate-100 rounded-2xl w-fit border border-slate-200/70">
-        <button
-          onClick={() => setHorizon('present')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            horizon === 'present'
-              ? 'bg-white text-slate-900 shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <Activity className="w-4 h-4 text-emerald-600" />
-          <span>Presente (Hoy)</span>
-        </button>
+      {/* Selector de Vistas: Flujo Clínico Continuo vs Monitor por Sillones Dentales */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2 p-1.5 bg-slate-100 rounded-2xl w-fit border border-slate-200/70">
+          <button
+            onClick={() => setHorizon('present')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              horizon === 'present'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Activity className="w-4 h-4 text-emerald-600" />
+            <span>Presente (Hoy)</span>
+          </button>
 
-        <button
-          onClick={() => setHorizon('future')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            horizon === 'future'
-              ? 'bg-white text-slate-900 shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <CalendarDays className="w-4 h-4 text-blue-600" />
-          <span>Próximas Citas</span>
-        </button>
+          <button
+            onClick={() => setHorizon('future')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              horizon === 'future'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <CalendarDays className="w-4 h-4 text-blue-600" />
+            <span>Próximas Citas</span>
+          </button>
 
-        <button
-          onClick={() => setHorizon('past')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            horizon === 'past'
-              ? 'bg-white text-slate-900 shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <History className="w-4 h-4 text-slate-500" />
-          <span>Historial Clínico</span>
-        </button>
+          <button
+            onClick={() => setHorizon('past')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              horizon === 'past'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <History className="w-4 h-4 text-slate-500" />
+            <span>Historial Clínico</span>
+          </button>
+        </div>
+
+        {/* Alternador de Modo de Vista */}
+        <div className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-2xl border border-slate-200/70 w-fit">
+          <button
+            type="button"
+            onClick={() => setViewMode('flow')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              viewMode === 'flow'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <List className="w-3.5 h-3.5 text-amber-600" />
+            <span>Flujo Continuo</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('units')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              viewMode === 'units'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <LayoutGrid className="w-3.5 h-3.5 text-purple-600" />
+            <span>Monitor por Gabinetes</span>
+          </button>
+        </div>
       </div>
 
-      {/* Lista de Citas en Tiempo Real */}
-      <div className="space-y-3">
+      {viewMode === 'units' ? (
+        <StableCalendarView />
+      ) : (
+        <>
+          {/* Lista de Citas en Tiempo Real */}
+          <div className="space-y-3">
         {loading ? (
           <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center shadow-xs">
             <div className="w-8 h-8 border-3 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
@@ -472,6 +510,8 @@ export default function CalendarPage() {
           ))
         )}
       </div>
+      </>
+      )}
 
       {/* Modal Flotante de Agendar Cita */}
       {showNewModal && (

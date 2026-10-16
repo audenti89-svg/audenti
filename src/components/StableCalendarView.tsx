@@ -1,78 +1,179 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Calendar, Clock, CheckCircle2, Building2, User, Stethoscope, RefreshCw, Plus } from 'lucide-react';
+import { useNotificationSound } from '@/hooks/useNotificationSound';
 
 export function StableCalendarView() {
   const [currentView, setCurrentView] = useState<'day' | 'week'>('day');
   const [selectedCabinet, setSelectedCabinet] = useState('Gabinete 1 (Principal)');
+  const [liveSlots, setLiveSlots] = useState<Array<{ time: string; patient?: string; status: 'free' | 'busy'; treatment?: string }>>([]);
+  const [loading, setLoading] = useState(false);
+  const { playTone } = useNotificationSound();
+
+  const CABINETS = [
+    { id: 'cab-1', name: 'Gabinete 1 (Principal)', desc: 'Sillón Director Dra. Aura Estudillo', badge: 'Activo' },
+    { id: 'cab-2', name: 'Gabinete 2', desc: 'Ortodoncia & Profilaxis Ultrasónica', badge: 'Operativo' },
+    { id: 'cab-3', name: 'Quirófano Quirúrgico', desc: 'Implantología & Cirugía Maxilofacial', badge: 'Esterilizado' }
+  ];
+
+  const fetchCabinetStatus = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/appointments');
+      const data = await res.json();
+      const appointments = data?.success && Array.isArray(data.appointments) ? data.appointments : [];
+
+      const times = ['09:00 AM', '10:30 AM', '12:00 PM', '02:00 PM', '04:00 PM', '05:30 PM', '07:00 PM'];
+      const mapped = times.map((t) => {
+        const matching = appointments.find((a: any) =>
+          (a.branch?.includes(selectedCabinet.slice(0, 8)) || selectedCabinet.includes('Principal')) &&
+          (a.appointment_time?.startsWith(t.substring(0, 2)))
+        );
+        return {
+          time: t,
+          patient: matching ? matching.patient_name : undefined,
+          treatment: matching ? matching.treatment : undefined,
+          status: matching ? ('busy' as const) : ('free' as const)
+        };
+      });
+      setLiveSlots(mapped);
+    } catch (e) {
+      console.warn('Error fetching cabinet status:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchCabinetStatus();
+    const interval = setInterval(fetchCabinetStatus, 5000);
+    return () => clearInterval(interval);
+  }, [selectedCabinet]);
 
   return (
-    <div className="space-y-6 text-white p-4 md:p-6 bg-[#0a0c0e] min-h-screen">
-      {/* Header de Controles sin re-renders molestos */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#111315] p-4 rounded-2xl border border-neutral-800">
+    <div className="space-y-6">
+      {/* Header de Gabinete Estable */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
         <div>
-          <h2 className="text-xl font-bold tracking-tight">Agenda & Sillón Dental en Tiempo Real</h2>
-          <p className="text-xs text-neutral-400">Sincronización estable con Supabase (Sin parpadeos)</p>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-200 uppercase tracking-wide">
+              Matriz de Sillones Dentales
+            </span>
+            <span className="text-slate-400 text-xs font-semibold">Zero-Flickering Realtime</span>
+          </div>
+          <h2 className="text-xl font-bold tracking-tight text-slate-900">Monitor Clínico de Unidades Dentales</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Disponibilidad en vivo y asignación de tiempos por sillón.</p>
         </div>
-        <div className="flex items-center gap-2 bg-neutral-900 p-1 rounded-xl border border-neutral-800">
+
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setCurrentView('day')}
-            className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all ${
-              currentView === 'day' ? 'bg-yellow-500 text-neutral-950' : 'text-neutral-400 hover:text-white'
-            }`}
+            onClick={() => { fetchCabinetStatus(); playTone('message'); }}
+            className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 transition"
+            title="Refrescar estado de sillones"
           >
-            Vista Día
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
-          <button
-            onClick={() => setCurrentView('week')}
-            className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all ${
-              currentView === 'week' ? 'bg-yellow-500 text-neutral-950' : 'text-neutral-400 hover:text-white'
-            }`}
-          >
-            Vista Semana
-          </button>
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/80">
+            <button
+              onClick={() => setCurrentView('day')}
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                currentView === 'day' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Turno Día
+            </button>
+            <button
+              onClick={() => setCurrentView('week')}
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                currentView === 'week' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Semana
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Selector de Unidades Dentales */}
-      <div className="flex gap-2 overflow-x-auto pb-2">
-        {['Gabinete 1 (Principal)', 'Gabinete 2', 'Quirófano Quirúrgico'].map((cabinet) => (
-          <button
-            key={cabinet}
-            onClick={() => setSelectedCabinet(cabinet)}
-            className={`px-4 py-2.5 rounded-xl border text-xs font-medium whitespace-nowrap transition-all ${
-              selectedCabinet === cabinet
-                ? 'border-yellow-500/50 bg-yellow-500/10 text-yellow-400'
-                : 'border-neutral-800 bg-neutral-900 text-neutral-400 hover:border-neutral-700'
-            }`}
-          >
-            {cabinet}
-          </button>
-        ))}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {CABINETS.map((cab) => {
+          const isSelected = selectedCabinet === cab.name;
+          return (
+            <button
+              key={cab.id}
+              onClick={() => { setSelectedCabinet(cab.name); playTone('message'); }}
+              className={`p-4 rounded-2xl border text-left transition-all cursor-pointer ${
+                isSelected
+                  ? 'border-amber-400 bg-amber-50/60 ring-2 ring-amber-400/20 shadow-xs'
+                  : 'border-slate-200 bg-white hover:border-slate-300'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className={`text-xs font-bold ${isSelected ? 'text-amber-950' : 'text-slate-900'}`}>
+                  {cab.name}
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  {cab.badge}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 truncate">{cab.desc}</p>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Cuadrícula de Horarios Estable */}
-      <div className="bg-[#111315] border border-neutral-800 rounded-2xl p-6 shadow-xl">
-        <div className="flex justify-between items-center mb-6 border-b border-neutral-800 pb-4">
-          <span className="font-semibold text-sm text-yellow-400">Unidad Activa: {selectedCabinet}</span>
-          <span className="text-xs text-green-400 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">
-            ● En Vivo (Supabase Realtime)
+      {/* Cuadrícula Horaria Estable */}
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm space-y-4">
+        <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-amber-600" />
+            <span className="font-bold text-xs text-slate-900">Unidad Seleccionada: {selectedCabinet}</span>
+          </div>
+          <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            Sincronizado Supabase Realtime
           </span>
         </div>
 
-        <div className="space-y-3">
-          {['09:00 AM', '10:30 AM', '12:00 PM', '04:00 PM', '05:30 PM'].map((time, idx) => (
-            <div key={idx} className="flex items-center justify-between p-4 bg-neutral-900/80 border border-neutral-800/60 rounded-xl hover:border-neutral-700 transition-all">
-              <div className="flex items-center gap-4">
-                <span className="text-sm font-bold text-neutral-300 w-20">{time}</span>
+        <div className="space-y-2.5">
+          {liveSlots.map((slot, idx) => (
+            <div
+              key={idx}
+              className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border transition-all ${
+                slot.status === 'busy'
+                  ? 'bg-amber-50/50 border-amber-200/90 text-amber-950'
+                  : 'bg-slate-50/60 border-slate-200/70 hover:bg-slate-50'
+              }`}
+            >
+              <div className="flex items-center gap-3.5 mb-2 sm:mb-0">
+                <span className="text-xs font-mono font-bold text-slate-700 w-20">{slot.time}</span>
                 <div>
-                  <span className="text-sm font-medium block text-white">Disponible para Asignación</span>
-                  <span className="text-xs text-neutral-400">Sillón libre sincronizado</span>
+                  {slot.status === 'busy' ? (
+                    <>
+                      <span className="text-xs font-bold text-slate-900 block">{slot.patient}</span>
+                      <span className="text-[11px] text-amber-800 font-medium">{slot.treatment || 'Consulta Especializada'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-xs font-semibold text-slate-700 block">Sillón Libre &amp; Esterilizado</span>
+                      <span className="text-[11px] text-slate-400">Disponible para asignación inmediata</span>
+                    </>
+                  )}
                 </div>
               </div>
-              <button className="px-4 py-2 bg-yellow-500/10 hover:bg-yellow-500 text-yellow-400 hover:text-neutral-950 border border-yellow-500/30 text-xs font-bold rounded-lg transition-all">
-                + Agendar Cita
-              </button>
+
+              <div>
+                {slot.status === 'busy' ? (
+                  <span className="inline-flex px-3 py-1 rounded-lg bg-amber-200 text-amber-900 text-xs font-bold">
+                    Cita en Proceso
+                  </span>
+                ) : (
+                  <span className="inline-flex px-3 py-1 rounded-lg bg-emerald-100 text-emerald-900 text-xs font-bold">
+                    Disponible
+                  </span>
+                )}
+              </div>
             </div>
           ))}
         </div>

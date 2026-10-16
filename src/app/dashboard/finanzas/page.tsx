@@ -21,11 +21,15 @@ import {
   CheckCircle,
   X,
   FileSpreadsheet,
-  AlertCircle
+  AlertCircle,
+  BarChart3,
+  PieChart
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
+import { FinancialAnalyticsDashboard } from '@/components/FinancialAnalyticsDashboard'
 
 export default function FinanzasPage() {
+  const [activeTab, setActiveTab] = useState<'arqueo' | 'auditoria'>('arqueo')
   const [transactions, setTransactions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -219,8 +223,41 @@ export default function FinanzasPage() {
         </div>
       </div>
 
-      {/* Tarjetas de Resumen Financiero con Fallback en Cero */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Selector de Pestaña: Arqueo Diario vs Inteligencia & Auditoría */}
+      <div className="flex gap-2 p-1.5 bg-slate-100 rounded-2xl w-fit border border-slate-200/70">
+        <button
+          type="button"
+          onClick={() => setActiveTab('arqueo')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'arqueo'
+              ? 'bg-white text-slate-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Receipt className="w-4 h-4 text-amber-600" />
+          <span>Libro Diario & Caja Líquida</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('auditoria')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'auditoria'
+              ? 'bg-white text-slate-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4 text-purple-600" />
+          <span>Auditoría Financiera &amp; Canales Trueque</span>
+        </button>
+      </div>
+
+      {activeTab === 'auditoria' ? (
+        <FinancialAnalyticsDashboard />
+      ) : (
+        <>
+          {/* Tarjetas de Resumen Financiero con Fallback en Cero */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Ingresos Líquidos */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs">
           <div className="flex items-center justify-between mb-2">
@@ -386,6 +423,8 @@ export default function FinanzasPage() {
           </div>
         )}
       </div>
+      </>
+      )}
 
       {/* Modal para Registrar Cobro o Trueque Profesional */}
       {isModalOpen && (
