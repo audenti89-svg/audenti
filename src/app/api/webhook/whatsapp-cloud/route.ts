@@ -3,6 +3,7 @@ import { generateGeminiResponse } from '@/lib/ai/gemini';
 import { sendWhatsAppMessage } from '@/lib/whatsapp/client';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 interface WhatsAppWebhookPayload {
   object: string;

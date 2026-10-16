@@ -1,13 +1,16 @@
 import OpenAI from 'openai';
 
-const openrouter = new OpenAI({
-  baseURL: 'https://openrouter.ai/api/v1',
-  apiKey: process.env.OPENROUTER_API_KEY,
-  defaultHeaders: {
-    'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://audenti.app',
-    'X-Title': 'Audenti Clinical CRM',
-  },
-});
+function getOpenRouterClient(): OpenAI {
+  const apiKey = process.env.OPENROUTER_API_KEY || 'sk-dummy-key-for-build';
+  return new OpenAI({
+    baseURL: 'https://openrouter.ai/api/v1',
+    apiKey,
+    defaultHeaders: {
+      'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://audenti.app',
+      'X-Title': 'Audenti Clinical CRM',
+    },
+  });
+}
 
 const SYSTEM_PROMPT = `
 Eres el Asistente Técnico y Comercial Oficial de Audenti y nuestra Agencia de Aplicaciones Web Responsive.
@@ -20,6 +23,7 @@ Tu objetivo es atender prospectos, resolver dudas sobre desarrollo de software, 
 
 export async function generateGeminiResponse(userPhone: string, userMessage: string): Promise<string> {
   try {
+    const openrouter = getOpenRouterClient();
     const completion = await openrouter.chat.completions.create({
       model: process.env.AI_DEFAULT_MODEL || 'google/gemini-flash-1.5',
       messages: [
