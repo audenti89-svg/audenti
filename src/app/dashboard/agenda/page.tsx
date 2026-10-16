@@ -106,8 +106,8 @@ export default function CalendarPage() {
         const mapped: ClinicalAppointment[] = (data || []).map((item: any) => {
           const startDate = new Date(item.start_time)
           const endDate = new Date(item.end_time || item.start_time)
-          const timeStr = `${startDate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })} - ${endDate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}`
-          const dateStr = startDate.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
+          const timeStr = `${startDate.toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit' })} - ${endDate.toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit' })}`
+          const dateStr = startDate.toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City', day: '2-digit', month: 'short', year: 'numeric' })
           const durationMin = Math.round((endDate.getTime() - startDate.getTime()) / 60000) || 45
 
           return {

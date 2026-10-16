@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import {
+  getNowInMexico,
+  formatTimeInMexico,
+  formatDateInMexico,
+  TIMEZONE_MEXICO
+} from '@/utils/timezone'
 
 export const runtime = 'nodejs'
 
@@ -71,7 +77,7 @@ export async function POST(request: Request) {
         phone: phone || 'No proporcionado',
         painLevel: painLevel || 'severo',
         symptoms: symptoms || 'Dolor dental agudo / Urgencia nocturna',
-        timestamp: new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        timestamp: formatTimeInMexico(),
         chatSnippet: chatSnippet || 'El paciente reportó dolor agudo en horario nocturno.',
         status: 'pending',
         patientLocation: patientLocation || undefined
@@ -191,17 +197,19 @@ export async function POST(request: Request) {
       found.resolvedAt = new Date().toISOString()
 
       // Guardar también en el registro de citas persistentes de Audenti para que aparezca en Agenda y Dashboard
+      const nowMx = getNowInMexico()
       const emergencyTime = decision === 'approved_exceptional'
-        ? new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-        : '08:30:00'
+        ? formatTimeInMexico(nowMx)
+        : '08:30'
+      const emergencyDate = formatDateInMexico(nowMx)
 
       const emergencyAppointment = {
         id: `APT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         folio: `EMG-${Math.floor(1000 + Math.random() * 9000)}`,
         patient_name: found.patientName.replace('[Desconocido] ', ''),
         patient_phone: found.phone.replace('[Desconocido] ', ''),
-        appointment_date: new Date().toISOString().split('T')[0],
-        appointment_time: emergencyTime,
+        appointment_date: emergencyDate,
+        appointment_time: emergencyTime + ':00',
         treatment: `🔴 Urgencia Dental: ${found.symptoms}`,
         branch: found.branchName || 'Sede Balbuena (Matriz)',
         status: (decision === 'approved_exceptional' ? 'in_chair' : 'confirmed') as any,
@@ -213,6 +221,42 @@ export async function POST(request: Request) {
         globalThis.__audenti_appointments = []
       }
       globalThis.__audenti_appointments = [emergencyAppointment, ...globalThis.__audenti_appointments].slice(0, 50)
+
+      // Persistencia oficial garantizada en Supabase para appointments
+      try {
+        const supabase = await createClient()
+        const cleanPhone = found.phone.replace('[Desconocido] ', '')
+        const cleanName = found.patientName.replace('[Desconocido] ', '')
+
+        let patientId: string | undefined = undefined
+        const { data: patient } = await supabase
+          .from('patients')
+          .upsert({
+            full_name: cleanName,
+            phone: cleanPhone,
+            notes: `Urgencia Aprobada por Dra. Aura Estudillo: ${found.symptoms}`
+          }, { onConflict: 'phone' })
+          .select('id')
+          .maybeSingle()
+
+        if (patient?.id) {
+          patientId = patient.id
+        }
+
+        const startIso = new Date(`${emergencyDate}T${emergencyTime}:00`).toISOString()
+        const endIso = new Date(new Date(startIso).getTime() + 45 * 60000).toISOString()
+
+        await supabase.from('appointments').insert({
+          patient_id: patientId,
+          treatment_type: `🔴 Urgencia Dental (${found.symptoms.substring(0, 40)})`,
+          status: decision === 'approved_exceptional' ? 'in_chair' : 'confirmed',
+          start_time: startIso,
+          end_time: endIso,
+          notes: `Folio: ${emergencyAppointment.folio}. Sede: ${emergencyAppointment.branch}. Aprobado por Dra. Aura Estudillo.`
+        })
+      } catch (dbErr: any) {
+        console.warn('Nota Supabase emergency appointment insert:', dbErr?.message)
+      }
 
       return NextResponse.json({
         success: true,

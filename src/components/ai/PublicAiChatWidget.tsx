@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { MessageSquare, Sparkles, X, Send, Bot, User, ArrowRight, Calendar, Volume2, VolumeX, ShieldCheck } from 'lucide-react'
 import { useAccessibility } from '@/context/AccessibilityContext'
 import { AuraHologram } from './AuraHologram'
+import { formatTimeInMexico } from '@/utils/timezone'
 
 interface Message {
   id: string
@@ -49,10 +50,10 @@ export function PublicAiChatWidget() {
             if ((c.status === 'approved_exceptional' || c.status === 'scheduled_first_hour') && !receivedDecisions.current.has(c.id)) {
               receivedDecisions.current.add(c.id)
               const decisionMsg: Message = {
-                id: `decision-${Date.now()}`,
+                id: `decision-${c.id}`,
                 role: 'assistant',
                 content: `🩺 **COMUNICADO OFICIAL DE LA DRA. AURA ESTUDILLO:**\n\n${c.doctorNotes}\n\n*Folio de seguimiento: ${c.id}*. Nuestro equipo médico ya está coordinando la apertura/ingreso prioritario.`,
-                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                time: formatTimeInMexico()
               }
               setMessages(prev => [...prev, decisionMsg])
               setIsOpen(true)
@@ -97,7 +98,7 @@ export function PublicAiChatWidget() {
       id: Date.now().toString(),
       role: 'user',
       content: userText,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      time: formatTimeInMexico()
     }
 
     setMessages(prev => [...prev, userMsg])
@@ -154,7 +155,7 @@ export function PublicAiChatWidget() {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: data?.reply || '¡Hola! Soy Aura AI, ¿en qué te puedo ayudar?',
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        time: formatTimeInMexico()
       }
 
       setMessages(prev => [...prev, botMsg])
@@ -164,7 +165,7 @@ export function PublicAiChatWidget() {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
         content: 'Hubo una breve intermitencia al procesar tu consulta con la IA. Puedes consultarme nuevamente sobre procedimientos, horarios o pulsar "Agendar Cita" para atención inmediata con la Dra. Aura.',
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        time: formatTimeInMexico()
       }
       setMessages(prev => [...prev, errorMsg])
     } finally {

@@ -3,6 +3,12 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 import { PersistentAppointment } from '@/app/api/appointments/route'
+import {
+  getNowInMexico,
+  formatDateInMexico,
+  formatTimeInMexico,
+  TIMEZONE_MEXICO
+} from '@/utils/timezone'
 
 export interface CreateAppointmentInput {
   folio?: string
@@ -38,8 +44,12 @@ export async function createAppointmentAction(input: CreateAppointmentInput) {
     }
 
     const generatedFolio = folio || `AUD-${Math.floor(1000 + Math.random() * 9000)}`
+    const nowMx = getNowInMexico()
     const nowIso = new Date().toISOString()
-    const appDate = appointment_date || new Date(Date.now() + 24 * 3600 * 1000).toISOString().split('T')[0]
+    const tomorrowMx = new Date(nowMx)
+    tomorrowMx.setDate(tomorrowMx.getDate() + 1)
+
+    const appDate = appointment_date || formatDateInMexico(tomorrowMx)
     const appTime = appointment_time || '11:00:00'
     const appBranch = branch || 'Sede Balbuena (Matriz)'
     const appTreatment = treatment || 'Consulta / Valoración Estética Oral'
@@ -85,7 +95,9 @@ export async function createAppointmentAction(input: CreateAppointmentInput) {
         newAppointment.patient_id = patient.id
       }
 
-      const startDateTime = new Date(`${appDate}T${appTime}`)
+      // Convertir hora local CDMX (GMT-6) a UTC ISO String
+      const timePart = appTime.length === 5 ? `${appTime}:00` : appTime
+      const startDateTime = new Date(`${appDate}T${timePart}-06:00`)
       const endDateTime = new Date(startDateTime.getTime() + 45 * 60000)
 
       const { error: apptError } = await supabase.from('appointments').insert({

@@ -2,6 +2,13 @@ import { NextResponse } from 'next/server'
 import { getGroqClient } from '@/lib/groq'
 import { createClient } from '@/utils/supabase/server'
 import { createAppointmentAction } from '@/actions/appointments'
+import {
+  getNowInMexico,
+  formatTimeInMexico,
+  formatDateInMexico,
+  formatPrettyDateInMexico,
+  TIMEZONE_MEXICO
+} from '@/utils/timezone'
 
 export const runtime = 'nodejs'
 
@@ -232,36 +239,59 @@ async function ejecutarTool(name: string, args: any) {
   }
 
   if (name === 'consultarDisponibilidadCalendario') {
-    // Consulta reactiva con Supabase o simulación de huecos en agenda
-    try {
-      const supabase = await createClient()
-      const { data: upcoming } = await supabase
-        .from('appointments')
-        .select('start_time, status')
-        .gte('start_time', new Date().toISOString())
-        .order('start_time', { ascending: true })
-        .limit(5)
+    const nowMx = getNowInMexico()
+    const currentHour = nowMx.getHours()
+    const currentMin = nowMx.getMinutes()
+    const todayFormatted = formatPrettyDateInMexico(nowMx)
 
-      // Generar 3 slots atractivos
-      const tomorrow = new Date()
-      tomorrow.setDate(tomorrow.getDate() + 1)
-      const dateStr = tomorrow.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
+    // Bloques estándar de atención en clínica
+    const standardDailySlots = [
+      { hour: 10, time: '10:00', label: '10:00 hrs (Mañana)' },
+      { hour: 11, time: '11:00', label: '11:00 hrs (Mañana)' },
+      { hour: 12, time: '12:00', label: '12:00 hrs (Mediodía)' },
+      { hour: 16, time: '16:00', label: '16:00 hrs (Tarde)' },
+      { hour: 17, time: '17:30', label: '17:30 hrs (Tarde)' },
+      { hour: 19, time: '19:00', label: '19:00 hrs (Vespertino)' }
+    ]
 
-      return {
-        disponible: true,
-        fechaSugerida: dateStr,
-        horariosDisponibles: ['11:00 hrs (Mañana)', '16:00 hrs (Tarde)', '17:30 hrs (Tarde)'],
-        doctora: 'Dra. Aura Estudillo (Directora Médica & Especialista en Estética Oral)',
-        sede: 'Audenti — Estudio Clínico Principal',
-        instruccionAlPaciente: 'Elige el horario que más te convenga y compárteme tu nombre y WhatsApp para apartarlo de inmediato.'
-      }
-    } catch {
-      return {
-        disponible: true,
-        fechaSugerida: 'Próximos días disponibles',
-        horariosDisponibles: ['11:00 hrs', '16:00 hrs', '17:30 hrs'],
-        doctora: 'Dra. Aura Estudillo'
-      }
+    // Si el usuario pregunta por "hoy" o no especificó fecha
+    const fechaPedida = (args.fecha || '').toLowerCase()
+    const isAskingToday = fechaPedida.includes('hoy')
+
+    // Filtrar huecos que aún no han pasado hoy
+    const remainingToday = standardDailySlots.filter(s => s.hour > currentHour || (s.hour === currentHour && currentMin < 15))
+
+    let fechaSugerida = ''
+    let horariosDisponibles: string[] = []
+    let avisoTemporal = ''
+
+    if (isAskingToday && remainingToday.length > 0) {
+      fechaSugerida = `Hoy (${todayFormatted})`
+      horariosDisponibles = remainingToday.slice(0, 3).map(s => s.label)
+      avisoTemporal = 'Horarios disponibles para el resto del día de hoy.'
+    } else {
+      // Si ya pasaron los horarios de hoy (ej. son más de las 18:00 hrs) o no quedan slots hoy,
+      // NUNCA ofrecer horarios matutinos/vespertinos pasados. Ofrecer el día de mañana a primera hora.
+      const tomorrowMx = new Date(nowMx)
+      tomorrowMx.setDate(tomorrowMx.getDate() + 1)
+      const tomorrowFormatted = formatPrettyDateInMexico(tomorrowMx)
+
+      fechaSugerida = `Mañana (${tomorrowFormatted})`
+      horariosDisponibles = ['08:30 hrs (Primera Hora / Prioritario)', '11:00 hrs (Mañana)', '16:00 hrs (Tarde)']
+      avisoTemporal = currentHour >= 18
+        ? 'Por el horario actual vespertino (más de las 18:00 hrs), los turnos regulares de hoy han concluido. Te ofrecemos atención a Primera Hora de mañana o apertura extraordinaria en caso de urgencia roja.'
+        : 'Horarios confirmados y libres para mañana.'
+    }
+
+    return {
+      disponible: true,
+      horaActualMexico: formatTimeInMexico(nowMx) + ' hrs',
+      fechaSugerida,
+      horariosDisponibles,
+      avisoTemporal,
+      doctora: 'Dra. Aura Estudillo (Directora Médica & Especialista en Estética Oral, Céd. 8492019)',
+      sede: 'Audenti — Estudio Clínico Principal (Sede Balbuena)',
+      instruccionAlPaciente: 'Elige el horario que más te convenga y facilítame tu nombre y WhatsApp para apartarlo de inmediato.'
     }
   }
 
@@ -332,7 +362,7 @@ async function ejecutarTool(name: string, args: any) {
   if (name === 'escalarEmergenciaNocturnaDraAura') {
     const { motivoUrgencia, nivelDolor, nombrePaciente, telefono } = args
     const caseId = `EMG-${Date.now().toString().slice(-6)}`
-    const nowTime = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+    const nowTime = formatTimeInMexico()
 
     const newCase = {
       id: caseId,
@@ -348,12 +378,15 @@ async function ejecutarTool(name: string, args: any) {
     if (!globalThis.__audenti_emergency_cases) {
       globalThis.__audenti_emergency_cases = []
     }
-    globalThis.__audenti_emergency_cases = [newCase, ...globalThis.__audenti_emergency_cases].slice(0, 30)
+    const alreadyEscalated = globalThis.__audenti_emergency_cases.some(c => c.symptoms === newCase.symptoms)
+    if (!alreadyEscalated) {
+      globalThis.__audenti_emergency_cases = [newCase, ...globalThis.__audenti_emergency_cases].slice(0, 30)
+    }
 
     return {
       escalamientoExitoso: true,
       folioEmergencia: caseId,
-      horaNotificacion: nowTime,
+      horaNotificacion: nowTime + ' hrs (CDMX)',
       estado: 'ALERTA ROJA (🔴) ENVIADA AL PANEL DIRECTIVO DE LA DRA. AURA ESTUDILLO',
       mensajeDoctora: 'El caso ha sido transmitido con máxima prioridad al dispositivo móvil de la Dra. Aura Estudillo.',
       indicacionPaciente: 'Por favor, mantén esta ventana abierta y facilítanos tu número telefónico o WhatsApp. La Dra. Aura revisará tu caso en breve para autorizar tu atención extraordinaria inmediata o priorizarte a primera hora de la mañana.'
@@ -447,6 +480,22 @@ export async function POST(request: Request) {
     let basePrompt = role === 'doctor'
       ? DOCTOR_EXECUTIVE_SYSTEM_PROMPT
       : PUBLIC_WARM_SYSTEM_PROMPT
+
+    // Inyección de Fecha, Hora y Zona Horaria Oficial (America/Mexico_City)
+    const nowMx = getNowInMexico()
+    const currentTimeStr = formatTimeInMexico(nowMx)
+    const todayPretty = formatPrettyDateInMexico(nowMx)
+    const isLateEvening = nowMx.getHours() >= 18
+
+    basePrompt += `\n\n[CONTEXTO TEMPORAL Y ZONA HORARIA EN TIEMPO REAL - AUDENTI (AMERICA/MEXICO_CITY, GMT-6)]:\n`
+    basePrompt += `- Fecha actual: ${todayPretty}\n`
+    basePrompt += `- Hora actual de México: ${currentTimeStr} hrs\n`
+    basePrompt += `- REGLA CRÍTICA TEMPORAL: Son las ${currentTimeStr} hrs. NUNCA ofrezcas horarios del día de hoy que ya hayan transcurrido (por ejemplo, NO ofrezcas 10:00, 11:00, 12:00, 16:00 ni horas anteriores a las ${currentTimeStr} hrs). `
+    if (isLateEvening) {
+      basePrompt += `Como ya son más de las 18:00 hrs, el horario regular de consulta presencial de hoy ha concluido. Ofrece exclusivamente horarios para MAÑANA (ej. Primera hora a las 08:30 AM o 11:00 AM) o atención extraordinaria nocturna si es una urgencia médica grave.`
+    } else {
+      basePrompt += `Solo puedes ofrecer horarios posteriores a las ${currentTimeStr} hrs para el día de hoy, o turnos a partir de mañana.`
+    }
 
     // Si ya tenemos datos del paciente en la sesión, inyectarlos en la memoria activa del prompt
     if (role === 'public' && (rememberedPhone || rememberedName)) {
@@ -617,41 +666,46 @@ export async function POST(request: Request) {
 
     // Solo se registra en el panel de alertas si es una Urgencia Roja real o una Solicitud Amarilla prioritaria
     if (isRed || isYellow) {
-      const caseId = `${isRed ? 'RED' : 'YEL'}-${Date.now().toString().slice(-6)}`
-      const nowTime = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+      const nowTime = formatTimeInMexico()
       
       // Extraer posible teléfono
       const phoneMatch = rawUser.match(/\b\d{10}\b/) || conversation.map(c => c.content || '').join(' ').match(/\b\d{10}\b/)
-      const detectedPhone = phoneMatch ? phoneMatch[0] : '[Desconocido] Pendiente por WhatsApp'
+      const detectedPhone = phoneMatch ? phoneMatch[0] : (rememberedPhone || '[Desconocido] Pendiente por WhatsApp')
 
       const targetBranch = normUser.includes('chalma') || normUser.includes('gam') || normUser.includes('gustavo')
         ? 'Sede Guadalupe Chalma'
         : 'Sede Balbuena (Matriz)'
 
-      const newAlertCase = {
-        id: caseId,
-        alertType: (isRed ? 'red_emergency' : 'yellow_appointment') as 'red_emergency' | 'yellow_appointment',
-        patientName: detectedPhone !== '[Desconocido] Pendiente por WhatsApp' ? `Paciente (${detectedPhone})` : '[Desconocido] Paciente Web en Línea',
-        phone: detectedPhone,
-        painLevel: (isRed ? 'severo' : 'moderado') as 'severo' | 'moderado',
-        symptoms: rawUser || conversation[conversation.length - 1]?.content || (isRed ? 'Urgencia por dolor agudo' : 'Valoración Estética Especializada'),
-        timestamp: nowTime,
-        chatSnippet: `Mensaje recibido: "${rawUser || conversation[conversation.length - 1]?.content}"`,
-        status: 'pending' as const,
-        branchName: targetBranch,
-        proposedSlot: isYellow ? {
-          date: 'Próxima fecha disponible',
-          time: '11:00 AM o 16:00 PM',
-          treatment: normUser.includes('carilla') ? 'Carillas E.Max' : 'Diseño de Sonrisa'
-        } : undefined
-      }
-
       if (!globalThis.__audenti_emergency_cases) {
         globalThis.__audenti_emergency_cases = []
       }
 
-      const exists = globalThis.__audenti_emergency_cases.some(c => c.symptoms === newAlertCase.symptoms)
-      if (!exists) {
+      // Evitar duplicados por contenido/síntomas parecidos o alertas rojas ya activas en la misma sesión
+      const alreadyReported = globalThis.__audenti_emergency_cases.some(
+        c => c.symptoms.trim().toLowerCase() === rawUser.trim().toLowerCase() ||
+             (c.phone === detectedPhone && detectedPhone !== '[Desconocido] Pendiente por WhatsApp' && c.status === 'pending')
+      )
+
+      if (!alreadyReported) {
+        const caseId = `${isRed ? 'RED' : 'YEL'}-${Date.now().toString().slice(-6)}`
+        const newAlertCase = {
+          id: caseId,
+          alertType: (isRed ? 'red_emergency' : 'yellow_appointment') as 'red_emergency' | 'yellow_appointment',
+          patientName: detectedPhone !== '[Desconocido] Pendiente por WhatsApp' ? `Paciente (${detectedPhone})` : (rememberedName || '[Desconocido] Paciente Web en Línea'),
+          phone: detectedPhone,
+          painLevel: (isRed ? 'severo' : 'moderado') as 'severo' | 'moderado',
+          symptoms: rawUser || conversation[conversation.length - 1]?.content || (isRed ? 'Urgencia por dolor agudo' : 'Valoración Estética Especializada'),
+          timestamp: nowTime,
+          chatSnippet: `Mensaje recibido: "${rawUser || conversation[conversation.length - 1]?.content}"`,
+          status: 'pending' as const,
+          branchName: targetBranch,
+          proposedSlot: isYellow ? {
+            date: 'Próxima fecha disponible',
+            time: '11:00 AM o 16:00 PM',
+            treatment: normUser.includes('carilla') ? 'Carillas E.Max' : 'Diseño de Sonrisa'
+          } : undefined
+        }
+
         globalThis.__audenti_emergency_cases = [newAlertCase, ...globalThis.__audenti_emergency_cases].slice(0, 30)
       }
     }
