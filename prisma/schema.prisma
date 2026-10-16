@@ -1,0 +1,125 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  STAFF
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  IN_CLINIC
+  COMPLETED
+  NO_SHOW
+  CANCELLED
+}
+
+enum ConversationStatus {
+  OPEN
+  PENDING_HUMAN
+  RESOLVED
+}
+
+enum SenderType {
+  CLIENT
+  AI
+  STAFF
+}
+
+model User {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  passwordHash  String
+  name          String
+  role          Role           @default(STAFF)
+  isActive      Boolean        @default(true)
+  conversations Conversation[]
+  appointments  Appointment[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Patient {
+  id            String         @id @default(uuid())
+  name          String
+  phone         String         @unique
+  whatsappLid   String?
+  email         String?
+  tags          String[]
+  notes         String?
+  conversations Conversation[]
+  appointments  Appointment[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Conversation {
+  id           String             @id @default(uuid())
+  patientId    String
+  patient      Patient            @relation(fields: [patientId], references: [id])
+  assignedToId String?
+  assignedTo   User?              @relation(fields: [assignedToId], references: [id])
+  status       ConversationStatus @default(OPEN)
+  aiEnabled    Boolean            @default(true)
+  messages     Message[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderType     SenderType
+  senderName     String?
+  content        String
+  timestamp      DateTime     @default(now())
+}
+
+model Service {
+  id                    String        @id @default(uuid())
+  name                  String
+  description           String?
+  durationMinutes       Int           @default(30)
+  priceFrom             Float         @default(0.0)
+  requiresPriorValuation Boolean      @default(false)
+  appointments          Appointment[]
+  isActive              Boolean       @default(true)
+}
+
+model Appointment {
+  id              String            @id @default(uuid())
+  patientId       String
+  patient         Patient           @relation(fields: [patientId], references: [id])
+  serviceId       String
+  service         Service           @relation(fields: [serviceId], references: [id])
+  startDateTime   DateTime
+  durationMinutes Int
+  assignedStaffId String?
+  assignedStaff   User?             @relation(fields: [assignedStaffId], references: [id])
+  origin          String            @default("AI") // AI o MANUAL
+  status          AppointmentStatus @default(PENDING)
+  notes           String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model ClinicConfig {
+  id                String   @id @default(uuid())
+  name              String   @default("Audenti")
+  address           String
+  phone             String
+  aiAssistantName   String   @default("Aura AI")
+  aiTone            String   @default("Profesional, empático y clínico")
+  aiSystemPrompt    String   @default("Eres Aura AI, la asistente virtual de la Dra. Aura Estudillo en Audenti...")
+  activeTheme       String   @default("default") // default, day_of_dead, christmas, etc.
+  updatedAt         DateTime @updatedAt
+}
