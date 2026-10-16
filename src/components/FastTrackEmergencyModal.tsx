@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertCircle, CheckCircle, Clock, Phone, ShieldAlert, Sparkles, User, X } from 'lucide-react';
 
 interface FastTrackEmergencyModalProps {
@@ -9,6 +10,7 @@ interface FastTrackEmergencyModalProps {
 }
 
 export function FastTrackEmergencyModal({ isOpen = true, onClose }: FastTrackEmergencyModalProps) {
+  const [mounted, setMounted] = useState(false);
   const [patientName, setPatientName] = useState('');
   const [patientPhone, setPatientPhone] = useState('');
   const [emergencyNotes, setEmergencyNotes] = useState('');
@@ -16,7 +18,11 @@ export function FastTrackEmergencyModal({ isOpen = true, onClose }: FastTrackEme
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!isOpen || !mounted) return null;
 
   const handleEmergencySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,13 +53,19 @@ export function FastTrackEmergencyModal({ isOpen = true, onClose }: FastTrackEme
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-slate-900 border border-red-500/40 rounded-3xl p-6 md:p-8 text-white shadow-2xl relative overflow-hidden">
-        {/* Glow de emergencia */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-red-600/10 rounded-full blur-3xl pointer-events-none" />
+  const modalContent = (
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-200">
+      {/* Backdrop clicable para cerrar */}
+      <div 
+        className="absolute inset-0 bg-transparent" 
+        onClick={onClose} 
+      />
 
-        {/* Header */}
+      <div className="w-full max-w-lg bg-slate-900 border border-red-500/50 rounded-3xl p-6 sm:p-8 text-white shadow-2xl relative z-10 overflow-hidden">
+        {/* Glow ambiental de emergencia */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-red-600/15 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Encabezado */}
         <div className="flex items-start justify-between mb-4 relative z-10">
           <div className="flex items-center gap-3">
             <span className="relative flex h-3.5 w-3.5">
@@ -75,7 +87,7 @@ export function FastTrackEmergencyModal({ isOpen = true, onClose }: FastTrackEme
               onClick={onClose}
               className="p-1.5 rounded-xl bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition cursor-pointer"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
           )}
         </div>
@@ -95,7 +107,7 @@ export function FastTrackEmergencyModal({ isOpen = true, onClose }: FastTrackEme
               <button
                 type="button"
                 onClick={onClose}
-                className="mt-2 px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white transition"
+                className="mt-2 px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white transition"
               >
                 Cerrar Ventana
               </button>
@@ -115,7 +127,7 @@ export function FastTrackEmergencyModal({ isOpen = true, onClose }: FastTrackEme
                   value={patientName}
                   onChange={(e) => setPatientName(e.target.value)}
                   placeholder="Ej. Juan Carlos Méndez"
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-800/90 border border-slate-700 rounded-xl text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
                 />
               </div>
             </div>
@@ -133,7 +145,7 @@ export function FastTrackEmergencyModal({ isOpen = true, onClose }: FastTrackEme
                     value={patientPhone}
                     onChange={(e) => setPatientPhone(e.target.value)}
                     placeholder="+52 55 1234 5678"
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-800/90 border border-slate-700 rounded-xl text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
                   />
                 </div>
               </div>
@@ -145,7 +157,7 @@ export function FastTrackEmergencyModal({ isOpen = true, onClose }: FastTrackEme
                 <select
                   value={painLevel}
                   onChange={(e) => setPainLevel(e.target.value as any)}
-                  className="w-full px-3 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                  className="w-full px-3 py-2.5 bg-slate-800/90 border border-slate-700 rounded-xl text-white text-xs focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
                 >
                   <option value="severo">Dolor Severo (Inmediato)</option>
                   <option value="critico">Crítico (Trauma / Hemorragia)</option>
@@ -163,7 +175,7 @@ export function FastTrackEmergencyModal({ isOpen = true, onClose }: FastTrackEme
                 value={emergencyNotes}
                 onChange={(e) => setEmergencyNotes(e.target.value)}
                 placeholder="Ej. Dolor punzante e inflamación en molar superior derecho..."
-                className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                className="w-full px-3.5 py-2.5 bg-slate-800/90 border border-slate-700 rounded-xl text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
               />
             </div>
 
@@ -172,7 +184,7 @@ export function FastTrackEmergencyModal({ isOpen = true, onClose }: FastTrackEme
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white transition"
+                  className="px-4 py-2.5 text-xs font-semibold text-slate-400 hover:text-white transition"
                 >
                   Cancelar
                 </button>
@@ -197,4 +209,6 @@ export function FastTrackEmergencyModal({ isOpen = true, onClose }: FastTrackEme
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }
