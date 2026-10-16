@@ -20,14 +20,15 @@ export function PublicAiChatWidget() {
     {
       id: 'welcome',
       role: 'assistant',
-      content: '¡Hola! Soy Aura AI, la asistente virtual de la Dra. Aura Estudillo en Audenti. ¿En qué te puedo ayudar?',
+      content: 'Hola, platícame brevemente qué molestia o síntoma tienes para coordinar tu atención.',
       time: 'Ahora'
     }
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [speaking, setSpeaking] = useState(false)
-  const [lastEmergencyId, setLastEmergencyId] = useState<string | null>(null)
+  const [activeUrgencyStartTime, setActiveUrgencyStartTime] = useState<number | null>(null)
+  const contingencyTriggered = useRef<boolean>(false)
   const [sessionId] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('audenti_chat_session_id')
@@ -57,12 +58,14 @@ export function PublicAiChatWidget() {
         const data = await res.json()
         if (data?.success && Array.isArray(data.cases)) {
           data.cases.forEach((c: any) => {
-            if ((c.status === 'approved_exceptional' || c.status === 'scheduled_first_hour') && !receivedDecisions.current.has(c.id)) {
+            if ((c.status === 'approved_exceptional' || c.status === 'scheduled_first_hour' || c.status === 'appointment_confirmed') && !receivedDecisions.current.has(c.id)) {
               receivedDecisions.current.add(c.id)
+              // Al resolverse la decisión médica, cancelar timer de contingencia
+              setActiveUrgencyStartTime(null)
               const decisionMsg: Message = {
                 id: `decision-${c.id}`,
                 role: 'assistant',
-                content: `🩺 **COMUNICADO OFICIAL DE LA DRA. AURA ESTUDILLO:**\n\n${c.doctorNotes}\n\n*Folio de seguimiento: ${c.id}*. Nuestro equipo médico ya está coordinando la apertura/ingreso prioritario.`,
+                content: `🩺 **COMUNICADO DE LA DRA. AURA ESTUDILLO:**\n\n${c.doctorNotes || 'Tu atención prioritaria ha sido autorizada.'}\n\n*Folio de seguimiento: ${c.id}*. Nuestro equipo en gabinete está listo.`,
                 time: formatTimeInMexico()
               }
               setMessages(prev => [...prev, decisionMsg])
@@ -73,9 +76,31 @@ export function PublicAiChatWidget() {
       } catch {}
     }
 
-    const timer = setInterval(checkDoctorDecision, 5000)
+    const timer = setInterval(checkDoctorDecision, 3000)
     return () => clearInterval(timer)
   }, [])
+
+  // Contingencia de 60 segundos: si la doctora está en procedimiento clínico y no responde en 60s
+  useEffect(() => {
+    if (!activeUrgencyStartTime || contingencyTriggered.current) return
+
+    const interval = setInterval(() => {
+      const elapsedMs = Date.now() - activeUrgencyStartTime
+      if (elapsedMs >= 60000 && !contingencyTriggered.current) {
+        contingencyTriggered.current = true
+        setActiveUrgencyStartTime(null)
+        const contingencyMsg: Message = {
+          id: `contingency-${Date.now()}`,
+          role: 'assistant',
+          content: 'La Dra. Aura se encuentra en procedimiento clínico en este momento. Hemos registrado tu urgencia con prioridad alta; en cuanto concluya, te contactaremos de inmediato a tu WhatsApp para confirmar tu espacio.',
+          time: formatTimeInMexico()
+        }
+        setMessages(prev => [...prev, contingencyMsg])
+      }
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [activeUrgencyStartTime])
 
   const handleSpeak = (text: string) => {
     if ('speechSynthesis' in window) {
@@ -160,6 +185,12 @@ export function PublicAiChatWidget() {
         try {
           localStorage.setItem('audenti_last_booking_sync', Date.now().toString())
         } catch {}
+      }
+
+      // Si el triaje detectó urgencia/dolor agudo, activar el temporizador de contingencia médica de 60s
+      if (data?.triageCategory === 'urgency_pain') {
+        contingencyTriggered.current = false
+        setActiveUrgencyStartTime(Date.now())
       }
 
       const botMsg: Message = {

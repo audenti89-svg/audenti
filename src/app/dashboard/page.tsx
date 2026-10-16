@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { QuickActions } from '@/components/dashboard/QuickActions'
+import { DoctorLiveTriageAlert } from '@/components/dashboard/DoctorLiveTriageAlert'
 import Link from 'next/link'
 
 export default function DashboardPage() {
@@ -212,6 +213,9 @@ export default function DashboardPage() {
           </div>
         </div>
       </section>
+
+      {/* Banner de Triaje Clínico y Alertas Médicas en Vivo */}
+      <DoctorLiveTriageAlert />
 
       {/* Quick Actions Bar */}
       <QuickActions />

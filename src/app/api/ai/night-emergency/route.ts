@@ -37,6 +37,7 @@ export interface EmergencyCase {
   doctorDecision?: string
   doctorNotes?: string
   resolvedAt?: string
+  created_at?: string
 }
 
 // Almacén en memoria global para el servidor Next.js
