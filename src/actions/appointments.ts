@@ -197,11 +197,26 @@ export async function createAppointmentAction(input: CreateAppointmentInput) {
       console.warn('Nota Supabase Server Action fallback:', err?.message)
     }
 
-    // 3. Revalidación de rutas de Next.js
+    // 3. Revalidación de rutas de Next.js y Notificación Realtime
     try {
       revalidatePath('/dashboard')
       revalidatePath('/dashboard/agenda')
       revalidatePath('/dashboard/calendar')
+
+      // Emitir notificación por canal Supabase Realtime si el cliente está disponible
+      const supabase = await createClient()
+      const channel = supabase.channel('realtime_appointments')
+      channel.send({
+        type: 'broadcast',
+        event: 'new_appointment',
+        payload: {
+          folio: resolvedAppointment.folio,
+          patient_name: resolvedAppointment.patient_name,
+          date: resolvedAppointment.appointment_date,
+          time: resolvedAppointment.appointment_time,
+          status: resolvedAppointment.status
+        }
+      }).catch(() => {})
     } catch {}
 
     return {

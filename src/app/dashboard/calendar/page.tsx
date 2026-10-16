@@ -21,6 +21,7 @@ import {
   Stethoscope
 } from 'lucide-react'
 import { useNotificationSound } from '@/hooks/useNotificationSound'
+import { createClient } from '@/utils/supabase/client'
 
 type CalendarView = 'day' | 'week' | 'month' | 'year'
 
@@ -150,6 +151,19 @@ export default function CalendarPage() {
 
   useEffect(() => {
     fetchCalendarAppointments()
+    const supabase = createClient()
+
+    // Suscripción Realtime a citas (postgres_changes + broadcast)
+    const channel = supabase
+      .channel('calendar_realtime_appointments')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => {
+        fetchCalendarAppointments()
+      })
+      .on('broadcast', { event: 'new_appointment' }, () => {
+        fetchCalendarAppointments()
+      })
+      .subscribe()
+
     const interval = setInterval(fetchCalendarAppointments, 3000)
     const handleRefresh = () => fetchCalendarAppointments()
     window.addEventListener('storage', handleRefresh)
@@ -159,6 +173,7 @@ export default function CalendarPage() {
       clearInterval(interval)
       window.removeEventListener('storage', handleRefresh)
       window.removeEventListener('audenti_appointment_refresh', handleRefresh)
+      supabase.removeChannel(channel)
     }
   }, [])
 

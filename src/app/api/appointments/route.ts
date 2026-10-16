@@ -251,3 +251,63 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: error?.message }, { status: 500 })
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json()
+    const { id, folio, status, notes } = body
+
+    if (!id && !folio) {
+      return NextResponse.json({ success: false, error: 'Se requiere ID o Folio para actualizar la cita.' }, { status: 400 })
+    }
+
+    if (!globalThis.__audenti_appointments) {
+      globalThis.__audenti_appointments = []
+    }
+
+    const index = globalThis.__audenti_appointments.findIndex(
+      (a) => (id && a.id === id) || (folio && a.folio === folio)
+    )
+
+    let updatedAppt: PersistentAppointment | null = null
+
+    if (index !== -1) {
+      globalThis.__audenti_appointments[index] = {
+        ...globalThis.__audenti_appointments[index],
+        ...(status ? { status } : {}),
+        ...(notes ? { notes } : {})
+      }
+      updatedAppt = globalThis.__audenti_appointments[index]
+    }
+
+    // Actualizar en Supabase si es posible
+    try {
+      const supabase = await createClient()
+      if (id && !id.startsWith('APT-')) {
+        await supabase
+          .from('appointments')
+          .update({
+            ...(status ? { status } : {}),
+            ...(notes ? { notes } : {})
+          })
+          .eq('id', id)
+      }
+    } catch (e) {
+      console.warn('Nota en PATCH Supabase:', e)
+    }
+
+    try {
+      revalidatePath('/dashboard')
+      revalidatePath('/dashboard/agenda')
+      revalidatePath('/dashboard/calendar')
+    } catch {}
+
+    return NextResponse.json({
+      success: true,
+      appointment: updatedAppt,
+      message: 'Estado de cita actualizado correctamente.'
+    })
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error?.message }, { status: 500 })
+  }
+}

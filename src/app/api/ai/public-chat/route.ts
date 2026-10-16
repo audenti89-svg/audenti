@@ -306,8 +306,33 @@ async function ejecutarTool(name: string, args: any) {
     const folioGenerado = `AUD-${Math.floor(1000 + Math.random() * 9000)}`
     const patientNameClean = nombrePaciente || 'Paciente Web'
     const appTreatment = tratamiento || 'Consulta / Valoración Estética Oral'
-    const appDate = (fechaHora && fechaHora.includes('-')) ? fechaHora.split(' ')[0] : new Date(Date.now() + 24 * 3600 * 1000).toISOString().split('T')[0]
-    const appTime = (fechaHora && fechaHora.includes(':')) ? (fechaHora.split(' ')[1] || '11:00:00') : '11:00:00'
+
+    // Parseo inteligente de fecha
+    const nowMx = getNowInMexico()
+    let appDate = formatDateInMexico(nowMx)
+    const rawFechaHora = (fechaHora || '').toLowerCase()
+
+    if (rawFechaHora.includes('mañana')) {
+      const tomorrow = new Date(nowMx)
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      appDate = formatDateInMexico(tomorrow)
+    } else if (rawFechaHora.match(/\b(202\d-\d{2}-\d{2})\b/)) {
+      appDate = rawFechaHora.match(/\b(202\d-\d{2}-\d{2})\b/)![1]
+    }
+
+    // Parseo inteligente de hora (17:30, 16:00, etc.)
+    let appTime = '11:00:00'
+    const timeMatch = rawFechaHora.match(/\b(\d{1,2}:\d{2})\b/)
+    if (timeMatch) {
+      appTime = timeMatch[1].length === 5 ? `${timeMatch[1]}:00` : timeMatch[1]
+    } else {
+      const hourMatch = rawFechaHora.match(/\b(\d{1,2})\s*(?:pm|de la tarde|hrs|horas)\b/i)
+      if (hourMatch) {
+        let h = parseInt(hourMatch[1], 10)
+        if (h < 12 && /pm|tarde/i.test(hourMatch[0])) h += 12
+        appTime = `${h < 10 ? '0' + h : h}:00:00`
+      }
+    }
 
     // Ejecución Síncrona de Server Action de Persistencia
     const actionResult = await createAppointmentAction({
@@ -794,14 +819,49 @@ export async function POST(request: Request) {
       const cleanPhone = rememberedPhone || (rawUser.match(/\b\d{10}\b/) ? rawUser.match(/\b\d{10}\b/)![0] : 'WhatsApp')
       const patientNameClean = rememberedName || 'Paciente Web'
 
-      createAppointmentAction({
-        folio: detectedFolio,
-        patient_name: patientNameClean,
-        patient_phone: cleanPhone,
-        treatment: isPainReport ? 'Consulta / Alivio de Dolor Dental' : 'Consulta / Valoración Estética Oral',
-        branch: normUser.includes('chalma') ? 'Sede Guadalupe Chalma' : 'Sede Balbuena (Matriz)',
-        status: 'confirmed'
-      }).catch(e => console.warn('Sync fallback error:', e?.message))
+      // Extraer hora precisa si fue acordada en el chat (ej. "17:30", "16:00", "4 de la tarde")
+      let inferredTime = '11:00:00'
+      const timeMatch = (finalReply + ' ' + rawUser).match(/\b(\d{1,2}:\d{2})\b/)
+      if (timeMatch) {
+        inferredTime = timeMatch[1].length === 5 ? `${timeMatch[1]}:00` : timeMatch[1]
+      } else {
+        const hourMatch = (finalReply + ' ' + rawUser).match(/\b(\d{1,2})\s*(?:pm|de la tarde|hrs|horas)\b/i)
+        if (hourMatch) {
+          let h = parseInt(hourMatch[1], 10)
+          if (h < 12 && /pm|tarde/i.test(hourMatch[0])) h += 12
+          inferredTime = `${h < 10 ? '0' + h : h}:00:00`
+        }
+      }
+
+      // Extraer fecha precisa si menciona "hoy" o formato YYYY-MM-DD
+      const nowMx = getNowInMexico()
+      let inferredDate = formatDateInMexico(nowMx)
+      if (normReply.includes('mañana') || normUser.includes('mañana')) {
+        const tomorrow = new Date(nowMx)
+        tomorrow.setDate(tomorrow.getDate() + 1)
+        inferredDate = formatDateInMexico(tomorrow)
+      } else {
+        const dateMatch = (finalReply + ' ' + rawUser).match(/\b(202\d-\d{2}-\d{2})\b/)
+        if (dateMatch) {
+          inferredDate = dateMatch[1]
+        }
+      }
+
+      try {
+        await createAppointmentAction({
+          folio: detectedFolio,
+          patient_name: patientNameClean,
+          patient_phone: cleanPhone,
+          appointment_date: inferredDate,
+          appointment_time: inferredTime,
+          treatment: isPainReport ? 'Consulta / Alivio de Dolor Dental' : 'Consulta / Valoración Estética Oral',
+          branch: normUser.includes('chalma') ? 'Sede Guadalupe Chalma' : 'Sede Balbuena (Matriz)',
+          status: 'confirmed',
+          notes: `Folio: ${detectedFolio}. Sincronizado por fallback NLP Aura AI. Tel: ${cleanPhone}`
+        })
+      } catch (e: any) {
+        console.warn('Sync fallback error:', e?.message)
+      }
     }
 
     // Persistencia del Historial de Conversación para el CRM de la Dra. Aura

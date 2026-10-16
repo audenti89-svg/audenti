@@ -145,13 +145,17 @@ export default function CalendarPage() {
           if (apiData?.success && Array.isArray(apiData.appointments)) {
             const apiMapped: ClinicalAppointment[] = apiData.appointments.map((a: any) => {
               const dParts = (a.appointment_date || '').split('-')
-              const prettyDate = dParts.length === 3 ? `${dParts[2]} oct ${dParts[0]}` : a.appointment_date
+              const day = dParts[2] || '01'
+              const monthNum = parseInt(dParts[1] || '1', 10) - 1
+              const monthNames = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+              const monthStr = monthNames[monthNum] || 'oct'
+              const prettyDate = `${day} ${monthStr} ${dParts[0] || '2026'}`
               return {
                 id: a.id,
                 date: prettyDate,
                 rawDate: a.appointment_date || '',
                 isoStart: `${a.appointment_date}T${a.appointment_time || '11:00:00'}`,
-                time: `${a.appointment_time} (45 min)`,
+                time: `${(a.appointment_time || '11:00').substring(0, 5)} (45 min)`,
                 duration: '45 min',
                 patientName: a.patient_name,
                 phone: a.patient_phone || 'WhatsApp',
@@ -180,13 +184,17 @@ export default function CalendarPage() {
           if (apiData?.success && Array.isArray(apiData.appointments) && apiData.appointments.length > 0) {
             const apiMapped: ClinicalAppointment[] = apiData.appointments.map((a: any) => {
               const dParts = (a.appointment_date || '').split('-')
-              const prettyDate = dParts.length === 3 ? `${dParts[2]} oct ${dParts[0]}` : a.appointment_date
+              const day = dParts[2] || '01'
+              const monthNum = parseInt(dParts[1] || '1', 10) - 1
+              const monthNames = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+              const monthStr = monthNames[monthNum] || 'oct'
+              const prettyDate = `${day} ${monthStr} ${dParts[0] || '2026'}`
               return {
                 id: a.id,
                 date: prettyDate,
                 rawDate: a.appointment_date || '',
                 isoStart: `${a.appointment_date}T${a.appointment_time || '11:00:00'}`,
-                time: `${a.appointment_time} (45 min)`,
+                time: `${(a.appointment_time || '11:00').substring(0, 5)} (45 min)`,
                 duration: '45 min',
                 patientName: a.patient_name,
                 phone: a.patient_phone || 'WhatsApp',
@@ -212,22 +220,30 @@ export default function CalendarPage() {
         const apiRes = await fetch('/api/appointments')
         const apiData = await apiRes.json()
         if (apiData?.success && Array.isArray(apiData.appointments) && apiData.appointments.length > 0) {
-          const apiMapped: ClinicalAppointment[] = apiData.appointments.map((a: any) => ({
-            id: a.id,
-            date: a.appointment_date,
-            rawDate: a.appointment_date || '',
-            isoStart: `${a.appointment_date}T${a.appointment_time || '11:00:00'}`,
-            time: `${a.appointment_time} (45 min)`,
-            duration: '45 min',
-            patientName: a.patient_name,
-            phone: a.patient_phone || 'WhatsApp',
-            treatment: a.treatment || 'Consulta Odontológica General',
-            doctor: 'Dra. Aura Estudillo',
-            chair: a.branch || 'Gabinete Principal (Sede Balbuena)',
-            status: a.status || 'scheduled',
-            notes: `Folio: ${a.folio}. ${a.notes || ''}`,
-            commissionDue: 0
-          }))
+          const apiMapped: ClinicalAppointment[] = apiData.appointments.map((a: any) => {
+            const dParts = (a.appointment_date || '').split('-')
+            const day = dParts[2] || '01'
+            const monthNum = parseInt(dParts[1] || '1', 10) - 1
+            const monthNames = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+            const monthStr = monthNames[monthNum] || 'oct'
+            const prettyDate = `${day} ${monthStr} ${dParts[0] || '2026'}`
+            return {
+              id: a.id,
+              date: prettyDate,
+              rawDate: a.appointment_date || '',
+              isoStart: `${a.appointment_date}T${a.appointment_time || '11:00:00'}`,
+              time: `${(a.appointment_time || '11:00').substring(0, 5)} (45 min)`,
+              duration: '45 min',
+              patientName: a.patient_name,
+              phone: a.patient_phone || 'WhatsApp',
+              treatment: a.treatment || 'Consulta Odontológica General',
+              doctor: 'Dra. Aura Estudillo',
+              chair: a.branch || 'Gabinete Principal (Sede Balbuena)',
+              status: a.status || 'scheduled',
+              notes: `Folio: ${a.folio}. ${a.notes || ''}`,
+              commissionDue: 0
+            }
+          })
           setAppointments(apiMapped)
         } else {
           setAppointments([])
@@ -243,7 +259,7 @@ export default function CalendarPage() {
   useEffect(() => {
     fetchAppointments()
 
-    // Suscripción Realtime a citas
+    // Suscripción Realtime a citas (postgres changes + broadcast)
     const channel = supabase
       .channel('realtime_appointments')
       .on(
@@ -253,9 +269,12 @@ export default function CalendarPage() {
           fetchAppointments()
         }
       )
+      .on('broadcast', { event: 'new_appointment' }, () => {
+        fetchAppointments()
+      })
       .subscribe()
 
-    // Polling reactivo cada 3 segundos y escucha de eventos de almacenamiento
+    // Polling reactivo cada 3 segundos y escucha de eventos locales
     const interval = setInterval(fetchAppointments, 3000)
     const handleRefresh = () => fetchAppointments()
     window.addEventListener('storage', handleRefresh)
@@ -603,7 +622,7 @@ export default function CalendarPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+              <div className="flex flex-wrap items-center gap-2 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
                 {app.status === 'in_waiting' && (
                   <button
                     type="button"
@@ -612,6 +631,50 @@ export default function CalendarPage() {
                   >
                     <Volume2 className="w-3.5 h-3.5 text-amber-400" />
                     Llamar a Sillón
+                  </button>
+                )}
+
+                {app.status !== 'in_chair' && app.status !== 'completed' && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      playTone('arrival')
+                      try {
+                        await fetch('/api/appointments', {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ id: app.id, status: 'in_chair' })
+                        })
+                        window.dispatchEvent(new Event('audenti_appointment_refresh'))
+                        fetchAppointments()
+                      } catch {}
+                    }}
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                  >
+                    <Activity className="w-3.5 h-3.5" />
+                    Pasar a Sillón
+                  </button>
+                )}
+
+                {app.status === 'in_chair' && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      playTone('message')
+                      try {
+                        await fetch('/api/appointments', {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ id: app.id, status: 'completed' })
+                        })
+                        window.dispatchEvent(new Event('audenti_appointment_refresh'))
+                        fetchAppointments()
+                      } catch {}
+                    }}
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Concluir Consulta
                   </button>
                 )}
 

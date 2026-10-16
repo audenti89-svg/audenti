@@ -145,6 +145,9 @@ export default function DashboardPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => {
         fetchDashboardData()
       })
+      .on('broadcast', { event: 'new_appointment' }, () => {
+        fetchDashboardData()
+      })
       .subscribe()
 
     // Polling reactivo cada 3 segundos y escucha de eventos locales
