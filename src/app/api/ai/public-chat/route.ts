@@ -37,8 +37,10 @@ REGLAS DE CIBERSEGURIDAD CLÍNICA, PRIVACIDAD Y GUARDRAILS INQUEBRANTABLES:
 2. PROTOCOLO ELECTIVO (CONSULTAS DE RUTINA / AGENDAR CITA / VALORACIÓN GENERAL):
    - CERO CATÁLOGOS COMERCIALES NO SOLICITADOS: Si el usuario dice "quiero una cita", "sacar una cita", "agendar", "revisión", o proporciona su nombre y teléfono (ej. "ricardo 5522427769 para sacar una cita"):
      * Queda TERMINANTEMENTE PROHIBIDO responder con listas publicitarias o catálogos de carillas, blanqueamientos u ortodoncia. Actúa como una recepcionista humana de primer nivel, no como un folleto comercial.
-     * Si el usuario proporciona su nombre y teléfono en el mensaje: Agradécele cordialmente por su nombre (ej. "¡Con mucho gusto, Ricardo! Ya registré tu contacto."), pregúntale brevemente qué tipo de atención o molestia presenta (revisión de rutina, limpieza o valoración general), y consulta y ofrécele de inmediato los horarios disponibles con consultarDisponibilidadCalendario.
+     * Si el usuario proporciona su nombre y teléfono en el mensaje: Agradécele cordialmente por su nombre (ej. "¡Con mucho gusto, Ricardo! Ya registré tu contacto."), pregúntale qué tipo de atención requiere (revisión de rutina, limpieza o valoración general), y consulta y ofrécele de inmediato los horarios disponibles con consultarDisponibilidadCalendario.
      * NUNCA le vuelvas a pedir su nombre ni su teléfono si ya los proporcionó.
+     * Una vez que el paciente confirme el horario elegido (ej. "a las 11:00 am"), ejecuta la herramienta agendarCitaNuevayNotificar UNA SOLA VEZ para generar el folio oficial de confirmación.
+     * TRANSPARENCIA EN MENSAJERÍA: Como el envío por WhatsApp requiere que el paciente tenga abierta la pasarela o enlace de confirmación, indícale de manera transparente su Folio generado (ej. AUD-XXXX) y que el registro quedó asentado en la agenda de la clínica para que recepción lo valide con él. NO afirmes que "ya le llegó un mensaje a su WhatsApp" si no ha habido interacción previa por ese canal.
 
 3. PROHIBICIÓN ABSOLUTA DE MEDICAMENTOS, DOSIS Y DIAGNÓSTICOS:
    - Queda TERMINANTEMENTE PROHIBIDO diagnosticar patologías invasivas o mencionar nombres de fármacos (ej. ibuprofeno, paracetamol, amoxicilina, ketorolaco, clonixinato, naproxeno, aspirina, etc.), miligramos, dosis u horarios.
@@ -55,9 +57,9 @@ REGLAS DE CIBERSEGURIDAD CLÍNICA, PRIVACIDAD Y GUARDRAILS INQUEBRANTABLES:
    "La Dra. Aura Estudillo se encuentra a [X minutos / X km] de ti en la Sede [Nombre de Sede]. Estamos verificando en el sistema y en su panel directo si puede atenderte hoy de emergencia o a primera hora. Por favor mantente en línea."
 
 6. PROTOCOLO OBLIGATORIO DE CONTACTO Y MEMORIA DE SESIÓN:
-   - MEMORIA DE SESIÓN (NO REPETIR PREGUNTAS): Si en el contexto del chat o en los mensajes previos el paciente ya compartió su número telefónico / WhatsApp o su nombre, GUÁRDALO en tu memoria activa de sesión y **NUNCA VUELVAS A PEDIRLE SU TELÉFONO O NOMBRE**. Avanza de inmediato con la atención, propuesta de horarios o confirmación de cita.
-   - VALIDACIÓN OBLIGATORIA DE TELÉFONO/WHATSAPP: Si el usuario desea agendar, elige fecha o pide apartar su lugar pero NO ha proporcionado su número de WhatsApp/teléfono celular (ni en este mensaje ni en mensajes anteriores), solicita amablemente su teléfono con este mensaje claro:
-   "Para apartar tu lugar y enviarte el folio de confirmación a tu WhatsApp, por favor indícame tu número de teléfono."`
+   - MEMORIA DE SESIÓN (NO REPETIR PREGUNTAS): Si en el contexto del chat o en los mensajes previos el paciente ya compartió su número telefónico / WhatsApp o su nombre, GUÁRDALO en tu memoria activa de sesión y **NUNCA VUELVAS A PEDIRLE SU TELÉFONO O NOMBRE**. Avanza de inmediato con la propuesta de horarios o confirmación de cita.
+   - VALIDACIÓN OBLIGATORIA DE TELÉFONO/WHATSAPP: Si el usuario desea agendar o pide apartar su lugar pero NO ha proporcionado su número de WhatsApp/teléfono celular (ni en este mensaje ni en mensajes anteriores), solicita amablemente su teléfono con este mensaje claro:
+   "Para apartar tu lugar y generar tu folio de cita, por favor indícame tu número de WhatsApp."`
 
 const DOCTOR_EXECUTIVE_SYSTEM_PROMPT = `Eres "Aura AI Copilot", el copiloto clínico, operativo y analítico de máxima confianza para la Dra. Aura Estudillo (Directora Médica & Propietaria de Audenti, Cédula 8492019).
 
@@ -350,7 +352,7 @@ async function ejecutarTool(name: string, args: any) {
       telefono: cleanPhone,
       horario: fechaHora,
       especialista: 'Dra. Aura Estudillo (Céd. 8492019)',
-      notificacionEnviada: `Se ha enviado el comprobante a tu WhatsApp (${cleanPhone}) y la alerta al CRM de la Dra. Aura Estudillo.`,
+      notificacionEnviada: `Folio registrado en agenda de la Dra. Aura Estudillo. Se vinculó a tu número (${cleanPhone}).`,
       indicaciones: 'Presentarse 10 minutos antes con identificación. ¡Te esperamos con gusto en Audenti!'
     }
   }
@@ -799,10 +801,10 @@ export async function POST(request: Request) {
       finalReply = 'Lamento mucho que tengas esa molestia. Para darte pronta atención y alivio con la Dra. Aura Estudillo (Céd. Prof. 8492019), contamos con espacios para revisión y diagnóstico en Sede Balbuena y Guadalupe Chalma. ¿Te gustaría acudir por la mañana o por la tarde?'
     }
 
-    // Sincronización de seguridad: Si la respuesta contiene un folio AUD-XXXX que el modelo haya generado,
-    // persistirlo de forma inmediata con createAppointmentAction para garantizar que exista en BD
+    // Sincronización de seguridad: Solo persistir si la tool no fue invocada directamente
     const folioMatches = finalReply.match(/AUD-\d{4,6}/i)
-    if (folioMatches && folioMatches[0]) {
+    const toolAlreadyScheduled = firstChoice?.tool_calls?.some((c: any) => c.function?.name === 'agendarCitaNuevayNotificar')
+    if (folioMatches && folioMatches[0] && !toolAlreadyScheduled) {
       const detectedFolio = folioMatches[0].toUpperCase()
       const cleanPhone = rememberedPhone || (rawUser.match(/\b\d{10}\b/) ? rawUser.match(/\b\d{10}\b/)![0] : 'WhatsApp')
       const patientNameClean = rememberedName || 'Paciente Web'

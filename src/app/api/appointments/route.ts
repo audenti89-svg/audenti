@@ -96,10 +96,25 @@ export async function POST(request: Request) {
     if (!globalThis.__audenti_appointments) {
       globalThis.__audenti_appointments = []
     }
-    // Evitar duplicados por folio
-    const exists = globalThis.__audenti_appointments.some(a => a.folio === newAppointment.folio)
+    // Evitar duplicados por folio o por mismo paciente y teléfono en la misma fecha
+    const exists = globalThis.__audenti_appointments.some(
+      a => a.folio === newAppointment.folio ||
+           (a.patient_phone && a.patient_phone === newAppointment.patient_phone && a.appointment_date === newAppointment.appointment_date)
+    )
     if (!exists) {
       globalThis.__audenti_appointments = [newAppointment, ...globalThis.__audenti_appointments].slice(0, 50)
+    } else {
+      // Si ya existía, retornar la cita existente sin crear una segunda
+      const existingAppt = globalThis.__audenti_appointments.find(
+        a => a.folio === newAppointment.folio ||
+             (a.patient_phone && a.patient_phone === newAppointment.patient_phone && a.appointment_date === newAppointment.appointment_date)
+      )
+      return NextResponse.json({
+        success: true,
+        appointment: existingAppt || newAppointment,
+        folio: existingAppt?.folio || generatedFolio,
+        message: 'Cita ya registrada previamente en la agenda.'
+      })
     }
 
     // 2. Intentar inserción en base de datos Supabase si la sesión/privilegios lo permiten

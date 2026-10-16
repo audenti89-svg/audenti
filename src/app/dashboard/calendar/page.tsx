@@ -59,13 +59,21 @@ export default function CalendarPage() {
   const { soundEnabled, setSoundEnabled, playTone } = useNotificationSound()
 
   const [currentView, setCurrentView] = useState<CalendarView>('week')
-  const [selectedDate, setSelectedDate] = useState('2026-10-10')
+  
+  // Obtener fecha actual en formato YYYY-MM-DD
+  const getTodayStr = () => {
+    const d = new Date()
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
+    return parts // YYYY-MM-DD
+  }
+
+  const [selectedDate, setSelectedDate] = useState<string>(getTodayStr)
   const [appointments, setAppointments] = useState<CalendarAppointment[]>(INITIAL_APPOINTMENTS)
   const [filterDoctor, setFilterDoctor] = useState('all')
 
   // Modal de Creación Rápida Estilo Google Calendar
   const [showQuickCreateModal, setShowQuickCreateModal] = useState(false)
-  const [modalSlot, setModalSlot] = useState({ date: '2026-10-10', time: '12:00' })
+  const [modalSlot, setModalSlot] = useState({ date: getTodayStr(), time: '12:00' })
   const [newTitle, setNewTitle] = useState('')
   const [newPatient, setNewPatient] = useState('')
   const [newDoctor, setNewDoctor] = useState('Dra. Aura Estudillo')
@@ -75,16 +83,35 @@ export default function CalendarPage() {
   // Drag and drop simulado
   const [draggedApptId, setDraggedApptId] = useState<string | null>(null)
 
-  // Días de la semana para vista Semana
-  const weekDays = [
-    { name: 'LUN', day: '05', fullDate: '2026-10-05' },
-    { name: 'MAR', day: '06', fullDate: '2026-10-06' },
-    { name: 'MIÉ', day: '07', fullDate: '2026-10-07' },
-    { name: 'JUE', day: '08', fullDate: '2026-10-08' },
-    { name: 'VIE', day: '09', fullDate: '2026-10-09' },
-    { name: 'SÁB', day: '10', fullDate: '2026-10-10', isToday: true },
-    { name: 'DOM', day: '11', fullDate: '2026-10-11' },
-  ]
+  // Calcular dinámicamente los 7 días de la semana según la fecha seleccionada
+  const weekDays = (() => {
+    const base = new Date(`${selectedDate}T12:00:00-06:00`)
+    const dayOfWeek = (base.getDay() + 6) % 7 // 0=Lunes, 6=Domingo
+    const monday = new Date(base)
+    monday.setDate(base.getDate() - dayOfWeek)
+
+    const names = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM']
+    const todayStr = getTodayStr()
+
+    return names.map((name, idx) => {
+      const current = new Date(monday)
+      current.setDate(monday.getDate() + idx)
+      const fullDate = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Mexico_City',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(current)
+      const dayNum = fullDate.split('-')[2]
+
+      return {
+        name,
+        day: dayNum,
+        fullDate,
+        isToday: fullDate === todayStr
+      }
+    })
+  })()
 
   // Cargar citas persistentes en el calendario estilo Google Calendar
   const fetchCalendarAppointments = async () => {
@@ -175,21 +202,39 @@ export default function CalendarPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => { setSelectedDate('2026-10-10'); playTone('message'); }}
+              onClick={() => { setSelectedDate(getTodayStr()); playTone('message'); }}
               className="px-3.5 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 hover:bg-slate-50 transition-colors shadow-2xs"
             >
               Hoy
             </button>
             <div className="flex items-center">
-              <button type="button" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors">
+              <button
+                type="button"
+                onClick={() => {
+                  const b = new Date(`${selectedDate}T12:00:00-06:00`)
+                  b.setDate(b.getDate() - 7)
+                  setSelectedDate(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City', year: 'numeric', month: '2-digit', day: '2-digit' }).format(b))
+                }}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
+                title="Semana anterior"
+              >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <button type="button" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors">
+              <button
+                type="button"
+                onClick={() => {
+                  const b = new Date(`${selectedDate}T12:00:00-06:00`)
+                  b.setDate(b.getDate() + 7)
+                  setSelectedDate(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City', year: 'numeric', month: '2-digit', day: '2-digit' }).format(b))
+                }}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
+                title="Semana siguiente"
+              >
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
-            <h1 className="text-lg font-bold text-slate-900 tracking-tight ml-1">
-              Octubre 2026
+            <h1 className="text-lg font-bold text-slate-900 tracking-tight ml-1 capitalize">
+              {new Date(`${selectedDate}T12:00:00-06:00`).toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City', month: 'long', year: 'numeric' })}
             </h1>
           </div>
 
@@ -237,7 +282,7 @@ export default function CalendarPage() {
 
           <button
             type="button"
-            onClick={() => handleSlotClick('2026-10-10', '12:00')}
+            onClick={() => handleSlotClick(selectedDate, '12:00')}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold shadow-xs transition-colors"
           >
             <Plus className="w-4 h-4" />
@@ -254,10 +299,26 @@ export default function CalendarPage() {
         <aside className="w-full lg:w-64 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm shrink-0 space-y-4">
           <div>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold text-slate-800">Octubre 2026</span>
+              <span className="text-xs font-bold text-slate-800 capitalize">
+                {new Date(`${selectedDate}T12:00:00-06:00`).toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City', month: 'long', year: 'numeric' })}
+              </span>
               <div className="flex items-center gap-1">
-                <ChevronLeft className="w-3.5 h-3.5 text-slate-400 cursor-pointer hover:text-slate-700" />
-                <ChevronRight className="w-3.5 h-3.5 text-slate-400 cursor-pointer hover:text-slate-700" />
+                <ChevronLeft
+                  onClick={() => {
+                    const b = new Date(`${selectedDate}T12:00:00-06:00`)
+                    b.setMonth(b.getMonth() - 1)
+                    setSelectedDate(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City', year: 'numeric', month: '2-digit', day: '2-digit' }).format(b))
+                  }}
+                  className="w-3.5 h-3.5 text-slate-400 cursor-pointer hover:text-slate-700"
+                />
+                <ChevronRight
+                  onClick={() => {
+                    const b = new Date(`${selectedDate}T12:00:00-06:00`)
+                    b.setMonth(b.getMonth() + 1)
+                    setSelectedDate(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City', year: 'numeric', month: '2-digit', day: '2-digit' }).format(b))
+                  }}
+                  className="w-3.5 h-3.5 text-slate-400 cursor-pointer hover:text-slate-700"
+                />
               </div>
             </div>
             {/* Matriz 7x5 mini */}
@@ -266,14 +327,20 @@ export default function CalendarPage() {
             </div>
             <div className="grid grid-cols-7 gap-1 text-center text-xs">
               {Array.from({ length: 31 }, (_, i) => i + 1).map(day => {
-                const isSelected = day === 10
+                const dayPadded = day < 10 ? '0' + day : '' + day
+                const currentMonthPrefix = selectedDate.substring(0, 8) // YYYY-MM-
+                const targetFull = `${currentMonthPrefix}${dayPadded}`
+                const isSelected = selectedDate === targetFull
+                const isRealToday = getTodayStr() === targetFull
                 return (
                   <button
                     key={day}
-                    onClick={() => setSelectedDate(`2026-10-${day < 10 ? '0' + day : day}`)}
+                    onClick={() => setSelectedDate(targetFull)}
                     className={`h-7 w-7 rounded-full flex items-center justify-center font-semibold text-xs transition-colors mx-auto ${
                       isSelected
                         ? 'bg-amber-400 text-slate-950 font-bold shadow-xs'
+                        : isRealToday
+                        ? 'border border-amber-500 font-bold text-amber-900 bg-amber-50/50'
                         : 'text-slate-700 hover:bg-slate-100'
                     }`}
                   >
@@ -403,7 +470,9 @@ export default function CalendarPage() {
             <div className="p-6 space-y-4">
               <div className="flex items-center justify-between pb-3 border-b">
                 <div>
-                  <h2 className="text-base font-bold text-slate-900">Agenda de Hoy — Sábado, 10 de Octubre 2026</h2>
+                  <h2 className="text-base font-bold text-slate-900 capitalize">
+                    Agenda del Día — {new Date(`${selectedDate}T12:00:00-06:00`).toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                  </h2>
                   <p className="text-xs text-slate-500">Distribución simultánea por 3 Unidades Dentales</p>
                 </div>
               </div>
@@ -413,7 +482,7 @@ export default function CalendarPage() {
                   <div key={chair} className="bg-slate-50 rounded-2xl p-4 border border-slate-200 space-y-3">
                     <span className="text-xs font-bold text-slate-900 block border-b pb-2">{chair}</span>
                     <div className="space-y-2">
-                      {appointments.filter(a => a.chair.includes(chair.substring(0, 8))).map(a => (
+                      {appointments.filter(a => a.date === selectedDate && a.chair.includes(chair.substring(0, 8))).map(a => (
                         <div key={a.id} className={`p-3 rounded-xl border text-xs font-semibold shadow-2xs ${a.color}`}>
                           <div className="flex justify-between items-center">
                             <span className="font-bold">{a.patientName}</span>
@@ -433,21 +502,27 @@ export default function CalendarPage() {
           {/* VISTA MES */}
           {currentView === 'month' && (
             <div className="p-6 space-y-4">
-              <h2 className="text-base font-bold text-slate-900">Vista Panorámica Mensual (Octubre 2026)</h2>
+              <h2 className="text-base font-bold text-slate-900 capitalize">
+                Vista Panorámica Mensual ({new Date(`${selectedDate}T12:00:00-06:00`).toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City', month: 'long', year: 'numeric' })})
+              </h2>
               <div className="grid grid-cols-7 gap-2">
                 {Array.from({ length: 31 }, (_, i) => i + 1).map(day => {
-                  const dayDate = `2026-10-${day < 10 ? '0' + day : day}`
+                  const dayPadded = day < 10 ? '0' + day : '' + day
+                  const monthPrefix = selectedDate.substring(0, 8) // YYYY-MM-
+                  const dayDate = `${monthPrefix}${dayPadded}`
                   const count = appointments.filter(a => a.date === dayDate).length
+                  const isSelected = selectedDate === dayDate
+                  const isRealToday = getTodayStr() === dayDate
                   return (
                     <div
                       key={day}
                       onClick={() => handleSlotClick(dayDate, '10:00')}
                       className={`min-h-[85px] p-2 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
-                        day === 10 ? 'bg-amber-50/60 border-amber-300' : 'bg-slate-50/50 border-slate-200 hover:bg-white'
+                        isSelected ? 'bg-amber-50/80 border-amber-400 shadow-xs' : isRealToday ? 'bg-amber-50/30 border-amber-300' : 'bg-slate-50/50 border-slate-200 hover:bg-white'
                       }`}
                     >
                       <div className="flex justify-between items-center">
-                        <span className={`text-xs font-bold ${day === 10 ? 'text-amber-900' : 'text-slate-700'}`}>{day}</span>
+                        <span className={`text-xs font-bold ${isSelected ? 'text-amber-950 font-black' : 'text-slate-700'}`}>{day}</span>
                         {count > 0 && (
                           <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-amber-400 text-slate-950">
                             {count} citas
