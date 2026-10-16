@@ -20,7 +20,7 @@ export function PublicAiChatWidget() {
     {
       id: 'welcome',
       role: 'assistant',
-      content: 'Hola, platícame brevemente qué molestia o síntoma tienes para coordinar tu atención.',
+      content: '¡Hola! Soy la asistente de la Dra. Aura Estudillo; platícame si presentas alguna molestia o dolor de urgencia, o si deseas agendar consulta general o informes sobre algún tratamiento.',
       time: 'Ahora'
     }
   ])
@@ -308,7 +308,13 @@ export function PublicAiChatWidget() {
                   }`}
                 >
                   <p>{m.content}</p>
-                  <div className="flex items-center justify-between gap-3 mt-1.5 pt-1 border-t border-black/5 dark:border-white/5 text-[9px] text-slate-400">
+                  <div
+                    className={`flex items-center justify-between gap-3 mt-1.5 pt-1 border-t text-[9px] ${
+                      m.role === 'user'
+                        ? 'border-black/10 text-neutral-800 text-black/70 font-semibold'
+                        : 'border-white/5 text-slate-400'
+                    }`}
+                  >
                     <span>{m.time}</span>
                     {m.role === 'assistant' && (
                       <button

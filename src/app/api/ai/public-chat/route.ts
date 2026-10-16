@@ -30,9 +30,10 @@ PROTOCOLO ESTRICTO DE TRIAJE EN 2 PASOS (REGLA DE ORO):
    - QUEDA TERMINANTEMENTE PROHIBIDO enumerar o listar sedes/ubicaciones geográficas (Balbuena, Guadalupe Chalma, etc.) por iniciativa propia en el primer o segundo mensaje.
    - NO abrumes al paciente con direcciones ni opciones logísticas antes de conocer qué le sucede.
 
-2. ENFOQUE DE TRIAJE CLÍNICO INICIAL:
-   - Al iniciar o saludar, saluda con calidez como la asistente de la Dra. Aura Estudillo y pregunta DIRECTAMENTE el motivo o síntoma:
-     "Hola, platícame brevemente qué molestia o síntoma tienes para coordinar tu atención."
+2. ENFOQUE DE TRIAJE CLÍNICO INICIAL (CALIBRACIÓN ANTE SALUDO GENÉRICO):
+   - Cuando el usuario salude de forma genérica (ej. "hola", "buen día", "hola podría atenderme", "buenas tardes"):
+     * Identifícate como asistente de la Dra. Aura Estudillo y ofrece en UNA SOLA ORACIÓN la distinción rápida entre urgencia/síntoma o consulta general/informes para clasificarlo de inmediato:
+       "¡Hola! Soy la asistente de la Dra. Aura Estudillo; platícame si presentas alguna molestia o dolor que requiera atención de urgencia, o si deseas agendar una consulta general o informes sobre algún tratamiento."
 
 3. CLASIFICACIÓN DE MENSAJES Y RESPUESTA (MATRIZ DE TRIAJE):
    - A) PREGUNTA GENERAL: Responde de forma directa, concisa y sin forzar el agendamiento.
@@ -841,7 +842,7 @@ export async function POST(request: Request) {
         finalReply = 'Comprendo tu molestia dental. La Dra. Aura Estudillo cuenta con espacios prioritarios para una valoración diagnóstica y darte alivio hoy mismo. ¿Prefieres que te agende por la mañana o por la tarde?'
       } else {
         const greetingName = rememberedName ? `¡Hola ${rememberedName}! ` : '¡Hola! '
-        finalReply = `${greetingName}Con gusto te atiendo en Audenti con la Dra. Aura Estudillo. ¿Te gustaría agendar una cita de valoración diagnóstica o consultar nuestros horarios disponibles?`
+        finalReply = `${greetingName}Soy la asistente de la Dra. Aura Estudillo; platícame si presentas alguna molestia o síntoma de urgencia, o si deseas agendar consulta general o informes sobre algún tratamiento.`
       }
     } else if (isPainReport && /\b(carillas|blanqueamiento|promoci[oó]n|est[eé]tica)\b/i.test(normReply)) {
       finalReply = 'Lamento mucho que tengas esa molestia. Para darte pronta atención y alivio con la Dra. Aura Estudillo (Céd. Prof. 8492019), contamos con espacios para revisión y diagnóstico en Sede Balbuena y Guadalupe Chalma. ¿Te gustaría acudir por la mañana o por la tarde?'
