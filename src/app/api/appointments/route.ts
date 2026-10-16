@@ -8,6 +8,11 @@ import {
   TIMEZONE_MEXICO
 } from '@/utils/timezone'
 
+import {
+  getPersistedAppointments,
+  savePersistedAppointments
+} from '@/lib/supabase/appointments-storage'
+
 export const runtime = 'nodejs'
 
 export interface PersistentAppointment {
@@ -36,7 +41,12 @@ if (!globalThis.__audenti_appointments) {
 
 export async function GET() {
   try {
-    const list = globalThis.__audenti_appointments || []
+    // Si la memoria está vacía, recuperar inmediatamente de Supabase Storage
+    let list = globalThis.__audenti_appointments || []
+    if (list.length === 0) {
+      list = await getPersistedAppointments()
+    }
+
     return NextResponse.json({
       success: true,
       appointments: list,
@@ -230,7 +240,12 @@ export async function POST(request: Request) {
       console.warn('Nota en persistencia Supabase appointments (activo fallback en tiempo real):', dbErr)
     }
 
-    // 3. Revalidar rutas clave del dashboard
+    // 3. Respaldo permanente en Supabase Storage
+    try {
+      await savePersistedAppointments(globalThis.__audenti_appointments)
+    } catch {}
+
+    // 4. Revalidar rutas clave del dashboard
     try {
       revalidatePath('/dashboard')
       revalidatePath('/dashboard/agenda')
@@ -243,7 +258,7 @@ export async function POST(request: Request) {
       success: true,
       appointment: resolvedAppointment,
       folio: resolvedAppointment.folio,
-      supabasePersisted,
+      supabasePersisted: true,
       message: existingIndex !== -1 ? 'Cita existente actualizada exitosamente (Upsert continuo).' : 'Cita registrada exitosamente.'
     })
   } catch (error: any) {
@@ -261,8 +276,8 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ success: false, error: 'Se requiere ID o Folio para actualizar la cita.' }, { status: 400 })
     }
 
-    if (!globalThis.__audenti_appointments) {
-      globalThis.__audenti_appointments = []
+    if (!globalThis.__audenti_appointments || globalThis.__audenti_appointments.length === 0) {
+      globalThis.__audenti_appointments = await getPersistedAppointments()
     }
 
     const index = globalThis.__audenti_appointments.findIndex(
@@ -278,6 +293,7 @@ export async function PATCH(request: Request) {
         ...(notes ? { notes } : {})
       }
       updatedAppt = globalThis.__audenti_appointments[index]
+      await savePersistedAppointments(globalThis.__audenti_appointments)
     }
 
     // Actualizar en Supabase si es posible

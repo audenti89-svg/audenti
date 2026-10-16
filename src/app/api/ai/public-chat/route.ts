@@ -43,7 +43,17 @@ REGLAS CRÍTICAS DE CONVERSACIÓN (CERO PREGUNTAS OBVIAS):
 4. MEMORIA ACTIVA DE CONTACTO (NO REPETIR PREGUNTAS):
    - Si el paciente ya dio su teléfono o nombre en la conversación, NO lo vuelvas a pedir. Úsalos directamente para la confirmación.
 
-5. NOTIFICACIÓN DIRECTA AL PANEL MÉDICO:
+5. REGLA ESTRICTA DE GEOLOCALIZACIÓN Y CERO SUPOSICIONES FALSAS:
+   - QUEDA ESTRICTAMENTE PROHIBIDO inventar que una sucursal es "la más cercana" si el usuario no ha compartido su ubicación exacta.
+   - Sede Balbuena (Matriz) se ubica en la zona oriente/centro (Alcaldía Venustiano Carranza / Balbuena).
+   - Sede Guadalupe Chalma se ubica en el extremo Norte de la CDMX (Alcaldía Gustavo A. Madero, cerca de Cuautepec / Reclusorio Norte).
+   - Si el paciente menciona una zona lejana a Balbuena (ej. "Reclusorio Norte", "Cuautepec", "Indios Verdes", "GAM", "Tlalnepantla", "Satélite"):
+     * NUNCA le digas falsamente que Balbuena le queda a 15 minutos ni que es la más cercana.
+     * Si está en el Norte / Reclusorio Norte / GAM, ofrécele con total honestidad la Sede Guadalupe Chalma como la opción más próxima en su zona, o aclárale que la Sede Balbuena Matriz requiere un traslado de 35 a 55 minutos en vehículo.
+     * Pregúntale con honestidad si prefiere la Sede Guadalupe Chalma o la Sede Matriz Balbuena.
+   - Si el usuario NO menciona su ubicación, indícale amablemente que la clínica matriz se ubica en Balbuena y consulta si prefiere acudir ahí o en Guadalupe Chalma.
+
+6. NOTIFICACIÓN DIRECTA AL PANEL MÉDICO:
    - Toda urgencia o dolor reportado se escala automáticamente con la herramienta escalarEmergenciaNocturnaDraAura para que la doctora la reciba y confirme sin intermediarios.`
 
 const DOCTOR_EXECUTIVE_SYSTEM_PROMPT = `Eres "Aura AI Copilot", el copiloto clínico, operativo y analítico de máxima confianza para la Dra. Aura Estudillo (Directora Médica & Propietaria de Audenti, Cédula 8492019).
@@ -109,6 +119,11 @@ const TOOLS: any[] = [
           nombrePaciente: { type: 'string', description: 'Nombre completo del paciente' },
           telefono: { type: 'string', description: 'Número de WhatsApp o teléfono del paciente' },
           fechaHora: { type: 'string', description: 'Fecha y hora elegida para la cita' },
+          sucursal: {
+            type: 'string',
+            enum: ['Sede Balbuena (Matriz)', 'Sede Guadalupe Chalma', 'Cualquiera'],
+            description: 'Sucursal elegida según la ubicación del paciente (Norte = Guadalupe Chalma, Centro/Oriente = Balbuena)'
+          },
           tratamiento: { type: 'string', description: 'Tratamiento o motivo de la consulta' },
           notasClinicas: { type: 'string', description: 'Notas clínicas previas (alergias, antecedentes)' }
         },
@@ -334,6 +349,13 @@ async function ejecutarTool(name: string, args: any) {
       }
     }
 
+    const { sucursal } = args
+    const chosenBranch = sucursal && sucursal !== 'Cualquiera'
+      ? sucursal
+      : ((notasClinicas || '').toLowerCase().includes('chalma') || (nombrePaciente || '').toLowerCase().includes('chalma'))
+      ? 'Sede Guadalupe Chalma'
+      : 'Sede Balbuena (Matriz)'
+
     // Ejecución Síncrona de Server Action de Persistencia
     const actionResult = await createAppointmentAction({
       folio: folioGenerado,
@@ -342,7 +364,7 @@ async function ejecutarTool(name: string, args: any) {
       appointment_date: appDate,
       appointment_time: appTime,
       treatment: appTreatment,
-      branch: 'Sede Balbuena (Matriz)',
+      branch: chosenBranch,
       status: 'confirmed',
       notes: `Cita reservada por Aura AI. Folio: ${folioGenerado}. ${notasClinicas ? `ALERTA: ${notasClinicas}` : ''}`
     })
@@ -411,52 +433,49 @@ async function ejecutarTool(name: string, args: any) {
 
   if (name === 'consultarUbicacionSedeOptima') {
     const { zonaPaciente, lat, lng } = args
-    const doctorLoc = globalThis.__audenti_doctor_location || {
-      branchId: 'balbuena',
-      branchName: 'Sede Balbuena',
-      address: 'Zona Balbuena, CDMX',
-      lat: 19.4187,
-      lng: -99.1124,
-      status: 'en_gabinete'
-    }
-
-    // Coordenadas aproximadas según la zona mencionada
     const z = (zonaPaciente || '').toLowerCase()
-    let estimatedLat = lat || 19.4187
-    let estimatedLng = lng || -99.1124
-    let distanceApprox = 4.2
-    let travelTime = 15
 
-    if (z.includes('norte') || z.includes('gam') || z.includes('gustavo') || z.includes('lindavista') || z.includes('chalma')) {
-      estimatedLat = 19.5000
-      estimatedLng = -99.1400
-      distanceApprox = 12.5
-      travelTime = 32
-    } else if (z.includes('roma') || z.includes('condesa') || z.includes('cuauhtemoc') || z.includes('reforma') || z.includes('centro')) {
-      estimatedLat = 19.4162
-      estimatedLng = -99.1628
-      distanceApprox = 5.8
-      travelTime = 18
+    const isNorthOrChalma = z.includes('norte') || z.includes('reclusorio') || z.includes('gam') ||
+      z.includes('gustavo') || z.includes('lindavista') || z.includes('chalma') ||
+      z.includes('cuautepec') || z.includes('ticoman') || z.includes('tlalnepantla')
+
+    let sedeRecomendada = 'Sede Balbuena (Matriz)'
+    let distanciaKm = 6.5
+    let tiempoMinutos = 20
+    let explicacionZona = ''
+
+    if (isNorthOrChalma) {
+      sedeRecomendada = 'Sede Guadalupe Chalma (Zona Norte / GAM)'
+      distanciaKm = 4.0
+      tiempoMinutos = 12
+      explicacionZona = `Para la zona Norte (${zonaPaciente}), nuestra clínica en Sede Guadalupe Chalma es la opción más cercana (aprox. 12-15 min). La Sede Matriz Balbuena se encuentra a unos 40-55 minutos en vehículo.`
+    } else if (z.includes('roma') || z.includes('condesa') || z.includes('cuauhtemoc') || z.includes('centro') || z.includes('reforma')) {
+      sedeRecomendada = 'Sede Balbuena (Matriz)'
+      distanciaKm = 6.0
+      tiempoMinutos = 18
+      explicacionZona = `Desde la zona Centro/Roma (${zonaPaciente}), la Sede Balbuena Matriz queda a unos 18-22 minutos en vehículo.`
     } else if (z.includes('sur') || z.includes('coyoacan') || z.includes('tlalpan') || z.includes('del valle')) {
-      estimatedLat = 19.3500
-      estimatedLng = -99.1600
-      distanceApprox = 14.8
-      travelTime = 38
+      sedeRecomendada = 'Sede Balbuena (Matriz)'
+      distanciaKm = 14.5
+      tiempoMinutos = 35
+      explicacionZona = `Desde el Sur (${zonaPaciente}), la Sede Balbuena Matriz se encuentra a aproximadamente 30-40 minutos de traslado.`
+    } else {
+      sedeRecomendada = 'Sede Balbuena (Matriz)'
+      distanciaKm = 8.0
+      tiempoMinutos = 25
+      explicacionZona = `Nuestra clínica matriz se ubica en Sede Balbuena. Si estás en el extremo norte de la ciudad, también contamos con Sede Guadalupe Chalma.`
     }
 
     return {
       consultaExitosa: true,
-      zonaReportada: zonaPaciente,
-      sedeActivaDraAura: {
-        nombre: doctorLoc.branchName,
-        estado: doctorLoc.status === 'en_gabinete' ? 'Atendiendo en Gabinete' : 'Disponible en Consulta'
-      },
-      distanciaEstimada: `a unos ${travelTime} minutos de distancia (aprox. ${distanceApprox} km)`,
-      tiempoEstimadoVehiculo: `a unos ${travelTime} minutos de distancia`,
-      recomendacionLogistica: `La Dra. Aura Estudillo se encuentra a unos ${travelTime} minutos de distancia de ti en la ${doctorLoc.branchName}. Estamos verificando en el sistema y en su panel directo si puede atenderte hoy de emergencia o a primera hora. Por favor mantente en línea.`,
-      redSedesAudenti: [
-        'Sede Balbuena (Dra. Aura Estudillo presente)',
-        'Sede Guadalupe Chalma (Red Audenti)',
+      zonaReportada: zonaPaciente || 'No especificada',
+      sedeOptimaRecomendada: sedeRecomendada,
+      tiempoEstimadoVehiculo: `${tiempoMinutos} minutos aprox.`,
+      distanciaAprox: `${distanciaKm} km`,
+      analisisGeograficoHonesto: explicacionZona,
+      redSedesDisponibles: [
+        'Sede Balbuena (Matriz — Dra. Aura Estudillo)',
+        'Sede Guadalupe Chalma (Extremo Norte / GAM)',
         'Sede Roma Norte (Próxima apertura)'
       ]
     }
@@ -847,6 +866,9 @@ export async function POST(request: Request) {
         }
       }
 
+      const isNorthUser = normUser.includes('chalma') || normUser.includes('reclusorio') ||
+        normUser.includes('cuautepec') || normUser.includes('gam') || normUser.includes('norte')
+
       try {
         await createAppointmentAction({
           folio: detectedFolio,
@@ -855,7 +877,7 @@ export async function POST(request: Request) {
           appointment_date: inferredDate,
           appointment_time: inferredTime,
           treatment: isPainReport ? 'Consulta / Alivio de Dolor Dental' : 'Consulta / Valoración Estética Oral',
-          branch: normUser.includes('chalma') ? 'Sede Guadalupe Chalma' : 'Sede Balbuena (Matriz)',
+          branch: isNorthUser ? 'Sede Guadalupe Chalma' : 'Sede Balbuena (Matriz)',
           status: 'confirmed',
           notes: `Folio: ${detectedFolio}. Sincronizado por fallback NLP Aura AI. Tel: ${cleanPhone}`
         })

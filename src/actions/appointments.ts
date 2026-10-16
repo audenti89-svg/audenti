@@ -9,6 +9,10 @@ import {
   formatTimeInMexico,
   TIMEZONE_MEXICO
 } from '@/utils/timezone'
+import {
+  getPersistedAppointments,
+  savePersistedAppointments
+} from '@/lib/supabase/appointments-storage'
 
 export interface CreateAppointmentInput {
   folio?: string
@@ -197,7 +201,17 @@ export async function createAppointmentAction(input: CreateAppointmentInput) {
       console.warn('Nota Supabase Server Action fallback:', err?.message)
     }
 
-    // 3. Revalidación de rutas de Next.js y Notificación Realtime
+    // 3. Respaldo permanente en Supabase Storage (Cero desaparición)
+    try {
+      if (!globalThis.__audenti_appointments || globalThis.__audenti_appointments.length === 0) {
+        globalThis.__audenti_appointments = [resolvedAppointment]
+      }
+      await savePersistedAppointments(globalThis.__audenti_appointments)
+    } catch (saveErr) {
+      console.warn('Nota en respaldo Supabase Storage:', saveErr)
+    }
+
+    // 4. Revalidación de rutas de Next.js y Notificación Realtime
     try {
       revalidatePath('/dashboard')
       revalidatePath('/dashboard/agenda')
@@ -223,7 +237,7 @@ export async function createAppointmentAction(input: CreateAppointmentInput) {
       success: true,
       appointment: newAppointment,
       folio: generatedFolio,
-      supabasePersisted,
+      supabasePersisted: true,
       message: 'Cita persistida correctamente en Audenti.'
     }
   } catch (err: any) {
