@@ -31,7 +31,7 @@ import {
 } from 'lucide-react'
 import { useNotificationSound } from '@/hooks/useNotificationSound'
 
-type ChatTab = 'external' | 'internal'
+type ChatTab = 'external' | 'internal' | 'aura_ai_history'
 type InternalSubTab = 'peer' | 'specialty_board' | 'reception' | 'management'
 
 interface ReferralPerson {
@@ -102,6 +102,35 @@ export function ChatInterface() {
   // Mensajería dinámica
   const [inputMessage, setInputMessage] = useState('')
   const [messages, setMessages] = useState<Record<string, Message[]>>({})
+
+  // Historial de Conversaciones de Aura AI (CRM Directo)
+  const [auraAiSessions, setAuraAiSessions] = useState<any[]>([])
+  const [selectedSessionId, setSelectedSessionId] = useState<string>('')
+  const [loadingAuraSessions, setLoadingAuraSessions] = useState(false)
+
+  const fetchAuraAiHistory = async () => {
+    try {
+      setLoadingAuraSessions(true)
+      const res = await fetch('/api/ai/chat-history')
+      const data = await res.json()
+      if (data?.success && Array.isArray(data.sessions)) {
+        setAuraAiSessions(data.sessions)
+        if (!selectedSessionId && data.sessions.length > 0) {
+          setSelectedSessionId(data.sessions[0].sessionId)
+        }
+      }
+    } catch (e) {
+      console.warn('Error fetching Aura AI history:', e)
+    } finally {
+      setLoadingAuraSessions(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchAuraAiHistory()
+    const timer = setInterval(fetchAuraAiHistory, 4000)
+    return () => clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     async function loadChatPatients() {
@@ -220,7 +249,7 @@ export function ChatInterface() {
             }`}
           >
             <HeartHandshake className="w-4 h-4" />
-            A. Pacientes, Red de Referidos &amp; Familias
+            A. Pacientes &amp; Familias
           </button>
 
           <button
@@ -231,7 +260,23 @@ export function ChatInterface() {
             }`}
           >
             <Users className="w-4 h-4" />
-            B. Jerarquía Interna &amp; Staff
+            B. Staff Interno
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setMainTab('aura_ai_history')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              mainTab === 'aura_ai_history' ? 'bg-amber-400 text-slate-950 shadow-sm' : 'text-slate-200 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-cyan-300" />
+            C. Historial Aura AI (Pacientes Web &amp; Urgencias)
+            {auraAiSessions.length > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 text-white font-mono">
+                {auraAiSessions.length}
+              </span>
+            )}
           </button>
         </div>
 
@@ -335,6 +380,77 @@ export function ChatInterface() {
                 )}
               </div>
             </>
+          ) : mainTab === 'aura_ai_history' ? (
+            // Directorio de Sesiones Web con Aura AI
+            <>
+              <div className="p-3.5 border-b border-slate-200/80 bg-slate-900 text-white flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-cyan-300 animate-pulse" />
+                  <span className="text-xs font-bold uppercase tracking-wide">Sesiones Web Aura AI</span>
+                </div>
+                <button
+                  onClick={fetchAuraAiHistory}
+                  className="text-[10px] text-amber-300 hover:underline font-mono"
+                >
+                  Refrescar
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+                {loadingAuraSessions && auraAiSessions.length === 0 ? (
+                  <div className="p-8 text-center text-xs text-slate-400">
+                    Sincronizando chats de pacientes con Aura AI...
+                  </div>
+                ) : auraAiSessions.length === 0 ? (
+                  <div className="p-8 text-center space-y-2">
+                    <Sparkles className="w-8 h-8 text-slate-300 mx-auto" />
+                    <p className="text-xs font-bold text-slate-700">Sin conversaciones registradas</p>
+                    <p className="text-[11px] text-slate-500">
+                      Cuando un paciente interactúe con el widget web de Aura AI, la conversación se registrará aquí en tiempo real.
+                    </p>
+                  </div>
+                ) : (
+                  auraAiSessions.map(session => {
+                    const isSelected = selectedSessionId === session.sessionId
+                    const isRedAlert = session.urgencyLevel === 'red'
+                    const isYellowAlert = session.urgencyLevel === 'yellow'
+
+                    return (
+                      <button
+                        key={session.sessionId}
+                        onClick={() => setSelectedSessionId(session.sessionId)}
+                        className={`w-full p-3 rounded-xl text-left transition-all border ${
+                          isSelected
+                            ? 'bg-amber-100/80 border-amber-400 shadow-2xs'
+                            : isRedAlert
+                            ? 'bg-rose-50/70 border-rose-300 hover:bg-rose-100/50'
+                            : 'bg-white border-slate-200/80 hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-1 mb-1">
+                          <span className="text-xs font-bold text-slate-900 truncate">
+                            {isRedAlert && '🔴 '}{isYellowAlert && '🟡 '}
+                            {session.patientName}
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                            {session.lastTimestamp}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 line-clamp-1 italic">
+                          "{session.lastMessage}"
+                        </p>
+                        <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-100 text-[10px]">
+                          <span className="font-mono text-slate-500 font-semibold">{session.phone}</span>
+                          <span className="px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 font-bold">
+                            {session.messageCount} msgs
+                          </span>
+                        </div>
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+            </>
           ) : (
             // Jerarquía Interna
             <div className="p-3 space-y-2">
@@ -386,7 +502,33 @@ export function ChatInterface() {
           {/* Cabecera del chat */}
           <div className="h-16 px-6 border-b border-slate-200/80 flex items-center justify-between shrink-0 bg-slate-50/30">
             <div>
-              {mainTab === 'external' ? (
+              {mainTab === 'aura_ai_history' ? (
+                (() => {
+                  const currentSession = auraAiSessions.find(s => s.sessionId === selectedSessionId)
+                  return (
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-slate-900">
+                          {currentSession ? currentSession.patientName : 'Historial de Chat Aura AI'}
+                        </h3>
+                        {currentSession?.urgencyLevel === 'red' && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                            🔴 Urgencia 24/7 (Fast-Track)
+                          </span>
+                        )}
+                        {currentSession?.urgencyLevel === 'yellow' && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                            🟡 Cita Prioritaria
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        {currentSession?.phone || 'Sin WhatsApp'} • ID de Sesión: {selectedSessionId || 'Ninguna'}
+                      </p>
+                    </div>
+                  )
+                })()
+              ) : mainTab === 'external' ? (
                 activePatient ? (
                   <>
                     <div className="flex items-center gap-2">
@@ -429,7 +571,57 @@ export function ChatInterface() {
 
           {/* Mensajes */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/20">
-            {((mainTab === 'external' ? messages[selectedPatientId] : messages[`internal-${internalTab}`]) || []).length === 0 ? (
+            {mainTab === 'aura_ai_history' ? (
+              (() => {
+                const currentSession = auraAiSessions.find(s => s.sessionId === selectedSessionId)
+                const sessionMsgs = currentSession?.messages || []
+
+                if (sessionMsgs.length === 0) {
+                  return (
+                    <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-3">
+                      <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-600">
+                        <Sparkles className="w-6 h-6" />
+                      </div>
+                      <h4 className="text-sm font-bold text-slate-800">Selecciona una sesión de Aura AI</h4>
+                      <p className="text-xs text-slate-500 max-w-sm">
+                        Selecciona cualquier conversación de la lista lateral para inspeccionar el historial completo de mensajes entre el paciente y Aura AI.
+                      </p>
+                    </div>
+                  )
+                }
+
+                return sessionMsgs.map((msg: any) => {
+                  const isUser = msg.sender === 'user'
+                  return (
+                    <div key={msg.id} className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 shadow-2xs ${
+                        isUser ? 'bg-amber-400 text-slate-950' : 'bg-cyan-700 text-white'
+                      }`}>
+                        {isUser ? 'PAC' : 'AI'}
+                      </div>
+                      <div className={`max-w-[78%] space-y-1 ${isUser ? 'items-end' : ''}`}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-bold text-slate-700 pl-1">
+                            {isUser ? (msg.patientName || 'Paciente') : 'Aura AI (Asistente Virtual)'}
+                          </span>
+                        </div>
+                        <div className={`px-4 py-2.5 rounded-2xl text-xs leading-relaxed shadow-2xs whitespace-pre-wrap ${
+                          isUser
+                            ? 'bg-slate-900 text-white rounded-tr-xs'
+                            : 'bg-white text-slate-900 border border-slate-200/80 rounded-tl-xs'
+                        }`}>
+                          {msg.messageText}
+                        </div>
+                        <div className={`flex items-center gap-1 text-[10px] text-slate-400 ${isUser ? 'justify-end pr-1' : 'pl-1'}`}>
+                          <span>{msg.timestamp} hrs</span>
+                          {isUser && <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })
+              })()
+            ) : ((mainTab === 'external' ? messages[selectedPatientId] : messages[`internal-${internalTab}`]) || []).length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-3">
                 <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
                   <MessageSquare className="w-6 h-6" />

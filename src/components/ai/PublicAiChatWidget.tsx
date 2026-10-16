@@ -28,6 +28,16 @@ export function PublicAiChatWidget() {
   const [loading, setLoading] = useState(false)
   const [speaking, setSpeaking] = useState(false)
   const [lastEmergencyId, setLastEmergencyId] = useState<string | null>(null)
+  const [sessionId] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('audenti_chat_session_id')
+      if (stored) return stored
+      const newId = `sess_${Date.now()}_${Math.floor(Math.random() * 10000)}`
+      localStorage.setItem('audenti_chat_session_id', newId)
+      return newId
+    }
+    return `sess_${Date.now()}`
+  })
   const receivedDecisions = useRef<Set<string>>(new Set())
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -130,6 +140,7 @@ export function PublicAiChatWidget() {
         body: JSON.stringify({
           messages: history,
           role: 'public',
+          sessionId,
           sessionContext: {
             phone: detectedPhone || undefined,
             patientName: detectedName || undefined

@@ -28,32 +28,35 @@ PERSONALIDAD (ROL PÚBLICO - CÁLIDO, ACOGEDOR Y HUMANO):
 
 REGLAS DE CIBERSEGURIDAD CLÍNICA, PRIVACIDAD Y GUARDRAILS INQUEBRANTABLES:
 
-1. PROHIBICIÓN ABSOLUTA DE MEDICAMENTOS, DOSIS Y DIAGNÓSTICOS:
+1. PROTOCOLO FAST-TRACK PARA URGENCIAS Y DOLOR (CERO BUROCRACIA):
+   - Si el usuario reporta dolor severo, inflamación, muela rota, golpe o urgencia:
+     * NUNCA pedir correo, dirección, antecedentes largos ni cuestionarios innecesarios.
+     * Solo requerir Nombre y WhatsApp/Teléfono celular para enlazar la decisión médica de la Dra. Aura Estudillo.
+     * Ejecuta inmediatamente la herramienta escalarEmergenciaNocturnaDraAura para emitir el folio provisional de emergencia y disparar la Alerta Roja al panel directivo.
+
+2. PROTOCOLO ELECTIVO (CONSULTAS DE RUTINA / ESTÉTICA DENTAL / INFORMACIÓN):
+   - Si el usuario solicita valoración general, limpieza, ortodoncia, carillas, etc. (sin dolor agudo):
+     * Exige siempre nombre y teléfono/WhatsApp antes de emitir la confirmación formal de la cita con agendarCitaNuevayNotificar.
+     * Guía al paciente cordialmente y consulta la agenda con consultarDisponibilidadCalendario.
+
+3. PROHIBICIÓN ABSOLUTA DE MEDICAMENTOS, DOSIS Y DIAGNÓSTICOS:
    - Queda TERMINANTEMENTE PROHIBIDO diagnosticar patologías invasivas o mencionar nombres de fármacos (ej. ibuprofeno, paracetamol, amoxicilina, ketorolaco, clonixinato, naproxeno, aspirina, etc.), miligramos, dosis u horarios.
    - Si el usuario pregunta qué tomar, qué pastilla tomar o qué remedio usar para el dolor o síntoma, DEBES RESPONDER EXACTAMENTE CON ESTE MENSAJE OBLIGATORIO:
    "No tengo permitido recomendar ni recetar medicamentos. He enviado tu reporte directamente a la Dra. Aura Estudillo. Por favor ingresa tu número de WhatsApp y mantente en línea mientras la doctora evalúa tu caso para darte la indicación correspondiente."
 
-2. FILTRADO CLÍNICO ESTRICTO ANTE SÍNTOMAS O DOLOR (CERO CATÁLOGOS O VENTAS):
+4. FILTRADO CLÍNICO ESTRICTO ANTE SÍNTOMAS O DOLOR (CERO CATÁLOGOS O VENTAS):
    - Si el usuario reporta cualquier molestia, dolor de muela, diente flojo, inflamación o síntoma, queda TERMINANTEMENTE PROHIBIDO ofrecer tratamientos estéticos (carillas, blanqueamientos) o recitar listas de precios.
    - Tu respuesta debe ser empática, directa y centrada exclusivamente en calmar al paciente y proponer espacios de valoración diagnóstica con la Dra. Aura Estudillo usando consultarDisponibilidadCalendario.
 
-3. PRIVACIDAD DE GEOLOCALIZACIÓN Y TIEMPOS RELATIVOS:
+5. PRIVACIDAD DE GEOLOCALIZACIÓN Y TIEMPOS RELATIVOS:
    - NUNCA reveles calles, números ni direcciones físicas exactas de las sedes ni del paciente.
    - Limítate estrictamente a informar el nombre de la sede y el cálculo de tiempos relativos de traslado:
    "La Dra. Aura Estudillo se encuentra a [X minutos / X km] de ti en la Sede [Nombre de Sede]. Estamos verificando en el sistema y en su panel directo si puede atenderte hoy de emergencia o a primera hora. Por favor mantente en línea."
 
-4. PROTOCOLO PUENTE NOCTURNO 24/7 (🔴 ALERTA ROJA):
-   - Ante dolor severo o urgencias, usa la herramienta \`escalarEmergenciaNocturnaDraAura\` de inmediato para avisar a la doctora en tiempo real y pide con amabilidad el número de WhatsApp.
-
-5. PROTOCOLO OBLIGATORIO DE CONTACTO Y MEMORIA DE SESIÓN PARA AGENDAR CITAS:
+6. PROTOCOLO OBLIGATORIO DE CONTACTO Y MEMORIA DE SESIÓN:
    - MEMORIA DE SESIÓN (NO REPETIR PREGUNTAS): Si en el contexto del chat o en los mensajes previos el paciente ya compartió su número telefónico / WhatsApp o su nombre, GUÁRDALO en tu memoria activa de sesión y **NUNCA VUELVAS A PEDIRLE SU TELÉFONO O NOMBRE**. Avanza de inmediato con la atención, propuesta de horarios o confirmación de cita.
    - VALIDACIÓN OBLIGATORIA DE TELÉFONO/WHATSAPP: Si el usuario desea agendar, elige fecha o pide apartar su lugar pero NO ha proporcionado su número de WhatsApp/teléfono celular (ni en este mensaje ni en mensajes anteriores), solicita amablemente su teléfono con este mensaje claro:
-   "Para apartar tu lugar y enviarte el folio de confirmación a tu WhatsApp, por favor indícame tu número de teléfono."
-   - Solo cuando el paciente proporcione su nombre y un número de teléfono/WhatsApp válido (o ya lo haya dado previamente), invoca la herramienta \`agendarCitaNuevayNotificar\`.
-   - NUNCA digas que la notificación se envió a su celular a menos que el paciente haya proporcionado su número de WhatsApp o teléfono celular.
-
-6. COSTOS Y CITAS:
-   - Usa \`consultarCostosTratamiento\` para aranceles y \`consultarDisponibilidadCalendario\` para fechas con la Dra. Aura.`
+   "Para apartar tu lugar y enviarte el folio de confirmación a tu WhatsApp, por favor indícame tu número de teléfono."`
 
 const DOCTOR_EXECUTIVE_SYSTEM_PROMPT = `Eres "Aura AI Copilot", el copiloto clínico, operativo y analítico de máxima confianza para la Dra. Aura Estudillo (Directora Médica & Propietaria de Audenti, Cédula 8492019).
 
@@ -451,11 +454,12 @@ async function ejecutarTool(name: string, args: any) {
 
 export async function POST(request: Request) {
   try {
-    const { messages, userMessage, role = 'public', sessionContext } = await request.json()
+    const { messages, userMessage, role = 'public', sessionContext, sessionId: incomingSessionId } = await request.json()
 
     // 1. Extracción de Memoria de Sesión (Teléfono y Nombre) de los mensajes previos
     let rememberedPhone = sessionContext?.phone || ''
     let rememberedName = sessionContext?.patientName || ''
+    const currentSessionId = incomingSessionId || sessionContext?.sessionId || `sess_web_${Date.now()}`
 
     const allHistoryText = [
       ...(Array.isArray(messages) ? messages.map((m: any) => m.content || '') : []),
@@ -775,9 +779,81 @@ export async function POST(request: Request) {
       }).catch(e => console.warn('Sync fallback error:', e?.message))
     }
 
+    // Persistencia del Historial de Conversación para el CRM de la Dra. Aura
+    try {
+      const nowMx = getNowInMexico()
+      const timeFormatted = formatTimeInMexico(nowMx)
+      const urgencyTag = isRed ? 'red' : isYellow ? 'yellow' : 'normal'
+      const patientLabel = rememberedName || (rawUser.match(/(?:me llamo|mi nombre es|soy)\s+([a-zA-ZáéíóúÁÉÍÓÚñÑ\s]{2,30})/i)?.[1]?.trim()) || 'Paciente en Línea'
+      const phoneLabel = rememberedPhone || (rawUser.match(/\b\d{10}\b/)?.[0]) || 'Pendiente por WhatsApp'
+
+      if (!globalThis.__audenti_chat_history) {
+        globalThis.__audenti_chat_history = []
+      }
+
+      // 1. Mensaje del usuario
+      globalThis.__audenti_chat_history.push({
+        id: `usr_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        sessionId: currentSessionId,
+        sender: 'user',
+        messageText: rawUser,
+        timestamp: timeFormatted,
+        createdAt: new Date().toISOString(),
+        patientName: patientLabel,
+        phone: phoneLabel,
+        urgencyLevel: urgencyTag
+      })
+
+      // 2. Respuesta de la IA
+      globalThis.__audenti_chat_history.push({
+        id: `ai_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        sessionId: currentSessionId,
+        sender: 'assistant',
+        messageText: finalReply,
+        timestamp: timeFormatted,
+        createdAt: new Date().toISOString(),
+        patientName: patientLabel,
+        phone: phoneLabel,
+        urgencyLevel: urgencyTag
+      })
+
+      if (globalThis.__audenti_chat_history.length > 500) {
+        globalThis.__audenti_chat_history.splice(0, globalThis.__audenti_chat_history.length - 500)
+      }
+
+      // Intento de guardado en Supabase en tabla chat_history si existe
+      createClient().then(async (supabase) => {
+        try {
+          await supabase.from('chat_history').insert([
+            {
+              session_id: currentSessionId,
+              sender: 'user',
+              message_text: rawUser,
+              patient_name: patientLabel,
+              patient_phone: phoneLabel,
+              urgency_level: urgencyTag,
+              local_timestamp: timeFormatted
+            },
+            {
+              session_id: currentSessionId,
+              sender: 'assistant',
+              message_text: finalReply,
+              patient_name: patientLabel,
+              patient_phone: phoneLabel,
+              urgency_level: urgencyTag,
+              local_timestamp: timeFormatted
+            }
+          ])
+        } catch {}
+      }).catch(() => {})
+    } catch (histErr) {
+      console.warn('Error al persistir historial de chat en CRM:', histErr)
+    }
+
     return NextResponse.json({
       success: true,
       reply: finalReply,
+      sessionId: currentSessionId,
       doctor: 'Dra. Aura Estudillo (Céd. 8492019)',
       modelUsed: modelToUse,
       timestamp: new Date().toISOString()
