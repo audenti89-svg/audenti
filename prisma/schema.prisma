@@ -12,6 +12,23 @@ enum Role {
   STAFF
 }
 
+enum StaffDepartment {
+  RECEPTION
+  DENTISTS
+  ANESTHESIA
+  MANAGEMENT
+}
+
+enum AcquisitionSource {
+  QR_CODE
+  WHATSAPP_DIRECT
+  SOCIAL_FACEBOOK
+  SOCIAL_INSTAGRAM
+  SOCIAL_TIKTOK
+  SOCIAL_YOUTUBE
+  WEB_ORGANIC
+}
+
 enum AppointmentStatus {
   PENDING
   CONFIRMED
@@ -34,30 +51,50 @@ enum SenderType {
 }
 
 model User {
-  id            String         @id @default(uuid())
-  email         String         @unique
-  passwordHash  String
-  name          String
-  role          Role           @default(STAFF)
-  isActive      Boolean        @default(true)
-  conversations Conversation[]
-  appointments  Appointment[]
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id              String            @id @default(uuid())
+  email           String            @unique
+  passwordHash    String
+  name            String
+  role            Role              @default(STAFF)
+  department      StaffDepartment   @default(RECEPTION)
+  isActive        Boolean           @default(true)
+  sentMessages    InternalMessage[]
+  conversations   Conversation[]
+  appointments    Appointment[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model FamilyGroup {
+  id        String    @id @default(uuid())
+  name      String    // Ej. "Familia Sánchez"
+  patients  Patient[]
+  createdAt DateTime  @default(now())
 }
 
 model Patient {
-  id            String         @id @default(uuid())
-  name          String
-  phone         String         @unique
-  whatsappLid   String?
-  email         String?
-  tags          String[]
-  notes         String?
-  conversations Conversation[]
-  appointments  Appointment[]
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id                String             @id @default(uuid())
+  name              String
+  phone             String             @unique
+  whatsappLid       String?
+  email             String?
+  acquisitionSource AcquisitionSource  @default(WEB_ORGANIC)
+  
+  // Referral Network & Family Relations
+  referredById      String?
+  referredBy        Patient?           @relation("PatientReferrals", fields: [referredById], references: [id])
+  referrals         Patient[]          @relation("PatientReferrals")
+  
+  familyGroupId     String?
+  familyGroup       FamilyGroup?       @relation(fields: [familyGroupId], references: [id])
+  
+  tags              String[]
+  notes             InternalNote[]
+  conversations     Conversation[]
+  appointments      Appointment[]
+  financialRecords  FinancialLedger[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 }
 
 model Conversation {
@@ -83,15 +120,35 @@ model Message {
   timestamp      DateTime     @default(now())
 }
 
+model InternalNote {
+  id        String   @id @default(uuid())
+  patientId String
+  patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+}
+
+model InternalMessage {
+  id           String           @id @default(uuid())
+  senderId     String
+  sender       User             @relation(fields: [senderId], references: [id])
+  targetDept   StaffDepartment? // Null si es mensaje individual o global
+  targetUserId String?          // Para mensajes directos a un empleado
+  message      String
+  isUrgent     Boolean          @default(false)
+  createdAt    DateTime         @default(now())
+}
+
 model Service {
-  id                    String        @id @default(uuid())
-  name                  String
-  description           String?
-  durationMinutes       Int           @default(30)
-  priceFrom             Float         @default(0.0)
-  requiresPriorValuation Boolean      @default(false)
-  appointments          Appointment[]
-  isActive              Boolean       @default(true)
+  id                     String        @id @default(uuid())
+  name                   String
+  description            String?
+  durationMinutes        Int           @default(30)
+  standardPrice          Float         @default(0.0)
+  requiresPriorValuation Boolean       @default(false)
+  appointments           Appointment[]
+  isActive               Boolean       @default(true)
 }
 
 model Appointment {
@@ -104,11 +161,22 @@ model Appointment {
   durationMinutes Int
   assignedStaffId String?
   assignedStaff   User?             @relation(fields: [assignedStaffId], references: [id])
+  isEmergency     Boolean           @default(false)
   origin          String            @default("AI") // AI o MANUAL
   status          AppointmentStatus @default(PENDING)
   notes           String?
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
+}
+
+model FinancialLedger {
+  id        String   @id @default(uuid())
+  patientId String
+  patient   Patient  @relation(fields: [patientId], references: [id])
+  amount    Float    @default(0.0)
+  isBarter  Boolean  @default(false) // True si es trueque / intercambio de servicios
+  concept   String
+  createdAt DateTime @default(now())
 }
 
 model ClinicConfig {
