@@ -1,177 +1,133 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { getGroqClient } from '@/lib/groq'
+import { NextResponse } from 'next/server';
+import { executeAIAgent } from '@/lib/ai/router';
+import { prisma } from '@/lib/prisma';
 
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
-/**
- * Webhook Receptor Universal para Pasarela QR de WhatsApp (Evolution API, Z-API, Baileys)
- * Permite que Aura AI responda automáticamente por WhatsApp y persista la conversación en Prisma/Supabase.
- */
+// Verificación del Webhook (requerido por Meta / WhatsApp Cloud API)
+export async function GET(request: Request) {
+  const url = new URL(request.url);
+  const mode = url.searchParams.get('hub.mode');
+  const token = url.searchParams.get('hub.verify_token');
+  const challenge = url.searchParams.get('hub.challenge');
 
-interface WebhookPayload {
-  event?: string
-  instance?: string
-  data?: {
-    key?: {
-      remoteJid?: string
-      fromMe?: boolean
-      id?: string
-    }
-    pushName?: string
-    message?: {
-      conversation?: string
-      extendedTextMessage?: {
-        text?: string
-      }
-    }
-    messageType?: string
+  const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'audenti_secure_token';
+
+  if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+    return new NextResponse(challenge, { status: 200 });
   }
+
+  return NextResponse.json({ error: 'Token de verificación inválido' }, { status: 403 });
 }
 
-export async function POST(req: NextRequest) {
+// Recepción de mensajes entrantes de los pacientes
+export async function POST(request: Request) {
   try {
-    const body: WebhookPayload = await req.json()
+    const body = await request.json();
 
-    // 1. Validar que sea un mensaje entrante (no enviado por el propio bot)
-    if (body.data?.key?.fromMe) {
-      return NextResponse.json({ status: 'ignored_own_message' })
-    }
+    // 1. Formato WhatsApp Cloud API (Meta Developers)
+    const entry = body.entry?.[0];
+    const changes = entry?.changes?.[0];
+    const value = changes?.value;
+    const messageData = value?.messages?.[0];
 
-    const remoteJid = body.data?.key?.remoteJid || ''
-    // Extraer número de teléfono (ej. 5215522427769@s.whatsapp.net -> 5522427769 o 521...)
-    const rawNumber = remoteJid.replace(/@.*$/, '')
-    const cleanPhone = rawNumber.replace(/^521/, '52') // Normalizar prefijo México
+    // 2. Formato Pasarela QR (Evolution API / Z-API / Baileys)
+    const qrData = body.data;
+    const isQrGateway = Boolean(qrData?.key);
 
-    if (!cleanPhone) {
-      return NextResponse.json({ status: 'no_phone' })
-    }
+    let patientPhone = '';
+    let patientMessage = '';
+    let patientName = 'Paciente WhatsApp';
 
-    // Extraer el texto del mensaje
-    const messageText =
-      body.data?.message?.conversation ||
-      body.data?.message?.extendedTextMessage?.text ||
-      ''
-
-    if (!messageText.trim()) {
-      return NextResponse.json({ status: 'empty_text' })
-    }
-
-    const patientName = body.data?.pushName || 'Paciente WhatsApp'
-
-    // 2. Buscar o crear el paciente en Prisma / Supabase
-    let patient = await prisma.patient.findFirst({
-      where: {
-        OR: [{ phone: cleanPhone }, { phone: rawNumber }, { whatsappLid: remoteJid }]
+    if (messageData) {
+      // Proviene de WhatsApp Cloud API
+      patientPhone = messageData.from || '';
+      patientMessage = messageData.text?.body || '';
+      patientName = value?.contacts?.[0]?.profile?.name || 'Paciente WhatsApp';
+    } else if (isQrGateway) {
+      // Proviene de pasarela QR
+      if (qrData?.key?.fromMe) {
+        return NextResponse.json({ success: true, status: 'ignored_own_message' }, { status: 200 });
       }
-    })
-
-    if (!patient) {
-      patient = await prisma.patient.create({
-        data: {
-          name: patientName,
-          phone: cleanPhone,
-          whatsappLid: remoteJid,
-          tags: ['whatsapp', 'nuevo_prospecto']
-        }
-      })
+      const remoteJid = qrData?.key?.remoteJid || '';
+      patientPhone = remoteJid.replace(/@.*$/, '').replace(/^521/, '52');
+      patientMessage = qrData?.message?.conversation || qrData?.message?.extendedTextMessage?.text || '';
+      patientName = qrData?.pushName || 'Paciente WhatsApp';
     }
 
-    // 3. Buscar o crear la conversación activa
-    let conversation = await prisma.conversation.findFirst({
-      where: {
-        patientId: patient.id,
-        status: { in: ['OPEN', 'PENDING_HUMAN'] }
+    if (!patientMessage || !patientPhone) {
+      return NextResponse.json({ success: true, status: 'no_processable_message' }, { status: 200 });
+    }
+
+    // Invocamos nuestro Enrutador Central usando el dominio 'patient_chat' (GPT-4o mini)
+    const aiResponse = await executeAIAgent({
+      domain: 'patient_chat',
+      prompt: patientMessage,
+      contextData: {
+        patientPhone,
+        channel: 'whatsapp',
+        clinicName: 'Audenti Odontología (Dra. Aura Estudillo)',
       },
-      include: {
-        messages: {
-          orderBy: { timestamp: 'desc' },
-          take: 10
-        }
-      }
-    })
+    });
 
-    if (!conversation) {
-      conversation = await prisma.conversation.create({
+    const replyText = typeof aiResponse.result === 'string'
+      ? aiResponse.result
+      : (aiResponse.result?.result || aiResponse.result?.content || JSON.stringify(aiResponse.result));
+
+    console.log(`[WhatsApp CXM] Respuesta generada para ${patientPhone}:`, replyText);
+
+    // Opcional: Persistir en Prisma si está configurado
+    try {
+      let patientRecord = await prisma.patient.findFirst({
+        where: { phone: patientPhone }
+      });
+
+      if (!patientRecord) {
+        patientRecord = await prisma.patient.create({
+          data: {
+            name: patientName,
+            phone: patientPhone,
+            tags: ['whatsapp', 'crm_cxm']
+          }
+        });
+      }
+
+      let conv = await prisma.conversation.findFirst({
+        where: { patientId: patientRecord.id, status: 'OPEN' }
+      });
+
+      if (!conv) {
+        conv = await prisma.conversation.create({
+          data: { patientId: patientRecord.id, status: 'OPEN', aiEnabled: true }
+        });
+      }
+
+      await prisma.message.create({
         data: {
-          patientId: patient.id,
-          status: 'OPEN',
-          aiEnabled: true
-        },
-        include: {
-          messages: true
+          conversationId: conv.id,
+          senderType: 'CLIENT',
+          senderName: patientName,
+          content: patientMessage
         }
-      })
+      });
+
+      await prisma.message.create({
+        data: {
+          conversationId: conv.id,
+          senderType: 'AI',
+          senderName: 'Aura AI',
+          content: replyText
+        }
+      });
+    } catch (dbErr: any) {
+      console.warn('[WhatsApp Webhook DB Note]:', dbErr.message);
     }
 
-    // 4. Guardar el mensaje entrante del paciente en la BD
-    await prisma.message.create({
-      data: {
-        conversationId: conversation.id,
-        senderType: 'CLIENT',
-        senderName: patient.name,
-        content: messageText
-      }
-    })
-
-    // 5. Si la IA está apagada para esta conversación (ej. Dra. Aura tomó el control manual), no responder con IA
-    if (!conversation.aiEnabled || conversation.status === 'PENDING_HUMAN') {
-      return NextResponse.json({ status: 'human_mode_active' })
-    }
-
-    // 6. Preparar historial para Aura AI (Llama 3.3 con Groq)
-    const recentMessages = (conversation.messages || [])
-      .reverse()
-      .map((m) => ({
-        role: m.senderType === 'CLIENT' ? ('user' as const) : ('assistant' as const),
-        content: m.content
-      }))
-
-    const groq = getGroqClient()
-    const systemPrompt = `Eres "Aura AI", la asistente virtual y concierge inteligente de la clínica dental "Audenti", dirigida por la Dra. Aura Estudillo (Cédula Profesional 8492019).
-Estás respondiendo directamente en WHATSAPP al paciente "${patient.name}" (${cleanPhone}).
-
-DIRECTRICES CLÍNICAS Y DE CONVERSACIÓN:
-1. Respuestas breves, empáticas y cálidas, ideales para leer en WhatsApp (máximo 2 a 4 oraciones por mensaje).
-2. Si el paciente pide agendar cita:
-   - Ya conoces su número de WhatsApp (${cleanPhone}). NO se lo vuelvas a pedir.
-   - Pregúntale cordialmente qué día y turno (matutino o vespertino) le favorece y qué tratamiento requiere (limpieza, revisión general, valoración estética).
-3. Si reporta dolor severo o urgencia nocturna:
-   - Actúa con contención y empatía.
-   - Indícale que su caso ha sido marcado como Prioritario para la Dra. Aura Estudillo y que se le asignará el primer espacio disponible.
-4. NUNCA recetes medicamentos, dosis o miligramos (ibuprofeno, paracetamol, etc.).
-5. No mandes listas publicitarias ni catálogos largos no solicitados.`
-
-    const chatCompletion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...recentMessages,
-        { role: 'user', content: messageText }
-      ],
-      temperature: 0.2,
-      max_tokens: 300
-    })
-
-    const aiReply =
-      chatCompletion.choices[0]?.message?.content?.trim() ||
-      '¡Hola! He recibido tu mensaje en Audenti. En un momento te comparto los horarios disponibles con la Dra. Aura Estudillo.'
-
-    // 7. Guardar la respuesta de Aura AI en la BD
-    await prisma.message.create({
-      data: {
-        conversationId: conversation.id,
-        senderType: 'AI',
-        senderName: 'Aura AI',
-        content: aiReply
-      }
-    })
-
-    // 8. Enviar la respuesta a la pasarela QR si está configurada la URL de la pasarela
-    const qrGatewayUrl = process.env.WHATSAPP_QR_GATEWAY_URL
-    const qrApiKey = process.env.WHATSAPP_QR_API_KEY
-    const qrInstanceName = process.env.WHATSAPP_QR_INSTANCE || 'audenti-aura'
+    // Si está configurada la pasarela QR, despachar el mensaje
+    const qrGatewayUrl = process.env.WHATSAPP_QR_GATEWAY_URL;
+    const qrApiKey = process.env.WHATSAPP_QR_API_KEY;
+    const qrInstanceName = process.env.WHATSAPP_QR_INSTANCE || 'audenti-aura';
 
     if (qrGatewayUrl) {
       try {
@@ -182,35 +138,24 @@ DIRECTRICES CLÍNICAS Y DE CONVERSACIÓN:
             ...(qrApiKey ? { apikey: qrApiKey } : {})
           },
           body: JSON.stringify({
-            number: cleanPhone,
-            text: aiReply
+            number: patientPhone,
+            text: replyText
           })
-        })
-      } catch (sendErr) {
-        console.error('Error enviando mensaje a la pasarela QR de WhatsApp:', sendErr)
+        });
+      } catch (sendErr: any) {
+        console.error('[WhatsApp QR Send Error]:', sendErr.message);
       }
     }
 
     return NextResponse.json({
       success: true,
-      reply: aiReply,
-      patientId: patient.id,
-      conversationId: conversation.id
-    })
-  } catch (error: any) {
-    console.error('Error en webhook de WhatsApp QR:', error)
-    return NextResponse.json(
-      { success: false, error: error?.message || 'Error procesando webhook' },
-      { status: 500 }
-    )
-  }
-}
+      processed: true,
+      patientPhone,
+      reply: replyText
+    }, { status: 200 });
 
-export async function GET() {
-  return NextResponse.json({
-    status: 'online',
-    gateway: 'WhatsApp QR Bridge (Evolution API / Z-API / Baileys)',
-    assistant: 'Aura AI',
-    timestamp: new Date().toISOString()
-  })
+  } catch (error: any) {
+    console.error('[WhatsApp Webhook Error]:', error.message);
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
 }
