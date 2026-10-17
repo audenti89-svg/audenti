@@ -210,7 +210,7 @@ export default function DashboardPage() {
 
     // Suscripción al canal estándar de KPIs y alertas globales
     const kpiChannel = supabase
-      .channel('dashboard_kpis_realtime_listener')
+      .channel('dashboard_realtime_kpis')
       .on('broadcast', { event: 'emergency_triage_alert' }, ({ payload }) => {
         fetchDashboardData()
         playTone('urgent')

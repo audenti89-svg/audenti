@@ -176,7 +176,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
 
     // Escucha explícita en dashboard_realtime_kpis para triaje de urgencias
     const kpisChannel = supabase
-      .channel('header_kpis_realtime')
+      .channel('dashboard_realtime_kpis')
       .on('broadcast', { event: 'emergency_triage_alert' }, ({ payload }) => {
         setHasActiveEmergency(true)
         setIsEmergencyModalOpen(true)
