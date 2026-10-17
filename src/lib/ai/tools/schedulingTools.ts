@@ -414,10 +414,17 @@ export async function executeConciergeTool(name: string, args: Record<string, an
 
           if (existingPat) {
             patId = existingPat.id;
+            // Actualizar nombre si no lo tenía
+            try {
+              if (patientName && patientName !== 'Paciente Urgencia') {
+                await supabase.from('patients').update({ full_name: patientName }).eq('id', patId);
+              }
+            } catch {}
           } else {
             const { data: newPat } = await supabase
               .from('patients')
               .insert({
+                full_name: patientName || 'Paciente Urgencia',
                 phone: phone,
                 onboarding_completed: false
               })

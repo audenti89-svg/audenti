@@ -134,6 +134,15 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
       const painOrEmergencyRegex = /(?:dolor|duele|muela|aguanto|urgente|urgencia|emergencia|sangr|hinchad|inflamad|infecci|ca[ií]da|golpe|quebr|fractur|absceso|pus)/i;
       const isUrgent = painOrEmergencyRegex.test(effectivePrompt);
 
+      // Extracción de nombre y teléfono del prompt o historial
+      const fullContextText = `${effectivePrompt} ${history.map(h => h.content).join(' ')}`;
+      const phoneMatch = fullContextText.match(/\b\d{10}\b/) || fullContextText.match(/\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/);
+      const extractedPhone = phoneMatch ? phoneMatch[0].replace(/\D/g, '') : (contextData?.phone || 'No provisto');
+
+      const nameMatch = fullContextText.match(/(?:me llamo|mi nombre es|soy)\s+([a-zA-ZáéíóúÁÉÍÓÚñÑ]{2,25}(?:\s+[a-zA-ZáéíóúÁÉÍÓÚñÑ]{2,25})?)/i) ||
+                         fullContextText.match(/\b([A-ZÁÉÍÓÚ][a-zñáéíóú]+(?:\s+[A-ZÁÉÍÓÚ][a-zñáéíóú]+)?)\b/);
+      const extractedName = contextData?.patientName || (nameMatch ? nameMatch[1].trim() : 'Paciente');
+
       const conversationMessages: any[] = [
         { role: 'system', content: dynamicSystemPrompt },
         ...history.map(h => ({ role: h.role, content: h.content })),
@@ -172,8 +181,8 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
             }
 
             // Inyectar contexto si falta en argumentos
-            if (contextData?.phone && !fnArgs.phone) fnArgs.phone = contextData.phone;
-            if (contextData?.patientName && !fnArgs.patientName) fnArgs.patientName = contextData.patientName;
+            if (!fnArgs.phone || fnArgs.phone === 'No provisto') fnArgs.phone = extractedPhone;
+            if (!fnArgs.patientName || fnArgs.patientName === 'Paciente Urgencia') fnArgs.patientName = extractedName;
             if (contextData?.userZone && !fnArgs.userZone) fnArgs.userZone = contextData.userZone;
             if (fnName === 'escalateEmergencyTriage' && !fnArgs.symptoms) {
               fnArgs.symptoms = effectivePrompt;
@@ -190,7 +199,25 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
             });
           }
 
-          // Segunda pasada para generar la respuesta contextual final con los datos reales
+          // Si fue urgencia, aplicar la respuesta clínica oficial estricta sin alucinaciones
+          const hasEmergencyEscalation = responseMessage.tool_calls.some(
+            tc => tc.function.name === 'escalateEmergencyTriage'
+          );
+
+          if (hasEmergencyEscalation) {
+            const officialEmergencyResponse = `${extractedName}, he activado la alerta de emergencia en la pantalla de la Dra. Aura Estudillo. Tus datos y tu caso ya están en su panel para que evalúe recibirte de inmediato. En un momento la doctora autorizará la atención.`;
+            return {
+              success: true,
+              domain,
+              result: officialEmergencyResponse,
+              triageCategory: 'urgency_pain',
+              appointmentCreated: false,
+              provider: 'groq/patient-chat-emergency-direct',
+              executionTimeMs: Date.now() - startTime
+            };
+          }
+
+          // Segunda pasada para generar la respuesta contextual final con los datos reales para citas no urgentes
           const secondTurn = await groq.chat.completions.create({
             model: 'openai/gpt-oss-20b',
             messages: conversationMessages,
@@ -211,10 +238,6 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
           const rawReply = secondTurn.choices[0]?.message?.content || '';
           const cleanedReply = cleanText(rawReply);
 
-          // Si se ejecutó alguna tool, verificar si fue urgencia o cita
-          const hasEmergencyEscalation = responseMessage.tool_calls.some(
-            tc => tc.function.name === 'escalateEmergencyTriage'
-          );
           const hasCreatedAppointment = responseMessage.tool_calls.some(
             tc => tc.function.name === 'createAppointment'
           );
@@ -223,7 +246,6 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
             success: true,
             domain,
             result: cleanedReply,
-            triageCategory: hasEmergencyEscalation ? 'urgency_pain' : undefined,
             appointmentCreated: hasCreatedAppointment,
             provider: 'groq/patient-chat-concierge-tools',
             executionTimeMs: Date.now() - startTime
@@ -232,16 +254,15 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
 
         // Si el usuario reportó dolor/urgencia pero el modelo no ejecutó la tool por alguna razón, ejecutarla programáticamente de inmediato
         if (isUrgent) {
-          const emergencyOutput = await executeConciergeTool('escalateEmergencyTriage', {
+          await executeConciergeTool('escalateEmergencyTriage', {
             symptoms: effectivePrompt,
-            patientName: contextData?.patientName || 'Paciente Urgencia',
-            phone: contextData?.phone || 'No provisto',
+            patientName: extractedName,
+            phone: extractedPhone,
             painLevel: 'severo',
             targetBranch: contextData?.doctorBranch || 'Sede Balbuena'
           });
 
-          const folio = emergencyOutput?.folio || `EMG-${Math.floor(1000 + Math.random() * 9000)}`;
-          const directUrgentReply = `Hemos registrado tu urgencia con el folio ${folio} y notificado de inmediato a la pantalla de la Dra. Aura Estudillo. ¿En aproximadamente cuántos minutos podrías llegar a la clínica para coordinar tu recepción inmediata?`;
+          const directUrgentReply = `${extractedName}, he activado la alerta de emergencia en la pantalla de la Dra. Aura Estudillo. Tus datos y tu caso ya están en su panel para que evalúe recibirte de inmediato. En un momento la doctora autorizará la atención.`;
 
           return {
             success: true,
@@ -272,19 +293,18 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
         
         try {
           if (isUrgent) {
-            const emergencyOutput = await executeConciergeTool('escalateEmergencyTriage', {
+            await executeConciergeTool('escalateEmergencyTriage', {
               symptoms: effectivePrompt,
-              patientName: contextData?.patientName || 'Paciente Urgencia',
-              phone: contextData?.phone || 'No provisto',
+              patientName: extractedName,
+              phone: extractedPhone,
               painLevel: 'severo',
               targetBranch: contextData?.doctorBranch || 'Sede Balbuena'
             });
 
-            const folio = emergencyOutput?.folio || `EMG-${Math.floor(1000 + Math.random() * 9000)}`;
             return {
               success: true,
               domain,
-              result: `Tu urgencia ha sido registrada con el folio ${folio} y enviada a la pantalla de la Dra. Aura Estudillo. Por favor mantén la calma, evita automedicarte y dinos en cuántos minutos estimas llegar a la clínica.`,
+              result: `${extractedName}, he activado la alerta de emergencia en la pantalla de la Dra. Aura Estudillo. Tus datos y tu caso ya están en su panel para que evalúe recibirte de inmediato. En un momento la doctora autorizará la atención.`,
               triageCategory: 'urgency_pain',
               provider: 'groq/patient-chat-emergency-failover',
               executionTimeMs: Date.now() - startTime
