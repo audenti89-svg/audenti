@@ -1,89 +1,31 @@
 {
-  "name": "Audenti — DentalCloud Pro",
-  "short_name": "Audenti Pro",
-  "description": "Plataforma integral de gestión clínica, CRM odontológico y expedientes bajo la dirección de la Dra. Aura Estudillo (Céd. Prof. 8492019)",
-  "id": "/",
-  "start_url": "/?source=pwa",
-  "scope": "/",
+  "name": "Audenti - Clínica Dental Inteligente",
+  "short_name": "Audenti",
+  "description": "Plataforma de gestión clínica impulsada por IA y automatización.",
+  "start_url": "/",
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
-  "background_color": "#202D4C",
-  "theme_color": "#202D4C",
-  "orientation": "portrait",
-  "categories": ["medical", "business", "productivity", "utilities"],
-  "lang": "es-MX",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
   "icons": [
     {
-      "src": "/icons/icon-72x72.png",
-      "sizes": "72x72",
-      "type": "image/png",
-      "purpose": "any"
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
     },
     {
-      "src": "/icons/icon-96x96.png",
-      "sizes": "96x96",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icons/icon-128x128.png",
-      "sizes": "128x128",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icons/icon-144x144.png",
-      "sizes": "144x144",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icons/icon-152x152.png",
-      "sizes": "152x152",
-      "type": "image/png",
-      "purpose": "any"
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
     },
     {
       "src": "/icons/icon-192x192.png",
       "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icons/icon-384x384.png",
-      "sizes": "384x384",
-      "type": "image/png",
-      "purpose": "any"
+      "type": "image/png"
     },
     {
       "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icons/icon-512x512-maskable.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
+      "type": "image/png"
     }
-  ],
-  "shortcuts": [
-    {
-      "name": "Agenda Médica",
-      "url": "/dashboard/calendar",
-      "description": "Ver calendario y sillones dentales"
-    },
-    {
-      "name": "Expediente Digital",
-      "url": "/dashboard/expediente",
-      "description": "Odontograma y notas clínicas"
-    },
-    {
-      "name": "Imprimir Papelería",
-      "url": "/dashboard/patients/AUD-4422/print",
-      "description": "Recetas membretadas y presupuestos"
-    }
-  ],
-  "prefer_related_applications": false
+  ]
 }
