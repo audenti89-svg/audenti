@@ -38,12 +38,19 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const redirectUrl = request.nextUrl.clone();
-  const isAuthRoute = redirectUrl.pathname.startsWith('/auth');
+  const isAuthRoute = redirectUrl.pathname.startsWith('/auth') || redirectUrl.pathname === '/login';
   const isOnboardingRoute = redirectUrl.pathname.startsWith('/onboarding');
   const isDashboardRoute = redirectUrl.pathname.startsWith('/dashboard');
+  const isAdminRoute = redirectUrl.pathname.startsWith('/admin');
+  const isPatientsRoute = redirectUrl.pathname.startsWith('/patients');
 
-  // 1. Si no hay usuario autenticado e intenta acceder a dashboard o onboarding -> redirigir a login
-  if (!user && (isDashboardRoute || isOnboardingRoute)) {
+  // Comprobar token directo de sesión (sb-access-token o auth de Supabase)
+  const sessionToken = request.cookies.get('sb-access-token')?.value ||
+                       request.cookies.get('sb-token')?.value ||
+                       user;
+
+  // 1. Si no hay sesión e intenta acceder a /admin, /patients, /dashboard o /onboarding -> redirigir a login
+  if (!user && (isDashboardRoute || isOnboardingRoute || isAdminRoute || isPatientsRoute)) {
     redirectUrl.pathname = '/auth/login';
     return NextResponse.redirect(redirectUrl);
   }
