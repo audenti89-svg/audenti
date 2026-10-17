@@ -45,6 +45,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
   const { playTone } = useNotificationSound()
   const [showNotifications, setShowNotifications] = useState(false)
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false)
+  const [hasActiveEmergency, setHasActiveEmergency] = useState(false)
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const notifRef = useRef<HTMLDivElement>(null)
 
@@ -132,6 +133,8 @@ export function Header({ onMenuToggle }: HeaderProps) {
         }
       } catch {}
 
+      const hasEmergency = items.some(item => item.type === 'emergency')
+      setHasActiveEmergency(hasEmergency)
       setNotifications(items.slice(0, 10))
     } catch {
       // Ignorar errores transitorios
@@ -142,7 +145,9 @@ export function Header({ onMenuToggle }: HeaderProps) {
     fetchLiveNotifications()
 
     const supabase = createClient()
-    const channel = supabase
+    
+    // Escucha en header_notifications_realtime
+    const headerChannel = supabase
       .channel('header_notifications_realtime')
       .on('broadcast', { event: 'new_appointment' }, () => {
         fetchLiveNotifications()
@@ -153,17 +158,34 @@ export function Header({ onMenuToggle }: HeaderProps) {
         playTone('urgent')
       })
       .on('broadcast', { event: 'emergency_triage_alert' }, () => {
+        setHasActiveEmergency(true)
         fetchLiveNotifications()
         playTone('urgent')
       })
       .subscribe()
 
-    const interval = setInterval(fetchLiveNotifications, 5000)
+    // Escucha explícita en dashboard_realtime_kpis para triaje de urgencias
+    const kpisChannel = supabase
+      .channel('header_kpis_realtime')
+      .on('broadcast', { event: 'emergency_triage_alert' }, () => {
+        setHasActiveEmergency(true)
+        fetchLiveNotifications()
+        playTone('urgent')
+      })
+      .subscribe()
+
+    const interval = setInterval(fetchLiveNotifications, 4000)
 
     const handleRefresh = () => fetchLiveNotifications()
+    const handleEmergencyAlert = () => {
+      setHasActiveEmergency(true)
+      fetchLiveNotifications()
+      playTone('urgent')
+    }
+
     window.addEventListener('storage', handleRefresh)
     window.addEventListener('audenti_appointment_refresh', handleRefresh)
-    window.addEventListener('audenti_emergency_refresh', handleRefresh)
+    window.addEventListener('audenti_emergency_refresh', handleEmergencyAlert)
 
     const handleClickOutside = (e: MouseEvent) => {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
@@ -174,10 +196,11 @@ export function Header({ onMenuToggle }: HeaderProps) {
 
     return () => {
       clearInterval(interval)
-      supabase.removeChannel(channel)
+      supabase.removeChannel(headerChannel)
+      supabase.removeChannel(kpisChannel)
       window.removeEventListener('storage', handleRefresh)
       window.removeEventListener('audenti_appointment_refresh', handleRefresh)
-      window.removeEventListener('audenti_emergency_refresh', handleRefresh)
+      window.removeEventListener('audenti_emergency_refresh', handleEmergencyAlert)
       document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [])
@@ -263,12 +286,19 @@ export function Header({ onMenuToggle }: HeaderProps) {
           onClick={() => {
             setIsEmergencyModalOpen(true);
             playTone('urgent');
+            setHasActiveEmergency(false);
           }}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition shadow-xs cursor-pointer whitespace-nowrap"
-          title="Triage de Urgencia Inmediata"
+          className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer whitespace-nowrap ${
+            hasActiveEmergency
+              ? 'bg-red-600 hover:bg-red-500 text-white animate-pulse ring-4 ring-red-400 shadow-lg shadow-red-500/50 scale-105 duration-300'
+              : 'bg-red-600/90 hover:bg-red-500 text-white'
+          }`}
+          title={hasActiveEmergency ? "¡URGENCIA ACTIVA DETECTADA! Clic para revisar inmediatamente" : "Triage de Urgencia Inmediata"}
         >
-          <ShieldAlert className="w-3.5 h-3.5 animate-pulse shrink-0" />
-          <span className="hidden sm:inline">Triage Urgencias</span>
+          <ShieldAlert className={`w-3.5 h-3.5 shrink-0 ${hasActiveEmergency ? 'animate-bounce text-yellow-300' : 'animate-pulse'}`} />
+          <span className="hidden sm:inline">
+            {hasActiveEmergency ? '¡Urgencia Activa!' : 'Triage Urgencias'}
+          </span>
         </button>
 
         {/* Menú Flotante de Notificaciones en Vivo */}
