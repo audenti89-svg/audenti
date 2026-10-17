@@ -188,10 +188,49 @@ export async function executeConciergeTool(name: string, args: Record<string, an
         branch = 'Sede Balbuena'
       } = args;
 
-      // Generar fecha y hora combinada ISO
+      // 0. Prohibición estricta de autoconfirmación de citas si el motivo es dolor agudo o urgencia
+      const isEmergencyRequest =
+        treatmentType.toLowerCase().includes('urgencia') ||
+        treatmentType.toLowerCase().includes('dolor') ||
+        treatmentType.toLowerCase().includes('emergencia');
+
+      if (isEmergencyRequest) {
+        return {
+          status: 403,
+          confirmed: false,
+          error: 'POLITICA_URGENCIA_ACTIVA',
+          mensajeError: 'Las urgencias no pueden autoconfirmarse como citas ordinarias. Por favor escala el caso con escalateEmergencyTriage para someterlo a la decisión médica de la Dra. Aura Estudillo.'
+        };
+      }
+
+      // Validar horario y márgenes permitidos
       const startDateTimeStr = `${date}T${time}:00`;
       const startDate = new Date(startDateTimeStr);
       const endDate = new Date(startDate.getTime() + 45 * 60 * 1000); // 45 minutos estándar
+
+      // Verificar si el horario solicitado colisiona con una cita confirmada
+      try {
+        const checkStart = new Date(startDate.getTime() - 30 * 60 * 1000).toISOString();
+        const checkEnd = new Date(endDate.getTime() + 30 * 60 * 1000).toISOString();
+        const { data: conflicts } = await supabase
+          .from('appointments')
+          .select('id, start_time, treatment_type')
+          .gte('start_time', checkStart)
+          .lte('start_time', checkEnd)
+          .neq('status', 'cancelled')
+          .limit(1);
+
+        if (conflicts && conflicts.length > 0) {
+          return {
+            status: 409,
+            confirmed: false,
+            error: 'CONFLICTO_AGENDA',
+            mensajeError: `El horario de las ${time} hrs en esa fecha ya tiene un compromiso reservado en la agenda. Por favor consulta getAvailableSlots y ofrece una alternativa disponible.`
+          };
+        }
+      } catch (confErr: any) {
+        console.warn('Nota de verificación de colisiones en citas:', confErr?.message);
+      }
 
       const folio = `AUD-${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -312,18 +351,25 @@ export async function executeConciergeTool(name: string, args: Record<string, an
         }
 
         // 5. Emitir broadcast realtime para actualizar el Dashboard, Calendario y Notificaciones de la Dra. Aura de inmediato
-        const channel = supabase.channel('dashboard_realtime_kpis');
-        channel.send({
-          type: 'broadcast',
-          event: 'new_appointment',
-          payload: newAppointmentRecord
-        }).catch(() => {});
+        const emitAppointmentToChannels = (channelName: string) => {
+          const ch = supabase.channel(channelName);
+          ch.send({
+            type: 'broadcast',
+            event: 'new_appointment',
+            payload: newAppointmentRecord
+          }).catch(() => {});
 
-        channel.send({
-          type: 'broadcast',
-          event: 'doctor_notification',
-          payload: doctorAlert
-        }).catch(() => {});
+          ch.send({
+            type: 'broadcast',
+            event: 'doctor_notification',
+            payload: doctorAlert
+          }).catch(() => {});
+        };
+
+        emitAppointmentToChannels('dashboard_page_realtime');
+        emitAppointmentToChannels('header_notifications_realtime');
+        emitAppointmentToChannels('calendar_page_realtime');
+        emitAppointmentToChannels('dashboard_realtime_kpis');
 
         return {
           status: 200,
@@ -466,19 +512,26 @@ export async function executeConciergeTool(name: string, args: Record<string, an
           console.warn('Nota al persistir doctor_alerts para urgencia:', alertErr?.message);
         }
 
-        // 5. Emitir broadcast realtime para encender la barra de triaje y la campana de la Dra. Aura
-        const channel = supabase.channel('dashboard_realtime_kpis');
-        channel.send({
-          type: 'broadcast',
-          event: 'emergency_triage_alert',
-          payload: emergencyRecord
-        }).catch(() => {});
+        // 5. Emitir broadcast realtime para encender la barra de triaje, toast y campana de la Dra. Aura en todos los canales activos
+        const emitToChannel = (channelName: string) => {
+          const ch = supabase.channel(channelName);
+          ch.send({
+            type: 'broadcast',
+            event: 'emergency_triage_alert',
+            payload: emergencyRecord
+          }).catch(() => {});
 
-        channel.send({
-          type: 'broadcast',
-          event: 'doctor_notification',
-          payload: doctorAlert
-        }).catch(() => {});
+          ch.send({
+            type: 'broadcast',
+            event: 'doctor_notification',
+            payload: doctorAlert
+          }).catch(() => {});
+        };
+
+        emitToChannel('dashboard_page_realtime');
+        emitToChannel('header_notifications_realtime');
+        emitToChannel('calendar_page_realtime');
+        emitToChannel('dashboard_realtime_kpis');
       } catch (storageErr: any) {
         console.warn('Error al respaldar urgencia en Supabase Storage:', storageErr?.message);
       }

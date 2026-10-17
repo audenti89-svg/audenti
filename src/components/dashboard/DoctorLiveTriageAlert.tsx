@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { AlertCircle, Clock, CheckCircle2, Phone, Sparkles, Send, BellRing, MapPin, X } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
+import { useNotificationSound } from '@/hooks/useNotificationSound'
 
 interface EmergencyAlert {
   id: string
@@ -23,6 +24,7 @@ export function DoctorLiveTriageAlert() {
   const [loading, setLoading] = useState(false)
   const [actionInProgress, setActionInProgress] = useState<string | null>(null)
   const [elapsedSecondsMap, setElapsedSecondsMap] = useState<Record<string, number>>({})
+  const { playTone } = useNotificationSound()
 
   const fetchAlerts = async () => {
     try {
@@ -91,8 +93,32 @@ export function DoctorLiveTriageAlert() {
 
   useEffect(() => {
     fetchAlerts()
-    const interval = setInterval(fetchAlerts, 5000)
-    return () => clearInterval(interval)
+
+    // Suscripción Realtime para activación instantánea del Triage y sonido urgente
+    const supabase = createClient()
+    const channel = supabase
+      .channel('live_triage_alert_channel')
+      .on('broadcast', { event: 'emergency_triage_alert' }, () => {
+        fetchAlerts()
+        playTone('urgent')
+      })
+      .subscribe()
+
+    const interval = setInterval(fetchAlerts, 3000)
+
+    const handleRefresh = () => {
+      fetchAlerts()
+      playTone('urgent')
+    }
+    window.addEventListener('storage', handleRefresh)
+    window.addEventListener('audenti_emergency_refresh', handleRefresh)
+
+    return () => {
+      clearInterval(interval)
+      supabase.removeChannel(channel)
+      window.removeEventListener('storage', handleRefresh)
+      window.removeEventListener('audenti_emergency_refresh', handleRefresh)
+    }
   }, [])
 
   // Timer de segundos transcurridos
