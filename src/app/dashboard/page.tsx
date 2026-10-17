@@ -148,15 +148,9 @@ export default function DashboardPage() {
     fetchDashboardData()
 
     const supabase = createClient()
-    // Suscripción Realtime a cambios en citas y alertas de la Dra. Aura
+    // Suscripción Realtime a broadcast de citas y alertas de la Dra. Aura
     const channel = supabase
-      .channel('dashboard_realtime_kpis')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => {
-        fetchDashboardData()
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => {
-        fetchDashboardData()
-      })
+      .channel('dashboard_page_realtime')
       .on('broadcast', { event: 'new_appointment' }, ({ payload }) => {
         fetchDashboardData()
         if (payload) {

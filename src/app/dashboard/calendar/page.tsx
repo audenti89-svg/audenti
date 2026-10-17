@@ -195,12 +195,9 @@ export default function CalendarPage() {
     fetchCalendarAppointments()
     const supabase = createClient()
 
-    // Suscripción Realtime a citas (postgres_changes + broadcast)
+    // Suscripción Realtime a citas (broadcast)
     const channel = supabase
-      .channel('dashboard_realtime_kpis')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => {
-        fetchCalendarAppointments()
-      })
+      .channel('calendar_page_realtime')
       .on('broadcast', { event: 'new_appointment' }, () => {
         fetchCalendarAppointments()
       })

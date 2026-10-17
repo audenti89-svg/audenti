@@ -143,7 +143,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
 
     const supabase = createClient()
     const channel = supabase
-      .channel('dashboard_realtime_kpis')
+      .channel('header_notifications_realtime')
       .on('broadcast', { event: 'new_appointment' }, () => {
         fetchLiveNotifications()
         playTone('message')
