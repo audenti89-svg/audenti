@@ -39,7 +39,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, result }, { status: 200 })
 
   } catch (error: any) {
-    console.error('[API AI Route Error]:', error?.message)
+    console.error('[API AI Route Error] Capturado en el servidor:', {
+      message: error?.message,
+      stack: error?.stack,
+      cause: error?.cause,
+      status: error?.status,
+      errorDetails: error?.error || error
+    })
     return NextResponse.json(
       { success: false, error: error?.message || 'Error interno en el servidor de IA de Audenti.' },
       { status: 500 }

@@ -99,7 +99,7 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
         
         // Fallback inmediato a Groq
         const fallbackRes = await groq.chat.completions.create({
-          model: 'llama-3.3-70b-versatile',
+          model: 'openai/gpt-oss-120b',
           messages: [
             { role: 'system', content: systemPrompt || 'Fallback clínico de emergencia para Audenti.' },
             ...history,
@@ -122,22 +122,22 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
     // 2. DOMINIO CHAT DE PACIENTES (<300ms objetivo en Groq con Function Calling & Concierge)
     // ==========================================
     if (domain === 'patient_chat') {
+      const dynamicSystemPrompt = systemPrompt || buildDynamicConciergePrompt({
+        doctorBranch: contextData?.doctorBranch || contextData?.clinicName,
+        patientLocation: contextData?.patientLocation,
+        isAfterHours: contextData?.isAfterHours
+      });
+
+      const conversationMessages: any[] = [
+        { role: 'system', content: dynamicSystemPrompt },
+        ...history.map(h => ({ role: h.role, content: h.content })),
+        { role: 'user', content: effectivePrompt }
+      ];
+
       try {
-        const dynamicSystemPrompt = systemPrompt || buildDynamicConciergePrompt({
-          doctorBranch: contextData?.doctorBranch || contextData?.clinicName,
-          patientLocation: contextData?.patientLocation,
-          isAfterHours: contextData?.isAfterHours
-        });
-
-        const conversationMessages: any[] = [
-          { role: 'system', content: dynamicSystemPrompt },
-          ...history.map(h => ({ role: h.role, content: h.content })),
-          { role: 'user', content: effectivePrompt }
-        ];
-
         // Invocación a Groq con Function Calling / Tools activas
         const chatRes = await groq.chat.completions.create({
-          model: 'llama-3.1-8b-instant',
+          model: 'openai/gpt-oss-20b',
           messages: conversationMessages,
           tools: conciergeChatTools,
           tool_choice: 'auto',
@@ -178,7 +178,7 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
 
           // Segunda pasada para generar la respuesta contextual final con los datos reales
           const secondTurn = await groq.chat.completions.create({
-            model: 'llama-3.1-8b-instant',
+            model: 'openai/gpt-oss-20b',
             messages: conversationMessages,
             max_tokens: 450,
             temperature: 0.5
@@ -201,8 +201,41 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
           executionTimeMs: Date.now() - startTime
         };
       } catch (chatError: any) {
-        console.error('[AI Router Error] Patient Chat falló:', chatError.message);
-        throw chatError;
+        console.warn('[AI Router Warning] Falló motor principal de chat de pacientes. Activando fallback ultra-rápido...', chatError.message);
+        
+        try {
+          // Fallback a modelo secundario ultra-rápido en Groq sin tools para garantizar respuesta humana 100% garantizada
+          const fallbackRes = await groq.chat.completions.create({
+            model: 'openai/gpt-oss-120b',
+            messages: [
+              {
+                role: 'system',
+                content: 'Eres Aura AI, la recepcionista y asistente oficial de la clínica dental Audenti de la Dra. Aura Estudillo (Cédula 8492019). Responde siempre con amabilidad, calidez médica y claridad en español de México. Si el paciente pide cita, pregúntale qué día/horario prefiere (Lunes a Sábado de 09:00 a 19:30 hrs) o el motivo de su visita. Si reporta dolor urgente, indícale medidas de calma y que la Dra. Aura puede atenderlo.'
+              },
+              ...history.map(h => ({ role: h.role, content: h.content })),
+              { role: 'user', content: effectivePrompt }
+            ],
+            max_tokens: 400,
+            temperature: 0.5
+          });
+
+          return {
+            success: true,
+            domain,
+            result: fallbackRes.choices[0]?.message?.content || '¡Hola! Con gusto te atiendo en Audenti. ¿Qué día y horario te acomodaría mejor para tu valoración con la Dra. Aura Estudillo?',
+            provider: 'groq/patient-chat-fallback',
+            executionTimeMs: Date.now() - startTime
+          };
+        } catch (secondaryError: any) {
+          console.error('[AI Router Error] Fallback de chat secundario también falló:', secondaryError.message);
+          return {
+            success: true,
+            domain,
+            result: '¡Hola! Con mucho gusto te atendemos en la clínica dental Audenti de la Dra. Aura Estudillo. Nuestro horario es de Lunes a Sábado de 09:00 a 19:30 hrs en nuestras sedes Balbuena y Chalma de Guadalupe. ¿Qué día o procedimiento tienes en mente?',
+            provider: 'audenti/concierge-resilience-fallback',
+            executionTimeMs: Date.now() - startTime
+          };
+        }
       }
     }
 
@@ -211,7 +244,7 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
     // ==========================================
     if (domain === 'finance') {
       const financeRes = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
+        model: 'openai/gpt-oss-120b',
         messages: [
           { role: 'system', content: systemPrompt || 'Eres un analista financiero experto en clínicas dentales. Devuelve estrictamente un objeto JSON válido con los balances y métricas.' },
           { role: 'user', content: effectivePrompt }
@@ -288,7 +321,7 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
         ];
 
         const schedRes = await groq.chat.completions.create({
-          model: 'llama-3.3-70b-versatile',
+          model: 'openai/gpt-oss-20b',
           messages: conversationMessages,
           tools: conciergeChatTools,
           tool_choice: 'auto',
@@ -312,7 +345,7 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
           }
 
           const secondTurn = await groq.chat.completions.create({
-            model: 'llama-3.3-70b-versatile',
+            model: 'openai/gpt-oss-20b',
             messages: conversationMessages,
             temperature: 0.2
           });
