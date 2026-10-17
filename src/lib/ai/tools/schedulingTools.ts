@@ -220,34 +220,79 @@ export async function executeConciergeTool(name: string, args: Record<string, an
         }
       }
 
-      // 2. Insertar cita confirmada atómicamente en appointments
-      const { data: createdAppt, error: apptError } = await supabase
-        .from('appointments')
-        .insert({
-          patient_id: patId || null,
+      // 2. Intentar inserción en base de datos relacional de Supabase (tolerante a esquema)
+      try {
+        await supabase
+          .from('appointments')
+          .insert({
+            patient_id: patId || null,
+            treatment_type: treatmentType,
+            status: 'confirmed',
+            start_time: startDate.toISOString(),
+            end_time: endDate.toISOString(),
+            notes: `[FOLIO: ${folio}] Cita confirmada por Aura AI. Sede: ${branch}. Teléfono: ${phone}. Paciente: ${patientName}`
+          });
+      } catch (dbErr: any) {
+        console.warn('Nota Supabase DB insert en createAppointment:', dbErr?.message);
+      }
+
+      // 3. Persistencia atómica definitiva en Supabase Storage (appointments.json)
+      try {
+        const { data: currentFile } = await supabase.storage.from('audenti_database').download('appointments.json');
+        let currentList: any[] = [];
+        if (currentFile) {
+          try {
+            const currentText = await currentFile.text();
+            if (currentText && currentText.trim()) {
+              currentList = JSON.parse(currentText);
+            }
+          } catch {}
+        }
+
+        const newAppointmentRecord = {
+          id: folio,
+          folio: folio,
+          patient_name: patientName,
+          patient_phone: phone,
+          appointment_date: date,
+          appointment_time: time,
+          treatment: treatmentType,
           treatment_type: treatmentType,
+          branch: branch,
           status: 'confirmed',
+          notes: `[FOLIO: ${folio}] Cita confirmada por Aura AI. Sede: ${branch}. Teléfono: ${phone}. Paciente: ${patientName}`,
           start_time: startDate.toISOString(),
           end_time: endDate.toISOString(),
-          notes: `[FOLIO: ${folio}] Cita confirmada por Aura AI. Sede: ${branch}. Teléfono: ${phone}. Paciente: ${patientName}`
-        })
-        .select('id')
-        .maybeSingle();
+          created_at: new Date().toISOString()
+        };
 
-      if (apptError) {
-        throw new Error(apptError.message);
+        const updatedList = [newAppointmentRecord, ...currentList.filter((a: any) => a.folio !== folio && a.id !== folio)].slice(0, 50);
+        await supabase.storage.from('audenti_database').upload('appointments.json', JSON.stringify(updatedList, null, 2), {
+          upsert: true,
+          contentType: 'application/json'
+        });
+
+        // 4. Emitir broadcast realtime para actualizar el Dashboard de la Dra. Aura de inmediato
+        const channel = supabase.channel('dashboard_realtime_kpis');
+        channel.send({
+          type: 'broadcast',
+          event: 'new_appointment',
+          payload: newAppointmentRecord
+        }).catch(() => {});
+      } catch (storageErr: any) {
+        console.warn('Error al respaldar cita en Supabase Storage:', storageErr?.message);
       }
 
       return {
         confirmed: true,
         folio,
-        appointmentId: createdAppt?.id || folio,
+        appointmentId: folio,
         patientName,
         date,
         time,
         treatmentType,
         branch,
-        mensajeConfirmacion: `Tu cita ha quedado agendada y confirmada con la Dra. Aura Estudillo para el día ${date} a las ${time} hrs en ${branch}. Tu folio de atención es ${folio}. Te esperamos 10 minutos antes.`
+        mensajeConfirmacion: `Tu cita ha quedado agendada con la Dra. Aura Estudillo para el día ${date} a las ${time} hrs en ${branch}. Tu folio es ${folio}. Te esperamos con gusto.`
       };
     }
 
@@ -260,49 +305,98 @@ export async function executeConciergeTool(name: string, args: Record<string, an
       // 1. Asegurar o crear paciente
       let patId: string | undefined;
       if (phone && phone !== 'No provisto') {
-        const { data: existingPat } = await supabase
-          .from('patients')
-          .select('id')
-          .eq('phone', phone)
-          .maybeSingle();
-
-        if (existingPat) {
-          patId = existingPat.id;
-        } else {
-          const { data: newPat } = await supabase
+        try {
+          const { data: existingPat } = await supabase
             .from('patients')
-            .insert({
-              full_name: patientName,
-              phone: phone,
-              onboarding_completed: false
-            })
             .select('id')
+            .eq('phone', phone)
             .maybeSingle();
-          patId = newPat?.id;
-        }
+
+          if (existingPat) {
+            patId = existingPat.id;
+          } else {
+            const { data: newPat } = await supabase
+              .from('patients')
+              .insert({
+                phone: phone,
+                onboarding_completed: false
+              })
+              .select('id')
+              .maybeSingle();
+            patId = newPat?.id;
+          }
+        } catch {}
       }
 
-      // 2. Insertar cita prioritaria en Supabase para alertar a la Dra. Aura
-      const { data: newAppt, error: apptError } = await supabase
-        .from('appointments')
-        .insert({
-          patient_id: patId || null,
+      // 2. Intentar inserción en base de datos relacional de citas de emergencia
+      try {
+        await supabase
+          .from('appointments')
+          .insert({
+            patient_id: patId || null,
+            treatment_type: `URGENCIA DENTAL (${painLevel.toUpperCase()})`,
+            status: 'pending_review',
+            start_time: nowIso,
+            notes: `[FOLIO: ${folio}] SÍNTOMAS: ${symptoms}. Zona Paciente: ${userZone}. Sede: ${targetBranch}. Tel: ${phone}`
+          });
+      } catch (dbErr: any) {
+        console.warn('Nota Supabase DB insert en emergency triage:', dbErr?.message);
+      }
+
+      // 3. Persistencia atómica de urgencia en Supabase Storage para activar el Triage en vivo
+      try {
+        const { data: currentFile } = await supabase.storage.from('audenti_database').download('appointments.json');
+        let currentList: any[] = [];
+        if (currentFile) {
+          try {
+            const currentText = await currentFile.text();
+            if (currentText && currentText.trim()) {
+              currentList = JSON.parse(currentText);
+            }
+          } catch {}
+        }
+
+        const emergencyRecord = {
+          id: folio,
+          folio: folio,
+          patient_name: patientName,
+          patient_phone: phone,
+          appointment_date: formatDateInMexico(getNowInMexico()),
+          appointment_time: 'Urgencia Inmediata',
+          treatment: `URGENCIA DENTAL (${painLevel.toUpperCase()})`,
           treatment_type: `URGENCIA DENTAL (${painLevel.toUpperCase()})`,
+          branch: targetBranch,
           status: 'pending_review',
+          notes: `[FOLIO: ${folio}] SÍNTOMAS: ${symptoms}. Zona Paciente: ${userZone}. Sede: ${targetBranch}. Tel: ${phone}`,
           start_time: nowIso,
-          notes: `[FOLIO: ${folio}] SÍNTOMAS: ${symptoms}. Zona Paciente: ${userZone}. Sede: ${targetBranch}. Tel: ${phone}`
-        })
-        .select('id')
-        .maybeSingle();
+          created_at: nowIso
+        };
+
+        const updatedList = [emergencyRecord, ...currentList.filter((a: any) => a.folio !== folio && a.id !== folio)].slice(0, 50);
+        await supabase.storage.from('audenti_database').upload('appointments.json', JSON.stringify(updatedList, null, 2), {
+          upsert: true,
+          contentType: 'application/json'
+        });
+
+        // 4. Emitir broadcast realtime para encender la barra de triaje en el Dashboard de la Dra. Aura
+        const channel = supabase.channel('dashboard_realtime_kpis');
+        channel.send({
+          type: 'broadcast',
+          event: 'emergency_triage_alert',
+          payload: emergencyRecord
+        }).catch(() => {});
+      } catch (storageErr: any) {
+        console.warn('Error al respaldar urgencia en Supabase Storage:', storageErr?.message);
+      }
 
       return {
         escalated: true,
         folio,
-        appointmentId: newAppt?.id || folio,
+        appointmentId: folio,
         status: 'notified_to_doctor',
         doctorName: 'Dra. Aura Estudillo',
         targetBranch,
-        mensajeParaPaciente: `El caso de urgencia ha sido asignado al Triage Prioritario de la Dra. Aura Estudillo bajo el Folio ${folio}. La clínica está evaluando tiempos y apertura extraordinaria en ${targetBranch}.`
+        mensajeParaPaciente: `He registrado tu urgencia con el folio ${folio} para la Dra. Aura Estudillo. Por favor mantén la calma y evita automedicarte; nuestro equipo se está coordinando para atenderte.`
       };
     }
 

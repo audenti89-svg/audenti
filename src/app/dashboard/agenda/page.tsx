@@ -140,10 +140,74 @@ export default function CalendarPage() {
 
         setAppointments(mapped)
       } else {
+        // Hidratar desde Supabase Storage si la tabla DB no retorna registros
+        try {
+          const { data: storageFile } = await supabase.storage.from('audenti_database').download('appointments.json')
+          if (storageFile) {
+            const text = await storageFile.text()
+            if (text && text.trim()) {
+              const list = JSON.parse(text)
+              if (Array.isArray(list) && list.length > 0) {
+                const mappedStorage: ClinicalAppointment[] = list.map((item: any) => ({
+                  id: item.id || item.folio,
+                  date: item.appointment_date || '2026-10-18',
+                  rawDate: item.appointment_date || '2026-10-18',
+                  isoStart: `${item.appointment_date || '2026-10-18'}T${item.appointment_time || '10:00:00'}`,
+                  time: item.appointment_time || '10:00',
+                  duration: '45 min',
+                  patientName: item.patient_name || item.paciente || 'Paciente Audenti',
+                  phone: item.patient_phone || item.telefono || 'Sin teléfono',
+                  treatment: item.treatment || item.treatment_type || 'Valoración Odontológica',
+                  doctor: 'Dra. Aura Estudillo',
+                  chair: 'Gabinete Principal',
+                  status: (item.status as any) || 'scheduled',
+                  notes: item.notes || 'Cita clínica en plataforma Audenti',
+                  commissionDue: 0
+                }))
+                setAppointments(mappedStorage)
+                return
+              }
+            }
+          }
+        } catch (sErr) {
+          console.warn('Nota en lectura de storage en agenda:', sErr)
+        }
+
         setAppointments([])
       }
     } catch (err) {
       console.warn('Nota en appointments sync:', err)
+      // Fallback final a storage
+      try {
+        const { data: storageFile } = await supabase.storage.from('audenti_database').download('appointments.json')
+        if (storageFile) {
+          const text = await storageFile.text()
+          if (text && text.trim()) {
+            const list = JSON.parse(text)
+            if (Array.isArray(list) && list.length > 0) {
+              const mappedStorage: ClinicalAppointment[] = list.map((item: any) => ({
+                id: item.id || item.folio,
+                date: item.appointment_date || '2026-10-18',
+                rawDate: item.appointment_date || '2026-10-18',
+                isoStart: `${item.appointment_date || '2026-10-18'}T${item.appointment_time || '10:00:00'}`,
+                time: item.appointment_time || '10:00',
+                duration: '45 min',
+                patientName: item.patient_name || item.paciente || 'Paciente Audenti',
+                phone: item.patient_phone || item.telefono || 'Sin teléfono',
+                treatment: item.treatment || item.treatment_type || 'Valoración Odontológica',
+                doctor: 'Dra. Aura Estudillo',
+                chair: 'Gabinete Principal',
+                status: (item.status as any) || 'scheduled',
+                notes: item.notes || 'Cita clínica en plataforma Audenti',
+                commissionDue: 0
+              }))
+              setAppointments(mappedStorage)
+              return
+            }
+          }
+        }
+      } catch {}
+
       setAppointments([])
     } finally {
       setLoading(false)

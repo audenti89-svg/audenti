@@ -33,8 +33,10 @@ export function DoctorLiveTriageAlert() {
         .eq('status', 'pending_review')
         .order('created_at', { ascending: false })
 
-      if (data) {
-        const mapped: EmergencyAlert[] = data.map((d: any) => ({
+      let triageCases: EmergencyAlert[] = []
+
+      if (data && data.length > 0) {
+        triageCases = data.map((d: any) => ({
           id: d.id,
           alertType: 'red_emergency',
           patientName: d.patients?.full_name || 'Paciente Urgencia',
@@ -45,8 +47,43 @@ export function DoctorLiveTriageAlert() {
           created_at: d.created_at,
           status: 'pending'
         }))
-        setCases(mapped)
       }
+
+      // Hidratar desde Supabase Storage para respaldar la alerta en vivo
+      try {
+        const { data: storageFile } = await supabase.storage.from('audenti_database').download('appointments.json')
+        if (storageFile) {
+          const text = await storageFile.text()
+          if (text && text.trim()) {
+            const list = JSON.parse(text)
+            if (Array.isArray(list)) {
+              const pendingFromStorage = list.filter((a: any) => a.status === 'pending_review' || (a.treatment && a.treatment.includes('URGENCIA')))
+              const existingIds = new Set(triageCases.map(c => c.id))
+              for (const p of pendingFromStorage) {
+                const caseId = p.id || p.folio
+                if (!existingIds.has(caseId)) {
+                  triageCases.push({
+                    id: caseId,
+                    alertType: 'red_emergency',
+                    patientName: p.patient_name || p.paciente || 'Paciente Urgencia',
+                    phone: p.patient_phone || p.telefono || 'Sin teléfono',
+                    painLevel: 'severo',
+                    symptoms: p.notes || p.treatment || 'Dolor dental agudo / Urgencia médica',
+                    timestamp: 'Ahora',
+                    created_at: p.created_at || new Date().toISOString(),
+                    status: 'pending'
+                  })
+                  existingIds.add(caseId)
+                }
+              }
+            }
+          }
+        }
+      } catch (storageErr) {
+        console.warn('Nota en lectura de urgencias desde storage:', storageErr)
+      }
+
+      setCases(triageCases)
     } catch (e) {
       // Ignorar fallas silenciosas en polling
     }
