@@ -11,12 +11,27 @@ import {
   Users,
   Building2,
   Calendar,
-  CheckCircle2
+  CheckCircle2,
+  Bell,
+  X,
+  Sparkles,
+  AlertCircle
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { QuickActions } from '@/components/dashboard/QuickActions'
 import { DoctorLiveTriageAlert } from '@/components/dashboard/DoctorLiveTriageAlert'
 import Link from 'next/link'
+
+interface ToastAlert {
+  id: string
+  title: string
+  message: string
+  type: 'appointment' | 'emergency'
+  date?: string
+  time?: string
+  branch?: string
+  folio?: string
+}
 
 export default function DashboardPage() {
   const [kpis, setKpis] = useState({
@@ -29,6 +44,7 @@ export default function DashboardPage() {
   })
   const [recentAppointments, setRecentAppointments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [activeToast, setActiveToast] = useState<ToastAlert | null>(null)
   const supabase = createClient()
 
   const fetchDashboardData = async () => {
@@ -131,7 +147,7 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchDashboardData()
 
-    // Suscripción Realtime a cambios en citas
+    // Suscripción Realtime a cambios en citas y alertas de la Dra. Aura
     const channel = supabase
       .channel('dashboard_realtime_kpis')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => {
@@ -140,8 +156,57 @@ export default function DashboardPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => {
         fetchDashboardData()
       })
-      .on('broadcast', { event: 'new_appointment' }, () => {
+      .on('broadcast', { event: 'new_appointment' }, ({ payload }) => {
         fetchDashboardData()
+        if (payload) {
+          const dateStr = payload.appointment_date || 'Lunes 19'
+          const timeStr = payload.appointment_time || '09:00'
+          setActiveToast({
+            id: payload.id || `toast-${Date.now()}`,
+            title: `Nueva cita agendada por IA: ${payload.patient_name || 'Paciente'}`,
+            message: `${payload.patient_name || 'Paciente'} - ${dateStr}, ${timeStr} hrs (${payload.branch || 'Sede Balbuena'})`,
+            type: 'appointment',
+            date: dateStr,
+            time: timeStr,
+            branch: payload.branch,
+            folio: payload.folio
+          })
+          try {
+            window.dispatchEvent(new CustomEvent('audenti_appointment_refresh'))
+          } catch {}
+        }
+      })
+      .on('broadcast', { event: 'doctor_notification' }, ({ payload }) => {
+        if (payload) {
+          setActiveToast({
+            id: payload.id || `toast-${Date.now()}`,
+            title: payload.title || 'Nueva notificación de la clínica',
+            message: payload.message || 'Se ha registrado una actividad en la plataforma.',
+            type: payload.type === 'urgencia' ? 'emergency' : 'appointment',
+            date: payload.appointment_date,
+            time: payload.appointment_time,
+            branch: payload.branch,
+            folio: payload.folio
+          })
+        }
+      })
+      .on('broadcast', { event: 'emergency_triage_alert' }, ({ payload }) => {
+        fetchDashboardData()
+        if (payload) {
+          setActiveToast({
+            id: payload.id || `toast-urg-${Date.now()}`,
+            title: `🔴 Urgencia Clínica Escalada: ${payload.patient_name || 'Paciente'}`,
+            message: `${payload.treatment || 'Urgencia'} - ${payload.branch || 'Sede Balbuena'}. Requiere atención prioritaria.`,
+            type: 'emergency',
+            date: payload.appointment_date,
+            time: payload.appointment_time,
+            branch: payload.branch,
+            folio: payload.folio
+          })
+          try {
+            window.dispatchEvent(new CustomEvent('audenti_emergency_refresh'))
+          } catch {}
+        }
       })
       .subscribe()
 
@@ -159,6 +224,15 @@ export default function DashboardPage() {
     }
   }, [])
 
+  // Auto-cerrar el Toast después de 8 segundos
+  useEffect(() => {
+    if (!activeToast) return
+    const timer = setTimeout(() => {
+      setActiveToast(null)
+    }, 8000)
+    return () => clearTimeout(timer)
+  }, [activeToast])
+
   const today = new Intl.DateTimeFormat('es-MX', {
     weekday: 'long',
     day: 'numeric',
@@ -167,7 +241,74 @@ export default function DashboardPage() {
   }).format(new Date())
 
   return (
-    <div className="flex flex-col w-full space-y-6 pb-12">
+    <div className="flex flex-col w-full space-y-6 pb-12 relative">
+      {/* Toast Flotante de Notificación en Vivo (Dra. Aura) */}
+      {activeToast && (
+        <div className="fixed top-24 right-4 sm:right-8 z-50 max-w-md w-[calc(100vw-2rem)] sm:w-auto animate-in slide-in-from-top-4 fade-in duration-300">
+          <div className={`p-4 rounded-2xl shadow-2xl border backdrop-blur-md flex items-start gap-3.5 transition-all ${
+            activeToast.type === 'emergency'
+              ? 'bg-red-950/95 text-white border-red-500/80 shadow-red-900/30'
+              : 'bg-slate-900/95 text-white border-amber-500/80 shadow-amber-950/30'
+          }`}>
+            <div className={`p-2.5 rounded-xl shrink-0 mt-0.5 ${
+              activeToast.type === 'emergency' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'
+            }`}>
+              {activeToast.type === 'emergency' ? (
+                <AlertCircle className="w-5 h-5 animate-pulse" />
+              ) : (
+                <Sparkles className="w-5 h-5 animate-spin" />
+              )}
+            </div>
+
+            <div className="flex-1 min-w-0 pr-1">
+              <div className="flex items-center gap-2">
+                <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                  activeToast.type === 'emergency'
+                    ? 'bg-red-500/30 text-red-300 border border-red-500/40'
+                    : 'bg-amber-500/30 text-amber-300 border border-amber-500/40'
+                }`}>
+                  {activeToast.type === 'emergency' ? 'Urgencia Inmediata' : 'Cita Agendada por IA'}
+                </span>
+                <span className="text-[11px] font-mono text-slate-400">Ahora mismo</span>
+              </div>
+              <h4 className="text-sm font-bold text-white mt-1 leading-snug line-clamp-1">
+                {activeToast.title}
+              </h4>
+              <p className="text-xs text-slate-300 mt-1 leading-relaxed line-clamp-2">
+                {activeToast.message}
+              </p>
+
+              <div className="mt-3 flex items-center gap-2">
+                <Link
+                  href="/dashboard/calendar"
+                  onClick={() => setActiveToast(null)}
+                  className="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold transition shadow-xs flex items-center gap-1.5"
+                >
+                  <CalendarDays className="w-3.5 h-3.5" />
+                  Ver en Calendario
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setActiveToast(null)}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition"
+                >
+                  Descartar
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setActiveToast(null)}
+              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition shrink-0"
+              aria-label="Cerrar notificación"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Welcome Banner */}
       <section className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6 transition-all">
         <div className="space-y-2">

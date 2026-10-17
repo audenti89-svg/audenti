@@ -52,27 +52,87 @@ export function Header({ onMenuToggle }: HeaderProps) {
     try {
       const items: NotificationItem[] = []
       const supabase = createClient()
-      const { data } = await supabase
-        .from('appointments')
-        .select('id, treatment_type, status, start_time, notes, patients(full_name)')
-        .order('created_at', { ascending: false })
-        .limit(6)
 
-      if (data) {
-        data.forEach((a: any) => {
-          const isPending = a.status === 'pending_review'
-          items.push({
-            id: `appt-${a.id}`,
-            type: isPending ? 'emergency' : 'appointment',
-            title: isPending ? '🔴 Alerta: Urgencia en Espera' : '📅 Cita en Plataforma',
-            message: `${a.patients?.full_name || 'Paciente'} • ${a.treatment_type || 'Consulta Odontológica'}`,
-            time: 'En vivo',
-            link: isPending ? '/dashboard' : '/dashboard/agenda'
-          })
-        })
+      // 1. Hidratar desde doctor_alerts.json (alertas directas de la Dra. Aura generadas por IA)
+      try {
+        const { data: alertsFile } = await supabase.storage.from('audenti_database').download('doctor_alerts.json')
+        if (alertsFile) {
+          const alertsText = await alertsFile.text()
+          if (alertsText && alertsText.trim()) {
+            const parsedAlerts = JSON.parse(alertsText)
+            if (Array.isArray(parsedAlerts)) {
+              parsedAlerts.forEach((a: any) => {
+                const isEmergency = a.type === 'urgencia'
+                items.push({
+                  id: a.id || `alert-${Math.random()}`,
+                  type: isEmergency ? 'emergency' : 'appointment',
+                  title: a.title || (isEmergency ? '🔴 Alerta: Urgencia Clínica' : '📅 Nueva cita agendada por IA'),
+                  message: a.message || `${a.patient_name || 'Paciente'} - ${a.branch || 'Sede Balbuena'}`,
+                  time: a.appointment_time || a.time || 'Reciente',
+                  link: isEmergency ? '/dashboard' : '/dashboard/calendar'
+                })
+              })
+            }
+          }
+        }
+      } catch (storageAlertErr) {
+        console.warn('Nota doctor_alerts hydration:', storageAlertErr)
       }
 
-      setNotifications(items)
+      // 2. Hidratar desde appointments.json en Storage
+      try {
+        const { data: apptFile } = await supabase.storage.from('audenti_database').download('appointments.json')
+        if (apptFile) {
+          const apptText = await apptFile.text()
+          if (apptText && apptText.trim()) {
+            const parsedAppts = JSON.parse(apptText)
+            if (Array.isArray(parsedAppts)) {
+              parsedAppts.slice(0, 5).forEach((p: any) => {
+                const isPending = p.status === 'pending_review'
+                const alreadyExists = items.some(it => it.id.includes(p.id || p.folio))
+                if (!alreadyExists) {
+                  items.push({
+                    id: `appt-storage-${p.id || p.folio}`,
+                    type: isPending ? 'emergency' : 'appointment',
+                    title: isPending ? '🔴 Urgencia en Espera' : '📅 Cita Agendada',
+                    message: `${p.patient_name || 'Paciente'} • ${p.treatment || p.treatment_type || 'Consulta'} (${p.appointment_date || ''} ${p.appointment_time || ''})`,
+                    time: p.appointment_time || 'En agenda',
+                    link: isPending ? '/dashboard' : '/dashboard/calendar'
+                  })
+                }
+              })
+            }
+          }
+        }
+      } catch {}
+
+      // 3. Fallback / Complemento con tabla relacional de Supabase
+      try {
+        const { data } = await supabase
+          .from('appointments')
+          .select('id, treatment_type, status, start_time, notes, patients(full_name)')
+          .order('created_at', { ascending: false })
+          .limit(4)
+
+        if (data) {
+          data.forEach((a: any) => {
+            const isPending = a.status === 'pending_review'
+            const existing = items.some(it => it.id.includes(a.id))
+            if (!existing) {
+              items.push({
+                id: `appt-db-${a.id}`,
+                type: isPending ? 'emergency' : 'appointment',
+                title: isPending ? '🔴 Alerta: Urgencia en Espera' : '📅 Cita en Plataforma',
+                message: `${a.patients?.full_name || 'Paciente'} • ${a.treatment_type || 'Consulta Odontológica'}`,
+                time: 'En vivo',
+                link: isPending ? '/dashboard' : '/dashboard/calendar'
+              })
+            }
+          })
+        }
+      } catch {}
+
+      setNotifications(items.slice(0, 10))
     } catch {
       // Ignorar errores transitorios
     }
@@ -80,7 +140,25 @@ export function Header({ onMenuToggle }: HeaderProps) {
 
   useEffect(() => {
     fetchLiveNotifications()
-    const interval = setInterval(fetchLiveNotifications, 6000)
+
+    const supabase = createClient()
+    const channel = supabase
+      .channel('dashboard_realtime_kpis')
+      .on('broadcast', { event: 'new_appointment' }, () => {
+        fetchLiveNotifications()
+        playTone('message')
+      })
+      .on('broadcast', { event: 'doctor_notification' }, () => {
+        fetchLiveNotifications()
+        playTone('urgent')
+      })
+      .on('broadcast', { event: 'emergency_triage_alert' }, () => {
+        fetchLiveNotifications()
+        playTone('urgent')
+      })
+      .subscribe()
+
+    const interval = setInterval(fetchLiveNotifications, 5000)
 
     const handleRefresh = () => fetchLiveNotifications()
     window.addEventListener('storage', handleRefresh)
@@ -96,6 +174,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
 
     return () => {
       clearInterval(interval)
+      supabase.removeChannel(channel)
       window.removeEventListener('storage', handleRefresh)
       window.removeEventListener('audenti_appointment_refresh', handleRefresh)
       window.removeEventListener('audenti_emergency_refresh', handleRefresh)
@@ -200,14 +279,20 @@ export function Header({ onMenuToggle }: HeaderProps) {
               setShowNotifications(!showNotifications)
               playTone('message')
             }}
-            className={`relative p-2 rounded-xl transition-colors cursor-pointer ${
-              showNotifications ? 'bg-amber-100/80 text-amber-900' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+            className={`relative p-2 rounded-xl transition-all cursor-pointer ${
+              showNotifications
+                ? 'bg-amber-100 text-amber-950 ring-2 ring-amber-400'
+                : notifications.length > 0
+                ? 'text-amber-800 bg-amber-50 hover:bg-amber-100'
+                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
             }`}
-            title="Notificaciones de sucursal y urgencias"
+            title="Bandeja de Alertas y Citas (Dra. Aura)"
           >
-            <Bell className="w-4 h-4" />
+            <Bell className={`w-4 h-4 ${notifications.length > 0 ? 'text-amber-600 animate-wiggle' : ''}`} />
             {notifications.length > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white animate-pulse" />
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-600 text-white text-[10px] font-extrabold flex items-center justify-center ring-2 ring-white animate-pulse shadow-xs">
+                {notifications.length}
+              </span>
             )}
           </button>
 

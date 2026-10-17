@@ -276,12 +276,53 @@ export async function executeConciergeTool(name: string, args: Record<string, an
           throw new Error(`Fallo de almacenamiento: ${uploadError.message}`);
         }
 
-        // 4. Emitir broadcast realtime para actualizar el Dashboard y el Calendario de la Dra. Aura de inmediato
+        // 4. Registrar alerta formal para la Dra. Aura Estudillo en notifications/doctor_alerts
+        const doctorAlert = {
+          id: `alert-${folio}`,
+          type: 'nueva_cita',
+          title: `Nueva cita agendada por IA: ${patientName}`,
+          message: `${patientName} • ${treatmentType} • ${date} ${time} hrs (${branch})`,
+          patient_name: patientName,
+          appointment_date: date,
+          appointment_time: time,
+          branch: branch,
+          folio: folio,
+          time: `${date} ${time}`,
+          created_at: new Date().toISOString(),
+          read: false
+        };
+
+        // Guardar alerta en doctor_alerts.json
+        try {
+          const { data: alertsFile } = await supabase.storage.from('audenti_database').download('doctor_alerts.json');
+          let alertsList: any[] = [];
+          if (alertsFile) {
+            try {
+              const text = await alertsFile.text();
+              if (text && text.trim()) alertsList = JSON.parse(text);
+            } catch {}
+          }
+          const updatedAlerts = [doctorAlert, ...alertsList.filter((a: any) => a.id !== doctorAlert.id)].slice(0, 50);
+          await supabase.storage.from('audenti_database').upload('doctor_alerts.json', JSON.stringify(updatedAlerts, null, 2), {
+            upsert: true,
+            contentType: 'application/json'
+          });
+        } catch (alertErr: any) {
+          console.warn('Nota al persistir doctor_alerts:', alertErr?.message);
+        }
+
+        // 5. Emitir broadcast realtime para actualizar el Dashboard, Calendario y Notificaciones de la Dra. Aura de inmediato
         const channel = supabase.channel('dashboard_realtime_kpis');
         channel.send({
           type: 'broadcast',
           event: 'new_appointment',
           payload: newAppointmentRecord
+        }).catch(() => {});
+
+        channel.send({
+          type: 'broadcast',
+          event: 'doctor_notification',
+          payload: doctorAlert
         }).catch(() => {});
 
         return {
@@ -391,12 +432,52 @@ export async function executeConciergeTool(name: string, args: Record<string, an
           contentType: 'application/json'
         });
 
-        // 4. Emitir broadcast realtime para encender la barra de triaje en el Dashboard de la Dra. Aura
+        // 4. Guardar alerta de urgencia en doctor_alerts.json
+        const doctorAlert = {
+          id: `alert-${folio}`,
+          type: 'urgencia',
+          title: `🔴 Urgencia Clínica Escalada: ${patientName}`,
+          message: `${patientName} • Dolor ${painLevel.toUpperCase()} • ${targetBranch} • Síntomas: ${symptoms}`,
+          patient_name: patientName,
+          appointment_date: formatDateInMexico(getNowInMexico()),
+          appointment_time: 'Inmediata',
+          branch: targetBranch,
+          folio: folio,
+          time: 'Urgencia Inmediata',
+          created_at: nowIso,
+          read: false
+        };
+
+        try {
+          const { data: alertsFile } = await supabase.storage.from('audenti_database').download('doctor_alerts.json');
+          let alertsList: any[] = [];
+          if (alertsFile) {
+            try {
+              const text = await alertsFile.text();
+              if (text && text.trim()) alertsList = JSON.parse(text);
+            } catch {}
+          }
+          const updatedAlerts = [doctorAlert, ...alertsList.filter((a: any) => a.id !== doctorAlert.id)].slice(0, 50);
+          await supabase.storage.from('audenti_database').upload('doctor_alerts.json', JSON.stringify(updatedAlerts, null, 2), {
+            upsert: true,
+            contentType: 'application/json'
+          });
+        } catch (alertErr: any) {
+          console.warn('Nota al persistir doctor_alerts para urgencia:', alertErr?.message);
+        }
+
+        // 5. Emitir broadcast realtime para encender la barra de triaje y la campana de la Dra. Aura
         const channel = supabase.channel('dashboard_realtime_kpis');
         channel.send({
           type: 'broadcast',
           event: 'emergency_triage_alert',
           payload: emergencyRecord
+        }).catch(() => {});
+
+        channel.send({
+          type: 'broadcast',
+          event: 'doctor_notification',
+          payload: doctorAlert
         }).catch(() => {});
       } catch (storageErr: any) {
         console.warn('Error al respaldar urgencia en Supabase Storage:', storageErr?.message);
