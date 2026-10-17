@@ -29,6 +29,11 @@ export default function DashboardError({
           <p className="text-xs text-slate-500 leading-relaxed">
             Se ha producido un ajuste en el canal reactivo. Puedes reintentar la conexión o regresar al panel principal.
           </p>
+          {error?.message && (
+            <div className="p-3 bg-red-50 rounded-xl border border-red-200 text-left overflow-x-auto text-[11px] font-mono text-red-800">
+              <span className="font-bold">Error:</span> {error.message}
+            </div>
+          )}
         </div>
 
         <div className="flex flex-col sm:flex-row items-center gap-3 justify-center pt-2">

@@ -45,11 +45,11 @@ export default function DashboardPage() {
   const [recentAppointments, setRecentAppointments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [activeToast, setActiveToast] = useState<ToastAlert | null>(null)
-  const supabase = createClient()
 
   const fetchDashboardData = async () => {
     setLoading(true)
     try {
+      const supabase = createClient()
       // 1. Contar citas registradas
       const { data: appointments, error: appErr } = await supabase
         .from('appointments')
@@ -147,6 +147,7 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchDashboardData()
 
+    const supabase = createClient()
     // Suscripción Realtime a cambios en citas y alertas de la Dra. Aura
     const channel = supabase
       .channel('dashboard_realtime_kpis')
@@ -233,12 +234,20 @@ export default function DashboardPage() {
     return () => clearTimeout(timer)
   }, [activeToast])
 
-  const today = new Intl.DateTimeFormat('es-MX', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date())
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const today = mounted
+    ? new Intl.DateTimeFormat('es-MX', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }).format(new Date())
+    : 'Cargando jornada...'
 
   return (
     <div className="flex flex-col w-full space-y-6 pb-12 relative">
