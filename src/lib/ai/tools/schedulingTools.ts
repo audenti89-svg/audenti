@@ -537,10 +537,14 @@ export async function executeConciergeTool(name: string, args: Record<string, an
       }
 
       return {
+        status: 200,
+        confirmed: true,
         escalated: true,
         folio,
         appointmentId: folio,
-        status: 'notified_to_doctor',
+        patientName,
+        phone,
+        statusLabel: 'notified_to_doctor',
         doctorName: 'Dra. Aura Estudillo',
         targetBranch,
         mensajeParaPaciente: `He registrado tu urgencia con el folio ${folio} para la Dra. Aura Estudillo. Por favor mantén la calma y evita automedicarte; nuestro equipo se está coordinando para atenderte.`

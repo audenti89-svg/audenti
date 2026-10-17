@@ -20,6 +20,7 @@ import {
 import { createClient } from '@/utils/supabase/client'
 import { QuickActions } from '@/components/dashboard/QuickActions'
 import { DoctorLiveTriageAlert } from '@/components/dashboard/DoctorLiveTriageAlert'
+import { useNotificationSound } from '@/hooks/useNotificationSound'
 import Link from 'next/link'
 
 interface ToastAlert {
@@ -34,6 +35,7 @@ interface ToastAlert {
 }
 
 export default function DashboardPage() {
+  const { playTone } = useNotificationSound()
   const [kpis, setKpis] = useState({
     todayAppointments: 0,
     activeInChair: 'Sin paciente activo',
@@ -187,11 +189,36 @@ export default function DashboardPage() {
       })
       .on('broadcast', { event: 'emergency_triage_alert' }, ({ payload }) => {
         fetchDashboardData()
+        playTone('urgent')
         if (payload) {
           setActiveToast({
             id: payload.id || `toast-urg-${Date.now()}`,
             title: `🔴 Urgencia Clínica Escalada: ${payload.patient_name || 'Paciente'}`,
-            message: `${payload.treatment || 'Urgencia'} - ${payload.branch || 'Sede Balbuena'}. Requiere atención prioritaria.`,
+            message: `${payload.treatment || 'Urgencia'} - ${payload.branch || 'Sede Balbuena'}. Folio: ${payload.folio || 'EMG'}.`,
+            type: 'emergency',
+            date: payload.appointment_date,
+            time: payload.appointment_time,
+            branch: payload.branch,
+            folio: payload.folio
+          })
+          try {
+            window.dispatchEvent(new CustomEvent('audenti_emergency_refresh'))
+          } catch {}
+        }
+      })
+      .subscribe()
+
+    // Suscripción al canal estándar de KPIs y alertas globales
+    const kpiChannel = supabase
+      .channel('dashboard_kpis_realtime_listener')
+      .on('broadcast', { event: 'emergency_triage_alert' }, ({ payload }) => {
+        fetchDashboardData()
+        playTone('urgent')
+        if (payload) {
+          setActiveToast({
+            id: payload.id || `toast-urg-${Date.now()}`,
+            title: `🔴 Urgencia Clínica Escalada: ${payload.patient_name || 'Paciente'}`,
+            message: `${payload.treatment || 'Urgencia'} - ${payload.branch || 'Sede Balbuena'}. Folio: ${payload.folio || 'EMG'}.`,
             type: 'emergency',
             date: payload.appointment_date,
             time: payload.appointment_time,
@@ -208,14 +235,21 @@ export default function DashboardPage() {
     // Polling reactivo cada 3 segundos y escucha de eventos locales
     const interval = setInterval(fetchDashboardData, 3000)
     const handleRefresh = () => fetchDashboardData()
+    const handleEmergencyAlert = () => {
+      fetchDashboardData()
+      playTone('urgent')
+    }
     window.addEventListener('storage', handleRefresh)
     window.addEventListener('audenti_appointment_refresh', handleRefresh)
+    window.addEventListener('audenti_emergency_refresh', handleEmergencyAlert)
 
     return () => {
       clearInterval(interval)
       window.removeEventListener('storage', handleRefresh)
       window.removeEventListener('audenti_appointment_refresh', handleRefresh)
+      window.removeEventListener('audenti_emergency_refresh', handleEmergencyAlert)
       supabase.removeChannel(channel)
+      supabase.removeChannel(kpiChannel)
     }
   }, [])
 

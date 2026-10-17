@@ -130,6 +130,10 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
         isAfterHours: contextData?.isAfterHours
       });
 
+      // Detección estricta de urgencia o dolor agudo en el mensaje del usuario
+      const painOrEmergencyRegex = /(?:dolor|duele|muela|aguanto|urgente|urgencia|emergencia|sangr|hinchad|inflamad|infecci|ca[ií]da|golpe|quebr|fractur|absceso|pus)/i;
+      const isUrgent = painOrEmergencyRegex.test(effectivePrompt);
+
       const conversationMessages: any[] = [
         { role: 'system', content: dynamicSystemPrompt },
         ...history.map(h => ({ role: h.role, content: h.content })),
@@ -137,14 +141,19 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
       ];
 
       try {
+        // Si el usuario reporta dolor o urgencia, forzar tool_choice a escalateEmergencyTriage
+        const toolChoice = isUrgent
+          ? { type: 'function' as const, function: { name: 'escalateEmergencyTriage' } }
+          : 'auto';
+
         // Invocación a Groq con Function Calling / Tools activas
         const chatRes = await groq.chat.completions.create({
           model: 'openai/gpt-oss-20b',
           messages: conversationMessages,
           tools: conciergeChatTools,
-          tool_choice: 'auto',
+          tool_choice: toolChoice,
           max_tokens: 450,
-          temperature: 0.5
+          temperature: 0.3
         });
 
         const responseMessage = chatRes.choices[0]?.message;
@@ -166,6 +175,9 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
             if (contextData?.phone && !fnArgs.phone) fnArgs.phone = contextData.phone;
             if (contextData?.patientName && !fnArgs.patientName) fnArgs.patientName = contextData.patientName;
             if (contextData?.userZone && !fnArgs.userZone) fnArgs.userZone = contextData.userZone;
+            if (fnName === 'escalateEmergencyTriage' && !fnArgs.symptoms) {
+              fnArgs.symptoms = effectivePrompt;
+            }
 
             // Ejecución contra la base de datos Supabase
             const toolOutput = await executeConciergeTool(fnName, fnArgs);
@@ -218,6 +230,29 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
           };
         }
 
+        // Si el usuario reportó dolor/urgencia pero el modelo no ejecutó la tool por alguna razón, ejecutarla programáticamente de inmediato
+        if (isUrgent) {
+          const emergencyOutput = await executeConciergeTool('escalateEmergencyTriage', {
+            symptoms: effectivePrompt,
+            patientName: contextData?.patientName || 'Paciente Urgencia',
+            phone: contextData?.phone || 'No provisto',
+            painLevel: 'severo',
+            targetBranch: contextData?.doctorBranch || 'Sede Balbuena'
+          });
+
+          const folio = emergencyOutput?.folio || `EMG-${Math.floor(1000 + Math.random() * 9000)}`;
+          const directUrgentReply = `Hemos registrado tu urgencia con el folio ${folio} y notificado de inmediato a la pantalla de la Dra. Aura Estudillo. ¿En aproximadamente cuántos minutos podrías llegar a la clínica para coordinar tu recepción inmediata?`;
+
+          return {
+            success: true,
+            domain,
+            result: directUrgentReply,
+            triageCategory: 'urgency_pain',
+            provider: 'groq/patient-chat-urgent-enforced',
+            executionTimeMs: Date.now() - startTime
+          };
+        }
+
         const rawContent = responseMessage?.content || '';
         const cleanReply = rawContent
           .replace(/^---+$/gm, '')
@@ -236,6 +271,26 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
         console.warn('[AI Router Warning] Falló motor principal de chat de pacientes. Activando fallback ultra-rápido...', chatError.message);
         
         try {
+          if (isUrgent) {
+            const emergencyOutput = await executeConciergeTool('escalateEmergencyTriage', {
+              symptoms: effectivePrompt,
+              patientName: contextData?.patientName || 'Paciente Urgencia',
+              phone: contextData?.phone || 'No provisto',
+              painLevel: 'severo',
+              targetBranch: contextData?.doctorBranch || 'Sede Balbuena'
+            });
+
+            const folio = emergencyOutput?.folio || `EMG-${Math.floor(1000 + Math.random() * 9000)}`;
+            return {
+              success: true,
+              domain,
+              result: `Tu urgencia ha sido registrada con el folio ${folio} y enviada a la pantalla de la Dra. Aura Estudillo. Por favor mantén la calma, evita automedicarte y dinos en cuántos minutos estimas llegar a la clínica.`,
+              triageCategory: 'urgency_pain',
+              provider: 'groq/patient-chat-emergency-failover',
+              executionTimeMs: Date.now() - startTime
+            };
+          }
+
           // Fallback a modelo secundario ultra-rápido en Groq sin tools para garantizar respuesta humana 100% garantizada
           const fallbackRes = await groq.chat.completions.create({
             model: 'openai/gpt-oss-120b',

@@ -46,6 +46,8 @@ export function Header({ onMenuToggle }: HeaderProps) {
   const [showNotifications, setShowNotifications] = useState(false)
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false)
   const [hasActiveEmergency, setHasActiveEmergency] = useState(false)
+  const [activeEmergencyFolio, setActiveEmergencyFolio] = useState<string | null>(null)
+  const [emergencyCount, setEmergencyCount] = useState(0)
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const notifRef = useRef<HTMLDivElement>(null)
 
@@ -133,8 +135,13 @@ export function Header({ onMenuToggle }: HeaderProps) {
         }
       } catch {}
 
-      const hasEmergency = items.some(item => item.type === 'emergency')
-      setHasActiveEmergency(hasEmergency)
+      const emergencyItems = items.filter(item => item.type === 'emergency')
+      setHasActiveEmergency(emergencyItems.length > 0)
+      setEmergencyCount(emergencyItems.length)
+      if (emergencyItems.length > 0 && !activeEmergencyFolio) {
+        const foundFolio = emergencyItems[0].id.replace(/^(appt-storage-|appt-db-|alert-)/, '')
+        setActiveEmergencyFolio(foundFolio.slice(0, 10))
+      }
       setNotifications(items.slice(0, 10))
     } catch {
       // Ignorar errores transitorios
@@ -157,8 +164,10 @@ export function Header({ onMenuToggle }: HeaderProps) {
         fetchLiveNotifications()
         playTone('urgent')
       })
-      .on('broadcast', { event: 'emergency_triage_alert' }, () => {
+      .on('broadcast', { event: 'emergency_triage_alert' }, ({ payload }) => {
         setHasActiveEmergency(true)
+        setEmergencyCount(prev => prev + 1)
+        if (payload?.folio) setActiveEmergencyFolio(payload.folio)
         fetchLiveNotifications()
         playTone('urgent')
       })
@@ -167,8 +176,10 @@ export function Header({ onMenuToggle }: HeaderProps) {
     // Escucha explícita en dashboard_realtime_kpis para triaje de urgencias
     const kpisChannel = supabase
       .channel('header_kpis_realtime')
-      .on('broadcast', { event: 'emergency_triage_alert' }, () => {
+      .on('broadcast', { event: 'emergency_triage_alert' }, ({ payload }) => {
         setHasActiveEmergency(true)
+        setEmergencyCount(prev => prev + 1)
+        if (payload?.folio) setActiveEmergencyFolio(payload.folio)
         fetchLiveNotifications()
         playTone('urgent')
       })
@@ -177,8 +188,9 @@ export function Header({ onMenuToggle }: HeaderProps) {
     const interval = setInterval(fetchLiveNotifications, 4000)
 
     const handleRefresh = () => fetchLiveNotifications()
-    const handleEmergencyAlert = () => {
+    const handleEmergencyAlert = (e?: any) => {
       setHasActiveEmergency(true)
+      if (e?.detail?.folio) setActiveEmergencyFolio(e.detail.folio)
       fetchLiveNotifications()
       playTone('urgent')
     }
@@ -293,12 +305,17 @@ export function Header({ onMenuToggle }: HeaderProps) {
               ? 'bg-red-600 hover:bg-red-500 text-white animate-pulse ring-4 ring-red-400 shadow-lg shadow-red-500/50 scale-105 duration-300'
               : 'bg-red-600/90 hover:bg-red-500 text-white'
           }`}
-          title={hasActiveEmergency ? "¡URGENCIA ACTIVA DETECTADA! Clic para revisar inmediatamente" : "Triage de Urgencia Inmediata"}
+          title={hasActiveEmergency ? `¡URGENCIA ACTIVA DETECTADA (${activeEmergencyFolio || 'EMG'})! Clic para revisar inmediatamente` : "Triage de Urgencia Inmediata"}
         >
           <ShieldAlert className={`w-3.5 h-3.5 shrink-0 ${hasActiveEmergency ? 'animate-bounce text-yellow-300' : 'animate-pulse'}`} />
           <span className="hidden sm:inline">
-            {hasActiveEmergency ? '¡Urgencia Activa!' : 'Triage Urgencias'}
+            {hasActiveEmergency ? `¡Urgencia Activa!${activeEmergencyFolio ? ` [${activeEmergencyFolio}]` : ''}` : 'Triage Urgencias'}
           </span>
+          {hasActiveEmergency && emergencyCount > 0 && (
+            <span className="ml-1 px-1.5 py-0.2 rounded-full bg-yellow-400 text-slate-950 font-black text-[10px] animate-pulse">
+              {emergencyCount}
+            </span>
+          )}
         </button>
 
         {/* Menú Flotante de Notificaciones en Vivo */}
