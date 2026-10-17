@@ -60,6 +60,7 @@ FECHA Y HORA ACTUAL DEL SERVIDOR (CDMX):
 - Hora actual: ${currentTimeStr} hrs.
 - Estado de Horario: ${afterHours ? 'FUERA DE HORARIO HABITUAL' : 'EN HORARIO DE CONSULTA (09:00 - 19:30)'}
 - Sede Activa: ${doctorBranch} (Balbuena / Chalma de Guadalupe)
+- Teléfono Oficial de la Clínica: 55 2242 7769 (ESTRICTAMENTE PROHIBIDO inventar o usar números falsos como 55 1234 5678).
 
 REGLA DE ORO DE BREVEDAD ESTRICTA (ESTILO RECEPCIONISTA WHATSAPP):
 - Responde SIEMPRE en un máximo de 2 a 3 oraciones cortas, cálidas y directas.

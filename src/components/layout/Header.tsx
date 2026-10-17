@@ -166,6 +166,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
       })
       .on('broadcast', { event: 'emergency_triage_alert' }, ({ payload }) => {
         setHasActiveEmergency(true)
+        setIsEmergencyModalOpen(true)
         setEmergencyCount(prev => prev + 1)
         if (payload?.folio) setActiveEmergencyFolio(payload.folio)
         fetchLiveNotifications()
@@ -178,6 +179,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
       .channel('header_kpis_realtime')
       .on('broadcast', { event: 'emergency_triage_alert' }, ({ payload }) => {
         setHasActiveEmergency(true)
+        setIsEmergencyModalOpen(true)
         setEmergencyCount(prev => prev + 1)
         if (payload?.folio) setActiveEmergencyFolio(payload.folio)
         fetchLiveNotifications()
@@ -190,6 +192,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
     const handleRefresh = () => fetchLiveNotifications()
     const handleEmergencyAlert = (e?: any) => {
       setHasActiveEmergency(true)
+      setIsEmergencyModalOpen(true)
       if (e?.detail?.folio) setActiveEmergencyFolio(e.detail.folio)
       fetchLiveNotifications()
       playTone('urgent')

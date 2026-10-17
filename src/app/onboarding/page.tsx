@@ -222,7 +222,7 @@ export default function OnboardingPage() {
               type="tel"
               required
               className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-slate-700/80 text-white placeholder-slate-500 focus:outline-none focus:border-[#E3A033] focus:ring-1 focus:ring-[#E3A033] transition-all"
-              placeholder="55 1234 5678"
+              placeholder="55 2242 7769"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
             />

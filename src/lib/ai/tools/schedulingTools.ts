@@ -520,12 +520,25 @@ export async function executeConciergeTool(name: string, args: Record<string, an
         }
 
         // 5. Emitir broadcast realtime para encender la barra de triaje, toast y campana de la Dra. Aura en todos los canales activos
+        const emergencyBroadcastPayload = {
+          folio: folio.startsWith('EMG-') ? folio : `EMG-${Date.now()}`,
+          patient_name: patientName,
+          phone: phone,
+          reason: symptoms,
+          symptoms: symptoms,
+          pain_level: painLevel,
+          treatment: `URGENCIA DENTAL (${painLevel.toUpperCase()})`,
+          branch: targetBranch,
+          timestamp: nowIso,
+          created_at: nowIso
+        };
+
         const emitToChannel = (channelName: string) => {
           const ch = supabase.channel(channelName);
           ch.send({
             type: 'broadcast',
             event: 'emergency_triage_alert',
-            payload: emergencyRecord
+            payload: emergencyBroadcastPayload
           }).catch(() => {});
 
           ch.send({
@@ -535,10 +548,20 @@ export async function executeConciergeTool(name: string, args: Record<string, an
           }).catch(() => {});
         };
 
+        // Enviar con await explícito al canal solicitado 'dashboard_realtime_kpis'
+        try {
+          await supabase.channel('dashboard_realtime_kpis').send({
+            type: 'broadcast',
+            event: 'emergency_triage_alert',
+            payload: emergencyBroadcastPayload
+          });
+        } catch (kpiBroadcastErr) {
+          console.warn('Nota broadcast directo a dashboard_realtime_kpis:', kpiBroadcastErr);
+        }
+
         emitToChannel('dashboard_page_realtime');
         emitToChannel('header_notifications_realtime');
         emitToChannel('calendar_page_realtime');
-        emitToChannel('dashboard_realtime_kpis');
       } catch (storageErr: any) {
         console.warn('Error al respaldar urgencia en Supabase Storage:', storageErr?.message);
       }

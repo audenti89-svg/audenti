@@ -142,7 +142,7 @@ export function FastTrackEmergencyModal({ isOpen = true, onClose }: FastTrackEme
                     required
                     value={patientPhone}
                     onChange={(e) => setPatientPhone(e.target.value)}
-                    placeholder="+52 55 1234 5678"
+                    placeholder="+52 55 2242 7769"
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-800/90 border border-slate-700 rounded-xl text-white text-xs placeholder:text-slate-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
                   />
                 </div>
