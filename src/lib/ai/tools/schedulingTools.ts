@@ -267,33 +267,46 @@ export async function executeConciergeTool(name: string, args: Record<string, an
         };
 
         const updatedList = [newAppointmentRecord, ...currentList.filter((a: any) => a.folio !== folio && a.id !== folio)].slice(0, 50);
-        await supabase.storage.from('audenti_database').upload('appointments.json', JSON.stringify(updatedList, null, 2), {
+        const { error: uploadError } = await supabase.storage.from('audenti_database').upload('appointments.json', JSON.stringify(updatedList, null, 2), {
           upsert: true,
           contentType: 'application/json'
         });
 
-        // 4. Emitir broadcast realtime para actualizar el Dashboard de la Dra. Aura de inmediato
+        if (uploadError) {
+          throw new Error(`Fallo de almacenamiento: ${uploadError.message}`);
+        }
+
+        // 4. Emitir broadcast realtime para actualizar el Dashboard y el Calendario de la Dra. Aura de inmediato
         const channel = supabase.channel('dashboard_realtime_kpis');
         channel.send({
           type: 'broadcast',
           event: 'new_appointment',
           payload: newAppointmentRecord
         }).catch(() => {});
-      } catch (storageErr: any) {
-        console.warn('Error al respaldar cita en Supabase Storage:', storageErr?.message);
-      }
 
-      return {
-        confirmed: true,
-        folio,
-        appointmentId: folio,
-        patientName,
-        date,
-        time,
-        treatmentType,
-        branch,
-        mensajeConfirmacion: `Tu cita ha quedado agendada con la Dra. Aura Estudillo para el día ${date} a las ${time} hrs en ${branch}. Tu folio es ${folio}. Te esperamos con gusto.`
-      };
+        return {
+          status: 200,
+          confirmed: true,
+          id: folio,
+          folio,
+          appointmentId: folio,
+          patientName,
+          date,
+          time,
+          start_time: startDate.toISOString(),
+          treatmentType,
+          branch,
+          mensajeConfirmacion: `Tu cita ha quedado agendada con la Dra. Aura Estudillo para el día ${date} a las ${time} hrs en ${branch}. Tu folio es ${folio}. Te esperamos con gusto.`
+        };
+      } catch (storageErr: any) {
+        console.error('Error al persistir cita en Supabase:', storageErr);
+        return {
+          status: 500,
+          confirmed: false,
+          error: storageErr?.message || 'Error de base de datos',
+          mensajeError: 'Hubo un detalle al guardar tu espacio en la agenda, un momento mientras lo soluciono o te conecto con la doctora.'
+        };
+      }
     }
 
     if (name === 'escalateEmergencyTriage') {

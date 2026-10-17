@@ -120,11 +120,13 @@ export default function CalendarPage() {
         .select('id, treatment_type, status, start_time, notes, patients(full_name)')
         .order('start_time', { ascending: true })
 
+      let allAppointments: CalendarAppointment[] = []
+
       if (data && data.length > 0) {
-        const mapped: CalendarAppointment[] = data.map((a: any) => {
+        allAppointments = data.map((a: any) => {
           const d = a.start_time ? new Date(a.start_time) : new Date()
-          const dateStr = d.toISOString().split('T')[0]
-          const timeStr = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false })
+          const dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
+          const timeStr = d.toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit', hour12: false })
 
           return {
             id: a.id,
@@ -141,20 +143,49 @@ export default function CalendarPage() {
             color: 'bg-amber-100 text-amber-950 border-l-4 border-amber-500'
           }
         })
-
-        setAppointments(prev => {
-          const manual = prev.filter(p => !p.id.startsWith('APT-'))
-          const combined = [...manual, ...mapped]
-          const seen = new Set<string>()
-          return combined.filter(item => {
-            const cleanName = (item.patientName || '').toLowerCase().trim()
-            const key = `${cleanName}_${item.date}`
-            if (!cleanName || seen.has(key)) return false
-            seen.add(key)
-            return true
-          })
-        })
       }
+
+      // Hidratar desde Supabase Storage para citas agendadas por IA
+      try {
+        const { data: storageFile } = await supabase.storage.from('audenti_database').download('appointments.json')
+        if (storageFile) {
+          const text = await storageFile.text()
+          if (text && text.trim()) {
+            const list = JSON.parse(text)
+            if (Array.isArray(list) && list.length > 0) {
+              const existingIds = new Set(allAppointments.map(a => a.id))
+              for (const p of list) {
+                const appId = p.id || p.folio || `apt-${Date.now()}`
+                if (!existingIds.has(appId)) {
+                  const appointmentDate = p.appointment_date || (p.start_time ? p.start_time.split('T')[0] : '2026-10-19')
+                  let rawTime = p.appointment_time || (p.start_time ? p.start_time.split('T')[1]?.substring(0, 5) : '09:00')
+                  if (rawTime.length > 5) rawTime = rawTime.substring(0, 5)
+
+                  allAppointments.push({
+                    id: appId,
+                    title: p.treatment || p.treatment_type || 'Consulta Odontológica',
+                    patientName: p.patient_name || p.paciente || 'Paciente Audenti',
+                    doctor: 'Dra. Aura Estudillo',
+                    chair: 'Gabinete 1 (Principal)',
+                    specialty: 'Odontología Integral',
+                    date: appointmentDate,
+                    startTime: rawTime,
+                    endTime: '10:00',
+                    durationMin: 45,
+                    status: (p.status as any) || 'confirmed',
+                    color: 'bg-amber-100 text-amber-950 border-l-4 border-amber-500'
+                  })
+                  existingIds.add(appId)
+                }
+              }
+            }
+          }
+        }
+      } catch (storageErr) {
+        console.warn('Nota en lectura de storage para calendario:', storageErr)
+      }
+
+      setAppointments(allAppointments)
     } catch {
       // Ignorar errores transitorios
     }
@@ -166,11 +197,14 @@ export default function CalendarPage() {
 
     // Suscripción Realtime a citas (postgres_changes + broadcast)
     const channel = supabase
-      .channel('calendar_realtime_appointments')
+      .channel('dashboard_realtime_kpis')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => {
         fetchCalendarAppointments()
       })
       .on('broadcast', { event: 'new_appointment' }, () => {
+        fetchCalendarAppointments()
+      })
+      .on('broadcast', { event: 'emergency_triage_alert' }, () => {
         fetchCalendarAppointments()
       })
       .subscribe()
@@ -352,34 +386,55 @@ export default function CalendarPage() {
                 />
               </div>
             </div>
-            {/* Matriz 7x5 mini */}
+            {/* Matriz 7x5 mini con semana iniciando en Lunes (L M M J V S D) */}
             <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400 mb-1">
-              <span>D</span><span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span>
+              <span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span>
             </div>
-            <div className="grid grid-cols-7 gap-1 text-center text-xs">
-              {Array.from({ length: 31 }, (_, i) => i + 1).map(day => {
-                const dayPadded = day < 10 ? '0' + day : '' + day
-                const currentMonthPrefix = selectedDate.substring(0, 8) // YYYY-MM-
-                const targetFull = `${currentMonthPrefix}${dayPadded}`
-                const isSelected = selectedDate === targetFull
-                const isRealToday = getTodayStr() === targetFull
-                return (
-                  <button
-                    key={day}
-                    onClick={() => setSelectedDate(targetFull)}
-                    className={`h-7 w-7 rounded-full flex items-center justify-center font-semibold text-xs transition-colors mx-auto ${
-                      isSelected
-                        ? 'bg-amber-400 text-slate-950 font-bold shadow-xs'
-                        : isRealToday
-                        ? 'border border-amber-500 font-bold text-amber-900 bg-amber-50/50'
-                        : 'text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    {day}
-                  </button>
-                )
-              })}
-            </div>
+            {(() => {
+              const [yearStr, monthStr] = selectedDate.split('-')
+              const year = parseInt(yearStr, 10)
+              const month = parseInt(monthStr, 10) - 1 // 0-indexed
+              const firstDayOfMonth = new Date(year, month, 1, 12, 0, 0)
+              // 0=Domingo, 1=Lunes, ... 6=Sábado -> convertir a Lunes=0, Domingo=6
+              const startDayOffset = (firstDayOfMonth.getDay() + 6) % 7
+              const totalDaysInMonth = new Date(year, month + 1, 0).getDate()
+
+              const monthPrefix = `${yearStr}-${monthStr}-`
+              const todayStr = getTodayStr()
+
+              return (
+                <div className="grid grid-cols-7 gap-1 text-center text-xs">
+                  {/* Celdas vacías previas para alinear el día 1 en su columna correcta */}
+                  {Array.from({ length: startDayOffset }).map((_, idx) => (
+                    <div key={`empty-${idx}`} className="h-7 w-7 mx-auto pointer-events-none" />
+                  ))}
+
+                  {/* Días del mes */}
+                  {Array.from({ length: totalDaysInMonth }, (_, i) => i + 1).map(day => {
+                    const dayPadded = day < 10 ? '0' + day : '' + day
+                    const targetFull = `${monthPrefix}${dayPadded}`
+                    const isSelected = selectedDate === targetFull
+                    const isRealToday = todayStr === targetFull
+
+                    return (
+                      <button
+                        key={day}
+                        onClick={() => setSelectedDate(targetFull)}
+                        className={`h-7 w-7 rounded-full flex items-center justify-center font-semibold text-xs transition-colors mx-auto ${
+                          isSelected
+                            ? 'bg-amber-400 text-slate-950 font-bold shadow-xs'
+                            : isRealToday
+                            ? 'border border-amber-500 font-bold text-amber-900 bg-amber-50/50'
+                            : 'text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        {day}
+                      </button>
+                    )
+                  })}
+                </div>
+              )
+            })()}
           </div>
 
           {/* Filtros por Especialistas Dentales */}
