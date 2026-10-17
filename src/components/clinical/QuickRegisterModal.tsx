@@ -9,9 +9,11 @@ import {
   ShieldCheck,
   HeartPulse,
   Save,
-  AlertCircle
+  AlertCircle,
+  Building2
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
+import { useBranchStore, BranchId, BRANCHES_DATA } from '@/stores/branchStore'
 
 interface QuickRegisterModalProps {
   isOpen: boolean
@@ -22,6 +24,7 @@ interface QuickRegisterModalProps {
 
 export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreated }: QuickRegisterModalProps) {
   const supabase = createClient()
+  const { currentBranchId } = useBranchStore()
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
 
@@ -31,11 +34,19 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
     birthYear: '',
     phone: '',
     email: '',
+    selectedBranchId: currentBranchId,
     emergencyContact: '',
     emergencyPhone: '',
     allergies: '',
     medicalConditions: '',
   })
+
+  // Sincronizar con la sucursal activa al abrir
+  useEffect(() => {
+    if (isOpen) {
+      setFormData(prev => ({ ...prev, selectedBranchId: currentBranchId }))
+    }
+  }, [isOpen, currentBranchId])
 
   if (!isOpen) return null
 
@@ -45,16 +56,32 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
     setErrorMsg('')
 
     try {
+      // 1. Obtener o resolver tenant_id dinámicamente según la sucursal seleccionada
       const { data: defaultTenant } = await supabase.from('tenants').select('id').limit(1).maybeSingle()
-      const { data: defaultBranch } = await supabase.from('branches').select('id').limit(1).maybeSingle()
+      
+      // Buscar sucursal en BD por nombre o slug
+      const branchMeta = BRANCHES_DATA[formData.selectedBranchId as BranchId] || BRANCHES_DATA.balbuena
+      const { data: matchedBranch } = await supabase
+        .from('branches')
+        .select('id, tenant_id')
+        .ilike('name', `%${formData.selectedBranchId.replace('-', ' ')}%`)
+        .limit(1)
+        .maybeSingle()
+
+      const resolvedTenantId = matchedBranch?.tenant_id || defaultTenant?.id || null
+      const resolvedBranchId = matchedBranch?.id || null
 
       const parsedAge = formData.age ? parseInt(formData.age, 10) : (formData.birthYear ? new Date().getFullYear() - parseInt(formData.birthYear, 10) : null)
 
+      // Payload exacto según directriz de mapeo dinámico:
       const patientPayload: any = {
         full_name: formData.fullName.trim(),
         age: parsedAge,
         phone: formData.phone.trim(),
         email: formData.email.trim() || null,
+        // Inyección dinámica de tenant_id y branch_id según sucursal elegida en el UI
+        tenant_id: resolvedTenantId,
+        branch_id: resolvedBranchId,
         emergency_contact_name: formData.emergencyContact.trim() || null,
         emergency_contact_phone: formData.emergencyPhone.trim() || null,
         allergies_medication: formData.allergies
@@ -66,8 +93,9 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
         onboarding_completed: true,
       }
 
-      if (defaultTenant?.id) patientPayload.tenant_id = defaultTenant.id
-      if (defaultBranch?.id) patientPayload.branch_id = defaultBranch.id
+      // Si no hay tenant_id por configuración en BD, no enviar campo nulo si tiene restricción
+      if (!patientPayload.tenant_id) delete patientPayload.tenant_id
+      if (!patientPayload.branch_id) delete patientPayload.branch_id
 
       const { data, error } = await supabase
         .from('patients')
@@ -146,6 +174,22 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
               onChange={e => setFormData({ ...formData, fullName: e.target.value })}
               className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#202D4C] focus:bg-white transition-all"
             />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1 flex items-center gap-1.5">
+              <Building2 className="w-3.5 h-3.5 text-amber-600" />
+              Sucursal / Sede Asignada (Inyección de Tenant) *
+            </label>
+            <select
+              value={formData.selectedBranchId}
+              onChange={e => setFormData({ ...formData, selectedBranchId: e.target.value as BranchId })}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#202D4C] focus:bg-white transition-all cursor-pointer"
+            >
+              <option value="balbuena">Sucursal Balbuena (Matriz) — Dra. Aura Estudillo</option>
+              <option value="guadalupe-chalma">Sucursal Guadalupe Chalma — Dr. Ramírez López</option>
+              <option value="colonia-roma">Sucursal Colonia Roma — Próxima Apertura</option>
+            </select>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
