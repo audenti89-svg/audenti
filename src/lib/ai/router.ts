@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import Anthropic from '@anthropic-ai/sdk';
 import Groq from 'groq-sdk';
+import { buildDynamicConciergePrompt } from './prompts/conciergePrompt';
 
 // Adaptador de compatibilidad para Google GenAI (SDK @google/genai moderno)
 export class GoogleGenerativeAI {
@@ -117,26 +118,32 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
     }
 
     // ==========================================
-    // 2. DOMINIO CHAT DE PACIENTES (<300ms objetivo en Groq)
+    // 2. DOMINIO CHAT DE PACIENTES (<300ms objetivo en Groq con Aura AI Concierge)
     // ==========================================
     if (domain === 'patient_chat') {
       try {
+        const dynamicSystemPrompt = systemPrompt || buildDynamicConciergePrompt({
+          doctorBranch: contextData?.doctorBranch || contextData?.clinicName,
+          patientLocation: contextData?.patientLocation,
+          isAfterHours: contextData?.isAfterHours
+        });
+
         const chatRes = await groq.chat.completions.create({
           model: 'llama-3.1-8b-instant',
           messages: [
-            { role: 'system', content: systemPrompt || 'Eres un asistente virtual empático, amable y rápido para WhatsApp y widgets web dentales de la clínica Audenti de la Dra. Aura Estudillo.' },
+            { role: 'system', content: dynamicSystemPrompt },
             ...history,
             { role: 'user', content: effectivePrompt }
           ],
-          max_tokens: 300,
-          temperature: 0.7
+          max_tokens: 350,
+          temperature: 0.6
         });
 
         return {
           success: true,
           domain,
           result: chatRes.choices[0]?.message?.content || '',
-          provider: 'groq/patient-chat-fast',
+          provider: 'groq/patient-chat-concierge',
           executionTimeMs: Date.now() - startTime
         };
       } catch (chatError: any) {
