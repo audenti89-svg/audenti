@@ -1,5 +1,6 @@
 import { getGroqClient } from '@/lib/groq'
 import { callBIEngine } from './engines/bi'
+import { callSchedulingEngine } from './engines/scheduling'
 
 export type AITaskDomain = 'clinical' | 'patient_chat' | 'finance' | 'bi' | 'scheduling'
 export type AITaskType = AITaskDomain
@@ -321,8 +322,12 @@ export async function executeAIAgent({ domain, prompt, contextData }: {
         break;
 
       case 'scheduling':
-        // 📅 Dominio de Citas: Citas y Function Calling
-        result = await callSchedulingModel(prompt, contextData, "Eres un asistente de recepción experto en gestión de agendas médicas.");
+        // 📅 Dominio de Citas: Citas y Function Calling con Supabase
+        try {
+          result = await callSchedulingEngine({ prompt, contextData });
+        } catch {
+          result = await callSchedulingModel(prompt, contextData, "Eres un asistente de recepción experto en gestión de agendas médicas.");
+        }
         break;
 
       default:
