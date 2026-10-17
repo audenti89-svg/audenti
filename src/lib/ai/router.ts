@@ -1,6 +1,7 @@
 import { getGroqClient } from '@/lib/groq'
+import { callBIEngine } from './engines/bi'
 
-export type AITaskDomain = 'clinical' | 'patient_chat' | 'finance' | 'scheduling' | 'bi'
+export type AITaskDomain = 'clinical' | 'patient_chat' | 'finance' | 'bi' | 'scheduling'
 export type AITaskType = AITaskDomain
 
 export interface AIRequestOptions {
@@ -27,14 +28,16 @@ export interface RouteAITaskPayload {
 
 export interface AIRouteResult {
   success: boolean
-  taskType: AITaskType
-  model: string
+  domain?: AITaskDomain
+  taskType?: AITaskType
+  model?: string
   modelUsed?: string
-  result: string
+  result?: any
   content?: string
   parsedJson?: any
   error?: string
   latencyMs?: number
+  executionTimeMs?: number
 }
 
 /**
@@ -74,11 +77,13 @@ export async function callClaudeModel(prompt: string, context?: any, systemPromp
         const text = json.choices?.[0]?.message?.content || 'Análisis clínico estructurado exitosamente.'
         return {
           success: true,
+          domain: 'clinical',
           taskType: 'clinical',
           model: 'Claude 3.5 Sonnet',
           modelUsed: 'anthropic/claude-3.5-sonnet',
           result: text,
           content: text,
+          executionTimeMs: Date.now() - start,
           latencyMs: Date.now() - start
         }
       }
@@ -99,22 +104,26 @@ export async function callClaudeModel(prompt: string, context?: any, systemPromp
     const text = completion.choices[0]?.message?.content || 'Análisis clínico estructurado exitosamente.'
     return {
       success: true,
+      domain: 'clinical',
       taskType: 'clinical',
       model: 'Claude 3.5 Sonnet (Groq-Engine)',
       modelUsed: 'openai/gpt-oss-120b',
       result: text,
       content: text,
+      executionTimeMs: Date.now() - start,
       latencyMs: Date.now() - start
     }
   } catch (err: any) {
     console.warn('Fallback clínico aplicado:', err?.message)
     return {
       success: true,
+      domain: 'clinical',
       taskType: 'clinical',
       model: 'Claude 3.5 Sonnet',
       modelUsed: 'clinical-heuristic',
       result: `Análisis clínico estructurado exitosamente: ${prompt}`,
       content: `Análisis clínico estructurado exitosamente: ${prompt}`,
+      executionTimeMs: Date.now() - start,
       latencyMs: Date.now() - start
     }
   }
@@ -146,28 +155,32 @@ export async function callFastChatModel(prompt: string, context?: any, systemPro
     const text = completion.choices[0]?.message?.content || 'Respuesta empática generada para el paciente.'
     return {
       success: true,
+      domain: 'patient_chat',
       taskType: 'patient_chat',
       model: 'GPT-4o mini',
       modelUsed: 'openai/gpt-oss-20b',
       result: text,
       content: text,
+      executionTimeMs: Date.now() - start,
       latencyMs: Date.now() - start
     }
   } catch (err: any) {
     return {
       success: true,
+      domain: 'patient_chat',
       taskType: 'patient_chat',
       model: 'GPT-4o mini',
       modelUsed: 'fast-chat-heuristic',
       result: '¡Hola! Con gusto te atiendo en Audenti. Platícame qué molestia presentas o si deseas consultar horarios de valoración.',
       content: '¡Hola! Con gusto te atiendo en Audenti. Platícame qué molestia presentas o si deseas consultar horarios de valoración.',
+      executionTimeMs: Date.now() - start,
       latencyMs: Date.now() - start
     }
   }
 }
 
 /**
- * 💰 Dominio Financiero (ERP & BI): Usamos un modelo con alta precisión analítica y estructuración de datos
+ * 💰 Dominio Financiero (ERP): Usamos un modelo con alta precisión analítica y estructuración de datos
  * Modelo: GPT-4o / Claude / Mixtral Analítico
  */
 export async function callAnalyticalModel(prompt: string, context?: any, systemPrompt?: string): Promise<AIRouteResult> {
@@ -197,22 +210,26 @@ export async function callAnalyticalModel(prompt: string, context?: any, systemP
 
     return {
       success: true,
+      domain: 'finance',
       taskType: 'finance',
       model: 'GPT-4o / Claude',
       modelUsed: 'openai/gpt-oss-120b',
       result: text,
       content: text,
       parsedJson,
+      executionTimeMs: Date.now() - start,
       latencyMs: Date.now() - start
     }
   } catch (err: any) {
     return {
       success: true,
+      domain: 'finance',
       taskType: 'finance',
       model: 'GPT-4o / Claude',
       modelUsed: 'analytical-heuristic',
       result: 'Reporte financiero y métricas procesadas con éxito.',
       content: 'Reporte financiero y métricas procesadas con éxito.',
+      executionTimeMs: Date.now() - start,
       latencyMs: Date.now() - start
     }
   }
@@ -244,21 +261,25 @@ export async function callSchedulingModel(prompt: string, context?: any, systemP
     const text = completion.choices[0]?.message?.content || 'Hueco de agenda optimizado.'
     return {
       success: true,
+      domain: 'scheduling',
       taskType: 'scheduling',
       model: 'Llama 3 / Function Calling',
       modelUsed: 'openai/gpt-oss-20b',
       result: text,
       content: text,
+      executionTimeMs: Date.now() - start,
       latencyMs: Date.now() - start
     }
   } catch (err: any) {
     return {
       success: true,
+      domain: 'scheduling',
       taskType: 'scheduling',
       model: 'Llama 3 / Function Calling',
       modelUsed: 'scheduler-heuristic',
       result: 'Hueco de agenda optimizado.',
       content: 'Hueco de agenda optimizado.',
+      executionTimeMs: Date.now() - start,
       latencyMs: Date.now() - start
     }
   }
@@ -266,27 +287,58 @@ export async function callSchedulingModel(prompt: string, context?: any, systemP
 
 /**
  * Ejecutor principal de Agentes de IA por Dominio (executeAIAgent)
+ * Integra Gemini 1.5 Pro en el dominio 'bi' y Claude/GPT/Llama en los demás
  */
-export async function executeAIAgent({ domain, prompt, contextData }: AIRequestOptions): Promise<AIRouteResult> {
-  switch (domain) {
-    case 'clinical':
-      // 🩺 Dominio Clínico (Dra. Aura): Usamos el modelo más potente para análisis y redacción médica
-      return await callClaudeModel(prompt, contextData, 'Eres un asistente médico experto en odontología y expedientes clínicos.')
+export async function executeAIAgent({ domain, prompt, contextData }: {
+  domain: AITaskDomain;
+  prompt: string;
+  contextData?: any;
+}) {
+  const startTime = Date.now();
 
-    case 'patient_chat':
-      // 💬 Dominio de Pacientes (CXM y Chatbot): Usamos un modelo rápido, fluido y económico
-      return await callFastChatModel(prompt, contextData, 'Eres un asistente virtual amable y empático de la clínica dental Audenti.')
+  try {
+    let result: any;
 
-    case 'finance':
-      // 💰 Dominio Financiero (ERP): Usamos un modelo con alta precisión analítica y estructuración de datos
-      return await callAnalyticalModel(prompt, contextData, 'Eres un experto analista financiero y contable de clínicas médicas.')
+    switch (domain) {
+      case 'clinical':
+        // 🩺 Dominio Clínico (Dra. Aura): Claude 3.5 Sonnet
+        result = await callClaudeModel(prompt, contextData, "Eres un asistente médico experto en odontología y expedientes clínicos.");
+        break;
 
-    case 'scheduling':
-      // 📅 Dominio de Citas: Enfocado en lógica estructurada y disponibilidad
-      return await callSchedulingModel(prompt, contextData, 'Eres un asistente de recepción experto en gestión de agendas médicas.')
+      case 'patient_chat':
+        // 💬 Dominio de Pacientes (CXM y Chatbot): GPT-4o mini / Groq
+        result = await callFastChatModel(prompt, contextData, "Eres un asistente virtual amable y empático de la clínica dental Audenti.");
+        break;
 
-    default:
-      throw new Error(`Dominio de IA no soportado: ${domain}`)
+      case 'finance':
+        // 💰 Dominio Financiero (ERP): Auditoría financiera y contable
+        result = await callAnalyticalModel(prompt, contextData, "Eres un experto analista financiero y contable de clínicas médicas.");
+        break;
+
+      case 'bi':
+        // 📊 Invocamos nuestro nuevo motor de Analítica y BI con Gemini 1.5 Pro
+        result = await callBIEngine({ prompt, contextData });
+        break;
+
+      case 'scheduling':
+        // 📅 Dominio de Citas: Citas y Function Calling
+        result = await callSchedulingModel(prompt, contextData, "Eres un asistente de recepción experto en gestión de agendas médicas.");
+        break;
+
+      default:
+        throw new Error(`Dominio de IA no reconocido: ${domain}`);
+    }
+
+    return {
+      success: true,
+      domain,
+      result,
+      executionTimeMs: Date.now() - startTime,
+    };
+
+  } catch (error: any) {
+    console.error(`[AI Router Error] Fallo en el dominio ${domain}:`, error.message);
+    throw error;
   }
 }
 
@@ -295,10 +347,21 @@ export async function executeAIAgent({ domain, prompt, contextData }: AIRequestO
  */
 export async function routeAITask(taskType: AITaskDomain, payload: RouteAITaskPayload): Promise<AIRouteResult> {
   const prompt = payload.prompt || payload.clinicalText || payload.userMessage || 'Procesar requerimiento'
-  const domain = (taskType === 'bi' ? 'finance' : taskType) as AITaskDomain
-  return await executeAIAgent({
+  const domain = taskType as AITaskDomain
+  const res = await executeAIAgent({
     domain,
     prompt,
     contextData: payload.dataContext
   })
+
+  return {
+    success: res.success,
+    domain: res.domain,
+    taskType: res.domain,
+    model: res.result?.engineUsed || res.result?.model || 'Audenti AI Engine',
+    result: typeof res.result === 'string' ? res.result : (res.result?.analysis || res.result?.result || JSON.stringify(res.result)),
+    content: typeof res.result === 'string' ? res.result : (res.result?.analysis || res.result?.content || JSON.stringify(res.result)),
+    executionTimeMs: res.executionTimeMs,
+    latencyMs: res.executionTimeMs
+  }
 }
