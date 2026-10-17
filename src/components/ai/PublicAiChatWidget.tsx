@@ -145,12 +145,13 @@ export function PublicAiChatWidget() {
         body: JSON.stringify({
           domain: 'patient_chat',
           prompt: userText,
+          history: history.slice(-10),
           contextData: {
             role: 'public',
             sessionId,
             phone: detectedPhone || undefined,
             patientName: detectedName || undefined,
-            history
+            userZone: typeof window !== 'undefined' ? localStorage.getItem('audenti_user_zone') || undefined : undefined
           }
         })
       })
@@ -163,7 +164,11 @@ export function PublicAiChatWidget() {
 
       const replyContent = typeof data?.result === 'string'
         ? data.result
-        : (data?.result?.result || data?.result?.content || '¡Hola! Con gusto te atiendo en la clínica dental Audenti de la Dra. Aura Estudillo. ¿En qué podemos ayudarte hoy?')
+        : (data?.result?.result || data?.result?.content || '')
+
+      if (!replyContent) {
+        throw new Error('No se recibió respuesta válida del asistente.')
+      }
 
       // Si la IA generó o confirmó una cita con folio, disparar evento para refrescar la agenda en tiempo real
       if (replyContent && (replyContent.includes('AUD-') || replyContent.includes('folio') || replyContent.includes('Folio'))) {

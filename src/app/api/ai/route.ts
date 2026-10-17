@@ -6,11 +6,19 @@ export const runtime = 'nodejs'
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { domain, prompt, contextData, userContext, patientContext, taskType } = body
+    const { domain, prompt, contextData, userContext, patientContext, taskType, history, messages } = body
 
     // Soporte flexible para peticiones de router (domain) o peticiones legadas (taskType/prompt)
-    const resolvedDomain = (domain || taskType || 'clinical') as AITaskDomain
+    const resolvedDomain = (domain || taskType || 'patient_chat') as AITaskDomain
     const resolvedPrompt = prompt || body.notes || body.userMessage || ''
+
+    // Preservar historial conversacional completo para mantener el hilo lógico
+    const resolvedHistory = Array.isArray(history) && history.length > 0
+      ? history
+      : (Array.isArray(messages) ? messages.map((m: any) => ({
+          role: m.role === 'user' ? 'user' : 'assistant',
+          content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
+        })) : [])
 
     // Validación básica de parámetros obligatorios
     if (!resolvedDomain || !resolvedPrompt) {
@@ -20,10 +28,11 @@ export async function POST(request: Request) {
       )
     }
 
-    // Ejecutamos el enrutador de agentes especializados
+    // Ejecutamos el enrutador de agentes especializados con historial y Function Calling
     const result = await executeAIAgent({
       domain: resolvedDomain,
       prompt: resolvedPrompt,
+      history: resolvedHistory,
       contextData: contextData || patientContext || userContext,
     })
 

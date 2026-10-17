@@ -2,6 +2,7 @@ import { GoogleGenAI } from '@google/genai';
 import Anthropic from '@anthropic-ai/sdk';
 import Groq from 'groq-sdk';
 import { buildDynamicConciergePrompt } from './prompts/conciergePrompt';
+import { conciergeChatTools, executeConciergeTool } from './tools/schedulingTools';
 
 // Adaptador de compatibilidad para Google GenAI (SDK @google/genai moderno)
 export class GoogleGenerativeAI {
@@ -118,7 +119,7 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
     }
 
     // ==========================================
-    // 2. DOMINIO CHAT DE PACIENTES (<300ms objetivo en Groq con Aura AI Concierge)
+    // 2. DOMINIO CHAT DE PACIENTES (<300ms objetivo en Groq con Function Calling & Concierge)
     // ==========================================
     if (domain === 'patient_chat') {
       try {
@@ -128,21 +129,74 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
           isAfterHours: contextData?.isAfterHours
         });
 
+        const conversationMessages: any[] = [
+          { role: 'system', content: dynamicSystemPrompt },
+          ...history.map(h => ({ role: h.role, content: h.content })),
+          { role: 'user', content: effectivePrompt }
+        ];
+
+        // Invocación a Groq con Function Calling / Tools activas
         const chatRes = await groq.chat.completions.create({
           model: 'llama-3.1-8b-instant',
-          messages: [
-            { role: 'system', content: dynamicSystemPrompt },
-            ...history,
-            { role: 'user', content: effectivePrompt }
-          ],
-          max_tokens: 350,
-          temperature: 0.6
+          messages: conversationMessages,
+          tools: conciergeChatTools,
+          tool_choice: 'auto',
+          max_tokens: 450,
+          temperature: 0.5
         });
+
+        const responseMessage = chatRes.choices[0]?.message;
+
+        // Si el modelo decide invocar herramientas para consultar Supabase
+        if (responseMessage?.tool_calls && responseMessage.tool_calls.length > 0) {
+          conversationMessages.push(responseMessage);
+
+          for (const toolCall of responseMessage.tool_calls) {
+            const fnName = toolCall.function.name;
+            let fnArgs: Record<string, any> = {};
+            try {
+              fnArgs = JSON.parse(toolCall.function.arguments || '{}');
+            } catch {
+              fnArgs = {};
+            }
+
+            // Inyectar contexto si falta en argumentos
+            if (contextData?.phone && !fnArgs.phone) fnArgs.phone = contextData.phone;
+            if (contextData?.patientName && !fnArgs.patientName) fnArgs.patientName = contextData.patientName;
+            if (contextData?.userZone && !fnArgs.userZone) fnArgs.userZone = contextData.userZone;
+
+            // Ejecución contra la base de datos Supabase
+            const toolOutput = await executeConciergeTool(fnName, fnArgs);
+
+            conversationMessages.push({
+              tool_call_id: toolCall.id,
+              role: 'tool',
+              name: fnName,
+              content: JSON.stringify(toolOutput)
+            });
+          }
+
+          // Segunda pasada para generar la respuesta contextual final con los datos reales
+          const secondTurn = await groq.chat.completions.create({
+            model: 'llama-3.1-8b-instant',
+            messages: conversationMessages,
+            max_tokens: 450,
+            temperature: 0.5
+          });
+
+          return {
+            success: true,
+            domain,
+            result: secondTurn.choices[0]?.message?.content || '',
+            provider: 'groq/patient-chat-concierge-tools',
+            executionTimeMs: Date.now() - startTime
+          };
+        }
 
         return {
           success: true,
           domain,
-          result: chatRes.choices[0]?.message?.content || '',
+          result: responseMessage?.content || '',
           provider: 'groq/patient-chat-concierge',
           executionTimeMs: Date.now() - startTime
         };
@@ -226,22 +280,63 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
     // 5. DOMINIO SCHEDULING (Function Calling / Citas)
     // ==========================================
     if (domain === 'scheduling') {
-      const schedRes = await groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
+      try {
+        const conversationMessages: any[] = [
           { role: 'system', content: systemPrompt || 'Asistente de agendamiento y citas dentales de la clínica Audenti.' },
+          ...history.map(h => ({ role: h.role, content: h.content })),
           { role: 'user', content: effectivePrompt }
-        ],
-        temperature: 0.2
-      });
+        ];
 
-      return {
-        success: true,
-        domain,
-        result: schedRes.choices[0]?.message?.content || '',
-        provider: 'groq/scheduling',
-        executionTimeMs: Date.now() - startTime
-      };
+        const schedRes = await groq.chat.completions.create({
+          model: 'llama-3.3-70b-versatile',
+          messages: conversationMessages,
+          tools: conciergeChatTools,
+          tool_choice: 'auto',
+          temperature: 0.2
+        });
+
+        const respMsg = schedRes.choices[0]?.message;
+
+        if (respMsg?.tool_calls && respMsg.tool_calls.length > 0) {
+          conversationMessages.push(respMsg);
+          for (const tc of respMsg.tool_calls) {
+            let parsedArgs = {};
+            try { parsedArgs = JSON.parse(tc.function.arguments || '{}'); } catch {}
+            const toolRes = await executeConciergeTool(tc.function.name, parsedArgs);
+            conversationMessages.push({
+              tool_call_id: tc.id,
+              role: 'tool',
+              name: tc.function.name,
+              content: JSON.stringify(toolRes)
+            });
+          }
+
+          const secondTurn = await groq.chat.completions.create({
+            model: 'llama-3.3-70b-versatile',
+            messages: conversationMessages,
+            temperature: 0.2
+          });
+
+          return {
+            success: true,
+            domain,
+            result: secondTurn.choices[0]?.message?.content || '',
+            provider: 'groq/scheduling-tools',
+            executionTimeMs: Date.now() - startTime
+          };
+        }
+
+        return {
+          success: true,
+          domain,
+          result: respMsg?.content || '',
+          provider: 'groq/scheduling',
+          executionTimeMs: Date.now() - startTime
+        };
+      } catch (schedErr: any) {
+        console.error('[Scheduling Error]:', schedErr.message);
+        throw schedErr;
+      }
     }
 
     throw new Error(`Dominio de IA no reconocido: ${domain}`);
