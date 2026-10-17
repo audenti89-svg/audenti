@@ -60,18 +60,28 @@ export async function updateSession(request: NextRequest) {
     // Lista de correos administradores / dueños del sistema (Dra. Aura Estudillo)
     const isSuperAdmin = user.email === 'audenti89@gmail.com';
 
-    // Verificar si el usuario es staff/doctor/owner en la tabla `users`
-    const { data: userProfile } = await supabase
-      .from('users')
-      .select('role, onboarding_completed')
-      .eq('id', user.id)
-      .maybeSingle();
+    // 1. Leer rol prioritariamente desde los Claims del JWT (Custom Access Token Hook de Supabase)
+    const jwtRole = user.app_metadata?.user_role || user.app_metadata?.role || user.user_metadata?.role;
 
-    const isStaffOrOwner =
+    let isStaffOrOwner =
       isSuperAdmin ||
-      userProfile?.role === 'owner' ||
-      userProfile?.role === 'admin' ||
-      userProfile?.role === 'doctor';
+      jwtRole === 'owner' ||
+      jwtRole === 'admin' ||
+      jwtRole === 'doctor';
+
+    // 2. Si no viene en los claims del token, consultar la tabla `users` como fallback
+    if (!isStaffOrOwner) {
+      const { data: userProfile } = await supabase
+        .from('users')
+        .select('role, onboarding_completed')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      isStaffOrOwner =
+        userProfile?.role === 'owner' ||
+        userProfile?.role === 'admin' ||
+        userProfile?.role === 'doctor';
+    }
 
     if (isStaffOrOwner) {
       // Dueña / Doctora / Administrador tiene acceso total directo al dashboard
