@@ -1,372 +1,278 @@
-import { getGroqClient } from '@/lib/groq'
-import { callBIEngine } from './engines/bi'
-import { callSchedulingEngine } from './engines/scheduling'
+import { GoogleGenAI } from '@google/genai';
+import Anthropic from '@anthropic-ai/sdk';
+import Groq from 'groq-sdk';
 
-export type AITaskDomain = 'clinical' | 'patient_chat' | 'finance' | 'bi' | 'scheduling'
-export type AITaskType = AITaskDomain
+// Adaptador de compatibilidad para Google GenAI (SDK @google/genai moderno)
+export class GoogleGenerativeAI {
+  private client: GoogleGenAI;
+  constructor(apiKey?: string) {
+    this.client = new GoogleGenAI({ apiKey: apiKey || process.env.GEMINI_API_KEY || '' });
+  }
+
+  getGenerativeModel({ model }: { model: string }) {
+    return {
+      generateContent: async (contents: Array<string | any>) => {
+        const textParts = contents
+          .filter(Boolean)
+          .map(c => (typeof c === 'string' ? c : JSON.stringify(c)))
+          .join('\n\n');
+        
+        const res = await this.client.models.generateContent({
+          model,
+          contents: textParts
+        });
+        return {
+          response: {
+            text: () => res.text || ''
+          }
+        };
+      }
+    };
+  }
+}
+
+// Inicialización segura de SDKs con validación de entorno
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY || '' });
+const googleAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+
+export type AITaskDomain = 'clinical' | 'patient_chat' | 'finance' | 'bi' | 'scheduling';
+export type AITaskType = AITaskDomain;
 
 export interface AIRequestOptions {
-  domain: AITaskDomain
-  prompt: string
-  contextData?: any
-  systemPrompt?: string
-  temperature?: number
-  maxTokens?: number
+  domain: AITaskDomain;
+  prompt: string;
+  systemPrompt?: string;
+  jsonMode?: boolean;
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  contextData?: any;
+  userContext?: any;
 }
 
-export interface RouteAITaskPayload {
-  prompt?: string
-  messages?: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
-  userMessage?: string
-  patientName?: string
-  patientPhone?: string
-  clinicalText?: string
-  treatment?: string
-  dataContext?: any
-  temperature?: number
-  maxTokens?: number
+export interface AIResponse {
+  success: boolean;
+  domain?: AITaskDomain;
+  result: any;
+  provider: string;
+  executionTimeMs: number;
+  error?: string;
 }
 
-export interface AIRouteResult {
-  success: boolean
-  domain?: AITaskDomain
-  taskType?: AITaskType
-  model?: string
-  modelUsed?: string
-  result?: any
-  content?: string
-  parsedJson?: any
-  error?: string
-  latencyMs?: number
-  executionTimeMs?: number
-}
+export async function executeAIAgent(options: AIRequestOptions): Promise<AIResponse> {
+  const startTime = Date.now();
+  const { domain, prompt, systemPrompt, jsonMode, history = [], contextData } = options;
 
-/**
- * 🩺 Dominio Clínico (Dra. Aura): Usamos el modelo más potente para análisis y redacción médica
- * Modelo: Claude 3.5 Sonnet (Anthropic API / OpenRouter) con fallback a GPT-OSS 120b
- */
-export async function callClaudeModel(prompt: string, context?: any, systemPrompt?: string): Promise<AIRouteResult> {
-  const start = Date.now()
-  const defaultSystem = systemPrompt || 'Eres un asistente médico experto en odontología y expedientes clínicos de la Dra. Aura Estudillo (Cédula Profesional 8492019).'
-  const contextStr = context ? `\n\nContexto clínico adjunto:\n${typeof context === 'object' ? JSON.stringify(context, null, 2) : context}` : ''
-
-  console.log('Activando Claude 3.5 Sonnet para análisis clínico...')
+  // Si existe contexto adicional estructurado, lo anexamos al prompt para enriquecer la inferencia
+  const contextString = contextData
+    ? `\n\n[Contexto Adjunto]:\n${typeof contextData === 'object' ? JSON.stringify(contextData, null, 2) : contextData}`
+    : '';
+  const effectivePrompt = `${prompt}${contextString}`;
 
   try {
-    if (process.env.OPENROUTER_API_KEY && process.env.OPENROUTER_API_KEY !== 'sk-dummy-key-for-build') {
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'https://audenti.app',
-          'X-Title': 'Audenti DentalCloud Pro - Clinical Agent'
-        },
-        body: JSON.stringify({
-          model: process.env.AI_CLINICAL_MODEL || 'anthropic/claude-3.5-sonnet',
+    // ==========================================
+    // 1. DOMINIO CLINICO (Claude 3.5 Sonnet -> Fallback a Groq Llama)
+    // ==========================================
+    if (domain === 'clinical') {
+      try {
+        const response = await anthropic.messages.create({
+          model: 'claude-3-5-sonnet-20241022',
+          max_tokens: 1500,
+          system: systemPrompt || 'Eres un asistente clínico experto apoyando a personal médico odontológico de la Dra. Aura Estudillo.',
           messages: [
-            { role: 'system', content: defaultSystem },
-            { role: 'user', content: `${prompt}${contextStr}` }
-          ],
-          temperature: 0.2,
-          max_tokens: 500
-        })
-      })
+            ...history.map(h => ({ role: h.role, content: h.content })),
+            { role: 'user', content: effectivePrompt }
+          ]
+        });
 
-      if (response.ok) {
-        const json = await response.json()
-        const text = json.choices?.[0]?.message?.content || 'Análisis clínico estructurado exitosamente.'
+        const textContent = response.content.find(c => c.type === 'text');
         return {
           success: true,
-          domain: 'clinical',
-          taskType: 'clinical',
-          model: 'Claude 3.5 Sonnet',
-          modelUsed: 'anthropic/claude-3.5-sonnet',
-          result: text,
-          content: text,
-          executionTimeMs: Date.now() - start,
-          latencyMs: Date.now() - start
-        }
+          domain,
+          result: textContent ? textContent.text : '',
+          provider: 'anthropic/claude-3.5-sonnet',
+          executionTimeMs: Date.now() - startTime
+        };
+      } catch (anthropicError: any) {
+        console.warn('[AI Router] Claude falló o sin saldo. Conmutando a fallback Groq...', anthropicError.message);
+        
+        // Fallback inmediato a Groq
+        const fallbackRes = await groq.chat.completions.create({
+          model: 'llama-3.3-70b-versatile',
+          messages: [
+            { role: 'system', content: systemPrompt || 'Fallback clínico de emergencia para Audenti.' },
+            ...history,
+            { role: 'user', content: effectivePrompt }
+          ],
+          temperature: 0.2
+        });
+
+        return {
+          success: true,
+          domain,
+          result: fallbackRes.choices[0]?.message?.content || '',
+          provider: 'groq/fallback-clinical',
+          executionTimeMs: Date.now() - startTime
+        };
       }
     }
 
-    // Fallback a Groq gpt-oss-120b
-    const groq = getGroqClient()
-    const completion = await groq.chat.completions.create({
-      model: 'openai/gpt-oss-120b',
-      messages: [
-        { role: 'system', content: defaultSystem },
-        { role: 'user', content: `${prompt}${contextStr}` }
-      ],
-      temperature: 0.2,
-      max_tokens: 450
-    })
+    // ==========================================
+    // 2. DOMINIO CHAT DE PACIENTES (<300ms objetivo en Groq)
+    // ==========================================
+    if (domain === 'patient_chat') {
+      try {
+        const chatRes = await groq.chat.completions.create({
+          model: 'llama-3.1-8b-instant',
+          messages: [
+            { role: 'system', content: systemPrompt || 'Eres un asistente virtual empático, amable y rápido para WhatsApp y widgets web dentales de la clínica Audenti de la Dra. Aura Estudillo.' },
+            ...history,
+            { role: 'user', content: effectivePrompt }
+          ],
+          max_tokens: 300,
+          temperature: 0.7
+        });
 
-    const text = completion.choices[0]?.message?.content || 'Análisis clínico estructurado exitosamente.'
-    return {
-      success: true,
-      domain: 'clinical',
-      taskType: 'clinical',
-      model: 'Claude 3.5 Sonnet (Groq-Engine)',
-      modelUsed: 'openai/gpt-oss-120b',
-      result: text,
-      content: text,
-      executionTimeMs: Date.now() - start,
-      latencyMs: Date.now() - start
-    }
-  } catch (err: any) {
-    console.warn('Fallback clínico aplicado:', err?.message)
-    return {
-      success: true,
-      domain: 'clinical',
-      taskType: 'clinical',
-      model: 'Claude 3.5 Sonnet',
-      modelUsed: 'clinical-heuristic',
-      result: `Análisis clínico estructurado exitosamente: ${prompt}`,
-      content: `Análisis clínico estructurado exitosamente: ${prompt}`,
-      executionTimeMs: Date.now() - start,
-      latencyMs: Date.now() - start
-    }
-  }
-}
-
-/**
- * 💬 Dominio de Pacientes (CXM y Chatbot): Usamos un modelo rápido, fluido y económico
- * Modelo: GPT-4o mini / Fast Chat (latencia < 300ms)
- */
-export async function callFastChatModel(prompt: string, context?: any, systemPrompt?: string): Promise<AIRouteResult> {
-  const start = Date.now()
-  const defaultSystem = systemPrompt || 'Eres un asistente virtual amable y empático de la clínica dental Audenti.'
-  const contextStr = context ? `\n\nContexto:\n${typeof context === 'object' ? JSON.stringify(context) : context}` : ''
-
-  console.log('Activando modelo optimizado para chat con pacientes...')
-
-  try {
-    const groq = getGroqClient()
-    const completion = await groq.chat.completions.create({
-      model: 'openai/gpt-oss-20b',
-      messages: [
-        { role: 'system', content: defaultSystem },
-        { role: 'user', content: `${prompt}${contextStr}` }
-      ],
-      temperature: 0.3,
-      max_tokens: 350
-    })
-
-    const text = completion.choices[0]?.message?.content || 'Respuesta empática generada para el paciente.'
-    return {
-      success: true,
-      domain: 'patient_chat',
-      taskType: 'patient_chat',
-      model: 'GPT-4o mini',
-      modelUsed: 'openai/gpt-oss-20b',
-      result: text,
-      content: text,
-      executionTimeMs: Date.now() - start,
-      latencyMs: Date.now() - start
-    }
-  } catch (err: any) {
-    return {
-      success: true,
-      domain: 'patient_chat',
-      taskType: 'patient_chat',
-      model: 'GPT-4o mini',
-      modelUsed: 'fast-chat-heuristic',
-      result: '¡Hola! Con gusto te atiendo en Audenti. Platícame qué molestia presentas o si deseas consultar horarios de valoración.',
-      content: '¡Hola! Con gusto te atiendo en Audenti. Platícame qué molestia presentas o si deseas consultar horarios de valoración.',
-      executionTimeMs: Date.now() - start,
-      latencyMs: Date.now() - start
-    }
-  }
-}
-
-/**
- * 💰 Dominio Financiero (ERP): Usamos un modelo con alta precisión analítica y estructuración de datos
- * Modelo: GPT-4o / Claude / Mixtral Analítico
- */
-export async function callAnalyticalModel(prompt: string, context?: any, systemPrompt?: string): Promise<AIRouteResult> {
-  const start = Date.now()
-  const defaultSystem = systemPrompt || 'Eres un experto analista financiero y contable de clínicas médicas.'
-  const contextStr = context ? `\n\nDatos Financieros:\n${typeof context === 'object' ? JSON.stringify(context, null, 2) : context}` : ''
-
-  console.log('Activando motor analítico para finanzas...')
-
-  try {
-    const groq = getGroqClient()
-    const completion = await groq.chat.completions.create({
-      model: 'openai/gpt-oss-120b',
-      messages: [
-        { role: 'system', content: defaultSystem },
-        { role: 'user', content: `${prompt}${contextStr}` }
-      ],
-      temperature: 0.1,
-      max_tokens: 500
-    })
-
-    const text = completion.choices[0]?.message?.content || 'Reporte financiero y métricas procesadas.'
-    let parsedJson = undefined
-    try {
-      parsedJson = JSON.parse(text)
-    } catch {}
-
-    return {
-      success: true,
-      domain: 'finance',
-      taskType: 'finance',
-      model: 'GPT-4o / Claude',
-      modelUsed: 'openai/gpt-oss-120b',
-      result: text,
-      content: text,
-      parsedJson,
-      executionTimeMs: Date.now() - start,
-      latencyMs: Date.now() - start
-    }
-  } catch (err: any) {
-    return {
-      success: true,
-      domain: 'finance',
-      taskType: 'finance',
-      model: 'GPT-4o / Claude',
-      modelUsed: 'analytical-heuristic',
-      result: 'Reporte financiero y métricas procesadas con éxito.',
-      content: 'Reporte financiero y métricas procesadas con éxito.',
-      executionTimeMs: Date.now() - start,
-      latencyMs: Date.now() - start
-    }
-  }
-}
-
-/**
- * 📅 Dominio de Citas: Enfocado en lógica estructurada y disponibilidad
- * Modelo: Llama 3 / Function Calling / Scheduler
- */
-export async function callSchedulingModel(prompt: string, context?: any, systemPrompt?: string): Promise<AIRouteResult> {
-  const start = Date.now()
-  const defaultSystem = systemPrompt || 'Eres un asistente de recepción experto en gestión de agendas médicas.'
-  const contextStr = context ? `\n\nDisponibilidad:\n${typeof context === 'object' ? JSON.stringify(context) : context}` : ''
-
-  console.log('Activando agente de agendamiento...')
-
-  try {
-    const groq = getGroqClient()
-    const completion = await groq.chat.completions.create({
-      model: 'openai/gpt-oss-20b',
-      messages: [
-        { role: 'system', content: defaultSystem },
-        { role: 'user', content: `${prompt}${contextStr}` }
-      ],
-      temperature: 0.2,
-      max_tokens: 300
-    })
-
-    const text = completion.choices[0]?.message?.content || 'Hueco de agenda optimizado.'
-    return {
-      success: true,
-      domain: 'scheduling',
-      taskType: 'scheduling',
-      model: 'Llama 3 / Function Calling',
-      modelUsed: 'openai/gpt-oss-20b',
-      result: text,
-      content: text,
-      executionTimeMs: Date.now() - start,
-      latencyMs: Date.now() - start
-    }
-  } catch (err: any) {
-    return {
-      success: true,
-      domain: 'scheduling',
-      taskType: 'scheduling',
-      model: 'Llama 3 / Function Calling',
-      modelUsed: 'scheduler-heuristic',
-      result: 'Hueco de agenda optimizado.',
-      content: 'Hueco de agenda optimizado.',
-      executionTimeMs: Date.now() - start,
-      latencyMs: Date.now() - start
-    }
-  }
-}
-
-/**
- * Ejecutor principal de Agentes de IA por Dominio (executeAIAgent)
- * Integra Gemini 1.5 Pro en el dominio 'bi' y Claude/GPT/Llama en los demás
- */
-export async function executeAIAgent({ domain, prompt, contextData }: {
-  domain: AITaskDomain;
-  prompt: string;
-  contextData?: any;
-}) {
-  const startTime = Date.now();
-
-  try {
-    let result: any;
-
-    switch (domain) {
-      case 'clinical':
-        // 🩺 Dominio Clínico (Dra. Aura): Claude 3.5 Sonnet
-        result = await callClaudeModel(prompt, contextData, "Eres un asistente médico experto en odontología y expedientes clínicos.");
-        break;
-
-      case 'patient_chat':
-        // 💬 Dominio de Pacientes (CXM y Chatbot): GPT-4o mini / Groq
-        result = await callFastChatModel(prompt, contextData, "Eres un asistente virtual amable y empático de la clínica dental Audenti.");
-        break;
-
-      case 'finance':
-        // 💰 Dominio Financiero (ERP): Auditoría financiera y contable
-        result = await callAnalyticalModel(prompt, contextData, "Eres un experto analista financiero y contable de clínicas médicas.");
-        break;
-
-      case 'bi':
-        // 📊 Invocamos nuestro nuevo motor de Analítica y BI con Gemini 1.5 Pro
-        result = await callBIEngine({ prompt, contextData });
-        break;
-
-      case 'scheduling':
-        // 📅 Dominio de Citas: Citas y Function Calling con Supabase
-        try {
-          result = await callSchedulingEngine({ prompt, contextData });
-        } catch {
-          result = await callSchedulingModel(prompt, contextData, "Eres un asistente de recepción experto en gestión de agendas médicas.");
-        }
-        break;
-
-      default:
-        throw new Error(`Dominio de IA no reconocido: ${domain}`);
+        return {
+          success: true,
+          domain,
+          result: chatRes.choices[0]?.message?.content || '',
+          provider: 'groq/patient-chat-fast',
+          executionTimeMs: Date.now() - startTime
+        };
+      } catch (chatError: any) {
+        console.error('[AI Router Error] Patient Chat falló:', chatError.message);
+        throw chatError;
+      }
     }
 
-    return {
-      success: true,
-      domain,
-      result,
-      executionTimeMs: Date.now() - startTime,
-    };
+    // ==========================================
+    // 3. DOMINIO FINANCIERO (Estructuración JSON estricta)
+    // ==========================================
+    if (domain === 'finance') {
+      const financeRes = await groq.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: systemPrompt || 'Eres un analista financiero experto en clínicas dentales. Devuelve estrictamente un objeto JSON válido con los balances y métricas.' },
+          { role: 'user', content: effectivePrompt }
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.1
+      });
+
+      let parsedResult;
+      try {
+        parsedResult = JSON.parse(financeRes.choices[0]?.message?.content || '{}');
+      } catch (e) {
+        parsedResult = { raw: financeRes.choices[0]?.message?.content };
+      }
+
+      return {
+        success: true,
+        domain,
+        result: parsedResult,
+        provider: 'groq/finance-json',
+        executionTimeMs: Date.now() - startTime
+      };
+    }
+
+    // ==========================================
+    // 4. DOMINIO BUSINESS INTELLIGENCE (Google Gemini 1.5 Pro)
+    // ==========================================
+    if (domain === 'bi') {
+      try {
+        const model = googleAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+        const result = await model.generateContent([
+          systemPrompt || 'Analiza los datos ejecutivos y métricas clínicas de Audenti:',
+          effectivePrompt
+        ]);
+        const responseText = result.response.text();
+
+        return {
+          success: true,
+          domain,
+          result: responseText,
+          provider: 'google/gemini-1.5-pro',
+          executionTimeMs: Date.now() - startTime
+        };
+      } catch (geminiError: any) {
+        console.warn('[AI Router] Gemini BI falló. Conmutando a Groq analítico...', geminiError.message);
+        
+        const fallbackBI = await groq.chat.completions.create({
+          model: 'llama-3.3-70b-versatile',
+          messages: [
+            { role: 'system', content: 'Fallback analítico BI de Audenti.' },
+            { role: 'user', content: effectivePrompt }
+          ]
+        });
+
+        return {
+          success: true,
+          domain,
+          result: fallbackBI.choices[0]?.message?.content || '',
+          provider: 'groq/fallback-bi',
+          executionTimeMs: Date.now() - startTime
+        };
+      }
+    }
+
+    // ==========================================
+    // 5. DOMINIO SCHEDULING (Function Calling / Citas)
+    // ==========================================
+    if (domain === 'scheduling') {
+      const schedRes = await groq.chat.completions.create({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: systemPrompt || 'Asistente de agendamiento y citas dentales de la clínica Audenti.' },
+          { role: 'user', content: effectivePrompt }
+        ],
+        temperature: 0.2
+      });
+
+      return {
+        success: true,
+        domain,
+        result: schedRes.choices[0]?.message?.content || '',
+        provider: 'groq/scheduling',
+        executionTimeMs: Date.now() - startTime
+      };
+    }
+
+    throw new Error(`Dominio de IA no reconocido: ${domain}`);
 
   } catch (error: any) {
-    console.error(`[AI Router Error] Fallo en el dominio ${domain}:`, error.message);
-    throw error;
+    console.error(`[AI Router Critical Error] Dominio: ${domain}`, error);
+    return {
+      success: false,
+      domain,
+      result: null,
+      provider: 'none',
+      executionTimeMs: Date.now() - startTime,
+      error: error.message || 'Error desconocido en el enrutador de IA'
+    };
   }
 }
 
 /**
- * Compatibilidad con routeAITask
+ * Función de compatibilidad para llamadas legadas (routeAITask)
  */
-export async function routeAITask(taskType: AITaskDomain, payload: RouteAITaskPayload): Promise<AIRouteResult> {
-  const prompt = payload.prompt || payload.clinicalText || payload.userMessage || 'Procesar requerimiento'
-  const domain = taskType as AITaskDomain
+export async function routeAITask(taskType: AITaskDomain, payload: any) {
+  const prompt = payload.prompt || payload.clinicalText || payload.userMessage || 'Procesar requerimiento';
+  const domain = taskType as AITaskDomain;
   const res = await executeAIAgent({
     domain,
     prompt,
     contextData: payload.dataContext
-  })
+  });
 
   return {
     success: res.success,
     domain: res.domain,
     taskType: res.domain,
-    model: res.result?.engineUsed || res.result?.model || 'Audenti AI Engine',
+    model: res.provider,
     result: typeof res.result === 'string' ? res.result : (res.result?.analysis || res.result?.result || JSON.stringify(res.result)),
     content: typeof res.result === 'string' ? res.result : (res.result?.analysis || res.result?.content || JSON.stringify(res.result)),
     executionTimeMs: res.executionTimeMs,
-    latencyMs: res.executionTimeMs
-  }
+    latencyMs: res.executionTimeMs,
+    error: res.error
+  };
 }
