@@ -246,13 +246,14 @@ export default function ExpedientePage() {
             <Printer className="w-4 h-4" />
             Imprimir Receta / Presupuesto
           </Link>
-          <a
-            href="/api/export?format=word"
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-50 text-slate-800 text-xs font-bold hover:bg-slate-100 transition-colors border border-slate-200 shadow-2xs"
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-50 text-slate-800 text-xs font-bold hover:bg-slate-100 transition-colors border border-slate-200 shadow-2xs cursor-pointer"
           >
             <FileText className="w-4 h-4 text-blue-600" />
-            Resumen (.doc)
-          </a>
+            Resumen Clínico
+          </button>
           <button
             type="button"
             onClick={() => setIsEditing(true)}

@@ -51,43 +51,7 @@ export default function DashboardPage() {
 
       let appList = appointments || []
 
-      // Complementar con citas persistentes de /api/appointments con desduplicación estricta
-      try {
-        const appRes = await fetch('/api/appointments')
-        const appJson = await appRes.json()
-        if (appJson?.success && Array.isArray(appJson.appointments) && appJson.appointments.length > 0) {
-          const apiMapped = appJson.appointments.map((a: any) => ({
-            id: a.id,
-            start_time: `${a.appointment_date}T${a.appointment_time}`,
-            end_time: `${a.appointment_date}T${a.appointment_time}`,
-            status: a.status || 'scheduled',
-            treatment_type: a.treatment || 'Consulta / Valoración Estética Oral',
-            patients: { full_name: a.patient_name, phone: a.patient_phone }
-          }))
-
-          // Unir y desduplicar por ID y por teléfono/nombre en el mismo día
-          const existingKeys = new Set(
-            appList.map((x: any) => {
-              const name = (Array.isArray(x.patients) ? x.patients[0]?.full_name : x.patients?.full_name) || ''
-              const day = (x.start_time || '').split('T')[0]
-              return `${name.toLowerCase().trim()}_${day}`
-            })
-          )
-
-          const additional = apiMapped.filter((x: any) => {
-            const name = (x.patients?.full_name || '').toLowerCase().trim()
-            const day = (x.start_time || '').split('T')[0]
-            const key = `${name}_${day}`
-            if (existingKeys.has(key)) return false
-            existingKeys.add(key)
-            return true
-          })
-
-          appList = [...additional, ...appList]
-        }
-      } catch (apiErr) {
-        // Ignorar si falla endpoint
-      }
+      // Citas cargadas directamente desde Supabase
 
       // Desduplicar cualquier entrada redundante final en appList
       const seenSessions = new Set<string>()

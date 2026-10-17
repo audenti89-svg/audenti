@@ -138,119 +138,13 @@ export default function CalendarPage() {
           }
         })
 
-        // Unir con citas guardadas en /api/appointments
-        try {
-          const apiRes = await fetch('/api/appointments')
-          const apiData = await apiRes.json()
-          if (apiData?.success && Array.isArray(apiData.appointments)) {
-            const apiMapped: ClinicalAppointment[] = apiData.appointments.map((a: any) => {
-              const dParts = (a.appointment_date || '').split('-')
-              const day = dParts[2] || '01'
-              const monthNum = parseInt(dParts[1] || '1', 10) - 1
-              const monthNames = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
-              const monthStr = monthNames[monthNum] || 'oct'
-              const prettyDate = `${day} ${monthStr} ${dParts[0] || '2026'}`
-              return {
-                id: a.id,
-                date: prettyDate,
-                rawDate: a.appointment_date || '',
-                isoStart: `${a.appointment_date}T${a.appointment_time || '11:00:00'}`,
-                time: `${(a.appointment_time || '11:00').substring(0, 5)} (45 min)`,
-                duration: '45 min',
-                patientName: a.patient_name,
-                phone: a.patient_phone || 'WhatsApp',
-                treatment: a.treatment || 'Consulta Odontológica General',
-                doctor: 'Dra. Aura Estudillo',
-                chair: a.branch || 'Gabinete Principal (Sede Balbuena)',
-                status: a.status || 'scheduled',
-                notes: `Folio: ${a.folio}. ${a.notes || ''}`,
-                commissionDue: 0
-              }
-            })
-            const existingIds = new Set(mapped.map(m => m.id))
-            const additional = apiMapped.filter(m => !existingIds.has(m.id))
-            setAppointments([...additional, ...mapped])
-          } else {
-            setAppointments(mapped)
-          }
-        } catch {
-          setAppointments(mapped)
-        }
+        setAppointments(mapped)
       } else {
-        // Fallback a /api/appointments si Supabase aún está vacío
-        try {
-          const apiRes = await fetch('/api/appointments')
-          const apiData = await apiRes.json()
-          if (apiData?.success && Array.isArray(apiData.appointments) && apiData.appointments.length > 0) {
-            const apiMapped: ClinicalAppointment[] = apiData.appointments.map((a: any) => {
-              const dParts = (a.appointment_date || '').split('-')
-              const day = dParts[2] || '01'
-              const monthNum = parseInt(dParts[1] || '1', 10) - 1
-              const monthNames = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
-              const monthStr = monthNames[monthNum] || 'oct'
-              const prettyDate = `${day} ${monthStr} ${dParts[0] || '2026'}`
-              return {
-                id: a.id,
-                date: prettyDate,
-                rawDate: a.appointment_date || '',
-                isoStart: `${a.appointment_date}T${a.appointment_time || '11:00:00'}`,
-                time: `${(a.appointment_time || '11:00').substring(0, 5)} (45 min)`,
-                duration: '45 min',
-                patientName: a.patient_name,
-                phone: a.patient_phone || 'WhatsApp',
-                treatment: a.treatment || 'Consulta Odontológica General',
-                doctor: 'Dra. Aura Estudillo',
-                chair: a.branch || 'Gabinete Principal (Sede Balbuena)',
-                status: a.status || 'scheduled',
-                notes: `Folio: ${a.folio}. ${a.notes || ''}`,
-                commissionDue: 0
-              }
-            })
-            setAppointments(apiMapped)
-          } else {
-            setAppointments([])
-          }
-        } catch {
-          setAppointments([])
-        }
-      }
-    } catch (err) {
-      console.warn('Nota en appointments sync (tabla limpia o sin datos aún):', err)
-      try {
-        const apiRes = await fetch('/api/appointments')
-        const apiData = await apiRes.json()
-        if (apiData?.success && Array.isArray(apiData.appointments) && apiData.appointments.length > 0) {
-          const apiMapped: ClinicalAppointment[] = apiData.appointments.map((a: any) => {
-            const dParts = (a.appointment_date || '').split('-')
-            const day = dParts[2] || '01'
-            const monthNum = parseInt(dParts[1] || '1', 10) - 1
-            const monthNames = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
-            const monthStr = monthNames[monthNum] || 'oct'
-            const prettyDate = `${day} ${monthStr} ${dParts[0] || '2026'}`
-            return {
-              id: a.id,
-              date: prettyDate,
-              rawDate: a.appointment_date || '',
-              isoStart: `${a.appointment_date}T${a.appointment_time || '11:00:00'}`,
-              time: `${(a.appointment_time || '11:00').substring(0, 5)} (45 min)`,
-              duration: '45 min',
-              patientName: a.patient_name,
-              phone: a.patient_phone || 'WhatsApp',
-              treatment: a.treatment || 'Consulta Odontológica General',
-              doctor: 'Dra. Aura Estudillo',
-              chair: a.branch || 'Gabinete Principal (Sede Balbuena)',
-              status: a.status || 'scheduled',
-              notes: `Folio: ${a.folio}. ${a.notes || ''}`,
-              commissionDue: 0
-            }
-          })
-          setAppointments(apiMapped)
-        } else {
-          setAppointments([])
-        }
-      } catch {
         setAppointments([])
       }
+    } catch (err) {
+      console.warn('Nota en appointments sync:', err)
+      setAppointments([])
     } finally {
       setLoading(false)
     }
@@ -640,11 +534,10 @@ export default function CalendarPage() {
                     onClick={async () => {
                       playTone('arrival')
                       try {
-                        await fetch('/api/appointments', {
-                          method: 'PATCH',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ id: app.id, status: 'in_chair' })
-                        })
+                        await supabase
+                          .from('appointments')
+                          .update({ status: 'in_chair' })
+                          .eq('id', app.id)
                         window.dispatchEvent(new Event('audenti_appointment_refresh'))
                         fetchAppointments()
                       } catch {}
@@ -662,11 +555,10 @@ export default function CalendarPage() {
                     onClick={async () => {
                       playTone('message')
                       try {
-                        await fetch('/api/appointments', {
-                          method: 'PATCH',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ id: app.id, status: 'completed' })
-                        })
+                        await supabase
+                          .from('appointments')
+                          .update({ status: 'completed' })
+                          .eq('id', app.id)
                         window.dispatchEvent(new Event('audenti_appointment_refresh'))
                         fetchAppointments()
                       } catch {}

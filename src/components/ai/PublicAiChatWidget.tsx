@@ -52,32 +52,12 @@ export function PublicAiChatWidget() {
 
   // Escuchar si la Dra. Aura Estudillo tomó una decisión remota para transmitirla en vivo al chat
   useEffect(() => {
-    const checkDoctorDecision = async () => {
-      try {
-        const res = await fetch('/api/ai/night-emergency')
-        const data = await res.json()
-        if (data?.success && Array.isArray(data.cases)) {
-          data.cases.forEach((c: any) => {
-            if ((c.status === 'approved_exceptional' || c.status === 'scheduled_first_hour' || c.status === 'appointment_confirmed') && !receivedDecisions.current.has(c.id)) {
-              receivedDecisions.current.add(c.id)
-              // Al resolverse la decisión médica, cancelar timer de contingencia
-              setActiveUrgencyStartTime(null)
-              const decisionMsg: Message = {
-                id: `decision-${c.id}`,
-                role: 'assistant',
-                content: `🩺 **COMUNICADO DE LA DRA. AURA ESTUDILLO:**\n\n${c.doctorNotes || 'Tu atención prioritaria ha sido autorizada.'}\n\n*Folio de seguimiento: ${c.id}*. Nuestro equipo en gabinete está listo.`,
-                time: formatTimeInMexico()
-              }
-              setMessages(prev => [...prev, decisionMsg])
-              setIsOpen(true)
-            }
-          })
-        }
-      } catch {}
+    const handleDoctorDecision = () => {
+      setActiveUrgencyStartTime(null)
     }
 
-    const timer = setInterval(checkDoctorDecision, 3000)
-    return () => clearInterval(timer)
+    window.addEventListener('audenti_emergency_refresh', handleDoctorDecision)
+    return () => window.removeEventListener('audenti_emergency_refresh', handleDoctorDecision)
   }, [])
 
   // Contingencia de 60 segundos: si la doctora está en procedimiento clínico y no responde en 60s
@@ -159,16 +139,18 @@ export function PublicAiChatWidget() {
         detectedName = nameMatch[1].trim()
       }
 
-      const res = await fetch('/api/ai/public-chat', {
+      const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: history,
-          role: 'public',
-          sessionId,
-          sessionContext: {
+          domain: 'patient_chat',
+          prompt: userText,
+          contextData: {
+            role: 'public',
+            sessionId,
             phone: detectedPhone || undefined,
-            patientName: detectedName || undefined
+            patientName: detectedName || undefined,
+            history
           }
         })
       })
@@ -179,8 +161,12 @@ export function PublicAiChatWidget() {
         throw new Error(data.error)
       }
 
+      const replyContent = typeof data?.result === 'string'
+        ? data.result
+        : (data?.result?.result || data?.result?.content || '¡Hola! Con gusto te atiendo en la clínica dental Audenti de la Dra. Aura Estudillo. ¿En qué podemos ayudarte hoy?')
+
       // Si la IA generó o confirmó una cita con folio, disparar evento para refrescar la agenda en tiempo real
-      if (data?.reply && (data.reply.includes('AUD-') || data.reply.includes('folio') || data.reply.includes('Folio'))) {
+      if (replyContent && (replyContent.includes('AUD-') || replyContent.includes('folio') || replyContent.includes('Folio'))) {
         window.dispatchEvent(new Event('audenti_appointment_refresh'))
         try {
           localStorage.setItem('audenti_last_booking_sync', Date.now().toString())
@@ -196,7 +182,7 @@ export function PublicAiChatWidget() {
       const botMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: data?.reply || '¡Hola! Soy Aura AI, ¿en qué te puedo ayudar?',
+        content: replyContent,
         time: formatTimeInMexico()
       }
 

@@ -2,7 +2,6 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
-import { PersistentAppointment } from '@/app/api/appointments/route'
 import {
   getNowInMexico,
   formatDateInMexico,
@@ -13,6 +12,21 @@ import {
   getPersistedAppointments,
   savePersistedAppointments
 } from '@/lib/supabase/appointments-storage'
+
+export interface PersistentAppointment {
+  id: string
+  folio: string
+  patient_id?: string
+  patient_name: string
+  patient_phone: string
+  appointment_date: string // YYYY-MM-DD
+  appointment_time: string // HH:mm:ss o HH:mm
+  treatment: string
+  branch: string
+  status: 'confirmed' | 'pending_review' | 'scheduled' | 'in_chair' | 'in_waiting' | 'completed' | 'cancelled'
+  notes?: string
+  created_at: string
+}
 
 export interface CreateAppointmentInput {
   folio?: string
@@ -72,59 +86,12 @@ export async function createAppointmentAction(input: CreateAppointmentInput) {
       created_at: nowIso
     }
 
-    // 1. Guardar de forma inmediata y garantizada en el almacén global del servidor (Lógica Upsert)
-    if (!globalThis.__audenti_appointments) {
-      globalThis.__audenti_appointments = []
-    }
-
-    const parseMinutes = (timeStr: string) => {
-      const parts = (timeStr || '').split(':').map(Number)
-      return (parts[0] || 0) * 60 + (parts[1] || 0)
-    }
-    const newMinutes = parseMinutes(appTime)
-
-    const existingIndex = globalThis.__audenti_appointments.findIndex(a => {
-      if (a.folio === generatedFolio) return true
-      if (a.patient_phone && patient_phone && a.patient_phone === patient_phone) {
-        if (a.appointment_date === appDate) {
-          const aMinutes = parseMinutes(a.appointment_time)
-          if (Math.abs(aMinutes - newMinutes) <= 30 || ['in_chair', 'pending_review', 'confirmed', 'scheduled'].includes(a.status)) {
-            return true
-          }
-        }
-      }
-      return false
-    })
-
-    let resolvedAppointment: PersistentAppointment
-
-    if (existingIndex !== -1) {
-      const target = globalThis.__audenti_appointments[existingIndex]
-      const updatedName = (patient_name && !patient_name.includes('Paciente Web') && !patient_name.includes('Paciente WhatsApp'))
-        ? patient_name
-        : (target.patient_name || patient_name)
-
-      resolvedAppointment = {
-        ...target,
-        patient_name: updatedName,
-        patient_phone: patient_phone || target.patient_phone,
-        treatment: treatment || target.treatment,
-        branch: branch || target.branch,
-        notes: notes || target.notes,
-        status: (status as any) || target.status
-      }
-      globalThis.__audenti_appointments[existingIndex] = resolvedAppointment
-    } else {
-      resolvedAppointment = newAppointment
-      globalThis.__audenti_appointments = [resolvedAppointment, ...globalThis.__audenti_appointments].slice(0, 50)
-    }
-
-    // 2. Intentar Upsert / Actualización en Supabase
+    // 1. Persistencia y Vinculación Atómica en Supabase (Base de Datos Relacional)
     let supabasePersisted = false
     try {
       const supabase = await createClient()
 
-      let patientId = resolvedAppointment.patient_id
+      let patientId: string | undefined
       if (patient_phone) {
         const { data: existingPatient } = await supabase
           .from('patients')
@@ -155,7 +122,7 @@ export async function createAppointmentAction(input: CreateAppointmentInput) {
       }
 
       if (patientId) {
-        resolvedAppointment.patient_id = patientId
+        newAppointment.patient_id = patientId
       }
 
       const timePart = appTime.length === 5 ? `${appTime}:00` : appTime
@@ -192,7 +159,7 @@ export async function createAppointmentAction(input: CreateAppointmentInput) {
             status: status === 'confirmed' ? 'confirmed' : 'scheduled',
             start_time: startDateTime.toISOString(),
             end_time: endDateTime.toISOString(),
-            notes: `Folio: ${resolvedAppointment.folio}. Sede: ${appBranch}. Tel: ${patient_phone}`
+            notes: `Folio: ${newAppointment.folio}. Sede: ${appBranch}. Tel: ${patient_phone}`
           })
           if (!apptError) supabasePersisted = true
         }
@@ -201,34 +168,32 @@ export async function createAppointmentAction(input: CreateAppointmentInput) {
       console.warn('Nota Supabase Server Action fallback:', err?.message)
     }
 
-    // 3. Respaldo permanente en Supabase Storage (Cero desaparición)
+    // 2. Respaldo permanente en Supabase Storage (Sin memoria volátil globalThis)
     try {
-      if (!globalThis.__audenti_appointments || globalThis.__audenti_appointments.length === 0) {
-        globalThis.__audenti_appointments = [resolvedAppointment]
-      }
-      await savePersistedAppointments(globalThis.__audenti_appointments)
+      const currentPersisted = await getPersistedAppointments()
+      const updatedList = [newAppointment, ...currentPersisted.filter(a => a.folio !== newAppointment.folio)].slice(0, 50)
+      await savePersistedAppointments(updatedList)
     } catch (saveErr) {
       console.warn('Nota en respaldo Supabase Storage:', saveErr)
     }
 
-    // 4. Revalidación de rutas de Next.js y Notificación Realtime
+    // 3. Revalidación de rutas de Next.js y Notificación Realtime
     try {
       revalidatePath('/dashboard')
       revalidatePath('/dashboard/agenda')
       revalidatePath('/dashboard/calendar')
 
-      // Emitir notificación por canal Supabase Realtime si el cliente está disponible
       const supabase = await createClient()
       const channel = supabase.channel('realtime_appointments')
       channel.send({
         type: 'broadcast',
         event: 'new_appointment',
         payload: {
-          folio: resolvedAppointment.folio,
-          patient_name: resolvedAppointment.patient_name,
-          date: resolvedAppointment.appointment_date,
-          time: resolvedAppointment.appointment_time,
-          status: resolvedAppointment.status
+          folio: newAppointment.folio,
+          patient_name: newAppointment.patient_name,
+          date: newAppointment.appointment_date,
+          time: newAppointment.appointment_time,
+          status: newAppointment.status
         }
       }).catch(() => {})
     } catch {}
@@ -238,7 +203,7 @@ export async function createAppointmentAction(input: CreateAppointmentInput) {
       appointment: newAppointment,
       folio: generatedFolio,
       supabasePersisted: true,
-      message: 'Cita persistida correctamente en Audenti.'
+      message: 'Cita persistida correctamente en Supabase.'
     }
   } catch (err: any) {
     console.error('Error en createAppointmentAction:', err)

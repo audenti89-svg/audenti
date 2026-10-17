@@ -100,13 +100,22 @@ export default function CrmPage() {
   const handleRunProactiveAudit = async () => {
     setIsAuditing(true)
     try {
-      const res = await fetch('/api/ai/crm-proactive-audit', {
+      const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          domain: 'bi',
+          prompt: 'Realiza una auditoría proactiva del CRM de la clínica dental: analiza pacientes en riesgo de fuga, cuellos de botella en presupuesto y oportunidades de reactivación.'
+        })
       })
       const data = await res.json()
-      if (data?.success && data?.analysis) {
-        setAuditData(data.analysis)
+      if (data?.success && data?.result) {
+        const text = typeof data.result === 'string' ? data.result : (data.result?.result || data.result?.analysis || JSON.stringify(data.result))
+        setAuditData({
+          title: 'Auditoría Proactiva de Retención',
+          summary: text,
+          recommendations: ['Contactar a pacientes con presupuesto pendiente', 'Priorizar revisiones periódicas de 6 meses']
+        })
       }
     } catch (err) {
       console.error('Error running proactive audit:', err)
@@ -118,35 +127,31 @@ export default function CrmPage() {
   const handleGenerateExecutiveAudio = async () => {
     setIsBriefGenerating(true)
     try {
-      const res = await fetch('/api/ai/executive-audio', {
+      const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type: 'daily_closing',
-          doctorName: 'Dra. Aura Estudillo',
-          clinicData: {
-            totalPatients: patients.length,
-            activeTreatments: stageCounts.tratamiento_activo,
-            revenueToday: 24500,
-            pendingFollowups: stageCounts.presupuesto_enviado,
-            atRiskPatients: stageCounts.contacto_inicial
-          }
+          domain: 'bi',
+          prompt: `Genera el guión conciso para el resumen ejecutivo en audio del día para la Dra. Aura Estudillo. Total de pacientes: ${patients.length}, tratamientos activos: ${stageCounts.tratamiento_activo}, ingresos estimados: $24,500 MXN.`
         })
       })
       const data = await res.json()
-      if (data?.success && data?.data) {
-        setExecutiveBrief(data.data)
-        // Reproducir locución por voz
-        if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-          window.speechSynthesis.cancel()
-          const utterance = new SpeechSynthesisUtterance(data.data.script)
-          utterance.lang = 'es-MX'
-          utterance.rate = 1.05
-          utterance.onend = () => setIsPlayingAudio(false)
-          utterance.onerror = () => setIsPlayingAudio(false)
-          setIsPlayingAudio(true)
-          window.speechSynthesis.speak(utterance)
-        }
+      const text = typeof data?.result === 'string' ? data.result : (data?.result?.result || data?.result?.analysis || 'Resumen operativo del día listo.')
+      const briefObj = {
+        title: 'Cierre de Operaciones del Día',
+        script: text,
+        metrics: { totalPatients: patients.length, activeTreatments: stageCounts.tratamiento_activo }
+      }
+      setExecutiveBrief(briefObj)
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel()
+        const utterance = new SpeechSynthesisUtterance(text)
+        utterance.lang = 'es-MX'
+        utterance.rate = 1.05
+        utterance.onend = () => setIsPlayingAudio(false)
+        utterance.onerror = () => setIsPlayingAudio(false)
+        setIsPlayingAudio(true)
+        window.speechSynthesis.speak(utterance)
       }
     } catch (err) {
       console.error('Error generating executive audio:', err)
@@ -179,24 +184,20 @@ export default function CrmPage() {
     const stage = targetPatient ? (patientStages[targetPatient.id] || 'contacto_inicial') : 'contacto_inicial'
 
     try {
-      const res = await fetch('/api/ai/crm-assistant', {
+      const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: stage === 'presupuesto_enviado' ? 'budget_reminder' : 'followup',
-          patientName: targetPatient?.full_name || 'Paciente',
-          stage: stage,
-          treatment: targetPatient?.treatment || 'Valoración Integral Dental',
-          notes: targetPatient?.onboarding_completed ? 'Bioseguridad verificada' : 'Nuevo prospecto'
+          domain: 'patient_chat',
+          prompt: `Redacta un mensaje amable de seguimiento para el paciente ${targetPatient?.full_name || 'Paciente'} en etapa ${stage} sobre su tratamiento de ${targetPatient?.treatment || 'Valoración Odontológica'}.`
         })
       })
 
       const data = await res.json()
-      if (data?.success && data?.data?.message) {
-        setAiGeneratedMessage(data.data.message)
-        setAiMeta(data.data)
-        if (targetPatient) setSelectedPatientForAi(targetPatient)
-      }
+      const messageText = typeof data?.result === 'string' ? data.result : (data?.result?.result || data?.result?.content || '¡Hola! Te contactamos de la clínica Audenti...')
+      setAiGeneratedMessage(messageText)
+      setAiMeta({ message: messageText })
+      if (targetPatient) setSelectedPatientForAi(targetPatient)
     } catch (err) {
       console.error('Error generating AI followup:', err)
     } finally {

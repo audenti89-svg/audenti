@@ -24,7 +24,7 @@ export interface EmergencyCase {
   painLevel: 'severo' | 'critico' | 'moderado' | 'leve'
   symptoms: string
   timestamp: string
-  chatSnippet: string
+  chatSnippet?: string
   status: 'pending' | 'approved_exceptional' | 'scheduled_first_hour' | 'appointment_confirmed' | 'dismissed'
   branchId?: 'balbuena' | 'guadalupe-chalma'
   branchName?: string
@@ -46,6 +46,8 @@ export interface EmergencyCase {
   resolvedAt?: string
 }
 
+import { createClient } from '@/utils/supabase/client'
+
 export function NightEmergencyRedAlertBanner() {
   const [cases, setCases] = useState<EmergencyCase[]>([])
   const [activeCase, setActiveCase] = useState<EmergencyCase | null>(null)
@@ -53,20 +55,35 @@ export function NightEmergencyRedAlertBanner() {
   const [minimized, setMinimized] = useState(false)
   const { playTone } = useNotificationSound()
 
-  // Sincronización rápida (3s) y escucha de eventos para tiempo real instantáneo
+  // Sincronización rápida (5s) y escucha de eventos para tiempo real instantáneo
   const fetchEmergencies = async () => {
     try {
-      const res = await fetch('/api/ai/night-emergency')
-      const data = await res.json()
-      if (data?.success && Array.isArray(data.cases)) {
-        setCases(data.cases)
-        // Auto-abrir la ventana emergente ÚNICAMENTE para emergencias rojas reales
-        const pendingRed = data.cases.find((c: EmergencyCase) => c.status === 'pending' && c.alertType === 'red_emergency')
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('appointments')
+        .select('id, treatment_type, status, start_time, notes, created_at, patients(full_name, phone)')
+        .eq('status', 'pending_review')
+        .order('created_at', { ascending: false })
+
+      if (data) {
+        const mapped: EmergencyCase[] = data.map((d: any) => ({
+          id: d.id,
+          alertType: 'red_emergency',
+          patientName: d.patients?.full_name || 'Paciente Urgencia',
+          phone: d.patients?.phone || 'Sin teléfono',
+          painLevel: 'severo',
+          symptoms: d.notes || d.treatment_type || 'Urgencia odontológica inmediata',
+          timestamp: 'Ahora',
+          created_at: d.created_at,
+          status: 'pending'
+        }))
+        setCases(mapped)
+        const pendingRed = mapped.find((c: EmergencyCase) => c.status === 'pending')
         if (pendingRed && (!activeCase || activeCase.id !== pendingRed.id)) {
           setActiveCase(pendingRed)
           setMinimized(false)
           playTone('arrival')
-        } else if (!pendingRed && activeCase?.alertType === 'red_emergency') {
+        } else if (!pendingRed && activeCase) {
           setActiveCase(null)
         }
       }
@@ -77,7 +94,7 @@ export function NightEmergencyRedAlertBanner() {
 
   useEffect(() => {
     fetchEmergencies()
-    const interval = setInterval(fetchEmergencies, 3000)
+    const interval = setInterval(fetchEmergencies, 5000)
 
     // Escuchar eventos locales en tiempo real
     const handleStorageChange = () => fetchEmergencies()
@@ -107,34 +124,24 @@ export function NightEmergencyRedAlertBanner() {
 
       const notes = customNotes || defaultNotes
 
-      const res = await fetch('/api/ai/night-emergency', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'decide',
-          caseId: activeCase.id,
-          decision,
-          doctorNotes: notes,
-          branchName: activeCase.branchName,
-          slot: activeCase.proposedSlot
+      const supabase = createClient()
+      await supabase
+        .from('appointments')
+        .update({
+          status: 'confirmed',
+          notes: notes
         })
-      })
+        .eq('id', activeCase.id)
 
-      const data = await res.json()
-      if (data?.success) {
-        playTone('message')
-        // Actualizar estado local
-        setCases(prev => prev.map(c => c.id === activeCase.id ? { ...c, status: decision === 'confirm_appointment' ? 'appointment_confirmed' : decision, doctorNotes: notes } : c))
-        
-        // Notificar y sincronizar con Dashboard y Calendario inmediatamente
-        window.dispatchEvent(new Event('audenti_appointment_refresh'))
-        window.dispatchEvent(new Event('audenti_emergency_refresh'))
-        try {
-          localStorage.setItem('audenti_emergency_last_resolved', Date.now().toString())
-        } catch {}
+      playTone('message')
+      setCases(prev => prev.map(c => c.id === activeCase.id ? { ...c, status: 'appointment_confirmed', doctorNotes: notes } : c))
+      window.dispatchEvent(new Event('audenti_appointment_refresh'))
+      window.dispatchEvent(new Event('audenti_emergency_refresh'))
+      try {
+        localStorage.setItem('audenti_emergency_last_resolved', Date.now().toString())
+      } catch {}
 
-        setActiveCase(null)
-      }
+      setActiveCase(null)
     } catch (err) {
       console.error('Error al resolver caso de emergencia:', err)
     } finally {

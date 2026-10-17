@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, CheckCircle2, Building2, User, Stethoscope, RefreshCw, Plus } from 'lucide-react';
 import { useNotificationSound } from '@/hooks/useNotificationSound';
 
+import { createClient } from '@/utils/supabase/client';
+
 export function StableCalendarView() {
   const [currentView, setCurrentView] = useState<'day' | 'week'>('day');
   const [selectedCabinet, setSelectedCabinet] = useState('Gabinete 1 (Principal)');
@@ -20,22 +22,28 @@ export function StableCalendarView() {
   const fetchCabinetStatus = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/appointments');
-      const data = await res.json();
-      const appointments = data?.success && Array.isArray(data.appointments) ? data.appointments : [];
-
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('appointments')
+        .select('id, start_time, treatment_type, status, notes, patients(full_name)');
+      
+      const appointments = data || [];
       const times = ['09:00 AM', '10:30 AM', '12:00 PM', '02:00 PM', '04:00 PM', '05:30 PM', '07:00 PM'];
       const mapped = times.map((t) => {
-        const matching = appointments.find((a: any) =>
-          (a.branch?.includes(selectedCabinet.slice(0, 8)) || selectedCabinet.includes('Principal')) &&
-          (a.appointment_time?.startsWith(t.substring(0, 2)))
-        );
-        return {
-          time: t,
-          patient: matching ? matching.patient_name : undefined,
-          treatment: matching ? matching.treatment : undefined,
-          status: matching ? ('busy' as const) : ('free' as const)
-        };
+        const hour = t.substring(0, 2);
+        const matching = appointments.find((a: any) => {
+          const timeStr = a.start_time ? new Date(a.start_time).toLocaleTimeString('es-MX', { hour: '2-digit' }) : '';
+          return timeStr.startsWith(hour);
+        });
+          const patName = Array.isArray((matching as any).patients)
+            ? (matching as any).patients[0]?.full_name
+            : (matching as any).patients?.full_name;
+          return {
+            time: t,
+            patient: matching ? (patName || 'Paciente en Turno') : undefined,
+            treatment: matching ? (matching.treatment_type || 'Tratamiento Clínico') : undefined,
+            status: matching ? ('busy' as const) : ('free' as const)
+          };
       });
       setLiveSlots(mapped);
     } catch (e) {

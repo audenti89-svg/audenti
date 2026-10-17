@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertCircle, CheckCircle, Clock, Phone, ShieldAlert, Sparkles, User, X } from 'lucide-react';
 
+import { createAppointmentAction } from '@/actions/appointments';
+
 interface FastTrackEmergencyModalProps {
   isOpen?: boolean;
   onClose?: () => void;
@@ -28,22 +30,18 @@ export function FastTrackEmergencyModal({ isOpen = true, onClose }: FastTrackEme
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      const res = await fetch('/api/ai/night-emergency', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'report',
-          patientName,
-          phone: patientPhone,
-          painLevel,
-          symptoms: emergencyNotes || 'Urgencia dental inmediata reportada desde Triage Fast-Track'
-        })
+      const res = await createAppointmentAction({
+        patient_name: patientName,
+        patient_phone: patientPhone,
+        treatment: `Urgencia Odontológica 24/7 (Nivel: ${painLevel.toUpperCase()})`,
+        status: 'pending_review',
+        notes: emergencyNotes || 'Urgencia dental inmediata reportada desde Triage Fast-Track'
       });
-      const data = await res.json();
-      if (data?.success) {
+      if (res.success) {
         setSubmitted(true);
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('audenti_emergency_refresh'));
+          window.dispatchEvent(new CustomEvent('audenti_appointment_refresh'));
         }
       }
     } catch (err) {

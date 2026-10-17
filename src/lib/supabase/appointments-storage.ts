@@ -1,12 +1,12 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { PersistentAppointment } from '@/app/api/appointments/route'
+import type { PersistentAppointment } from '@/actions/appointments'
 
 const STORAGE_BUCKET = 'audenti_database'
 const APPOINTMENTS_FILE = 'appointments.json'
 
 /**
  * Carga la lista persistente de citas directamente desde Supabase Storage.
- * Si la memoria global está vacía (por reinicio de servidor o despliegue), la inicializa con los datos de Supabase.
+ * Persistencia atómica serverless, sin depender de memoria volátil globalThis.
  */
 export async function getPersistedAppointments(): Promise<PersistentAppointment[]> {
   try {
@@ -14,26 +14,23 @@ export async function getPersistedAppointments(): Promise<PersistentAppointment[
     const { data, error } = await supabase.storage.from(STORAGE_BUCKET).download(APPOINTMENTS_FILE)
 
     if (error) {
-      // Si el archivo aún no existe en el bucket, retornamos la memoria o array vacío
-      return globalThis.__audenti_appointments || []
+      return []
     }
 
     const text = await data.text()
     if (!text || text.trim() === '') {
-      return globalThis.__audenti_appointments || []
+      return []
     }
 
     const parsed: PersistentAppointment[] = JSON.parse(text)
     if (Array.isArray(parsed)) {
-      // Sincronizar memoria en caliente
-      globalThis.__audenti_appointments = parsed
       return parsed
     }
 
-    return globalThis.__audenti_appointments || []
+    return []
   } catch (err: any) {
     console.warn('Nota en getPersistedAppointments (Supabase Storage):', err?.message)
-    return globalThis.__audenti_appointments || []
+    return []
   }
 }
 

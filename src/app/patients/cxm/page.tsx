@@ -78,15 +78,13 @@ export default function CXMDashboardPage() {
     setSendingId(patient.id)
 
     try {
-      // Intentar invocar el asistente de comunicación IA si existe
-      await fetch('/api/ai/crm-assistant', {
+      // Invocar el enrutador de IA con el dominio patient_chat
+      await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'followup',
-          patientName,
-          treatment: patient.last_treatment,
-          stage: 'tratamiento_activo'
+          domain: 'patient_chat',
+          prompt: `Redacta un mensaje de seguimiento post-operatorio cálido y profesional para el paciente ${patientName} para su procedimiento de ${patient.last_treatment || 'odontología general'}.`
         })
       }).catch(() => {})
 

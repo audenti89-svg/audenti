@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { AlertCircle, Clock, CheckCircle2, Phone, Sparkles, Send, BellRing, MapPin, X } from 'lucide-react'
+import { createClient } from '@/utils/supabase/client'
 
 interface EmergencyAlert {
   id: string
@@ -25,12 +26,26 @@ export function DoctorLiveTriageAlert() {
 
   const fetchAlerts = async () => {
     try {
-      const res = await fetch('/api/ai/night-emergency')
-      const data = await res.json()
-      if (data?.success && Array.isArray(data.cases)) {
-        // Mostrar casos pendientes
-        const pending = data.cases.filter((c: EmergencyAlert) => c.status === 'pending')
-        setCases(pending)
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('appointments')
+        .select('id, treatment_type, status, start_time, notes, created_at, patients(full_name, phone)')
+        .eq('status', 'pending_review')
+        .order('created_at', { ascending: false })
+
+      if (data) {
+        const mapped: EmergencyAlert[] = data.map((d: any) => ({
+          id: d.id,
+          alertType: 'red_emergency',
+          patientName: d.patients?.full_name || 'Paciente Urgencia',
+          phone: d.patients?.phone || 'Sin teléfono',
+          painLevel: 'severo',
+          symptoms: d.notes || d.treatment_type || 'Urgencia odontológica inmediata',
+          timestamp: 'Ahora',
+          created_at: d.created_at,
+          status: 'pending'
+        }))
+        setCases(mapped)
       }
     } catch (e) {
       // Ignorar fallas silenciosas en polling
@@ -39,7 +54,7 @@ export function DoctorLiveTriageAlert() {
 
   useEffect(() => {
     fetchAlerts()
-    const interval = setInterval(fetchAlerts, 3000)
+    const interval = setInterval(fetchAlerts, 5000)
     return () => clearInterval(interval)
   }, [])
 
@@ -70,22 +85,18 @@ export function DoctorLiveTriageAlert() {
   ) => {
     setActionInProgress(caseId)
     try {
-      const res = await fetch('/api/ai/night-emergency', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'decide',
-          caseId,
-          decision,
-          doctorNotes,
-          branchName: branchName || 'Sede Balbuena (Matriz)'
+      const supabase = createClient()
+      const newStatus = decision === 'dismissed' ? 'cancelled' : 'confirmed'
+      await supabase
+        .from('appointments')
+        .update({
+          status: newStatus,
+          notes: doctorNotes ? `Decisión médica: ${decision}. ${doctorNotes}` : `Decisión médica: ${decision}`
         })
-      })
-      if (res.ok) {
-        // Refrescar lista de alertas y disparar evento global para el calendario/dashboard
-        fetchAlerts()
-        window.dispatchEvent(new Event('audenti_appointment_refresh'))
-      }
+        .eq('id', caseId)
+
+      fetchAlerts()
+      window.dispatchEvent(new Event('audenti_appointment_refresh'))
     } catch (err) {
       console.warn('Error al procesar decisión médica:', err)
     } finally {

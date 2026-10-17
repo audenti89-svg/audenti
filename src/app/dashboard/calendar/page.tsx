@@ -114,23 +114,34 @@ export default function CalendarPage() {
   // Cargar citas persistentes en el calendario estilo Google Calendar
   const fetchCalendarAppointments = async () => {
     try {
-      const res = await fetch('/api/appointments')
-      const json = await res.json()
-      if (json?.success && Array.isArray(json.appointments)) {
-        const mapped: CalendarAppointment[] = json.appointments.map((a: any) => ({
-          id: a.id,
-          title: a.treatment || 'Consulta / Valoración Estética Oral',
-          patientName: a.patient_name,
-          doctor: 'Dra. Aura Estudillo',
-          chair: a.branch || 'Gabinete 1 (Principal)',
-          specialty: 'Odontología Integral & Estética',
-          date: a.appointment_date,
-          startTime: (a.appointment_time || '11:00').substring(0, 5),
-          endTime: '12:00',
-          durationMin: 45,
-          status: a.status || 'confirmed',
-          color: 'bg-amber-100 text-amber-950 border-l-4 border-amber-500'
-        }))
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('appointments')
+        .select('id, treatment_type, status, start_time, notes, patients(full_name)')
+        .order('start_time', { ascending: true })
+
+      if (data && data.length > 0) {
+        const mapped: CalendarAppointment[] = data.map((a: any) => {
+          const d = a.start_time ? new Date(a.start_time) : new Date()
+          const dateStr = d.toISOString().split('T')[0]
+          const timeStr = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false })
+
+          return {
+            id: a.id,
+            title: a.treatment_type || 'Consulta / Valoración Estética Oral',
+            patientName: a.patients?.full_name || 'Paciente',
+            doctor: 'Dra. Aura Estudillo',
+            chair: 'Gabinete 1 (Principal)',
+            specialty: 'Odontología Integral & Estética',
+            date: dateStr,
+            startTime: timeStr,
+            endTime: '12:00',
+            durationMin: 45,
+            status: a.status || 'confirmed',
+            color: 'bg-amber-100 text-amber-950 border-l-4 border-amber-500'
+          }
+        })
+
         setAppointments(prev => {
           const manual = prev.filter(p => !p.id.startsWith('APT-'))
           const combined = [...manual, ...mapped]

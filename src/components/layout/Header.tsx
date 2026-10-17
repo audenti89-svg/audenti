@@ -23,6 +23,7 @@ import {
 import { useBranchStore, BranchId, BRANCHES_DATA } from '@/stores/branchStore'
 import { useNotificationSound } from '@/hooks/useNotificationSound'
 import { FastTrackEmergencyModal } from '@/components/FastTrackEmergencyModal'
+import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
 
 export interface HeaderProps {
@@ -50,35 +51,23 @@ export function Header({ onMenuToggle }: HeaderProps) {
   const fetchLiveNotifications = async () => {
     try {
       const items: NotificationItem[] = []
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('appointments')
+        .select('id, treatment_type, status, start_time, notes, patients(full_name)')
+        .order('created_at', { ascending: false })
+        .limit(6)
 
-      // 1. Obtener emergencias activas
-      const emgRes = await fetch('/api/ai/night-emergency')
-      const emgData = await emgRes.json()
-      if (emgData?.success && Array.isArray(emgData.cases)) {
-        emgData.cases.slice(0, 5).forEach((c: any) => {
-          items.push({
-            id: `emg-${c.id}`,
-            type: 'emergency',
-            title: c.alertType === 'red_emergency' ? '🔴 Alerta Roja: Urgencia 24/7' : '🟡 Cita Prioritaria en Espera',
-            message: `${c.patientName}: "${c.symptoms}"`,
-            time: c.timestamp || 'Hoy',
-            link: '/dashboard'
-          })
-        })
-      }
-
-      // 2. Obtener citas agendadas recientes
-      const apptRes = await fetch('/api/appointments')
-      const apptData = await apptRes.json()
-      if (apptData?.success && Array.isArray(apptData.appointments)) {
-        apptData.appointments.slice(0, 5).forEach((a: any) => {
+      if (data) {
+        data.forEach((a: any) => {
+          const isPending = a.status === 'pending_review'
           items.push({
             id: `appt-${a.id}`,
-            type: 'appointment',
-            title: `📅 Cita Confirmada (${a.folio})`,
-            message: `${a.patient_name} • ${a.treatment} (${a.appointment_date} ${a.appointment_time})`,
+            type: isPending ? 'emergency' : 'appointment',
+            title: isPending ? '🔴 Alerta: Urgencia en Espera' : '📅 Cita en Plataforma',
+            message: `${a.patients?.full_name || 'Paciente'} • ${a.treatment_type || 'Consulta Odontológica'}`,
             time: 'En vivo',
-            link: '/dashboard/agenda'
+            link: isPending ? '/dashboard' : '/dashboard/agenda'
           })
         })
       }
@@ -91,7 +80,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
 
   useEffect(() => {
     fetchLiveNotifications()
-    const interval = setInterval(fetchLiveNotifications, 4000)
+    const interval = setInterval(fetchLiveNotifications, 6000)
 
     const handleRefresh = () => fetchLiveNotifications()
     window.addEventListener('storage', handleRefresh)
@@ -114,25 +103,13 @@ export function Header({ onMenuToggle }: HeaderProps) {
     }
   }, [])
 
-  const handleBranchChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleBranchChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newId = e.target.value as BranchId
     setBranchId(newId)
     playTone('arrival')
-
-    // Sincronizar en tiempo real la ubicación y sede activa de la Dra. Aura para la IA
     try {
-      await fetch('/api/geolocation', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'update_doctor_location',
-          branchId: newId,
-          status: 'en_gabinete'
-        })
-      })
-    } catch (err) {
-      console.warn('Error sincronizando geolocalización de Dra. Aura:', err)
-    }
+      localStorage.setItem('audenti_active_branch', newId)
+    } catch {}
   }
 
   return (

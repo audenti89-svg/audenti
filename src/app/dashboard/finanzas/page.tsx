@@ -193,13 +193,24 @@ export default function FinanzasPage() {
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
-          <a
-            href="/api/export?format=excel"
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-50 text-slate-800 text-xs font-bold hover:bg-slate-100 transition-colors border border-slate-200 shadow-2xs"
+          <button
+            type="button"
+            onClick={() => {
+              const csvContent = 'data:text/csv;charset=utf-8,ID,Concepto,Paciente,Tipo,Monto,Fecha\n' +
+                transactions.map(t => `"${t.id}","${t.concept}","${t.patient_name}","${t.type}",${t.amount},"${t.created_at}"`).join('\n')
+              const encodedUri = encodeURI(csvContent)
+              const link = document.createElement('a')
+              link.setAttribute('href', encodedUri)
+              link.setAttribute('download', `transacciones_audenti_${new Date().toISOString().split('T')[0]}.csv`)
+              document.body.appendChild(link)
+              link.click()
+              document.body.removeChild(link)
+            }}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-50 text-slate-800 text-xs font-bold hover:bg-slate-100 transition-colors border border-slate-200 shadow-2xs cursor-pointer"
           >
             <Download className="w-4 h-4 text-emerald-600" />
-            Exportar Excel
-          </a>
+            Exportar CSV / Excel
+          </button>
 
           {/* Botón Trueque / Intercambio */}
           <button

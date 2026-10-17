@@ -111,12 +111,22 @@ export function ChatInterface() {
   const fetchAuraAiHistory = async () => {
     try {
       setLoadingAuraSessions(true)
-      const res = await fetch('/api/ai/chat-history')
-      const data = await res.json()
-      if (data?.success && Array.isArray(data.sessions)) {
-        setAuraAiSessions(data.sessions)
-        if (!selectedSessionId && data.sessions.length > 0) {
-          setSelectedSessionId(data.sessions[0].sessionId)
+      const { data } = await supabase
+        .from('patients')
+        .select('id, full_name, phone, created_at')
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      if (data) {
+        const sessions = data.map((p: any) => ({
+          sessionId: p.id,
+          patientName: p.full_name,
+          phone: p.phone,
+          timestamp: p.created_at
+        }))
+        setAuraAiSessions(sessions)
+        if (!selectedSessionId && sessions.length > 0) {
+          setSelectedSessionId(sessions[0].sessionId)
         }
       }
     } catch (e) {
@@ -128,8 +138,6 @@ export function ChatInterface() {
 
   useEffect(() => {
     fetchAuraAiHistory()
-    const timer = setInterval(fetchAuraAiHistory, 4000)
-    return () => clearInterval(timer)
   }, [])
 
   useEffect(() => {

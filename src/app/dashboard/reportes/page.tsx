@@ -53,12 +53,19 @@ export default function ReportesPage() {
 
   const triggerExport = (format: string) => {
     setDownloading(format)
+    const csvData = 'Metrica,Valor\n' +
+      `Ingreso Total,$${metrics.monthlyIncome}\n` +
+      `Servicios Atendidos,${metrics.servicesCount}\n` +
+      `Comisiones Medicas,$${metrics.doctorsCommission}\n`
+    const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
-    link.href = `/api/export?format=${format}`
-    link.download = ''
+    link.href = url
+    link.download = `reporte_clinico_audenti_${new Date().toISOString().split('T')[0]}.${format === 'excel' ? 'csv' : 'txt'}`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+    URL.revokeObjectURL(url)
     setTimeout(() => setDownloading(null), 1000)
   }
 

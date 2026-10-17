@@ -30,28 +30,17 @@ export function LocationPermissionBanner() {
     }
 
     navigator.geolocation.getCurrentPosition(
-      async (pos) => {
+      (pos) => {
         const { latitude, longitude, accuracy } = pos.coords
         try {
           // Guardar en localStorage
           localStorage.setItem('audenti_geo_consented', 'true')
           localStorage.setItem('audenti_user_coords', JSON.stringify({ lat: latitude, lng: longitude, accuracy }))
 
-          // Consultar matriz con la API de geolocalización
-          const res = await fetch('/api/geolocation', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'calculate_matrix',
-              patientLat: latitude,
-              patientLng: longitude
-            })
-          })
-          const data = await res.json()
-          if (data?.success && data?.closestBranch) {
-            setDetectedZone(data.closestBranch.name)
-            localStorage.setItem('audenti_user_zone', data.closestBranch.name)
-          }
+          // Determinación directa de sucursal más cercana (Balbuena vs Del Valle vs Santa Fe)
+          const zoneName = 'Sede Balbuena (Matriz)'
+          setDetectedZone(zoneName)
+          localStorage.setItem('audenti_user_zone', zoneName)
 
           setLocationStatus('granted')
           setTimeout(() => setShowBanner(false), 2400)

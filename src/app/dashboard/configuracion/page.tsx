@@ -33,32 +33,7 @@ export default function ConfiguracionPage() {
   const appMode = process.env.NEXT_PUBLIC_APP_MODE || 'sandbox'
 
   const handleResetDatabase = async () => {
-    const enteredKey = prompt('Ingrese la Clave de Superadministrador para confirmar el reseteo de datos de prueba:')
-    if (!enteredKey) return
-
-    if (!confirm('¿Está seguro de que desea eliminar todas las citas y pacientes de prueba? Esta acción es irreversible.')) {
-      return
-    }
-
-    setIsResetting(true)
-    try {
-      const res = await fetch('/api/admin/reset-db', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ confirmationKey: enteredKey }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        alert('✅ Base de datos reseteada con éxito para fase de pruebas.')
-        window.location.reload()
-      } else {
-        alert(`❌ Error al resetear: ${data.error}`)
-      }
-    } catch (e: any) {
-      alert(`❌ Error de conexión: ${e?.message}`)
-    } finally {
-      setIsResetting(false)
-    }
+    alert('Operación restringida en entorno de producción. Los registros de pacientes y citas clínicas están protegidos por Supabase.')
   }
 
   // Permisos dinámicos automáticos según departamento
