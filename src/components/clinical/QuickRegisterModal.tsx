@@ -77,6 +77,11 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
 
       if (error) throw error
 
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('audenti_patient_created', { detail: data }))
+        window.dispatchEvent(new CustomEvent('audenti_appointment_refresh'))
+      }
+
       if (onSuccess) onSuccess(data)
       if (onPatientCreated) onPatientCreated()
       onClose()

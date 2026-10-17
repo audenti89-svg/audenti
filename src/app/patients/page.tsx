@@ -36,6 +36,43 @@ export default function PatientsPage() {
 
   useEffect(() => {
     fetchPatients()
+
+    // 1. Suscripción en tiempo real a inserciones y actualizaciones en la tabla patients
+    const patientChannel = supabase
+      .channel('patients_realtime_directory')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'patients' },
+        () => {
+          fetchPatients()
+        }
+      )
+      .on('broadcast', { event: 'new_appointment' }, () => {
+        fetchPatients()
+      })
+      .on('broadcast', { event: 'emergency_triage_alert' }, () => {
+        fetchPatients()
+      })
+      .subscribe()
+
+    // 2. Escucha de eventos locales y almacenamiento
+    const handleRefresh = () => fetchPatients()
+    window.addEventListener('storage', handleRefresh)
+    window.addEventListener('audenti_appointment_refresh', handleRefresh)
+    window.addEventListener('audenti_emergency_refresh', handleRefresh)
+    window.addEventListener('audenti_patient_created', handleRefresh)
+
+    // Polling reactivo cada 3 segundos
+    const interval = setInterval(fetchPatients, 3000)
+
+    return () => {
+      clearInterval(interval)
+      supabase.removeChannel(patientChannel)
+      window.removeEventListener('storage', handleRefresh)
+      window.removeEventListener('audenti_appointment_refresh', handleRefresh)
+      window.removeEventListener('audenti_emergency_refresh', handleRefresh)
+      window.removeEventListener('audenti_patient_created', handleRefresh)
+    }
   }, [])
 
   async function fetchPatients() {
@@ -79,8 +116,12 @@ export default function PatientsPage() {
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-teal-100 text-teal-800 border border-teal-200 uppercase tracking-wide">
               CRM Clínico 360°
             </span>
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1.5 shadow-2xs">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              <span>{patients.length} {patients.length === 1 ? 'Paciente Registrado' : 'Pacientes Registrados'}</span>
+            </span>
             <span className="text-xs text-slate-500 font-medium">
-              Dra. Aura Estudillo • Céd. Prof. 8492019
+              • Dra. Aura Estudillo • Céd. Prof. 8492019
             </span>
           </div>
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">CRM de Pacientes</h1>

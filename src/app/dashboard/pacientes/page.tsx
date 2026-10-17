@@ -46,6 +46,41 @@ export default function PacientesPage() {
 
   useEffect(() => {
     fetchPatients()
+
+    // Suscripción Realtime a inserciones y cambios en la tabla patients
+    const patientChannel = supabase
+      .channel('dashboard_pacientes_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'patients' },
+        () => {
+          fetchPatients()
+        }
+      )
+      .on('broadcast', { event: 'new_appointment' }, () => {
+        fetchPatients()
+      })
+      .on('broadcast', { event: 'emergency_triage_alert' }, () => {
+        fetchPatients()
+      })
+      .subscribe()
+
+    const handleRefresh = () => fetchPatients()
+    window.addEventListener('storage', handleRefresh)
+    window.addEventListener('audenti_appointment_refresh', handleRefresh)
+    window.addEventListener('audenti_emergency_refresh', handleRefresh)
+    window.addEventListener('audenti_patient_created', handleRefresh)
+
+    const interval = setInterval(fetchPatients, 3000)
+
+    return () => {
+      clearInterval(interval)
+      supabase.removeChannel(patientChannel)
+      window.removeEventListener('storage', handleRefresh)
+      window.removeEventListener('audenti_appointment_refresh', handleRefresh)
+      window.removeEventListener('audenti_emergency_refresh', handleRefresh)
+      window.removeEventListener('audenti_patient_created', handleRefresh)
+    }
   }, [])
 
   const filteredPatients = patients.filter((p) => {
