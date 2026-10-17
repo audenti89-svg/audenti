@@ -171,7 +171,7 @@ export function PublicAiChatWidget() {
       }
 
       // Si la IA generó o confirmó una cita con folio, disparar evento para refrescar la agenda en tiempo real
-      if (replyContent && (replyContent.includes('AUD-') || replyContent.includes('folio') || replyContent.includes('Folio'))) {
+      if (data?.appointmentCreated || (replyContent && (replyContent.includes('AUD-') || replyContent.includes('folio') || replyContent.includes('Folio')))) {
         window.dispatchEvent(new Event('audenti_appointment_refresh'))
         try {
           localStorage.setItem('audenti_last_booking_sync', Date.now().toString())
@@ -179,9 +179,10 @@ export function PublicAiChatWidget() {
       }
 
       // Si el triaje detectó urgencia/dolor agudo, activar el temporizador de contingencia médica de 60s
-      if (data?.triageCategory === 'urgency_pain') {
+      if (data?.triageCategory === 'urgency_pain' || replyContent.includes('EMG-') || replyContent.includes('URGENCIA') || replyContent.includes('Triage Prioritario')) {
         contingencyTriggered.current = false
         setActiveUrgencyStartTime(Date.now())
+        window.dispatchEvent(new Event('audenti_emergency_alert'))
       }
 
       const botMsg: Message = {
@@ -197,7 +198,7 @@ export function PublicAiChatWidget() {
       const errorMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'Hubo una breve intermitencia al procesar tu consulta con la IA. Puedes consultarme nuevamente sobre procedimientos, horarios o pulsar "Agendar Cita" para atención inmediata con la Dra. Aura.',
+        content: '¡Hola! Con gusto te atiendo en Audenti. En este momento estoy a tu disposición para ayudarte con información sobre valoraciones, tratamientos con la Dra. Aura Estudillo o para revisar los mejores horarios para tu cita. ¿Qué día o procedimiento tienes en mente?',
         time: formatTimeInMexico()
       }
       setMessages(prev => [...prev, errorMsg])

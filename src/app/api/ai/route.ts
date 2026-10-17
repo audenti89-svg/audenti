@@ -36,7 +36,12 @@ export async function POST(request: Request) {
       contextData: contextData || patientContext || userContext,
     })
 
-    return NextResponse.json({ success: true, result }, { status: 200 })
+    return NextResponse.json({
+      success: true,
+      result,
+      triageCategory: (result as any)?.triageCategory,
+      appointmentCreated: (result as any)?.appointmentCreated
+    }, { status: 200 })
 
   } catch (error: any) {
     console.error('[API AI Route Error] Capturado en el servidor:', {

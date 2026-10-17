@@ -34,17 +34,36 @@ export const conciergeChatTools = [
   {
     type: 'function' as const,
     function: {
-      name: 'escalateEmergencyTriage',
-      description: 'Registra y escala inmediatamente una urgencia o dolor dental agudo hacia la Dra. Aura Estudillo, cruzando la geolocalización y sedes activas (Balbuena / Roma / Chalma).',
+      name: 'createAppointment',
+      description: 'Crea y agenda atómicamente una cita en la base de datos de Supabase cuando el paciente ha definido fecha, hora y tratamiento, reflejándose de inmediato en la agenda y KPIs de la Dra. Aura.',
       parameters: {
         type: 'object',
         properties: {
-          patientName: { type: 'string', description: 'Nombre del paciente' },
-          phone: { type: 'string', description: 'Teléfono de contacto para localizarlo' },
-          symptoms: { type: 'string', description: 'Descripción de los síntomas, inflamación o fractura' },
+          patientName: { type: 'string', description: 'Nombre completo del paciente' },
+          phone: { type: 'string', description: 'Número de teléfono de 10 dígitos' },
+          date: { type: 'string', description: 'Fecha de la cita en formato YYYY-MM-DD (ej. 2026-10-18)' },
+          time: { type: 'string', description: 'Hora de inicio de la cita en formato HH:mm (ej. 10:00, 16:30)' },
+          treatmentType: { type: 'string', description: 'Tratamiento o motivo (ej. Valoración inicial, Limpieza dental, Resina, Ortodoncia)' },
+          branch: { type: 'string', description: 'Sede de la cita (Sede Balbuena o Sede Chalma de Guadalupe)' }
+        },
+        required: ['date', 'time']
+      }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'escalateEmergencyTriage',
+      description: 'Registra y escala inmediatamente una urgencia o dolor dental agudo hacia la Dra. Aura Estudillo, activando la alerta en el Dashboard y la contingencia de triaje clínico.',
+      parameters: {
+        type: 'object',
+        properties: {
+          patientName: { type: 'string', description: 'Nombre del paciente (si lo proporcionó)' },
+          phone: { type: 'string', description: 'Teléfono de contacto' },
+          symptoms: { type: 'string', description: 'Descripción detallada del dolor o urgencia dental' },
           painLevel: { type: 'string', enum: ['critico', 'severo', 'moderado', 'leve'], description: 'Nivel de dolor reportado' },
-          userZone: { type: 'string', description: 'Zona o ubicación del paciente' },
-          targetBranch: { type: 'string', description: 'Sede sugerida o más cercana (Balbuena, Roma, Chalma)' }
+          userZone: { type: 'string', description: 'Zona geográfica o sede preferida' },
+          targetBranch: { type: 'string', description: 'Sede sugerida (Balbuena, Roma, Chalma)' }
         },
         required: ['symptoms']
       }
@@ -156,6 +175,79 @@ export async function executeConciergeTool(name: string, args: Record<string, an
         sedeInfo: branch.toLowerCase().includes('balbuena')
           ? 'Sede Balbuena activa (con próxima mudanza a Colonia Roma)'
           : 'Sede Chalma de Guadalupe activa con normalidad'
+      };
+    }
+
+    if (name === 'createAppointment') {
+      const {
+        patientName = 'Paciente Cita Web',
+        phone = 'No provisto',
+        date,
+        time,
+        treatmentType = 'Valoración Odontológica',
+        branch = 'Sede Balbuena'
+      } = args;
+
+      // Generar fecha y hora combinada ISO
+      const startDateTimeStr = `${date}T${time}:00`;
+      const startDate = new Date(startDateTimeStr);
+      const endDate = new Date(startDate.getTime() + 45 * 60 * 1000); // 45 minutos estándar
+
+      const folio = `AUD-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      // 1. Asegurar o crear paciente
+      let patId: string | undefined;
+      if (phone && phone !== 'No provisto') {
+        const { data: existingPat } = await supabase
+          .from('patients')
+          .select('id')
+          .eq('phone', phone)
+          .maybeSingle();
+
+        if (existingPat) {
+          patId = existingPat.id;
+        } else {
+          const { data: newPat } = await supabase
+            .from('patients')
+            .insert({
+              full_name: patientName,
+              phone: phone,
+              onboarding_completed: false
+            })
+            .select('id')
+            .maybeSingle();
+          patId = newPat?.id;
+        }
+      }
+
+      // 2. Insertar cita confirmada atómicamente en appointments
+      const { data: createdAppt, error: apptError } = await supabase
+        .from('appointments')
+        .insert({
+          patient_id: patId || null,
+          treatment_type: treatmentType,
+          status: 'confirmed',
+          start_time: startDate.toISOString(),
+          end_time: endDate.toISOString(),
+          notes: `[FOLIO: ${folio}] Cita confirmada por Aura AI. Sede: ${branch}. Teléfono: ${phone}. Paciente: ${patientName}`
+        })
+        .select('id')
+        .maybeSingle();
+
+      if (apptError) {
+        throw new Error(apptError.message);
+      }
+
+      return {
+        confirmed: true,
+        folio,
+        appointmentId: createdAppt?.id || folio,
+        patientName,
+        date,
+        time,
+        treatmentType,
+        branch,
+        mensajeConfirmacion: `Tu cita ha quedado agendada y confirmada con la Dra. Aura Estudillo para el día ${date} a las ${time} hrs en ${branch}. Tu folio de atención es ${folio}. Te esperamos 10 minutos antes.`
       };
     }
 

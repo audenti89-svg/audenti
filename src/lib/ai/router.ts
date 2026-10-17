@@ -58,6 +58,8 @@ export interface AIResponse {
   provider: string;
   executionTimeMs: number;
   error?: string;
+  triageCategory?: string;
+  appointmentCreated?: boolean;
 }
 
 export async function executeAIAgent(options: AIRequestOptions): Promise<AIResponse> {
@@ -184,19 +186,49 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
             temperature: 0.5
           });
 
+          // Función auxiliar para limpiar Markdown crudo agresivo (###, ---, etc.)
+          const cleanText = (txt: string) => {
+            if (!txt) return '';
+            return txt
+              .replace(/^---+$/gm, '')
+              .replace(/^[#]+\s+/gm, '')
+              .replace(/\n{3,}/g, '\n\n')
+              .trim();
+          };
+
+          const rawReply = secondTurn.choices[0]?.message?.content || '';
+          const cleanedReply = cleanText(rawReply);
+
+          // Si se ejecutó alguna tool, verificar si fue urgencia o cita
+          const hasEmergencyEscalation = responseMessage.tool_calls.some(
+            tc => tc.function.name === 'escalateEmergencyTriage'
+          );
+          const hasCreatedAppointment = responseMessage.tool_calls.some(
+            tc => tc.function.name === 'createAppointment'
+          );
+
           return {
             success: true,
             domain,
-            result: secondTurn.choices[0]?.message?.content || '',
+            result: cleanedReply,
+            triageCategory: hasEmergencyEscalation ? 'urgency_pain' : undefined,
+            appointmentCreated: hasCreatedAppointment,
             provider: 'groq/patient-chat-concierge-tools',
             executionTimeMs: Date.now() - startTime
           };
         }
 
+        const rawContent = responseMessage?.content || '';
+        const cleanReply = rawContent
+          .replace(/^---+$/gm, '')
+          .replace(/^[#]+\s+/gm, '')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim();
+
         return {
           success: true,
           domain,
-          result: responseMessage?.content || '',
+          result: cleanReply,
           provider: 'groq/patient-chat-concierge',
           executionTimeMs: Date.now() - startTime
         };
@@ -210,7 +242,7 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
             messages: [
               {
                 role: 'system',
-                content: 'Eres Aura AI, la recepcionista y asistente oficial de la clínica dental Audenti de la Dra. Aura Estudillo (Cédula 8492019). Responde siempre con amabilidad, calidez médica y claridad en español de México. Si el paciente pide cita, pregúntale qué día/horario prefiere (Lunes a Sábado de 09:00 a 19:30 hrs) o el motivo de su visita. Si reporta dolor urgente, indícale medidas de calma y que la Dra. Aura puede atenderlo.'
+                content: 'Eres Aura AI, la recepcionista y asistente oficial de la clínica dental Audenti de la Dra. Aura Estudillo (Cédula 8492019). Responde siempre con amabilidad, calidez médica y claridad en español de México en texto plano y limpio sin usar símbolos como ### ni ---. Si el paciente pide cita, pregúntale qué día/horario prefiere (Lunes a Sábado de 09:00 a 19:30 hrs). Si reporta dolor urgente o no aguanta el dolor, dale calma, dile que se registra su urgencia para la Dra. Aura y recomiéndale no automedicarse.'
               },
               ...history.map(h => ({ role: h.role, content: h.content })),
               { role: 'user', content: effectivePrompt }
@@ -219,10 +251,17 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
             temperature: 0.5
           });
 
+          const rawFallback = fallbackRes.choices[0]?.message?.content || '¡Hola! Con gusto te atiendo en Audenti. ¿Qué día y horario te acomodaría mejor para tu valoración con la Dra. Aura Estudillo?';
+          const cleanFallback = rawFallback
+            .replace(/^---+$/gm, '')
+            .replace(/^[#]+\s+/gm, '')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+
           return {
             success: true,
             domain,
-            result: fallbackRes.choices[0]?.message?.content || '¡Hola! Con gusto te atiendo en Audenti. ¿Qué día y horario te acomodaría mejor para tu valoración con la Dra. Aura Estudillo?',
+            result: cleanFallback,
             provider: 'groq/patient-chat-fallback',
             executionTimeMs: Date.now() - startTime
           };
