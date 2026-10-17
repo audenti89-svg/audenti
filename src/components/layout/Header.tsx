@@ -288,7 +288,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
             }`}
             title="Bandeja de Alertas y Citas (Dra. Aura)"
           >
-            <Bell className={`w-4 h-4 ${notifications.length > 0 ? 'text-amber-600 animate-wiggle' : ''}`} />
+            <Bell className={`w-4 h-4 ${notifications.length > 0 ? 'text-amber-600 animate-pulse' : ''}`} />
             {notifications.length > 0 && (
               <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-600 text-white text-[10px] font-extrabold flex items-center justify-center ring-2 ring-white animate-pulse shadow-xs">
                 {notifications.length}

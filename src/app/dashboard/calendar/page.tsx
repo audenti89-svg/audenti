@@ -591,39 +591,71 @@ export default function CalendarPage() {
               <h2 className="text-base font-bold text-slate-900 capitalize">
                 Vista Panorámica Mensual ({new Date(`${selectedDate}T12:00:00-06:00`).toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City', month: 'long', year: 'numeric' })})
               </h2>
-              <div className="grid grid-cols-7 gap-2">
-                {Array.from({ length: 31 }, (_, i) => i + 1).map(day => {
-                  const dayPadded = day < 10 ? '0' + day : '' + day
-                  const monthPrefix = selectedDate.substring(0, 8) // YYYY-MM-
-                  const dayDate = `${monthPrefix}${dayPadded}`
-                  const count = appointments.filter(a => a.date === dayDate).length
-                  const isSelected = selectedDate === dayDate
-                  const isRealToday = getTodayStr() === dayDate
-                  return (
-                    <div
-                      key={day}
-                      onClick={() => handleSlotClick(dayDate, '10:00')}
-                      className={`min-h-[85px] p-2 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
-                        isSelected ? 'bg-amber-50/80 border-amber-400 shadow-xs' : isRealToday ? 'bg-amber-50/30 border-amber-300' : 'bg-slate-50/50 border-slate-200 hover:bg-white'
-                      }`}
-                    >
-                      <div className="flex justify-between items-center">
-                        <span className={`text-xs font-bold ${isSelected ? 'text-amber-950 font-black' : 'text-slate-700'}`}>{day}</span>
-                        {count > 0 && (
-                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-amber-400 text-slate-950">
-                            {count} citas
-                          </span>
-                        )}
-                      </div>
-                      <div className="space-y-0.5">
-                        {count > 0 && (
-                          <span className="text-[9px] text-slate-600 truncate block">Ocupación: {count * 20}%</span>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
+              {/* Header de días de la semana L M M J V S D */}
+              <div className="grid grid-cols-7 gap-2 text-center text-xs font-bold text-slate-500 mb-1">
+                <span>Lunes</span>
+                <span>Martes</span>
+                <span>Miércoles</span>
+                <span>Jueves</span>
+                <span>Viernes</span>
+                <span>Sábado</span>
+                <span>Domingo</span>
               </div>
+              {(() => {
+                const [yearStr, monthStr] = selectedDate.split('-')
+                const year = parseInt(yearStr, 10)
+                const month = parseInt(monthStr, 10) - 1
+                const firstDayOfMonth = new Date(year, month, 1, 12, 0, 0)
+                const startDayOffset = (firstDayOfMonth.getDay() + 6) % 7
+                const totalDaysInMonth = new Date(year, month + 1, 0).getDate()
+                const monthPrefix = `${yearStr}-${monthStr}-`
+                const todayStr = getTodayStr()
+
+                return (
+                  <div className="grid grid-cols-7 gap-2">
+                    {/* Celdas vacías de desfase */}
+                    {Array.from({ length: startDayOffset }).map((_, idx) => (
+                      <div key={`month-empty-${idx}`} className="min-h-[85px] p-2 rounded-xl border border-transparent bg-slate-50/20 pointer-events-none" />
+                    ))}
+
+                    {/* Días del mes */}
+                    {Array.from({ length: totalDaysInMonth }, (_, i) => i + 1).map(day => {
+                      const dayPadded = day < 10 ? '0' + day : '' + day
+                      const dayDate = `${monthPrefix}${dayPadded}`
+                      const count = appointments.filter(a => a.date === dayDate).length
+                      const isSelected = selectedDate === dayDate
+                      const isRealToday = todayStr === dayDate
+                      return (
+                        <div
+                          key={day}
+                          onClick={() => handleSlotClick(dayDate, '10:00')}
+                          className={`min-h-[85px] p-2 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
+                            isSelected
+                              ? 'bg-amber-50/80 border-amber-400 shadow-xs'
+                              : isRealToday
+                              ? 'bg-amber-50/30 border-amber-300'
+                              : 'bg-slate-50/50 border-slate-200 hover:bg-white'
+                          }`}
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className={`text-xs font-bold ${isSelected ? 'text-amber-950 font-black' : 'text-slate-700'}`}>{day}</span>
+                            {count > 0 && (
+                              <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-amber-400 text-slate-950">
+                                {count} citas
+                              </span>
+                            )}
+                          </div>
+                          <div className="space-y-0.5">
+                            {count > 0 && (
+                              <span className="text-[9px] text-slate-600 truncate block">Ocupación: {count * 20}%</span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
             </div>
           )}
 
