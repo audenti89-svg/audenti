@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -46,7 +47,7 @@ const systemNav: NavItem[] = [
   { label: 'Configuración',     path: '/dashboard/configuracion',icon: Settings },
 ]
 
-function NavGroup({ title, items }: { title: string; items: NavItem[] }) {
+function NavGroup({ title, items, unconfirmedCount }: { title: string; items: NavItem[]; unconfirmedCount: number }) {
   const pathname = usePathname()
   return (
     <div className="space-y-1">
@@ -57,18 +58,30 @@ function NavGroup({ title, items }: { title: string; items: NavItem[] }) {
         {items.map((item) => {
           const isActive = pathname === item.path || (item.path !== '/dashboard' && pathname.startsWith(item.path))
           const Icon = item.icon
+          const isCommunication = item.label === 'Comunicación'
+          const showPulsingBadge = isCommunication && unconfirmedCount > 0
+
           return (
             <Link
               key={item.path}
               href={item.path}
-              className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                 isActive
                   ? 'bg-amber-400 text-slate-950 font-bold shadow-sm'
                   : 'text-slate-200 hover:bg-white/10 hover:text-white'
               }`}
             >
-              <Icon className="w-4 h-4 shrink-0" />
-              <span>{item.label}</span>
+              <div className="flex items-center gap-3 min-w-0">
+                <Icon className="w-4 h-4 shrink-0" />
+                <span className="truncate">{item.label}</span>
+              </div>
+
+              {showPulsingBadge && (
+                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-600 text-white font-black text-[10px] shadow-sm animate-pulse border border-white/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                  Pendiente
+                </span>
+              )}
             </Link>
           )
         })}
@@ -86,6 +99,20 @@ export interface SidebarProps {
 }
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
+  const [unconfirmedCount, setUnconfirmedCount] = useState(0)
+
+  useEffect(() => {
+    const handleUnconfirmedChange = (e: any) => {
+      const count = e?.detail?.unconfirmedCount ?? 0
+      setUnconfirmedCount(count)
+    }
+
+    window.addEventListener('audenti_unconfirmed_notifications_change', handleUnconfirmedChange)
+    return () => {
+      window.removeEventListener('audenti_unconfirmed_notifications_change', handleUnconfirmedChange)
+    }
+  }, [])
+
   return (
     <>
       {/* Backdrop en Pantallas Móviles */}
@@ -118,9 +145,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         {/* Navigation */}
         <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
-          <NavGroup title="Gestión Clínica"     items={clinicalNav} />
-          <NavGroup title="Operación & Negocio" items={businessNav} />
-          <NavGroup title="Sistema"             items={systemNav}   />
+          <NavGroup title="Gestión Clínica"     items={clinicalNav} unconfirmedCount={unconfirmedCount} />
+          <NavGroup title="Operación & Negocio" items={businessNav} unconfirmedCount={unconfirmedCount} />
+          <NavGroup title="Sistema"             items={systemNav}   unconfirmedCount={unconfirmedCount} />
         </div>
 
         {/* User Footer */}

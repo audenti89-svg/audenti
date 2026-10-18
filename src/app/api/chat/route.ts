@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { sendDoctorWhatsAppAlert } from '@/lib/notifications/whatsapp-doctor';
+import { sendDoctorWhatsAppAlert, sendPatientWhatsAppMessage } from '@/lib/notifications/whatsapp-doctor';
 
 export const runtime = 'nodejs';
 
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
           type: 'voice_call'
         });
       } else {
-        // Notificar al paciente en vivo
+        // Notificar al paciente en vivo en la App Web
         await supabase.channel(`patient_chat_${patientId}`).send({
           type: 'broadcast',
           event: 'doctor_reply',
@@ -91,6 +91,35 @@ export async function POST(request: Request) {
           event: 'sync_patient_message',
           payload: message
         });
+
+        // 5. Sistema de Notificación Dual por Confirmación / Respuesta Médica:
+        // Obtener teléfono del paciente desde Supabase
+        try {
+          const { data: patientData } = await supabase
+            .from('patients')
+            .select('full_name, phone')
+            .eq('id', patientId)
+            .maybeSingle();
+
+          if (patientData?.phone) {
+            // A. Notificar al WhatsApp del Paciente
+            await sendPatientWhatsAppMessage({
+              patientPhone: patientData.phone,
+              patientName: patientData.full_name,
+              message: message.content
+            });
+
+            // B. Notificar confirmación espejo al WhatsApp de la Dra. Aura
+            await sendDoctorWhatsAppAlert({
+              title: `✅ RESPUESTA ENVIADA A PACIENTE`,
+              patientName: `${patientData.full_name} (${patientData.phone})`,
+              message: message.content,
+              type: 'info'
+            });
+          }
+        } catch (dualErr: any) {
+          console.warn('[Dual Notification Error]:', dualErr?.message);
+        }
       }
     } catch (e: any) {
       console.warn('Nota broadcast realtime en api/chat:', e?.message);

@@ -11,6 +11,9 @@ export interface OmnipresentToast {
   message: string
   type: 'chat' | 'voice' | 'emergency' | 'general'
   patientName?: string
+  phone?: string
+  folio?: string
+  isRegistered?: boolean
   timestamp: string
   url?: string
 }
@@ -96,7 +99,7 @@ export function OmnipresentDoctorLiveAlerts() {
 
   // 3. Listener Global Omnipresente de Supabase Realtime a Nivel Raíz
   useEffect(() => {
-    const handleIncomingMessage = (payload: any) => {
+    const handleIncomingMessage = async (payload: any) => {
       if (!payload) return
       playTone('arrival')
 
@@ -104,33 +107,72 @@ export function OmnipresentDoctorLiveAlerts() {
       const content = payload.content || payload.message || 'Nuevo mensaje'
       const time = payload.timestamp || payload.time || new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date())
 
+      // Verificar si el paciente está registrado en la base de datos
+      let isRegistered = false
+      let folio = ''
+      try {
+        if (payload.targetPatientId) {
+          const { data: pat } = await supabase
+            .from('patients')
+            .select('id, full_name, phone')
+            .eq('id', payload.targetPatientId)
+            .maybeSingle()
+          if (pat) {
+            isRegistered = true
+            folio = `EXP-${pat.id.slice(0, 8).toUpperCase()}`
+          }
+        }
+      } catch {}
+
       const newToast: OmnipresentToast = {
         id: `toast-${Date.now()}-${Math.random()}`,
         title: `💬 Mensaje de ${sender}`,
         message: content,
         type: 'chat',
         patientName: sender,
+        phone: payload.phone || '',
+        folio,
+        isRegistered,
         timestamp: time,
         url: '/dashboard/chat'
       }
 
-      setToasts(prev => [newToast, ...prev].slice(0, 4))
+      // Queda fijo hasta que la doctora confirme expresamente la lectura
+      setToasts(prev => [newToast, ...prev.filter(t => t.id !== newToast.id)].slice(0, 5))
       triggerNativePush(`💬 Mensaje de ${sender}`, content, '/dashboard/chat')
 
-      // Auto-remover a los 10 segundos
-      setTimeout(() => {
-        setToasts(prev => prev.filter(t => t.id !== newToast.id))
-      }, 10000)
+      // Emitir evento para el badge pulsante en Sidebar ('Comunicación')
+      try {
+        window.dispatchEvent(new CustomEvent('audenti_unconfirmed_notifications_change', {
+          detail: { unconfirmedCount: 1 }
+        }))
+      } catch {}
     }
 
-    const handleVoiceEvent = (payload: any) => {
+    const handleVoiceEvent = async (payload: any) => {
       if (!payload) return
-      const patient = payload.patientName || 'Paciente'
+      const patient = payload.patientName || 'Ricardo Sánchez'
       const time = payload.timestamp || 'Ahora'
+
+      // Verificar si existe en la BD
+      let isRegistered = false
+      let folio = ''
+      try {
+        if (payload.patientId) {
+          const { data: pat } = await supabase
+            .from('patients')
+            .select('id, full_name, phone')
+            .eq('id', payload.patientId)
+            .maybeSingle()
+          if (pat) {
+            isRegistered = true
+            folio = `EXP-${pat.id.slice(0, 8).toUpperCase()}`
+          }
+        }
+      } catch {}
 
       if (payload.status === 'active') {
         playTone('arrival')
-        // Alerta sonora sutil de inicio
         triggerNativePush(`📞 Llamada de Voz en Curso`, `${patient} está hablando con Aura IA.`, '/dashboard/chat')
       } else if (payload.status === 'ended') {
         playTone('arrival')
@@ -140,14 +182,26 @@ export function OmnipresentDoctorLiveAlerts() {
           message: payload.summary || `Solicitud de Cita Médica • Fecha/Horario por confirmar`,
           type: 'voice',
           patientName: patient,
+          phone: payload.phone || '',
+          folio,
+          isRegistered,
           timestamp: time,
           url: '/dashboard/chat'
         }
-        setToasts(prev => [toast, ...prev].slice(0, 3))
-        triggerNativePush(`👤 Paciente: ${patient} (Registrado)`, `📌 Motivo: Solicitud de Cita Médica\n⚠️ Acción Requerida: Confirmar fecha/horario de atención disponible.`, '/dashboard/chat')
-        setTimeout(() => {
-          setToasts(prev => prev.filter(t => t.id !== toast.id))
-        }, 15000)
+
+        // Queda fijo en pantalla: CERO borrado automático
+        setToasts(prev => [toast, ...prev.filter(t => t.id !== toast.id)].slice(0, 5))
+        triggerNativePush(
+          isRegistered ? `🟢 PACIENTE REGISTRADO: ${patient} (${folio})` : `🟠 PROSPECTO NUEVO: ${patient}`,
+          `📌 Motivo: Solicitud de Cita Médica\n⚠️ Acción Requerida: Confirmar fecha/horario de atención disponible.`,
+          '/dashboard/chat'
+        )
+
+        try {
+          window.dispatchEvent(new CustomEvent('audenti_unconfirmed_notifications_change', {
+            detail: { unconfirmedCount: 1 }
+          }))
+        } catch {}
       }
     }
 
@@ -232,17 +286,31 @@ export function OmnipresentDoctorLiveAlerts() {
                     <span className="text-xs font-black text-white">{t.title}</span>
                     <span className="text-[10px] text-amber-300 font-mono">{t.timestamp}</span>
                   </div>
+
+                  {/* Clasificación Obligatoria: Paciente Registrado vs Prospecto Nuevo */}
+                  <div className="mt-1.5 flex items-center gap-2">
+                    {t.isRegistered ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/25 border border-emerald-400/50 text-emerald-300 font-black text-[10px]">
+                        🟢 PACIENTE REGISTRADO {t.folio ? `(${t.folio})` : ''}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/25 border border-amber-400/50 text-amber-300 font-black text-[10px]">
+                        🟠 PROSPECTO NUEVO {t.phone ? `(${t.phone})` : ''}
+                      </span>
+                    )}
+                  </div>
+
                   {t.type === 'voice' ? (
                     <div className="mt-2 space-y-1 text-xs">
-                      <div className="bg-slate-900/80 p-2 rounded-xl border border-white/10 space-y-1">
-                        <p className="text-amber-300 font-bold">
-                          👤 Paciente: <span className="text-white">{t.patientName || 'Ricardo Sánchez'}</span> <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-mono">(Registrado)</span>
+                      <div className="bg-slate-900/80 p-2.5 rounded-xl border border-white/10 space-y-1">
+                        <p className="text-slate-200">
+                          👤 <strong>Paciente:</strong> <span className="text-white font-bold">{t.patientName}</span>
                         </p>
                         <p className="text-slate-300">
-                          📌 Motivo: <span className="text-white font-medium">Solicitud de Cita Médica</span>
+                          📌 <strong>Motivo:</strong> Solicitud de Cita Médica
                         </p>
                         <p className="text-amber-400 font-semibold text-[11px] flex items-center gap-1">
-                          ⚠️ Acción Requerida: Confirmar fecha/horario disponible
+                          ⚠️ Acción Requerida: Confirmar fecha/horario de atención disponible.
                         </p>
                         {t.message && !t.message.includes('Solicitud de Cita') && (
                           <p className="text-slate-400 text-[10px] pt-1 border-t border-white/10 italic">
@@ -260,20 +328,48 @@ export function OmnipresentDoctorLiveAlerts() {
               </div>
 
               <button
-                onClick={() => setToasts(prev => prev.filter(item => item.id !== t.id))}
+                onClick={() => {
+                  setToasts(prev => prev.filter(item => item.id !== t.id))
+                  try {
+                    window.dispatchEvent(new CustomEvent('audenti_unconfirmed_notifications_change', {
+                      detail: { unconfirmedCount: Math.max(0, toasts.length - 1) }
+                    }))
+                  } catch {}
+                }}
                 className="p-1 rounded-lg text-slate-400 hover:text-white shrink-0"
+                title="Cerrar notificación"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
 
-            <div className="mt-2.5 pt-2 border-t border-white/10 flex items-center justify-between text-[11px]">
-              <span className="text-slate-400">Audenti 24/7 Live Sync</span>
+            {/* Acciones Expresas: Confirmar Lectura o Ver en Chat */}
+            <div className="mt-3 pt-2.5 border-t border-white/10 flex items-center justify-between text-[11px] gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setToasts(prev => prev.filter(item => item.id !== t.id))
+                  playTone('message')
+                  try {
+                    window.dispatchEvent(new CustomEvent('audenti_unconfirmed_notifications_change', {
+                      detail: { unconfirmedCount: Math.max(0, toasts.length - 1) }
+                    }))
+                  } catch {}
+                }}
+                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black transition-all shadow-xs active:scale-95 cursor-pointer flex items-center gap-1.5"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                ✓ Confirmar Lectura
+              </button>
+
               <a
                 href={t.url || '/dashboard/chat'}
-                className="text-amber-400 hover:text-amber-300 font-bold hover:underline"
+                onClick={() => {
+                  setToasts(prev => prev.filter(item => item.id !== t.id))
+                }}
+                className="text-amber-400 hover:text-amber-300 font-bold hover:underline flex items-center gap-1"
               >
-                Ver en Chat Omnicanal →
+                Ver en Chat →
               </a>
             </div>
           </div>
