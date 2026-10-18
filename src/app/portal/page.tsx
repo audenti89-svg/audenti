@@ -200,8 +200,8 @@ export default function PatientPortalPage() {
       <header className="w-full bg-[#0d1322] border-b border-gray-800 px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 sticky top-0 z-40">
         {/* Identidad de la Clínica */}
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="w-10 h-10 rounded-full bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center shrink-0">
-            <img src="/logo.png" alt="Audenti" className="w-6 h-6 object-contain" />
+          <div className="w-10 h-10 rounded-full bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center shrink-0 overflow-hidden">
+            <AudentiLogo size={28} className="w-7 h-7 text-yellow-400" />
           </div>
           <div>
             <h1 className="text-sm font-bold tracking-wider text-white">AUDENTI CLINICAL</h1>
