@@ -139,9 +139,12 @@ export default function PatientPortalPage() {
     router.refresh();
   };
 
+  // Asegúrate de que el componente lea la sucursal asignada en la base de datos del paciente:
+  const branchDisplay = patient?.branch_name || patient?.tenant_id || "Sucursal Chalma de Guadalupe";
+
   // Resolver sede de atención directamente por branch_name o tenant_id
   const branchInfo = useMemo(() => {
-    const rawBranchName = (patient?.branch_name || '').toLowerCase();
+    const rawBranchName = (branchDisplay || '').toLowerCase();
     const tid = patient?.tenant_id || '';
 
     // Si tiene asignada Balbuena
@@ -155,7 +158,7 @@ export default function PatientPortalPage() {
 
     // Por defecto y si es Chalma de Guadalupe (o paciente recién registrado)
     return BRANCH_DETAILS['00000000-0000-0000-0000-000000000002'];
-  }, [patient]);
+  }, [patient, branchDisplay]);
 
   // Próxima Cita Activa
   const upcomingAppointment = useMemo(() => {
@@ -194,31 +197,27 @@ export default function PatientPortalPage() {
   return (
     <div className="min-h-screen bg-[#0A0F1D] text-white selection:bg-amber-400 selection:text-slate-950 pb-20">
       {/* 1. Header Institucional del Portal - PatientHeader Oficial Limpio y Separado */}
-      <header className="w-full bg-[#0d1322] border-b border-gray-800 px-6 py-4 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-40">
-        {/* Isotipo + Identidad de la Clínica */}
-        <div className="flex items-center gap-4">
+      <header className="w-full bg-[#0d1322] border-b border-gray-800 px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 sticky top-0 z-40">
+        {/* Identidad de la Clínica */}
+        <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="w-10 h-10 rounded-full bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center shrink-0">
-            <AudentiLogo className="w-6 h-6 text-yellow-400" />
+            <img src="/logo.png" alt="Audenti" className="w-6 h-6 object-contain" />
           </div>
-          <div className="flex flex-col justify-center">
-            <h1 className="text-base font-bold tracking-wider text-white leading-none">
-              AUDENTI CLINICAL
-            </h1>
-            <span className="text-xs text-yellow-400 mt-1 font-medium">
-              Dra. Aura Estudillo • Cédula Profesional 8492019
-            </span>
+          <div>
+            <h1 className="text-sm font-bold tracking-wider text-white">AUDENTI CLINICAL</h1>
+            <p className="text-xs text-yellow-400 font-medium">Dra. Aura Estudillo • Cédula Profesional 8492019</p>
           </div>
         </div>
 
-        {/* Badges y Sesión */}
-        <div className="flex items-center gap-4 flex-wrap">
+        {/* Insignia de Rol y Estado de Sesión */}
+        <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
           <span className="bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap">
             PORTAL DEL PACIENTE
           </span>
-          <div className="text-xs text-gray-300 flex items-center gap-2">
+          <span className="text-xs text-gray-300 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Sesión activa: <strong className="text-white font-bold">{patientName}</strong></span>
-          </div>
+            <span>Sesión activa: <strong className="text-white font-bold">{patient?.full_name || patientName}</strong></span>
+          </span>
           <button
             onClick={handleSignOut}
             className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-200 hover:text-white text-xs font-bold border border-gray-700 transition-all cursor-pointer shadow-xs ml-2"
