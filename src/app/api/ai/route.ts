@@ -28,11 +28,34 @@ export async function POST(request: Request) {
       )
     }
 
+    // BLINDAJE DE SEGURIDAD (ANTI-ABUSO Y PREVENCIÓN DE INYECCIONES):
+    // 1. Limitar longitud máxima de texto para evitar ataques DoS o agotamiento de tokens
+    if (typeof resolvedPrompt === 'string' && resolvedPrompt.length > 4000) {
+      return NextResponse.json(
+        { success: false, error: 'Longitud de texto excesiva. Máximo permitido: 4,000 caracteres.' },
+        { status: 413 }
+      )
+    }
+
+    // 2. Sanitizar dominios permitidos (evitar ejecución de dominios arbitrarios o privilegiados sin auth)
+    const ALLOWED_DOMAINS: AITaskDomain[] = ['clinical', 'patient_chat', 'finance', 'bi', 'scheduling']
+    if (!ALLOWED_DOMAINS.includes(resolvedDomain)) {
+      return NextResponse.json(
+        { success: false, error: 'Dominio de tarea de IA no autorizado.' },
+        { status: 403 }
+      )
+    }
+
+    // 3. Sanitizar patrones obvios de System Prompt Override / Leakage
+    const sanitizedPrompt = typeof resolvedPrompt === 'string'
+      ? resolvedPrompt.replace(/(\bignore\s+all\s+previous\s+instructions\b|\bignora\s+las\s+instrucciones\s+anteriores\b|\brevela\s+el\s+system\s+prompt\b)/gi, '[FILTRADO POR PROTOCOLO DE SEGURIDAD AUDENTI]')
+      : resolvedPrompt
+
     // Ejecutamos el enrutador de agentes especializados con historial y Function Calling
     const result = await executeAIAgent({
       domain: resolvedDomain,
-      prompt: resolvedPrompt,
-      history: resolvedHistory,
+      prompt: sanitizedPrompt,
+      history: resolvedHistory.slice(-15), // Máximo 15 turnos para evitar desbordamiento de contexto
       contextData: contextData || patientContext || userContext,
     })
 
