@@ -150,11 +150,12 @@ export default function DashboardPage() {
     fetchDashboardData()
 
     const supabase = createClient()
-    // Suscripción Realtime a broadcast de citas y alertas de la Dra. Aura
+    // Suscripción Realtime a broadcast de citas, urgencias y alertas de seguridad para la Dra. Aura
     const channel = supabase
       .channel('dashboard_page_realtime')
       .on('broadcast', { event: 'new_appointment' }, ({ payload }) => {
         fetchDashboardData()
+        playTone('arrival') // Aviso sonoro suave para nueva cita confirmada
         if (payload) {
           const dateStr = payload.appointment_date || 'Lunes 19'
           const timeStr = payload.appointment_time || '09:00'
@@ -175,6 +176,7 @@ export default function DashboardPage() {
       })
       .on('broadcast', { event: 'doctor_notification' }, ({ payload }) => {
         if (payload) {
+          playTone('message')
           setActiveToast({
             id: payload.id || `toast-${Date.now()}`,
             title: payload.title || 'Nueva notificación de la clínica',
@@ -189,7 +191,7 @@ export default function DashboardPage() {
       })
       .on('broadcast', { event: 'emergency_triage_alert' }, ({ payload }) => {
         fetchDashboardData()
-        playTone('urgent')
+        playTone('urgent') // Aviso sonoro de urgencia inmediata
         if (payload) {
           setActiveToast({
             id: payload.id || `toast-urg-${Date.now()}`,
@@ -204,6 +206,22 @@ export default function DashboardPage() {
           try {
             window.dispatchEvent(new CustomEvent('audenti_emergency_refresh'))
           } catch {}
+        }
+      })
+      .subscribe()
+
+    // Suscripción al Guardián de Seguridad IA 24/7 (AI-Sentinel)
+    const securityChannel = supabase
+      .channel('dashboard_security_sentinel')
+      .on('broadcast', { event: 'security_threat_blocked' }, ({ payload }) => {
+        if (payload) {
+          playTone('message')
+          setActiveToast({
+            id: `sec-${Date.now()}`,
+            title: payload.title || '🛡️ Amenaza Neutralizada por IA',
+            message: `${payload.details || 'Intento de inyección bloqueado'}. Riesgo evaluado: ${payload.risk || 95}%.`,
+            type: 'emergency'
+          })
         }
       })
       .subscribe()

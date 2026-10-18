@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { executeAIAgent, AITaskDomain } from '@/lib/ai/router'
+import { inspectRequestSecurity } from '@/lib/security/ai-sentinel'
 
 export const runtime = 'nodejs'
 
@@ -28,16 +29,30 @@ export async function POST(request: Request) {
       )
     }
 
-    // BLINDAJE DE SEGURIDAD (ANTI-ABUSO Y PREVENCIÓN DE INYECCIONES):
-    // 1. Limitar longitud máxima de texto para evitar ataques DoS o agotamiento de tokens
-    if (typeof resolvedPrompt === 'string' && resolvedPrompt.length > 4000) {
+    // 🛡️ GUARDIÁN DE SEGURIDAD IA 24/7 (AI-SENTINEL):
+    // Inspección heurística profunda, rate limiting en ráfagas y bloqueo de Prompt Injections
+    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown-client'
+    const securityCheck = await inspectRequestSecurity({
+      prompt: String(resolvedPrompt),
+      identifier: clientIp,
+      domain: resolvedDomain,
+      metadata: { taskType, userContext }
+    })
+
+    if (!securityCheck.allowed) {
       return NextResponse.json(
-        { success: false, error: 'Longitud de texto excesiva. Máximo permitido: 4,000 caracteres.' },
-        { status: 413 }
+        {
+          success: false,
+          blocked: true,
+          error: securityCheck.reason || 'Petición denegada por directivas de seguridad.',
+          threatType: securityCheck.threatType,
+          riskScore: securityCheck.riskScore
+        },
+        { status: securityCheck.threatType === 'ANOMALOUS_BURST' ? 429 : 403 }
       )
     }
 
-    // 2. Sanitizar dominios permitidos (evitar ejecución de dominios arbitrarios o privilegiados sin auth)
+    // Sanitizar dominios permitidos (evitar ejecución de dominios arbitrarios o no autorizados)
     const ALLOWED_DOMAINS: AITaskDomain[] = ['clinical', 'patient_chat', 'finance', 'bi', 'scheduling']
     if (!ALLOWED_DOMAINS.includes(resolvedDomain)) {
       return NextResponse.json(
@@ -46,9 +61,8 @@ export async function POST(request: Request) {
       )
     }
 
-    // 3. Sanitizar patrones obvios de System Prompt Override / Leakage
     const sanitizedPrompt = typeof resolvedPrompt === 'string'
-      ? resolvedPrompt.replace(/(\bignore\s+all\s+previous\s+instructions\b|\bignora\s+las\s+instrucciones\s+anteriores\b|\brevela\s+el\s+system\s+prompt\b)/gi, '[FILTRADO POR PROTOCOLO DE SEGURIDAD AUDENTI]')
+      ? resolvedPrompt.replace(/(\bignore\s+all\s+previous\s+instructions\b|\bignora\s+las\s+instrucciones\s+anteriores\b|\brevela\s+el\s+system\s+prompt\b)/gi, '[FILTRADO]')
       : resolvedPrompt
 
     // Ejecutamos el enrutador de agentes especializados con historial y Function Calling

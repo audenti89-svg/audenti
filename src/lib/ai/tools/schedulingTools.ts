@@ -371,6 +371,31 @@ export async function executeConciergeTool(name: string, args: Record<string, an
         emitAppointmentToChannels('calendar_page_realtime');
         emitAppointmentToChannels('dashboard_realtime_kpis');
 
+        // 6. Notificación WhatsApp (Disparo Inmediato al Paciente y a la Dra. Aura)
+        const doctorPhone = process.env.DOCTOR_WHATSAPP || '525522427769';
+        const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+        const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+
+        if (phoneId && accessToken) {
+          const { sendWhatsAppMessage } = await import('@/lib/whatsapp/client');
+          // Aviso a la Dra. Aura
+          sendWhatsAppMessage(
+            phoneId,
+            doctorPhone,
+            `📅 *Nueva Cita Agendada (Aura AI)*\n• Paciente: ${patientName}\n• Fecha: ${date} a las ${time} hrs\n• Sede: ${branch}\n• Folio: ${folio}\n• Tel: ${phone}`
+          ).catch((e: any) => console.warn('Nota de envío WhatsApp a la Doctora:', e?.message));
+
+          // Confirmación al Paciente (si proporcionó teléfono válido)
+          if (phone && phone !== 'No provisto' && phone.length >= 10) {
+            const cleanPatPhone = phone.replace(/\D/g, '').replace(/^(\+?52)?/, '52');
+            sendWhatsAppMessage(
+              phoneId,
+              cleanPatPhone,
+              `🦷 *Audenti Clinical — Confirmación de Cita*\nHola ${patientName}, tu cita con la Dra. Aura Estudillo ha quedado registrada para el día *${date} a las ${time} hrs* en ${branch}.\n• Folio Oficial: *${folio}*\n¡Te esperamos con gusto!`
+            ).catch((e: any) => console.warn('Nota de envío WhatsApp al Paciente:', e?.message));
+          }
+        }
+
         return {
           status: 200,
           confirmed: true,
@@ -562,6 +587,20 @@ export async function executeConciergeTool(name: string, args: Record<string, an
         emitToChannel('dashboard_page_realtime');
         emitToChannel('header_notifications_realtime');
         emitToChannel('calendar_page_realtime');
+
+        // 6. Notificación WhatsApp Prioritaria de Urgencia a la Dra. Aura Estudillo
+        const doctorPhone = process.env.DOCTOR_WHATSAPP || '525522427769';
+        const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+        const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+
+        if (phoneId && accessToken) {
+          const { sendWhatsAppMessage } = await import('@/lib/whatsapp/client');
+          sendWhatsAppMessage(
+            phoneId,
+            doctorPhone,
+            `🚨 *URGENCIA DENTAL ESCALADA (Aura AI)*\n• Paciente: *${patientName}*\n• Nivel de Dolor: *${painLevel.toUpperCase()}*\n• Teléfono: ${phone}\n• Sede: ${targetBranch}\n• Síntomas: ${symptoms}\n• Folio: *${folio}*\nFavor de revisar el Dashboard clínico para autorizar recepción.`
+          ).catch((e: any) => console.warn('Nota de envío WhatsApp Urgencia a la Doctora:', e?.message));
+        }
       } catch (storageErr: any) {
         console.warn('Error al respaldar urgencia en Supabase Storage:', storageErr?.message);
       }
