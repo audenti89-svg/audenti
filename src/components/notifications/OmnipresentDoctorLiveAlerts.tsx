@@ -130,33 +130,24 @@ export function OmnipresentDoctorLiveAlerts() {
 
       if (payload.status === 'active') {
         playTone('arrival')
-        const toast: OmnipresentToast = {
-          id: `voice-start-${Date.now()}`,
-          title: `📞 Llamada de Voz Activa con Aura IA`,
-          message: `${patient} está hablando en vivo por voz con Aura IA.`,
-          type: 'voice',
-          patientName: patient,
-          timestamp: time,
-          url: '/dashboard/chat'
-        }
-        setToasts(prev => [toast, ...prev].slice(0, 4))
-        triggerNativePush(`📞 Llamada de Voz Activa`, `${patient} está hablando con Aura IA.`, '/dashboard/chat')
+        // Alerta sonora sutil de inicio
+        triggerNativePush(`📞 Llamada de Voz en Curso`, `${patient} está hablando con Aura IA.`, '/dashboard/chat')
       } else if (payload.status === 'ended') {
-        playTone('message')
+        playTone('arrival')
         const toast: OmnipresentToast = {
           id: `voice-end-${Date.now()}`,
           title: `📞 Llamada de Voz Finalizada con Aura IA`,
-          message: payload.summary || `Llamada con ${patient} concluida. Transcripción registrada.`,
+          message: payload.summary || `Solicitud de Cita Médica • Fecha/Horario por confirmar`,
           type: 'voice',
           patientName: patient,
           timestamp: time,
           url: '/dashboard/chat'
         }
-        setToasts(prev => [toast, ...prev].slice(0, 4))
-        triggerNativePush(`📞 Llamada de Voz Finalizada`, payload.summary || `Llamada con ${patient} concluida.`, '/dashboard/chat')
+        setToasts(prev => [toast, ...prev].slice(0, 3))
+        triggerNativePush(`👤 Paciente: ${patient} (Registrado)`, `📌 Motivo: Solicitud de Cita Médica\n⚠️ Acción Requerida: Confirmar fecha/horario de atención disponible.`, '/dashboard/chat')
         setTimeout(() => {
           setToasts(prev => prev.filter(t => t.id !== toast.id))
-        }, 12000)
+        }, 15000)
       }
     }
 
@@ -241,9 +232,30 @@ export function OmnipresentDoctorLiveAlerts() {
                     <span className="text-xs font-black text-white">{t.title}</span>
                     <span className="text-[10px] text-amber-300 font-mono">{t.timestamp}</span>
                   </div>
-                  <p className="text-xs text-slate-300 mt-1 font-medium leading-snug line-clamp-2">
-                    &ldquo;{t.message}&rdquo;
-                  </p>
+                  {t.type === 'voice' ? (
+                    <div className="mt-2 space-y-1 text-xs">
+                      <div className="bg-slate-900/80 p-2 rounded-xl border border-white/10 space-y-1">
+                        <p className="text-amber-300 font-bold">
+                          👤 Paciente: <span className="text-white">{t.patientName || 'Ricardo Sánchez'}</span> <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-mono">(Registrado)</span>
+                        </p>
+                        <p className="text-slate-300">
+                          📌 Motivo: <span className="text-white font-medium">Solicitud de Cita Médica</span>
+                        </p>
+                        <p className="text-amber-400 font-semibold text-[11px] flex items-center gap-1">
+                          ⚠️ Acción Requerida: Confirmar fecha/horario disponible
+                        </p>
+                        {t.message && !t.message.includes('Solicitud de Cita') && (
+                          <p className="text-slate-400 text-[10px] pt-1 border-t border-white/10 italic">
+                            &ldquo;{t.message}&rdquo;
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-300 mt-1 font-medium leading-snug line-clamp-2">
+                      &ldquo;{t.message}&rdquo;
+                    </p>
+                  )}
                 </div>
               </div>
 

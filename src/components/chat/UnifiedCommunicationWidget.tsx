@@ -103,6 +103,20 @@ export function UnifiedCommunicationWidget({
     loadChatHistory()
   }, [patientId])
 
+  useEffect(() => {
+    const handleOpenWidget = (e?: any) => {
+      setIsOpen(true)
+      if (e?.detail?.tab) {
+        setActiveTab(e.detail.tab)
+      }
+    }
+
+    window.addEventListener('audenti_open_communication_widget', handleOpenWidget)
+    return () => {
+      window.removeEventListener('audenti_open_communication_widget', handleOpenWidget)
+    }
+  }, [])
+
   // Suscripción Realtime para mensajes de la doctora
   useEffect(() => {
     const channelName = `patient_chat_${patientId}`

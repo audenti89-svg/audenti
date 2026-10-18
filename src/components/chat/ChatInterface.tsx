@@ -846,13 +846,67 @@ export function ChatInterface() {
                         </span>
                       )}
                     </div>
-                    <div className={`px-4 py-2.5 rounded-2xl text-xs leading-relaxed shadow-2xs ${
-                      msg.isOwn
-                        ? 'bg-slate-900 text-white rounded-tr-xs'
-                        : 'bg-white text-slate-900 border border-slate-200/80 rounded-tl-xs'
-                    }`}>
-                      {msg.content}
-                    </div>
+                    {msg.content.includes('[Llamada Finalizada]') || msg.content.includes('[Llamada de Voz con') ? (
+                      <div className="bg-[#0f172a] border-2 border-amber-400/80 rounded-2xl p-4 text-white space-y-3 shadow-lg">
+                        <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                          <span className="text-[11px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5" /> Ficha de Triaje IA • Llamada de Voz
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">
+                            Paciente Registrado
+                          </span>
+                        </div>
+
+                        <div className="space-y-1.5 text-xs">
+                          <p className="text-slate-300">
+                            👤 <strong className="text-white">Paciente:</strong> {activePatient?.name || 'Ricardo Sánchez'} ({activePatient?.phone || '55 2242 7769'})
+                          </p>
+                          <p className="text-slate-300">
+                            📌 <strong className="text-white">Motivo Principal:</strong> Solicitud de Cita Odontológica / Consulta de Valoración
+                          </p>
+                          <p className="text-amber-300 font-semibold">
+                            🕒 <strong className="text-white">Horario Propuesto:</strong> Mañana 11:30 AM (Sede Chalma de Guadalupe)
+                          </p>
+                          <div className="p-2.5 rounded-xl bg-slate-900/90 border border-white/10 text-[11px] text-slate-300 italic">
+                            {msg.content.replace(/^🎙️\s*\[.*?\]:?/, '').trim()}
+                          </div>
+                        </div>
+
+                        {/* Botones de Acción Rápida para la Dra. Aura */}
+                        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-white/10">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              playTone('message')
+                              const confirmText = `¡Hola ${activePatient?.name || 'Ricardo'}! He revisado tu solicitud de cita por voz. Tu horario ha quedado CONFIRMADO para mañana a las 11:30 AM en nuestra Sede Chalma de Guadalupe. Te esperamos puntualmente.`
+                              setInputMessage(confirmText)
+                            }}
+                            className="flex-1 min-w-[140px] px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs text-center transition-all shadow-md active:scale-95"
+                          >
+                            ✓ Aprobar Horario (11:30 AM)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              playTone('message')
+                              const adjustText = `¡Hola ${activePatient?.name || 'Ricardo'}! Recibí tu solicitud. ¿Te funcionaría mejor a las 04:00 PM o prefieres en horario matutino a las 10:00 AM?`
+                              setInputMessage(adjustText)
+                            }}
+                            className="flex-1 min-w-[130px] px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs text-center transition-all shadow-md active:scale-95"
+                          >
+                            ✏️ Ajustar Horario
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className={`px-4 py-2.5 rounded-2xl text-xs leading-relaxed shadow-2xs ${
+                        msg.isOwn
+                          ? 'bg-slate-900 text-white rounded-tr-xs'
+                          : 'bg-white text-slate-900 border border-slate-200/80 rounded-tl-xs'
+                      }`}>
+                        {msg.content}
+                      </div>
+                    )}
                     <div className={`flex items-center gap-1 text-[10px] text-slate-400 ${msg.isOwn ? 'justify-end pr-1' : 'pl-1'}`}>
                       <span>{msg.time}</span>
                       {msg.isOwn && <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />}

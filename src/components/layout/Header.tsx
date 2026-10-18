@@ -142,10 +142,33 @@ export function Header({ onMenuToggle }: HeaderProps) {
         const foundFolio = emergencyItems[0].id.replace(/^(appt-storage-|appt-db-|alert-)/, '')
         setActiveEmergencyFolio(foundFolio.slice(0, 10))
       }
-      setNotifications(items.slice(0, 10))
+
+      // Filtrar notificaciones ya marcadas como atendidas por la doctora
+      let readIds: string[] = []
+      try {
+        const savedRead = localStorage.getItem('audenti_attended_notifications')
+        if (savedRead) readIds = JSON.parse(savedRead)
+      } catch {}
+
+      const unreadNotifications = items.filter(it => !readIds.includes(it.id))
+      setNotifications(unreadNotifications.slice(0, 15))
     } catch {
       // Ignorar errores transitorios
     }
+  }
+
+  const handleMarkAllAsAttended = () => {
+    try {
+      const currentIds = notifications.map(n => n.id)
+      let readIds: string[] = []
+      const savedRead = localStorage.getItem('audenti_attended_notifications')
+      if (savedRead) readIds = JSON.parse(savedRead)
+      const merged = Array.from(new Set([...readIds, ...currentIds]))
+      localStorage.setItem('audenti_attended_notifications', JSON.stringify(merged))
+      setNotifications([])
+      setHasActiveEmergency(false)
+      playTone('message')
+    } catch {}
   }
 
   useEffect(() => {
@@ -357,13 +380,23 @@ export function Header({ onMenuToggle }: HeaderProps) {
                     {notifications.length}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowNotifications(false)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleMarkAllAsAttended}
+                    className="px-2 py-0.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-[10px] font-bold border border-emerald-500/30 transition cursor-pointer"
+                    title="Marcar todas las alertas como atendidas y limpiar la campana"
+                  >
+                    ✓ Marcar Atendidas
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowNotifications(false)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
 
               {/* Lista de Notificaciones */}

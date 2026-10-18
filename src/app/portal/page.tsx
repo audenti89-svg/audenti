@@ -332,13 +332,18 @@ export default function PatientPortalPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-4 py-2.5 rounded-xl text-xs shadow-md transition-all active:scale-95"
+            <button
+              type="button"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('audenti_open_communication_widget', {
+                  detail: { tab: 'voice' }
+                }))
+              }}
+              className="inline-flex items-center gap-2 bg-[#F59E0B] hover:bg-amber-300 text-slate-950 font-black px-5 py-3 rounded-xl text-sm shadow-lg transition-all active:scale-95 cursor-pointer border border-amber-300"
             >
-              <PlusCircle className="w-4 h-4" />
+              <PlusCircle className="w-4 h-4 stroke-[2.5]" />
               Agendar / Reprogramar Cita
-            </Link>
+            </button>
           </div>
         </div>
 
