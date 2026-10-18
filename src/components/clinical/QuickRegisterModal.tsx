@@ -15,6 +15,13 @@ import {
 import { createClient } from '@/utils/supabase/client'
 import { useBranchStore, BranchId, BRANCHES_DATA } from '@/stores/branchStore'
 
+// Lista de sucursales disponibles para la selección del paciente con UUIDs de tenant:
+export const branches = [
+  { id: '00000000-0000-0000-0000-000000000001', name: 'Sucursal Balbuena (Matriz)' },
+  { id: '00000000-0000-0000-0000-000000000002', name: 'Sucursal Roma Norte' },
+  { id: '00000000-0000-0000-0000-000000000003', name: 'Sucursal Polanco' }
+]
+
 interface QuickRegisterModalProps {
   isOpen: boolean
   onClose: () => void
@@ -34,6 +41,7 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
     birthYear: '',
     phone: '',
     email: '',
+    tenant_id: branches[0].id, // Valor por defecto solicitado
     selectedBranchId: currentBranchId,
     emergencyContact: '',
     emergencyPhone: '',
@@ -44,7 +52,11 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
   // Sincronizar con la sucursal activa al abrir
   useEffect(() => {
     if (isOpen) {
-      setFormData(prev => ({ ...prev, selectedBranchId: currentBranchId }))
+      if (currentBranchId === 'colonia-roma') {
+        setFormData(prev => ({ ...prev, tenant_id: branches[1].id, selectedBranchId: currentBranchId }))
+      } else {
+        setFormData(prev => ({ ...prev, tenant_id: branches[0].id, selectedBranchId: currentBranchId }))
+      }
     }
   }, [isOpen, currentBranchId])
 
@@ -56,34 +68,20 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
     setErrorMsg('')
 
     try {
-      // 1. Obtener o resolver tenant_id dinámicamente según la sucursal seleccionada
-      const { data: defaultTenant } = await supabase.from('tenants').select('id').limit(1).maybeSingle()
-      
-      // Buscar sucursal en BD por nombre o slug
-      const branchMeta = BRANCHES_DATA[formData.selectedBranchId as BranchId] || BRANCHES_DATA.balbuena
-      const { data: matchedBranch } = await supabase
-        .from('branches')
-        .select('id, tenant_id')
-        .ilike('name', `%${formData.selectedBranchId.replace('-', ' ')}%`)
-        .limit(1)
-        .maybeSingle()
+      const parsedAge = formData.age
+        ? parseInt(formData.age, 10)
+        : (formData.birthYear ? new Date().getFullYear() - parseInt(formData.birthYear, 10) : 30)
 
-      const resolvedTenantId = matchedBranch?.tenant_id || defaultTenant?.id || null
-      const resolvedBranchId = matchedBranch?.id || null
-
-      const parsedAge = formData.age ? parseInt(formData.age, 10) : (formData.birthYear ? new Date().getFullYear() - parseInt(formData.birthYear, 10) : null)
-
-      // Payload exacto según directriz de mapeo dinámico:
-      const patientPayload: any = {
+      // Payload con tenant_id dinámico según la sucursal seleccionada
+      const patientData: any = {
         full_name: formData.fullName.trim(),
         age: parsedAge,
         phone: formData.phone.trim(),
-        email: formData.email.trim() || null,
-        // Inyección dinámica de tenant_id y branch_id según sucursal elegida en el UI
-        tenant_id: resolvedTenantId,
-        branch_id: resolvedBranchId,
+        tenant_id: formData.tenant_id, // UUID correspondiente a Balbuena, Roma, etc.
         emergency_contact_name: formData.emergencyContact.trim() || null,
         emergency_contact_phone: formData.emergencyPhone.trim() || null,
+        emergency_phone: formData.emergencyPhone.trim() || null,
+        allergies: formData.allergies ? [formData.allergies.trim()] : [],
         allergies_medication: formData.allergies
           ? formData.allergies.split(',').map(s => s.trim()).filter(Boolean)
           : [],
@@ -93,15 +91,31 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
         onboarding_completed: true,
       }
 
-      // Si no hay tenant_id por configuración en BD, no enviar campo nulo si tiene restricción
-      if (!patientPayload.tenant_id) delete patientPayload.tenant_id
-      if (!patientPayload.branch_id) delete patientPayload.branch_id
+      if (formData.email.trim()) {
+        patientData.email = formData.email.trim()
+      }
 
-      const { data, error } = await supabase
+      // Inserción en Supabase
+      let { data, error } = await supabase
         .from('patients')
-        .insert(patientPayload)
+        .insert([patientData])
         .select()
         .single()
+
+      // Si falla por restricción de clave foránea en tenant_id inexistente, obtener el tenant existente de la BD
+      if (error && (error.code === '23503' || error.message?.includes('foreign key'))) {
+        const { data: realTenant } = await supabase.from('tenants').select('id').limit(1).maybeSingle()
+        if (realTenant?.id) {
+          patientData.tenant_id = realTenant.id
+          const retry = await supabase
+            .from('patients')
+            .insert([patientData])
+            .select()
+            .single()
+          data = retry.data
+          error = retry.error
+        }
+      }
 
       if (error) throw error
 
@@ -177,19 +191,25 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1 flex items-center gap-1.5">
-              <Building2 className="w-3.5 h-3.5 text-amber-600" />
-              Sucursal / Sede Asignada (Inyección de Tenant) *
+            <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1.5">
+              <Building2 className="w-4 h-4 text-amber-600" />
+              SUCURSAL DE PREFERENCIA (MÁS CERCANA) *
             </label>
             <select
-              value={formData.selectedBranchId}
-              onChange={e => setFormData({ ...formData, selectedBranchId: e.target.value as BranchId })}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#202D4C] focus:bg-white transition-all cursor-pointer"
+              value={formData.tenant_id}
+              onChange={(e) => setFormData({ ...formData, tenant_id: e.target.value })}
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#202D4C] focus:bg-white transition-all cursor-pointer"
+              required
             >
-              <option value="balbuena">Sucursal Balbuena (Matriz) — Dra. Aura Estudillo</option>
-              <option value="guadalupe-chalma">Sucursal Guadalupe Chalma — Dr. Ramírez López</option>
-              <option value="colonia-roma">Sucursal Colonia Roma — Próxima Apertura</option>
+              {branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.name}
+                </option>
+              ))}
             </select>
+            <p className="text-xs text-slate-500 mt-1">
+              Selecciona la clínica donde deseas recibir tu atención diagnóstica.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
