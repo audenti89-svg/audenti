@@ -657,11 +657,12 @@ export function UnifiedCommunicationWidget({
                 </p>
               </div>
 
-              {/* Botón de Acción Principal de la Llamada */}
+              {/* Botón de Acción Principal de la Llamada con Estilo Semáforo */}
               <div className="w-full pt-1">
                 {isConnected ? (
                   <div className="flex items-center justify-center gap-3">
                     <button
+                      type="button"
                       onClick={() => setMicMuted(!micMuted)}
                       className={`p-3 rounded-2xl border transition-all ${
                         micMuted
@@ -674,20 +675,22 @@ export function UnifiedCommunicationWidget({
                     </button>
 
                     <button
+                      type="button"
                       onClick={handleToggleCall}
-                      className="flex-1 flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs sm:text-sm shadow-lg shadow-rose-600/40 transition-all"
+                      className="flex-1 flex items-center justify-center gap-2 py-3.5 px-4 rounded-2xl bg-red-600 hover:bg-red-500 text-white font-black text-xs sm:text-sm shadow-lg shadow-red-600/40 transition-all animate-pulse cursor-pointer"
                     >
                       <PhoneOff className="w-4 h-4" />
-                      Finalizar Llamada
+                      Finalizar / Colgar Llamada
                     </button>
                   </div>
                 ) : (
                   <button
+                    type="button"
                     disabled={isConnecting}
                     onClick={handleToggleCall}
-                    className="w-full flex items-center justify-center gap-2.5 py-4 px-6 rounded-2xl bg-[#202D4C] hover:bg-[#2A3A60] border border-amber-400/40 text-white font-black text-sm sm:text-base shadow-xl transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2.5 py-4 px-6 rounded-2xl bg-green-600 hover:bg-green-500 text-white font-black text-sm sm:text-base shadow-xl shadow-green-600/30 transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50 cursor-pointer"
                   >
-                    <Phone className="w-5 h-5 text-amber-400" />
+                    <Phone className="w-5 h-5" />
                     {isConnecting ? 'Conectando con Aura...' : 'Iniciar Llamada de Voz con Aura'}
                   </button>
                 )}

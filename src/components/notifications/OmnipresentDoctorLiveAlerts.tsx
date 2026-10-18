@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Bell, BellRing, MessageSquare, Phone, X, ShieldAlert, CheckCircle2 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { useNotificationSound } from '@/hooks/useNotificationSound'
@@ -23,6 +24,7 @@ export interface OmnipresentToast {
 const STORAGE_KEY_TOASTS = 'audenti_frozen_omnipresent_toasts'
 
 export function OmnipresentDoctorLiveAlerts() {
+  const router = useRouter()
   const [toasts, setToasts] = useState<OmnipresentToast[]>([])
   const [pushPermission, setPushPermission] = useState<NotificationPermission>('default')
   const [showPermissionPrompt, setShowPermissionPrompt] = useState(false)
@@ -59,6 +61,45 @@ export function OmnipresentDoctorLiveAlerts() {
       } catch {}
       return next
     })
+  }
+
+  // Dismiss y auto-confirmación (Supabase confirmed_by_doctor = true)
+  const dismissAlert = async (id: string, targetUrl?: string) => {
+    // 1. Quitar toast inmediatamente de la UI y del storage persistente
+    updateToastsPersistently(prev => prev.filter(item => item.id !== id))
+    
+    // 2. Registrar en lista de notificaciones atendidas
+    try {
+      const savedRead = localStorage.getItem('audenti_attended_notifications')
+      const readIds = savedRead ? JSON.parse(savedRead) : []
+      if (!readIds.includes(id)) {
+        readIds.push(id)
+        localStorage.setItem('audenti_attended_notifications', JSON.stringify(readIds))
+      }
+    } catch {}
+
+    // 3. Actualizar en Supabase confirmed_by_doctor = true
+    try {
+      const cleanAlertId = id.replace(/^(toast-|voice-end-|notif-)/, '')
+      // Intentar actualizar en doctor_alerts
+      await supabase
+        .from('doctor_alerts')
+        .update({ confirmed_by_doctor: true, status: 'confirmed' })
+        .or(`id.eq.${cleanAlertId},reference_id.eq.${cleanAlertId}`)
+
+      // Intentar actualizar en chat_messages si corresponde
+      await supabase
+        .from('chat_messages')
+        .update({ confirmed_by_doctor: true })
+        .eq('id', cleanAlertId)
+    } catch (err) {
+      console.warn('[dismissAlert confirmation sync]:', err)
+    }
+
+    // 4. Si se especificó una URL, navegar
+    if (targetUrl) {
+      router.push(targetUrl)
+    }
   }
 
   // 1. Registro del Service Worker y Verificación de Permiso de Notificaciones Nativas
@@ -369,7 +410,7 @@ export function OmnipresentDoctorLiveAlerts() {
 
               <button
                 onClick={() => {
-                  updateToastsPersistently(prev => prev.filter(item => item.id !== t.id))
+                  dismissAlert(t.id)
                 }}
                 className="p-1 rounded-lg text-slate-400 hover:text-white shrink-0 cursor-pointer"
                 title="Cerrar notificación"
@@ -383,7 +424,7 @@ export function OmnipresentDoctorLiveAlerts() {
               <button
                 type="button"
                 onClick={() => {
-                  updateToastsPersistently(prev => prev.filter(item => item.id !== t.id))
+                  dismissAlert(t.id)
                   playTone('message')
                 }}
                 className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black transition-all shadow-xs active:scale-95 cursor-pointer flex items-center gap-1.5"
@@ -392,15 +433,15 @@ export function OmnipresentDoctorLiveAlerts() {
                 ✓ Confirmar Lectura
               </button>
 
-              <a
-                href={t.url || '/dashboard/chat'}
+              <button
+                type="button"
                 onClick={() => {
-                  updateToastsPersistently(prev => prev.filter(item => item.id !== t.id))
+                  dismissAlert(t.id, t.url || '/dashboard/chat')
                 }}
-                className="text-amber-400 hover:text-amber-300 font-bold hover:underline flex items-center gap-1"
+                className="text-amber-400 hover:text-amber-300 font-bold hover:underline flex items-center gap-1 cursor-pointer bg-transparent border-0 p-0"
               >
                 Ver en Chat →
-              </a>
+              </button>
             </div>
           </div>
         ))}

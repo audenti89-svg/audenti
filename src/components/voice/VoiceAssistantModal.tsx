@@ -358,7 +358,7 @@ export function VoiceAssistantModal({
             </p>
           </div>
 
-          {/* ÚNICO BOTÓN PRINCIPAL DE ACCIÓN (Limpio y Profesional) */}
+          {/* BOTÓN SEMÁFORO DE ACCIÓN (Verde Semáforo -> Rojo Alerta) */}
           <div className="w-full pt-2">
             {isConnected ? (
               <div className="flex items-center gap-3 w-full">
@@ -378,10 +378,10 @@ export function VoiceAssistantModal({
                 <button
                   type="button"
                   onClick={handleEndCall}
-                  className="flex-1 flex items-center justify-center gap-2 py-3.5 px-6 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm shadow-lg shadow-rose-600/30 transition-all active:scale-95"
+                  className="flex-1 flex items-center justify-center gap-2 py-4 px-6 rounded-2xl bg-red-600 hover:bg-red-500 text-white font-black text-sm shadow-xl shadow-red-600/40 transition-all active:scale-95 animate-pulse cursor-pointer"
                 >
-                  <PhoneOff className="w-4 h-4" />
-                  Finalizar Llamada
+                  <PhoneOff className="w-5 h-5" />
+                  Finalizar / Colgar Llamada
                 </button>
               </div>
             ) : (
@@ -389,10 +389,10 @@ export function VoiceAssistantModal({
                 type="button"
                 disabled={isConnecting}
                 onClick={handleStartCall}
-                className="w-full flex items-center justify-center gap-2.5 py-4 px-6 rounded-2xl bg-[#202D4C] hover:bg-[#2A3A60] border border-amber-400/40 text-white font-bold text-sm shadow-xl transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2.5 py-4 px-6 rounded-2xl bg-green-600 hover:bg-green-500 text-white font-black text-sm sm:text-base shadow-xl shadow-green-600/30 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 cursor-pointer"
               >
-                <PhoneCall className="w-4 h-4 text-amber-400" />
-                {isConnecting ? 'Conectando con Aura...' : 'Iniciar Llamada por Voz'}
+                <PhoneCall className="w-5 h-5" />
+                {isConnecting ? 'Conectando con Aura...' : 'Iniciar Llamada de Voz con Aura'}
               </button>
             )}
           </div>

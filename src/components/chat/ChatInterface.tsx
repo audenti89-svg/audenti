@@ -501,63 +501,66 @@ export function ChatInterface() {
             </div>
 
             {/* Chips de Canales y Filtros */}
-            <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none text-[11px] font-bold">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1.5 scrollbar-none text-[11px] font-bold">
               <button
                 type="button"
                 onClick={() => setActiveFilter('all')}
-                className={`px-2.5 py-1 rounded-lg transition-all shrink-0 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all shrink-0 cursor-pointer ${
                   activeFilter === 'all'
                     ? 'bg-[#0F172A] text-white shadow-xs'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
-                Todas ({patients.length})
+                <Filter className="w-4 h-4 shrink-0" />
+                <span>Todas ({patients.length})</span>
               </button>
               <button
                 type="button"
                 onClick={() => setActiveFilter('voice_call')}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg transition-all shrink-0 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all shrink-0 cursor-pointer ${
                   activeFilter === 'voice_call'
                     ? 'bg-amber-500 text-slate-950 shadow-xs'
                     : 'bg-amber-50 text-amber-900 hover:bg-amber-100'
                 }`}
               >
-                <Phone className="w-3 h-3" />
-                Voz
+                <Phone className="w-4 h-4 shrink-0" />
+                <span>Voz</span>
               </button>
               <button
                 type="button"
                 onClick={() => setActiveFilter('whatsapp')}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg transition-all shrink-0 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all shrink-0 cursor-pointer ${
                   activeFilter === 'whatsapp'
                     ? 'bg-emerald-600 text-white shadow-xs'
                     : 'bg-emerald-50 text-emerald-900 hover:bg-emerald-100'
                 }`}
               >
-                <MessageSquare className="w-3 h-3" />
-                WhatsApp
+                <MessageSquare className="w-4 h-4 shrink-0" />
+                <span>WhatsApp</span>
               </button>
               <button
                 type="button"
                 onClick={() => setActiveFilter('web_chat')}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg transition-all shrink-0 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all shrink-0 cursor-pointer ${
                   activeFilter === 'web_chat'
                     ? 'bg-blue-600 text-white shadow-xs'
                     : 'bg-blue-50 text-blue-900 hover:bg-blue-100'
                 }`}
               >
-                💬 Web
+                <Radio className="w-4 h-4 shrink-0" />
+                <span>Web Chat</span>
               </button>
               <button
                 type="button"
                 onClick={() => setActiveFilter('urgent')}
-                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg transition-all shrink-0 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all shrink-0 cursor-pointer ${
                   activeFilter === 'urgent'
                     ? 'bg-rose-600 text-white shadow-xs'
                     : 'bg-rose-50 text-rose-900 hover:bg-rose-100'
                 }`}
               >
-                🚨 Urgentes
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>Urgentes</span>
               </button>
             </div>
           </div>

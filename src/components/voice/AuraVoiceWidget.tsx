@@ -411,7 +411,7 @@ export function AuraVoiceWidget({ className = '', defaultOpen = false }: AuraVoi
               </p>
             </div>
 
-              {/* Controles de Llamada y Micrófono */}
+              {/* Controles de Llamada y Micrófono con Botón Semáforo */}
             <div className="flex items-center gap-3 pt-1 w-full max-w-xs">
               {isConnected ? (
                 <>
@@ -428,21 +428,23 @@ export function AuraVoiceWidget({ className = '', defaultOpen = false }: AuraVoi
                   </button>
 
                   <button
+                    type="button"
                     onClick={handleToggleCall}
-                    className="flex-1 flex items-center justify-center gap-2 py-3.5 px-5 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-lg shadow-rose-600/30 transition-all"
+                    className="flex-1 flex items-center justify-center gap-2 py-3.5 px-5 rounded-2xl bg-red-600 hover:bg-red-500 text-white font-black text-xs shadow-lg shadow-red-600/40 transition-all animate-pulse cursor-pointer"
                   >
                     <PhoneOff className="w-4 h-4" />
-                    Finalizar Llamada
+                    Finalizar / Colgar Llamada
                   </button>
                 </>
               ) : (
                 <button
+                  type="button"
                   disabled={isConnecting}
                   onClick={handleToggleCall}
-                  className="w-full flex items-center justify-center gap-2.5 py-3.5 px-6 rounded-2xl bg-[#202D4C] hover:bg-[#2A3A60] border border-amber-400/40 text-white font-bold text-xs shadow-lg transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2.5 py-3.5 px-6 rounded-2xl bg-green-600 hover:bg-green-500 text-white font-black text-xs shadow-lg shadow-green-600/30 transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50 cursor-pointer"
                 >
-                  <PhoneCall className="w-4 h-4 text-amber-400" />
-                  {isConnecting ? 'Conectando con Aura...' : 'Iniciar Conversación de Voz'}
+                  <PhoneCall className="w-4 h-4" />
+                  {isConnecting ? 'Conectando con Aura...' : 'Iniciar Llamada de Voz con Aura'}
                 </button>
               )}
             </div>
