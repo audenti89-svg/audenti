@@ -5,6 +5,12 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { ShieldCheck, UserCheck, HeartPulse, PhoneCall, AlertTriangle } from 'lucide-react';
 
+const BRANCHES = [
+  { id: '00000000-0000-0000-0000-000000000001', name: 'Sucursal Balbuena (Matriz)' },
+  { id: '00000000-0000-0000-0000-000000000002', name: 'Sucursal Roma Norte' },
+  { id: '00000000-0000-0000-0000-000000000003', name: 'Sucursal Polanco' }
+];
+
 export default function OnboardingPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -16,6 +22,7 @@ export default function OnboardingPage() {
     age: '',
     birth_year: '',
     phone: '',
+    tenant_id: BRANCHES[0].id, // Sede por defecto
     emergency_contact_name: '',
     emergency_contact_phone: '',
     drug_allergies: '',
@@ -31,7 +38,7 @@ export default function OnboardingPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No hay usuario autenticado. Por favor inicia sesión nuevamente.');
 
-      // 1. Obtener tenant y branch por defecto si existen
+      // 1. Obtener tenant y branch de respaldo si existen en la BD
       const { data: defaultTenant } = await supabase.from('tenants').select('id').limit(1).maybeSingle();
       const { data: defaultBranch } = await supabase.from('branches').select('id').limit(1).maybeSingle();
 
@@ -45,8 +52,11 @@ export default function OnboardingPage() {
         age: parsedAge,
         phone: formData.phone.trim(),
         email: user.email,
+        tenant_id: formData.tenant_id, // Se almacena la sede seleccionada
         emergency_contact_name: formData.emergency_contact_name.trim(),
         emergency_contact_phone: formData.emergency_contact_phone.trim(),
+        emergency_phone: formData.emergency_contact_phone.trim(),
+        allergies: formData.drug_allergies ? [formData.drug_allergies.trim()] : [],
         allergies_medication: formData.drug_allergies
           ? formData.drug_allergies.split(',').map((s) => s.trim()).filter(Boolean)
           : [],
@@ -56,7 +66,6 @@ export default function OnboardingPage() {
         onboarding_completed: true,
       };
 
-      if (defaultTenant?.id) patientPayload.tenant_id = defaultTenant.id;
       if (defaultBranch?.id) patientPayload.branch_id = defaultBranch.id;
 
       const { error: patientErr } = await supabase
@@ -159,6 +168,27 @@ export default function OnboardingPage() {
               value={formData.full_name}
               onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
             />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-xs font-bold text-gray-300 mb-2 uppercase tracking-wide">
+              Sede o Sucursal Más Cercana *
+            </label>
+            <select
+              value={formData.tenant_id}
+              onChange={(e) => setFormData({ ...formData, tenant_id: e.target.value })}
+              className="w-full bg-[#0d1322] border border-gray-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-yellow-500 cursor-pointer"
+              required
+            >
+              {BRANCHES.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Selecciona la clínica a la que deseas acudir para que la Dra. Aura reciba tu expediente en la sede correspondiente.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">

@@ -16,11 +16,12 @@ import { createClient } from '@/utils/supabase/client'
 import { useBranchStore, BranchId, BRANCHES_DATA } from '@/stores/branchStore'
 
 // Lista de sucursales disponibles para la selección del paciente con UUIDs de tenant:
-export const branches = [
+export const BRANCHES = [
   { id: '00000000-0000-0000-0000-000000000001', name: 'Sucursal Balbuena (Matriz)' },
   { id: '00000000-0000-0000-0000-000000000002', name: 'Sucursal Roma Norte' },
   { id: '00000000-0000-0000-0000-000000000003', name: 'Sucursal Polanco' }
-]
+];
+export const branches = BRANCHES; // Compatibilidad
 
 interface QuickRegisterModalProps {
   isOpen: boolean
@@ -38,24 +39,24 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
   const [formData, setFormData] = useState({
     fullName: '',
     age: '',
-    birthYear: '',
     phone: '',
-    email: '',
-    tenant_id: branches[0].id, // Valor por defecto solicitado
-    selectedBranchId: currentBranchId,
+    tenant_id: BRANCHES[0].id, // Sede por defecto
     emergencyContact: '',
     emergencyPhone: '',
     allergies: '',
     medicalConditions: '',
+    birthYear: '',
+    email: '',
+    selectedBranchId: currentBranchId,
   })
 
   // Sincronizar con la sucursal activa al abrir
   useEffect(() => {
     if (isOpen) {
       if (currentBranchId === 'colonia-roma') {
-        setFormData(prev => ({ ...prev, tenant_id: branches[1].id, selectedBranchId: currentBranchId }))
+        setFormData(prev => ({ ...prev, tenant_id: BRANCHES[1].id, selectedBranchId: currentBranchId }))
       } else {
-        setFormData(prev => ({ ...prev, tenant_id: branches[0].id, selectedBranchId: currentBranchId }))
+        setFormData(prev => ({ ...prev, tenant_id: BRANCHES[0].id, selectedBranchId: currentBranchId }))
       }
     }
   }, [isOpen, currentBranchId])
@@ -190,25 +191,25 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-1.5">
+          <div className="mb-4">
+            <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide flex items-center gap-1.5">
               <Building2 className="w-4 h-4 text-amber-600" />
-              SUCURSAL DE PREFERENCIA (MÁS CERCANA) *
+              Sede o Sucursal Más Cercana *
             </label>
             <select
               value={formData.tenant_id}
               onChange={(e) => setFormData({ ...formData, tenant_id: e.target.value })}
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-slate-900 font-semibold focus:outline-none focus:ring-2 focus:ring-[#202D4C] focus:bg-white transition-all cursor-pointer"
+              className="w-full bg-slate-50 border border-slate-300 rounded-lg px-4 py-3 text-slate-900 font-semibold focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 cursor-pointer"
               required
             >
-              {branches.map((branch) => (
-                <option key={branch.id} value={branch.id}>
-                  {branch.name}
+              {BRANCHES.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
                 </option>
               ))}
             </select>
             <p className="text-xs text-slate-500 mt-1">
-              Selecciona la clínica donde deseas recibir tu atención diagnóstica.
+              Selecciona la clínica a la que deseas acudir para que la Dra. Aura reciba tu expediente en la sede correspondiente.
             </p>
           </div>
 
