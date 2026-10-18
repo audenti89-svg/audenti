@@ -83,32 +83,26 @@ export async function updateSession(request: NextRequest) {
         userProfile?.role === 'doctor';
     }
 
-    if (isStaffOrOwner) {
+    // REGLA CLAVE: Validación estricta de acceso por correo de la Dra. Aura Estudillo
+    const ADMIN_EMAILS = ['audenti89@gmail.com'];
+    const userEmail = user.email || '';
+    const isAdmin = ADMIN_EMAILS.includes(userEmail) || isStaffOrOwner;
+
+    // REGLA CLAVE: Si NO es la doctora/administrador y está intentando ver el dashboard administrativo:
+    if (!isAdmin) {
+      if (isDashboardRoute || isAdminRoute || isPatientsRoute) {
+        redirectUrl.pathname = '/portal';
+        return NextResponse.redirect(redirectUrl);
+      }
+    }
+
+    if (isAdmin) {
       // Dueña / Doctora / Administrador tiene acceso total directo al dashboard
       if (isAuthRoute || isOnboardingRoute) {
         redirectUrl.pathname = '/dashboard';
         return NextResponse.redirect(redirectUrl);
       }
       return supabaseResponse;
-    }
-
-    // Verificación de rol y protección de rutas administrativas:
-    const userRole = user.user_metadata?.role || user.app_metadata?.role || (isStaffOrOwner ? 'staff' : 'patient');
-
-    if (userRole === 'patient') {
-      // Si es un paciente tratando de entrar a rutas de administración, redirigir a su propio portal
-      if (
-        redirectUrl.pathname.startsWith('/dashboard/pacientes') ||
-        redirectUrl.pathname.startsWith('/dashboard/finanzas') ||
-        redirectUrl.pathname.startsWith('/dashboard/crm') ||
-        redirectUrl.pathname.startsWith('/dashboard/inventario') ||
-        redirectUrl.pathname.startsWith('/dashboard/configuracion') ||
-        redirectUrl.pathname.startsWith('/admin') ||
-        redirectUrl.pathname.startsWith('/patients')
-      ) {
-        redirectUrl.pathname = '/mi-expediente';
-        return NextResponse.redirect(redirectUrl);
-      }
     }
 
     // Para pacientes: verificar registro médico en la tabla `patients`
