@@ -6,6 +6,7 @@ import { createClient } from '@/utils/supabase/client'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Header } from '@/components/layout/Header'
 import { NightEmergencyRedAlertBanner } from '@/components/ai/NightEmergencyRedAlertBanner'
+import { DoctorVoiceCallAlertBanner } from '@/components/voice/DoctorVoiceCallAlertBanner'
 
 // Validación estricta de acceso por correo oficial de la Dra. Aura Estudillo
 const ADMIN_EMAILS = ['audenti89@gmail.com'];
@@ -74,6 +75,9 @@ export default function DashboardLayout({
 
       {/* Panel Flotante de Alerta Roja 24/7 para la Dra. Aura Estudillo */}
       <NightEmergencyRedAlertBanner />
+
+      {/* Banner de Notificaciones de Llamadas de Voz Aura IA en Tiempo Real */}
+      <DoctorVoiceCallAlertBanner />
     </div>
   )
 }

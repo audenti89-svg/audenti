@@ -278,6 +278,44 @@ export function ChatInterface() {
           })
         }
       })
+      .on('broadcast', { event: 'voice_call_event' }, ({ payload }) => {
+        if (payload && payload.patientId) {
+          if (payload.status === 'active') {
+            playTone('arrival')
+            const callNotice: Message = {
+              id: `call-start-${Date.now()}`,
+              senderName: 'Asistente de Voz Aura IA',
+              senderInitials: 'IA',
+              content: `📞 [Llamada de Voz Iniciada]: El paciente ${payload.patientName || 'Ricardo Sánchez'} ha iniciado una conversación de voz con Aura IA.`,
+              time: payload.timestamp || 'Ahora',
+              isOwn: false
+            }
+            setMessages(prev => ({
+              ...prev,
+              [payload.patientId]: [...(prev[payload.patientId] || []), callNotice]
+            }))
+            setUnreadPatients(prev => {
+              const next = new Set(prev)
+              next.add(payload.patientId)
+              return next
+            })
+          } else if (payload.status === 'ended') {
+            playTone('message')
+            const callSummary: Message = {
+              id: `call-end-${Date.now()}`,
+              senderName: 'Resumen Aura IA Voice',
+              senderInitials: 'IA',
+              content: `🎙️ [Llamada Finalizada]: ${payload.summary || 'Consulta por voz concluida con el paciente.'}`,
+              time: payload.timestamp || 'Ahora',
+              isOwn: false
+            }
+            setMessages(prev => ({
+              ...prev,
+              [payload.patientId]: [...(prev[payload.patientId] || []), callSummary]
+            }))
+          }
+        }
+      })
       .subscribe()
 
     return () => {
