@@ -66,6 +66,7 @@ export default function OnboardingPage() {
           : [],
         referral_source: formData.referral_source,
         referred_by: formData.referral_source === 'Recomendación de familiar o amigo' ? formData.referred_by.trim() : null,
+        branch_name: formData.tenant_id === '00000000-0000-0000-0000-000000000002' ? 'Sucursal Chalma de Guadalupe' : 'Sucursal Valbuena (Matriz)',
         onboarding_completed: true,
       };
 
@@ -77,12 +78,14 @@ export default function OnboardingPage() {
 
       if (patientErr) {
         console.warn('Upsert directo en patients:', patientErr);
-        // Intentar fallback sin foreign keys opcionales si fallara por RLS o FK
+        // Intentar fallback conservando la sede seleccionada sin forzar FK de tenant
         const fallbackPayload: any = {
           id: user.id,
           full_name: formData.full_name.trim(),
           phone: formData.phone.trim(),
           email: user.email,
+          tenant_id: formData.tenant_id,
+          branch_name: formData.tenant_id === '00000000-0000-0000-0000-000000000002' ? 'Sucursal Chalma de Guadalupe' : 'Sucursal Valbuena (Matriz)',
           emergency_contact_name: formData.emergency_contact_name.trim(),
           emergency_contact_phone: formData.emergency_contact_phone.trim(),
           onboarding_completed: true,

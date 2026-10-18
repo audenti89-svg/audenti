@@ -139,10 +139,24 @@ export default function PatientPortalPage() {
     router.refresh();
   };
 
-  // Resolver sede de atención
+  // Resolver sede de atención directamente por branch_name o tenant_id
   const branchInfo = useMemo(() => {
-    const tid = patient?.tenant_id || '00000000-0000-0000-0000-000000000001';
-    return BRANCH_DETAILS[tid] || BRANCH_DETAILS['00000000-0000-0000-0000-000000000001'];
+    const rawBranchName = (patient?.branch_name || '').toLowerCase();
+    const tid = patient?.tenant_id || '';
+
+    if (
+      rawBranchName.includes('chalma') ||
+      rawBranchName.includes('guadalupe') ||
+      tid === '00000000-0000-0000-0000-000000000002'
+    ) {
+      return BRANCH_DETAILS['00000000-0000-0000-0000-000000000002'];
+    }
+
+    if (tid && BRANCH_DETAILS[tid]) {
+      return BRANCH_DETAILS[tid];
+    }
+
+    return BRANCH_DETAILS['00000000-0000-0000-0000-000000000001'];
   }, [patient]);
 
   // Próxima Cita Activa
@@ -181,36 +195,43 @@ export default function PatientPortalPage() {
 
   return (
     <div className="min-h-screen bg-[#0A0F1D] text-white selection:bg-amber-400 selection:text-slate-950 pb-20">
-      {/* 1. Header Institucional del Portal Limpio y Sin Amontonamiento */}
-      <header className="border-b border-gray-800 bg-[#0d1322]/95 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-8 py-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <AudentiLogo className="w-9 h-9 text-amber-400 shrink-0" />
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-black text-white tracking-tight uppercase">
-                Audenti Clinical
-              </span>
-              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-400/15 text-amber-300 border border-amber-400/40">
-                Portal del Paciente
-              </span>
+      {/* 1. Header Institucional del Portal - Limpio, Espacioso y Sin Amontonamiento */}
+      <header className="border-b border-gray-800 bg-[#0d1322] sticky top-0 z-40 px-4 sm:px-8 py-4">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+          {/* Lado Izquierdo: Logotipo y Marca */}
+          <div className="flex items-center gap-4">
+            <div className="p-2 rounded-xl bg-amber-400/10 border border-amber-400/30 shrink-0">
+              <AudentiLogo className="w-8 h-8 text-amber-400" />
             </div>
-            <p className="text-[11px] text-gray-400 truncate">
-              Dra. Aura Estudillo • Céd. Prof. 8492019
-            </p>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-3">
+                <span className="text-base font-black tracking-wide text-white uppercase">
+                  Audenti Clinical
+                </span>
+                <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40">
+                  Portal del Paciente
+                </span>
+              </div>
+              <p className="text-xs text-gray-400 font-medium">
+                Dra. Aura Estudillo • Cédula Profesional 8492019
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-3 shrink-0 ml-auto sm:ml-0">
-          <span className="hidden sm:inline-block text-xs text-gray-400">
-            👤 Hola, <strong className="text-white">{patientName.split(' ')[0]}</strong>
-          </span>
-          <button
-            onClick={handleSignOut}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-semibold border border-gray-700 transition-all cursor-pointer"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            Salir
-          </button>
+          {/* Lado Derecho: Usuario y Salir */}
+          <div className="flex items-center justify-between md:justify-end gap-4 border-t md:border-t-0 border-gray-800/80 pt-3 md:pt-0">
+            <div className="text-xs text-gray-300 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Sesión activa: <strong className="text-white font-bold">{patientName}</strong></span>
+            </div>
+            <button
+              onClick={handleSignOut}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-200 hover:text-white text-xs font-bold border border-gray-700 transition-all cursor-pointer shadow-xs"
+            >
+              <LogOut className="w-3.5 h-3.5 text-amber-400" />
+              Cerrar Sesión
+            </button>
+          </div>
         </div>
       </header>
 

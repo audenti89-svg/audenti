@@ -2,49 +2,49 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { Info, Sparkles } from 'lucide-react';
+import { Sparkles, ArrowDown, ArrowUp, CheckCircle2, Lock } from 'lucide-react';
 
 // Coordenadas relativas en porcentaje (%) sobre el modelo anatómico 3D de arcada superior
-const UPPER_TEETH_COORDS: Record<number, { top: string; left: string; label: string }> = {
-  18: { top: '78%', left: '16%', label: '3er Molar Superior Der.' },
-  17: { top: '65%', left: '18%', label: '2do Molar Superior Der.' },
-  16: { top: '51%', left: '21%', label: '1er Molar Superior Der.' },
-  15: { top: '39%', left: '26%', label: '2do Premolar Superior Der.' },
-  14: { top: '28%', left: '32%', label: '1er Premolar Superior Der.' },
-  13: { top: '19%', left: '38%', label: 'Canino Superior Der.' },
-  12: { top: '14%', left: '44%', label: 'Incisivo Lateral Der.' },
-  11: { top: '12%', left: '49%', label: 'Incisivo Central Der.' },
+// pointerPos: posición exterior desde donde apunta la flecha hacia el diente
+const UPPER_TEETH: { num: number; label: string; pointerLeft: string; pointerTop: string; targetLeft: string; targetTop: string; direction: 'top' | 'bottom' | 'left' | 'right' }[] = [
+  { num: 18, label: '3er Molar Der.', pointerLeft: '4%', pointerTop: '80%', targetLeft: '17%', targetTop: '77%', direction: 'right' },
+  { num: 17, label: '2do Molar Der.', pointerLeft: '6%', pointerTop: '64%', targetLeft: '19%', targetTop: '64%', direction: 'right' },
+  { num: 16, label: '1er Molar Der.', pointerLeft: '9%', pointerTop: '48%', targetLeft: '22%', targetTop: '49%', direction: 'right' },
+  { num: 15, label: '2do Premolar Der.', pointerLeft: '14%', pointerTop: '34%', targetLeft: '27%', targetTop: '38%', direction: 'right' },
+  { num: 14, label: '1er Premolar Der.', pointerLeft: '20%', pointerTop: '20%', targetLeft: '33%', targetTop: '27%', direction: 'bottom' },
+  { num: 13, label: 'Canino Der.', pointerLeft: '28%', pointerTop: '8%', targetLeft: '39%', targetTop: '18%', direction: 'bottom' },
+  { num: 12, label: 'Incisivo Lat. Der.', pointerLeft: '37%', pointerTop: '4%', targetLeft: '44%', targetTop: '14%', direction: 'bottom' },
+  { num: 11, label: 'Incisivo Central Der.', pointerLeft: '45%', pointerTop: '2%', targetLeft: '48%', targetTop: '12%', direction: 'bottom' },
 
-  21: { top: '12%', left: '53%', label: 'Incisivo Central Izq.' },
-  22: { top: '14%', left: '58%', label: 'Incisivo Lateral Izq.' },
-  23: { top: '19%', left: '64%', label: 'Canino Superior Izq.' },
-  24: { top: '28%', left: '70%', label: '1er Premolar Superior Izq.' },
-  25: { top: '39%', left: '76%', label: '2do Premolar Superior Izq.' },
-  26: { top: '51%', left: '81%', label: '1er Molar Superior Izq.' },
-  27: { top: '65%', left: '84%', label: '2do Molar Superior Izq.' },
-  28: { top: '78%', left: '86%', label: '3er Molar Superior Izq.' },
-};
+  { num: 21, label: 'Incisivo Central Izq.', pointerLeft: '55%', pointerTop: '2%', targetLeft: '52%', targetTop: '12%', direction: 'bottom' },
+  { num: 22, label: 'Incisivo Lat. Izq.', pointerLeft: '63%', pointerTop: '4%', targetLeft: '57%', targetTop: '14%', direction: 'bottom' },
+  { num: 23, label: 'Canino Izq.', pointerLeft: '72%', pointerTop: '8%', targetLeft: '62%', targetTop: '18%', direction: 'bottom' },
+  { num: 24, label: '1er Premolar Izq.', pointerLeft: '80%', pointerTop: '20%', targetLeft: '68%', targetTop: '27%', direction: 'bottom' },
+  { num: 25, label: '2do Premolar Izq.', pointerLeft: '86%', pointerTop: '34%', targetLeft: '74%', targetTop: '38%', direction: 'left' },
+  { num: 26, label: '1er Molar Izq.', pointerLeft: '91%', pointerTop: '48%', targetLeft: '79%', targetTop: '49%', direction: 'left' },
+  { num: 27, label: '2do Molar Izq.', pointerLeft: '94%', pointerTop: '64%', targetLeft: '82%', targetTop: '64%', direction: 'left' },
+  { num: 28, label: '3er Molar Izq.', pointerLeft: '96%', pointerTop: '80%', targetLeft: '84%', targetTop: '77%', direction: 'left' },
+];
 
-// Coordenadas relativas en porcentaje (%) sobre el modelo anatómico 3D de mandíbula inferior
-const LOWER_TEETH_COORDS: Record<number, { top: string; left: string; label: string }> = {
-  48: { top: '26%', left: '17%', label: '3er Molar Inferior Der.' },
-  47: { top: '38%', left: '20%', label: '2do Molar Inferior Der.' },
-  46: { top: '50%', left: '24%', label: '1er Molar Inferior Der.' },
-  45: { top: '62%', left: '30%', label: '2do Premolar Inferior Der.' },
-  44: { top: '72%', left: '36%', label: '1er Premolar Inferior Der.' },
-  43: { top: '80%', left: '41%', label: 'Canino Inferior Der.' },
-  42: { top: '85%', left: '46%', label: 'Incisivo Lateral Der.' },
-  41: { top: '87%', left: '49%', label: 'Incisivo Central Der.' },
+const LOWER_TEETH: { num: number; label: string; pointerLeft: string; pointerTop: string; targetLeft: string; targetTop: string; direction: 'top' | 'bottom' | 'left' | 'right' }[] = [
+  { num: 48, label: '3er Molar Der.', pointerLeft: '5%', pointerTop: '22%', targetLeft: '18%', targetTop: '27%', direction: 'right' },
+  { num: 47, label: '2do Molar Der.', pointerLeft: '8%', pointerTop: '36%', targetLeft: '21%', targetTop: '39%', direction: 'right' },
+  { num: 46, label: '1er Molar Der.', pointerLeft: '12%', pointerTop: '50%', targetLeft: '25%', targetTop: '51%', direction: 'right' },
+  { num: 45, label: '2do Premolar Der.', pointerLeft: '18%', pointerTop: '64%', targetLeft: '31%', targetTop: '63%', direction: 'right' },
+  { num: 44, label: '1er Premolar Der.', pointerLeft: '24%', pointerTop: '76%', targetLeft: '37%', targetTop: '73%', direction: 'top' },
+  { num: 43, label: 'Canino Der.', pointerLeft: '31%', pointerTop: '88%', targetLeft: '42%', targetTop: '81%', direction: 'top' },
+  { num: 42, label: 'Incisivo Lat. Der.', pointerLeft: '39%', pointerTop: '94%', targetLeft: '46%', targetTop: '86%', direction: 'top' },
+  { num: 41, label: 'Incisivo Central Der.', pointerLeft: '46%', pointerTop: '96%', targetLeft: '48%', targetTop: '88%', direction: 'top' },
 
-  31: { top: '87%', left: '53%', label: 'Incisivo Central Izq.' },
-  32: { top: '85%', left: '56%', label: 'Incisivo Lateral Izq.' },
-  33: { top: '80%', left: '61%', label: 'Canino Inferior Izq.' },
-  34: { top: '72%', left: '66%', label: '1er Premolar Inferior Izq.' },
-  35: { top: '62%', left: '72%', label: '2do Premolar Inferior Izq.' },
-  36: { top: '50%', left: '78%', label: '1er Molar Inferior Izq.' },
-  37: { top: '38%', left: '82%', label: '2do Molar Inferior Izq.' },
-  38: { top: '26%', left: '85%', label: '3er Molar Inferior Izq.' },
-};
+  { num: 31, label: 'Incisivo Central Izq.', pointerLeft: '54%', pointerTop: '96%', targetLeft: '52%', targetTop: '88%', direction: 'top' },
+  { num: 32, label: 'Incisivo Lat. Izq.', pointerLeft: '61%', pointerTop: '94%', targetLeft: '55%', targetTop: '86%', direction: 'top' },
+  { num: 33, label: 'Canino Izq.', pointerLeft: '69%', pointerTop: '88%', targetLeft: '60%', targetTop: '81%', direction: 'top' },
+  { num: 34, label: '1er Premolar Izq.', pointerLeft: '76%', pointerTop: '76%', targetLeft: '65%', targetTop: '73%', direction: 'top' },
+  { num: 35, label: '2do Premolar Izq.', pointerLeft: '82%', pointerTop: '64%', targetLeft: '71%', targetTop: '63%', direction: 'left' },
+  { num: 36, label: '1er Molar Izq.', pointerLeft: '88%', pointerTop: '50%', targetLeft: '77%', targetTop: '51%', direction: 'left' },
+  { num: 37, label: '2do Molar Izq.', pointerLeft: '92%', pointerTop: '36%', targetLeft: '81%', targetTop: '39%', direction: 'left' },
+  { num: 38, label: '3er Molar Izq.', pointerLeft: '95%', pointerTop: '22%', targetLeft: '84%', targetTop: '27%', direction: 'left' },
+];
 
 interface PatientOdontogramProps {
   patientData: {
@@ -62,84 +62,86 @@ export default function PatientOdontogram({
   setSelectedTooth,
   diagnosisMap = {}
 }: PatientOdontogramProps) {
+  // LÓGICA DE DERECHOS: MODO 100% SOLO LECTURA.
+  // La boca 3D se mantiene despejada y sin círculos que tapen los dientes.
+  // Sólo los dientes con tratamiento registrado por la Dra. Aura muestran su puntero activo.
   return (
-    <div className="bg-[#121824] border border-gray-800 rounded-xl p-6 text-white shadow-xl space-y-6">
-      {/* Encabezado */}
+    <div className="bg-[#121824] border border-gray-800 rounded-2xl p-6 text-white shadow-xl space-y-6">
+      {/* Encabezado con Identificación Estricta de Sede */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-gray-800/80 pb-4">
         <div>
-          <h3 className="font-bold text-base text-yellow-400 flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-yellow-400" />
-            Mi Odontograma 3D Personal
-          </h3>
-          <p className="text-xs text-gray-400 mt-0.5">
-            Haz clic en una pieza sobre el modelo anatómico para consultar su estado clínico.
+          <div className="flex items-center gap-2">
+            <h3 className="font-bold text-base text-yellow-400 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-yellow-400" />
+              Mi Odontograma 3D Personal
+            </h3>
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-slate-800 text-slate-300 px-2.5 py-0.5 rounded-full border border-slate-700">
+              <Lock className="w-3 h-3 text-amber-400" /> Solo Lectura
+            </span>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">
+            Visualización anatómica limpia. Haz clic en los indicadores perimétricos para consultar el historial clínico de cada pieza.
           </p>
         </div>
-        <span className="text-xs bg-blue-900/50 text-blue-300 px-3 py-1 rounded-full border border-blue-500/30 font-semibold">
-          Sede: {patientData.branch_name}
+        <span className="text-xs bg-amber-400/15 text-amber-300 px-3.5 py-1.5 rounded-xl border border-amber-400/40 font-bold">
+          Sede Asignada: {patientData.branch_name}
         </span>
       </div>
 
-      {/* Grid de Modelos Anatómicos 3D */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-        {/* Contenedor de la Arcada Superior (3D) */}
-        <div className="text-center bg-[#0d1322] border border-gray-800 rounded-2xl p-4">
-          <span className="text-xs uppercase tracking-wider text-gray-300 font-bold block mb-3">
+      {/* Grid de Modelos Anatómicos 3D con Boca Despejada */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+        {/* Arcada Superior (3D) */}
+        <div className="bg-[#0A0F1D] border border-gray-800 rounded-2xl p-5 text-center relative overflow-hidden shadow-inner">
+          <span className="text-xs uppercase tracking-wider text-gray-300 font-bold block mb-4">
             Maxilar Superior (Arcada Arriba)
           </span>
-          <div className="relative inline-block bg-[#0A0F1D] border border-gray-700/80 rounded-xl p-3 shadow-inner max-w-full">
-            {/* Imagen del modelo anatómico superior */}
+
+          <div className="relative inline-block w-full max-w-[380px] p-2">
+            {/* Imagen Anatómica 3D 100% Despejada Sin Círculos Encimados */}
             <img
               src="/images/upper-arch.png"
               alt="Arcada Superior 3D"
-              className="w-[320px] max-w-full h-auto mx-auto object-contain block select-none pointer-events-none"
+              className="w-full h-auto mx-auto object-contain block select-none pointer-events-none drop-shadow-[0_10px_20px_rgba(0,0,0,0.6)]"
             />
 
-            {/* Zonas Hotspot con Resplandor Luminoso (Glow) sin números fijos tapa-vistas */}
-            {Object.entries(UPPER_TEETH_COORDS).map(([numStr, coords]) => {
-              const toothNum = parseInt(numStr, 10);
-              const isSelected = selectedTooth === toothNum;
-              const hasTreatment = diagnosisMap[toothNum]?.condition && diagnosisMap[toothNum]?.condition !== 'healthy';
+            {/* Punteros / Flechas Finas Externas que apuntan desde afuera sin tapar */}
+            {UPPER_TEETH.map((tooth) => {
+              const diag = diagnosisMap[tooth.num];
+              const isSelected = selectedTooth === tooth.num;
+              const hasTreatment = diag?.condition && diag.condition !== 'healthy';
 
               return (
                 <div
-                  key={toothNum}
-                  style={{ top: coords.top, left: coords.left }}
-                  className="absolute -translate-x-1/2 -translate-y-1/2 group z-10"
+                  key={tooth.num}
+                  style={{ top: tooth.pointerTop, left: tooth.pointerLeft }}
+                  className="absolute -translate-x-1/2 -translate-y-1/2 group z-20"
                 >
                   <button
                     type="button"
-                    onClick={() => setSelectedTooth(toothNum)}
+                    onClick={() => setSelectedTooth(tooth.num)}
                     className={cn(
-                      'w-7 h-7 sm:w-8 sm:h-8 rounded-full transition-all duration-300 cursor-pointer flex items-center justify-center',
+                      'px-1.5 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 border shadow-md',
                       isSelected
-                        ? 'bg-amber-400/50 border-2 border-yellow-300 shadow-[0_0_20px_rgba(251,191,36,0.9)] scale-125 z-30'
+                        ? 'bg-amber-400 text-slate-950 border-yellow-300 ring-2 ring-amber-400/60 scale-110 z-30 font-black'
                         : hasTreatment
-                        ? 'bg-blue-500/25 border border-blue-400/80 shadow-[0_0_12px_rgba(59,130,246,0.7)] hover:bg-blue-500/50 hover:scale-115'
-                        : 'bg-emerald-500/20 border border-emerald-400/70 shadow-[0_0_10px_rgba(16,185,129,0.6)] hover:bg-emerald-500/40 hover:scale-115'
+                        ? 'bg-blue-600/90 text-white border-blue-400 hover:bg-blue-500 hover:scale-105'
+                        : 'bg-slate-900/80 text-gray-400 border-gray-700/80 hover:text-white hover:border-gray-500'
                     )}
-                    aria-label={`Pieza #${toothNum} - ${coords.label}`}
+                    title={`Pieza #${tooth.num} - ${tooth.label}`}
                   >
-                    <span
-                      className={cn(
-                        'w-2 h-2 rounded-full transition-all',
-                        isSelected
-                          ? 'bg-amber-300 shadow-[0_0_8px_#fde047]'
-                          : hasTreatment
-                          ? 'bg-blue-300/80'
-                          : 'bg-emerald-300/80'
-                      )}
-                    />
+                    <span>{tooth.num}</span>
+                    {hasTreatment && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-300 animate-pulse" />
+                    )}
                   </button>
 
-                  {/* Tooltip flotante al pasar el cursor (hover) */}
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center pointer-events-none z-40 whitespace-nowrap animate-in fade-in zoom-in-90 duration-150">
-                    <div className="bg-slate-900/95 text-white border border-gray-700 text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-xl flex items-center gap-1.5">
-                      <span className="text-amber-400">Pieza #{toothNum}</span>
-                      <span className="text-gray-400 font-normal">|</span>
-                      <span className="text-gray-300">{coords.label.split(' ')[0]}</span>
+                  {/* Tooltip Detallado al Hover */}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center pointer-events-none z-40 whitespace-nowrap animate-in fade-in zoom-in-95 duration-150">
+                    <div className="bg-slate-950 text-white border border-gray-700 text-[11px] px-2.5 py-1 rounded-lg shadow-2xl flex items-center gap-1.5">
+                      <strong className="text-amber-400">Pieza #{tooth.num}</strong>
+                      <span className="text-gray-400">•</span>
+                      <span>{hasTreatment ? diag.label : 'Sin tratamiento (Al natural)'}</span>
                     </div>
-                    <div className="w-1.5 h-1.5 bg-slate-900 border-r border-b border-gray-700 rotate-45 -mt-1" />
                   </div>
                 </div>
               );
@@ -147,64 +149,58 @@ export default function PatientOdontogram({
           </div>
         </div>
 
-        {/* Contenedor de la Mandíbula Inferior (3D) */}
-        <div className="text-center bg-[#0d1322] border border-gray-800 rounded-2xl p-4">
-          <span className="text-xs uppercase tracking-wider text-gray-300 font-bold block mb-3">
+        {/* Mandíbula Inferior (3D) */}
+        <div className="bg-[#0A0F1D] border border-gray-800 rounded-2xl p-5 text-center relative overflow-hidden shadow-inner">
+          <span className="text-xs uppercase tracking-wider text-gray-300 font-bold block mb-4">
             Mandíbula (Arcada Abajo)
           </span>
-          <div className="relative inline-block bg-[#0A0F1D] border border-gray-700/80 rounded-xl p-3 shadow-inner max-w-full">
-            {/* Imagen del modelo anatómico inferior */}
+
+          <div className="relative inline-block w-full max-w-[380px] p-2">
+            {/* Imagen Anatómica 3D 100% Despejada Sin Círculos Encimados */}
             <img
               src="/images/lower-arch.png"
               alt="Mandíbula Inferior 3D"
-              className="w-[320px] max-w-full h-auto mx-auto object-contain block select-none pointer-events-none"
+              className="w-full h-auto mx-auto object-contain block select-none pointer-events-none drop-shadow-[0_10px_20px_rgba(0,0,0,0.6)]"
             />
 
-            {/* Zonas Hotspot con Resplandor Luminoso (Glow) sin números fijos tapa-vistas */}
-            {Object.entries(LOWER_TEETH_COORDS).map(([numStr, coords]) => {
-              const toothNum = parseInt(numStr, 10);
-              const isSelected = selectedTooth === toothNum;
-              const hasTreatment = diagnosisMap[toothNum]?.condition && diagnosisMap[toothNum]?.condition !== 'healthy';
+            {/* Punteros / Flechas Finas Externas */}
+            {LOWER_TEETH.map((tooth) => {
+              const diag = diagnosisMap[tooth.num];
+              const isSelected = selectedTooth === tooth.num;
+              const hasTreatment = diag?.condition && diag.condition !== 'healthy';
 
               return (
                 <div
-                  key={toothNum}
-                  style={{ top: coords.top, left: coords.left }}
-                  className="absolute -translate-x-1/2 -translate-y-1/2 group z-10"
+                  key={tooth.num}
+                  style={{ top: tooth.pointerTop, left: tooth.pointerLeft }}
+                  className="absolute -translate-x-1/2 -translate-y-1/2 group z-20"
                 >
                   <button
                     type="button"
-                    onClick={() => setSelectedTooth(toothNum)}
+                    onClick={() => setSelectedTooth(tooth.num)}
                     className={cn(
-                      'w-7 h-7 sm:w-8 sm:h-8 rounded-full transition-all duration-300 cursor-pointer flex items-center justify-center',
+                      'px-1.5 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 border shadow-md',
                       isSelected
-                        ? 'bg-amber-400/50 border-2 border-yellow-300 shadow-[0_0_20px_rgba(251,191,36,0.9)] scale-125 z-30'
+                        ? 'bg-amber-400 text-slate-950 border-yellow-300 ring-2 ring-amber-400/60 scale-110 z-30 font-black'
                         : hasTreatment
-                        ? 'bg-blue-500/25 border border-blue-400/80 shadow-[0_0_12px_rgba(59,130,246,0.7)] hover:bg-blue-500/50 hover:scale-115'
-                        : 'bg-emerald-500/20 border border-emerald-400/70 shadow-[0_0_10px_rgba(16,185,129,0.6)] hover:bg-emerald-500/40 hover:scale-115'
+                        ? 'bg-blue-600/90 text-white border-blue-400 hover:bg-blue-500 hover:scale-105'
+                        : 'bg-slate-900/80 text-gray-400 border-gray-700/80 hover:text-white hover:border-gray-500'
                     )}
-                    aria-label={`Pieza #${toothNum} - ${coords.label}`}
+                    title={`Pieza #${tooth.num} - ${tooth.label}`}
                   >
-                    <span
-                      className={cn(
-                        'w-2 h-2 rounded-full transition-all',
-                        isSelected
-                          ? 'bg-amber-300 shadow-[0_0_8px_#fde047]'
-                          : hasTreatment
-                          ? 'bg-blue-300/80'
-                          : 'bg-emerald-300/80'
-                      )}
-                    />
+                    <span>{tooth.num}</span>
+                    {hasTreatment && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-300 animate-pulse" />
+                    )}
                   </button>
 
-                  {/* Tooltip flotante al pasar el cursor (hover) */}
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center pointer-events-none z-40 whitespace-nowrap animate-in fade-in zoom-in-90 duration-150">
-                    <div className="bg-slate-900/95 text-white border border-gray-700 text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-xl flex items-center gap-1.5">
-                      <span className="text-amber-400">Pieza #{toothNum}</span>
-                      <span className="text-gray-400 font-normal">|</span>
-                      <span className="text-gray-300">{coords.label.split(' ')[0]}</span>
+                  {/* Tooltip Detallado al Hover */}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center pointer-events-none z-40 whitespace-nowrap animate-in fade-in zoom-in-95 duration-150">
+                    <div className="bg-slate-950 text-white border border-gray-700 text-[11px] px-2.5 py-1 rounded-lg shadow-2xl flex items-center gap-1.5">
+                      <strong className="text-amber-400">Pieza #{tooth.num}</strong>
+                      <span className="text-gray-400">•</span>
+                      <span>{hasTreatment ? diag.label : 'Sin tratamiento (Al natural)'}</span>
                     </div>
-                    <div className="w-1.5 h-1.5 bg-slate-900 border-r border-b border-gray-700 rotate-45 -mt-1" />
                   </div>
                 </div>
               );
@@ -213,19 +209,19 @@ export default function PatientOdontogram({
         </div>
       </div>
 
-      {/* Leyenda de Referencia */}
-      <div className="flex flex-wrap items-center justify-center gap-4 pt-2 text-[11px] text-gray-400 border-t border-gray-800/80">
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-full bg-emerald-500 border border-emerald-400 inline-block" />
-          Pieza Sana
+      {/* Leyenda Explicativa de Solo Lectura */}
+      <div className="flex flex-wrap items-center justify-center gap-6 pt-2 text-xs text-gray-400 border-t border-gray-800/80">
+        <span className="flex items-center gap-2">
+          <span className="px-2 py-0.5 rounded bg-slate-900 border border-gray-700 text-[10px] text-gray-300 font-bold">11</span>
+          Pieza sin tratamiento (Diente al natural)
         </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-full bg-blue-500 border border-blue-400 inline-block" />
-          Tratamiento Realizado (Resina / Corona / Endodoncia)
+        <span className="flex items-center gap-2">
+          <span className="px-2 py-0.5 rounded bg-blue-600 text-white border border-blue-400 text-[10px] font-bold">36</span>
+          Tratamiento Clínico Registrado por Dra. Aura
         </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-full bg-yellow-400 border border-yellow-300 inline-block" />
-          Pieza Seleccionada
+        <span className="flex items-center gap-2">
+          <span className="px-2 py-0.5 rounded bg-amber-400 text-slate-950 border border-yellow-300 text-[10px] font-black">16</span>
+          Pieza Seleccionada en Consulta
         </span>
       </div>
     </div>
