@@ -321,7 +321,7 @@ export function UnifiedCommunicationWidget({
   }
 
   // Notificar al Dashboard de la Doctora cuando inicia y finaliza la llamada
-  const notifyDoctorVoiceCall = async (state: 'active' | 'ended', summary?: string) => {
+  const notifyDoctorVoiceCall = async (state: 'active' | 'ended', summary?: string, dialogueList?: Array<{ role: 'user' | 'assistant'; text: string }>) => {
     const nowFormatted = new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date())
     try {
       await supabase.channel('chat_omnichannel_sync').send({
@@ -332,25 +332,30 @@ export function UnifiedCommunicationWidget({
           patientName,
           status: state,
           timestamp: nowFormatted,
-          summary: summary || (state === 'active' ? 'Llamada de voz en curso' : 'Llamada de voz finalizada')
+          summary: summary || (state === 'active' ? 'Llamada de voz en curso' : 'Llamada de voz finalizada'),
+          dialogue: dialogueList || []
         }
       })
 
-      // Si finalizó la llamada, persistir el resumen en el chat para la doctora
+      // Si finalizó la llamada, persistir la transcripción y el caso completo en el backend
       if (state === 'ended') {
-        await fetch('/api/chat', {
+        const fullTranscript = dialogueList && dialogueList.length > 0
+          ? dialogueList.map(t => `${t.role === 'user' ? patientName : 'Aura AI'}: ${t.text}`).join('\n')
+          : (summary || 'Consulta de voz finalizada.')
+
+        await fetch('/api/webhook/call-transcription', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             patientId,
-            message: {
-              id: `voice-summary-${Date.now()}`,
-              senderName: 'Asistente Aura IA Voice',
-              senderRole: 'ai',
-              content: `🎙️ [Llamada de Voz con ${patientName}]: ${summary || 'El paciente conversó mediante streaming de voz con Aura IA.'}`,
-              timestamp: nowFormatted,
-              isDoctor: false
-            }
+            patientName,
+            patientPhone: patient?.phone || '',
+            durationSeconds: 45,
+            consultationReason: 'Solicitud de Cita Médica por Voz',
+            urgencyLevel: 'Urgente',
+            transcription: fullTranscript,
+            dialogue: dialogueList || [],
+            summary: summary || 'El paciente se comunicó por voz con Aura IA solicitando consulta.'
           })
         })
       }
@@ -363,11 +368,15 @@ export function UnifiedCommunicationWidget({
   const handleToggleCall = async () => {
     if (isConnected || isConnecting) {
       releaseMicStream()
-      const transcriptSummary = transcripts.length > 0
-        ? transcripts.map(t => `${t.role === 'user' ? patientName : 'Aura'}: ${t.text}`).slice(-4).join(' | ')
-        : 'Consulta de voz finalizada sin transcripción prolongada.'
+      const formattedDialogue = transcripts.map(t => ({
+        role: (t.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+        text: t.text
+      }))
+      const transcriptSummary = formattedDialogue.length > 0
+        ? formattedDialogue.map(t => `${t.role === 'user' ? patientName : 'Aura'}: ${t.text}`).slice(-4).join(' | ')
+        : 'Consulta de voz finalizada.'
       await endSession()
-      await notifyDoctorVoiceCall('ended', transcriptSummary)
+      await notifyDoctorVoiceCall('ended', transcriptSummary, formattedDialogue)
     } else {
       setPermissionError(null)
 
@@ -676,10 +685,10 @@ export function UnifiedCommunicationWidget({
                   <button
                     disabled={isConnecting}
                     onClick={handleToggleCall}
-                    className="w-full flex items-center justify-center gap-2 py-4 px-6 rounded-2xl bg-[#F59E0B] hover:bg-[#D97706] text-black font-black text-sm sm:text-base shadow-xl shadow-amber-500/30 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2.5 py-4 px-6 rounded-2xl bg-[#202D4C] hover:bg-[#2A3A60] border border-amber-400/40 text-white font-black text-sm sm:text-base shadow-xl transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50"
                   >
-                    <Phone className="w-5 h-5" />
-                    {isConnecting ? 'Conectando...' : 'Iniciar Llamada con Aura'}
+                    <Phone className="w-5 h-5 text-amber-400" />
+                    {isConnecting ? 'Conectando con Aura...' : 'Iniciar Llamada de Voz con Aura'}
                   </button>
                 )}
               </div>

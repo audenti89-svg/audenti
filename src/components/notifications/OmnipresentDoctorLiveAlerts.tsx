@@ -160,6 +160,9 @@ export function OmnipresentDoctorLiveAlerts() {
         }
       } catch {}
 
+      const targetId = payload.targetPatientId || payload.patientId || ''
+      const targetUrl = targetId ? `/dashboard/chat?patientId=${encodeURIComponent(targetId)}` : (payload.url || '/dashboard/chat')
+
       const newToast: OmnipresentToast = {
         id: `toast-${Date.now()}-${Math.random()}`,
         title: isRegistered ? `💬 Mensaje de ${sender}` : `🟠 PROSPECTO NUEVO: ${sender}`,
@@ -172,12 +175,12 @@ export function OmnipresentDoctorLiveAlerts() {
         consultationReason: payload.consultationReason || 'Consulta General',
         urgencyLevel: payload.urgencyLevel || (/(?:dolor|duele|muela|aguanto|urgente)/i.test(content) ? 'Urgente' : 'No Urgente'),
         timestamp: time,
-        url: '/dashboard/chat'
+        url: targetUrl
       }
 
       // Queda fijo hasta que la doctora confirme expresamente la lectura (Persistencia Congelada)
       updateToastsPersistently(prev => [newToast, ...prev.filter(t => t.id !== newToast.id)].slice(0, 5))
-      triggerNativePush(newToast.title, `${newToast.consultationReason} • "${content}"`, '/dashboard/chat')
+      triggerNativePush(newToast.title, `${newToast.consultationReason} • "${content}"`, targetUrl)
     }
 
     const handleVoiceEvent = async (payload: any) => {
@@ -207,6 +210,9 @@ export function OmnipresentDoctorLiveAlerts() {
         triggerNativePush(`📞 Llamada de Voz en Curso`, `${patient} está hablando con Aura IA.`, '/dashboard/chat')
       } else if (payload.status === 'ended') {
         playTone('arrival')
+        const voiceTargetId = payload.patientId || payload.targetPatientId || ''
+        const voiceUrl = voiceTargetId ? `/dashboard/chat?patientId=${encodeURIComponent(voiceTargetId)}` : '/dashboard/chat'
+
         const toast: OmnipresentToast = {
           id: `voice-end-${Date.now()}`,
           title: `📞 Llamada de Voz Finalizada con Aura IA`,
@@ -216,10 +222,10 @@ export function OmnipresentDoctorLiveAlerts() {
           phone: payload.phone || '',
           folio,
           isRegistered,
-          consultationReason: 'Solicitud de Cita Médica por Voz',
-          urgencyLevel: 'Urgente',
+          consultationReason: payload.consultationReason || 'Solicitud de Cita Médica por Voz',
+          urgencyLevel: payload.urgencyLevel || 'Urgente',
           timestamp: time,
-          url: '/dashboard/chat'
+          url: voiceUrl
         }
 
         // Queda fijo en pantalla: CERO borrado automático (Persistencia Congelada)
@@ -227,7 +233,7 @@ export function OmnipresentDoctorLiveAlerts() {
         triggerNativePush(
           isRegistered ? `🟢 PACIENTE REGISTRADO: ${patient} (${folio})` : `🟠 PROSPECTO NUEVO: ${patient}`,
           `📌 Motivo: Solicitud de Cita Médica\n⚠️ Acción Requerida: Confirmar fecha/horario de atención disponible.`,
-          '/dashboard/chat'
+          voiceUrl
         )
       }
     }

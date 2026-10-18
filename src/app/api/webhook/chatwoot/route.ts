@@ -175,6 +175,7 @@ export async function POST(request: Request) {
     // 4. Persistir en chat_omnichannel.json de Supabase Storage para reflejar en /dashboard/chat
     const targetPatientId = patientRecord?.id || `prospect_${prospectPhone.replace(/\D/g, '') || conversationId || Date.now()}`;
     const nowFormatted = new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date());
+    const resolvedChannelType = channelType?.toLowerCase().includes('whatsapp') ? 'whatsapp' : 'web_chat';
 
     try {
       let allChats: Record<string, any[]> = {};
@@ -188,6 +189,7 @@ export async function POST(request: Request) {
         id: `cw-msg-${payload.id || Date.now()}`,
         senderName: isRegistered ? patientRecord.full_name : `${prospectName} (Prospecto)`,
         senderRole: 'patient',
+        channel_type: resolvedChannelType,
         content: messageContent,
         timestamp: nowFormatted,
         isDoctor: false,
@@ -195,6 +197,7 @@ export async function POST(request: Request) {
         folio: folio || 'PROSPECTO-NUEVO',
         channel: channelType,
         metadata: {
+          channel_type: resolvedChannelType,
           patientName: isRegistered ? patientRecord.full_name : prospectName,
           phone: prospectPhone,
           consultationReason,
@@ -207,6 +210,7 @@ export async function POST(request: Request) {
         id: `cw-ai-${Date.now()}`,
         senderName: 'Aura IA (Triaje Automático)',
         senderRole: 'ai',
+        channel_type: resolvedChannelType,
         content: aiTriageResponse,
         timestamp: nowFormatted,
         isDoctor: false
@@ -252,6 +256,9 @@ export async function POST(request: Request) {
         phone: prospectPhone,
         consultationReason,
         urgencyLevel,
+        channel_type: resolvedChannelType,
+        targetPatientId,
+        url: `/dashboard/chat?patientId=${encodeURIComponent(targetPatientId)}`,
         time: nowFormatted
       }
     });

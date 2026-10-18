@@ -44,7 +44,8 @@ const businessNav: NavItem[] = [
 ]
 
 const systemNav: NavItem[] = [
-  { label: 'Configuración',     path: '/dashboard/configuracion',icon: Settings },
+  { label: 'Configuración General', path: '/dashboard/configuracion', icon: Settings },
+  { label: 'Configuración WhatsApp', path: '/dashboard/configuracion/whatsapp', icon: MessageSquare },
 ]
 
 function NavGroup({ title, items, unconfirmedCount }: { title: string; items: NavItem[]; unconfirmedCount: number }) {

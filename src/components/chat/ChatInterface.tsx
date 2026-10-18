@@ -1,226 +1,105 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import {
-  Users,
-  HeartHandshake,
-  Stethoscope,
-  Receipt,
-  MessageSquare,
-  Shield,
   Search,
   Send,
-  Paperclip,
-  Video,
-  MoreVertical,
-  QrCode,
-  Share2,
-  CheckCheck,
+  Phone,
+  PhoneCall,
+  MessageSquare,
+  Sparkles,
+  Lock,
+  Calendar,
+  FileText,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  Radio,
   Volume2,
   VolumeX,
-  Bell,
-  Sparkles,
-  CheckSquare,
-  Square,
-  UserPlus,
-  SendHorizontal,
-  ChevronRight,
-  TrendingUp,
   User,
-  Radio
+  ShieldCheck,
+  TrendingUp,
+  MapPin,
+  ChevronRight,
+  Filter,
+  CheckCheck
 } from 'lucide-react'
+import { createClient } from '@/utils/supabase/client'
 import { useNotificationSound } from '@/hooks/useNotificationSound'
 
-type ChatTab = 'external' | 'internal' | 'aura_ai_history'
-type InternalSubTab = 'peer' | 'specialty_board' | 'reception' | 'management'
+export type ChannelFilter = 'all' | 'voice_call' | 'whatsapp' | 'web_chat' | 'urgent'
 
-interface ReferralPerson {
-  id: string
-  name: string
-  code: string
-  ltvContributed: number
-  status: 'active' | 'in_treatment' | 'completed'
-}
-
-interface FamilyMember {
-  id: string
-  name: string
-  relationship: string
-  lastVisit: string
-  age?: number
-}
-
-interface PatientDetails {
-  id: string
-  name: string
-  phone: string
-  photo?: string
-  referrer?: {
-    name: string
-    code: string
-    avatar: string
-  }
-  referralsMade: ReferralPerson[]
-  familyMembers: FamilyMember[]
-}
-
-interface Message {
+export interface ChatMessageItem {
   id: string
   senderName: string
-  senderInitials: string
+  senderInitials?: string
+  senderRole?: 'doctor' | 'patient' | 'ai' | 'staff'
+  channel_type?: 'voice_call' | 'whatsapp' | 'web_chat'
   content: string
   time: string
   isOwn: boolean
-  isCascadeNotice?: boolean
+  isPrivateNote?: boolean
+  metadata?: {
+    channel_type?: 'voice_call' | 'whatsapp' | 'web_chat'
+    durationSeconds?: number
+    consultationReason?: string
+    urgencyLevel?: 'Urgente' | 'No Urgente'
+    transcription?: string
+    dialogue?: Array<{ role: 'user' | 'assistant'; text: string }>
+    summary?: string
+    patientName?: string
+    phone?: string
+    folio?: string
+    isRegistered?: boolean
+    classification?: string
+  }
 }
 
-import { createClient } from '@/utils/supabase/client'
+export interface PatientDirectoryItem {
+  id: string
+  name: string
+  phone: string
+  folio: string
+  isRegistered: boolean
+  channel_type: 'voice_call' | 'whatsapp' | 'web_chat'
+  lastMessage: string
+  lastTime: string
+  isUrgent: boolean
+  consultationReason?: string
+  address?: string
+  emergencyContact?: string
+}
 
 export function ChatInterface() {
+  const searchParams = useSearchParams()
+  const urlPatientId = searchParams.get('patientId')
+
   const { soundEnabled, setSoundEnabled, playTone } = useNotificationSound()
   const supabase = createClient()
 
-  // Tabs y Navegación
-  const [mainTab, setMainTab] = useState<ChatTab>('external')
-  const [internalTab, setInternalTab] = useState<InternalSubTab>('peer')
-
-  // Pacientes reales cargados de Supabase
-  const [patients, setPatients] = useState<PatientDetails[]>([])
-  const [loadingPatients, setLoadingPatients] = useState(true)
-
-  // Paciente seleccionado
-  const [selectedPatientId, setSelectedPatientId] = useState<string>('')
+  // Filtros y Búsqueda
+  const [activeFilter, setActiveFilter] = useState<ChannelFilter>('all')
   const [searchTerm, setSearchTerm] = useState('')
 
-  // Selección múltiple para envíos en conjunto (Familiares + Referidos)
-  const [selectedRecipients, setSelectedRecipients] = useState<string[]>([])
-  const [broadcastTarget, setBroadcastTarget] = useState<'all' | 'family_only' | 'referrals_only' | 'custom'>('custom')
-
-  // Canal interno seleccionado
-  const [selectedInternalTarget, setSelectedInternalTarget] = useState('Interconsulta Médica')
-
-  // Mensajería dinámica
-  const [inputMessage, setInputMessage] = useState('')
-  const [messages, setMessages] = useState<Record<string, Message[]>>({})
+  // Lista de Contactos/Pacientes
+  const [patients, setPatients] = useState<PatientDirectoryItem[]>([])
+  const [loadingPatients, setLoadingPatients] = useState(true)
+  const [selectedPatientId, setSelectedPatientId] = useState<string>('')
   const [unreadPatients, setUnreadPatients] = useState<Set<string>>(new Set())
 
-  // Historial de Conversaciones de Aura AI (CRM Directo)
-  const [auraAiSessions, setAuraAiSessions] = useState<any[]>([])
-  const [selectedSessionId, setSelectedSessionId] = useState<string>('')
-  const [loadingAuraSessions, setLoadingAuraSessions] = useState(false)
-
-  const fetchAuraAiHistory = async () => {
-    try {
-      setLoadingAuraSessions(true)
-      const { data } = await supabase
-        .from('patients')
-        .select('id, full_name, phone, created_at')
-        .order('created_at', { ascending: false })
-        .limit(10)
-
-      if (data) {
-        const sessions = data.map((p: any) => ({
-          sessionId: p.id,
-          patientName: p.full_name,
-          phone: p.phone,
-          timestamp: p.created_at
-        }))
-        setAuraAiSessions(sessions)
-        if (!selectedSessionId && sessions.length > 0) {
-          setSelectedSessionId(sessions[0].sessionId)
-        }
-      }
-    } catch (e) {
-      console.warn('Error fetching Aura AI history:', e)
-    } finally {
-      setLoadingAuraSessions(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchAuraAiHistory()
-  }, [])
-
-  useEffect(() => {
-    async function loadChatPatients() {
-      setLoadingPatients(true)
-      try {
-        const { data, error } = await supabase
-          .from('patients')
-          .select('id, full_name, phone, emergency_contact_name, emergency_contact_phone')
-          .order('created_at', { ascending: false })
-
-        if (error) throw error
-
-        if (data && data.length > 0) {
-          const mapped: PatientDetails[] = data.map(p => ({
-            id: p.id,
-            name: p.full_name || 'Paciente sin nombre',
-            phone: p.phone || 'Sin teléfono',
-            referrer: undefined,
-            referralsMade: [],
-            familyMembers: p.emergency_contact_name ? [
-              {
-                id: `fam-${p.id}`,
-                name: p.emergency_contact_name,
-                relationship: 'Contacto de Emergencia',
-                lastVisit: p.emergency_contact_phone || 'Registrado en ficha',
-              }
-            ] : []
-          }))
-          setPatients(mapped)
-          setSelectedPatientId(mapped[0].id)
-        } else {
-          setPatients([])
-          setSelectedPatientId('')
-        }
-      } catch (err) {
-        console.warn('Nota en chat pacientes:', err)
-        setPatients([])
-        setSelectedPatientId('')
-      } finally {
-        setLoadingPatients(false)
-      }
-    }
-
-    loadChatPatients()
-  }, [])
+  // Mensajes por ID de paciente
+  const [messages, setMessages] = useState<Record<string, ChatMessageItem[]>>({})
+  const [inputMessage, setInputMessage] = useState('')
+  const [isPrivateNote, setIsPrivateNote] = useState(false)
+  const [sendingMessage, setSendingMessage] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const activePatient = patients.find(p => p.id === selectedPatientId) || null
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, selectedPatientId, mainTab, internalTab])
-
-  // Manejo de checkboxes de selección de familiares y referidos
-  const toggleRecipient = (name: string) => {
-    setSelectedRecipients(prev =>
-      prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
-    )
-  }
-
-  const selectAllFamily = () => {
-    if (!activePatient) return
-    const famNames = activePatient.familyMembers.map(m => m.name)
-    setSelectedRecipients(famNames)
-    setBroadcastTarget('family_only')
-  }
-
-  const selectAllReferrals = () => {
-    if (!activePatient) return
-    const refNames = activePatient.referralsMade.map(r => r.name)
-    setSelectedRecipients(refNames)
-    setBroadcastTarget('referrals_only')
-  }
-
-  const clearSelection = () => {
-    setSelectedRecipients([])
-    setBroadcastTarget('custom')
-  }
-
-  // Cargar mensajes persistidos de cada paciente desde chat_omnichannel.json
-  const loadStoredOmnichannelMessages = async () => {
+  // 1. Cargar historial persistido desde chat_omnichannel.json de Supabase Storage
+  const loadOmnichannelHistory = async () => {
     try {
       const { data: file } = await supabase.storage
         .from('audenti_database')
@@ -230,104 +109,240 @@ export function ChatInterface() {
         const text = await file.text()
         if (text && text.trim()) {
           const stored = JSON.parse(text)
-          const mapped: Record<string, Message[]> = {}
-          Object.keys(stored).forEach(patId => {
-            mapped[patId] = (stored[patId] || []).map((m: any) => ({
+          const mappedMessages: Record<string, ChatMessageItem[]> = {}
+          const directoryList: PatientDirectoryItem[] = []
+
+          // Obtener lista oficial de pacientes registrados de la base de datos para cruzar datos
+          let registeredMap: Record<string, any> = {}
+          try {
+            const { data: dbPatients } = await supabase
+              .from('patients')
+              .select('id, full_name, phone, emergency_contact_name, emergency_contact_phone')
+            if (dbPatients) {
+              dbPatients.forEach(p => {
+                registeredMap[p.id] = p
+              })
+            }
+          } catch {}
+
+          Object.keys(stored).forEach(contactId => {
+            const chatArray = stored[contactId] || []
+            mappedMessages[contactId] = chatArray.map((m: any) => ({
               id: m.id || String(Math.random()),
-              senderName: m.senderName,
-              senderInitials: m.isDoctor ? 'AE' : 'PAC',
+              senderName: m.senderName || (m.isDoctor ? 'Dra. Aura Estudillo' : 'Paciente'),
+              senderRole: m.senderRole || (m.isDoctor ? 'doctor' : 'patient'),
+              channel_type: m.channel_type || m.metadata?.channel_type || (m.content?.includes('Llamada de Voz') ? 'voice_call' : 'web_chat'),
               content: m.content,
-              time: m.timestamp,
-              isOwn: m.isDoctor
+              time: m.timestamp || m.time || '11:30 a.m.',
+              isOwn: Boolean(m.isDoctor),
+              isPrivateNote: Boolean(m.isPrivateNote),
+              metadata: m.metadata
             }))
+
+            // Obtener último mensaje para el directorio
+            const lastMsg = chatArray[chatArray.length - 1]
+            const isReg = Boolean(registeredMap[contactId] || lastMsg?.isRegistered || lastMsg?.metadata?.isRegistered || !contactId.startsWith('prospect_'))
+            const regData = registeredMap[contactId]
+
+            const rawName = regData?.full_name || lastMsg?.metadata?.patientName || lastMsg?.senderName || 'Paciente'
+            const cleanName = rawName.replace(/\s*\(Prospecto\)/gi, '').replace(/\s*\(.*?folio.*?\)/gi, '').trim()
+            const phone = regData?.phone || lastMsg?.metadata?.phone || lastMsg?.phone || (contactId.startsWith('prospect_') ? contactId.replace('prospect_', '') : '')
+            const folio = isReg ? `EXP-${contactId.slice(0, 8).toUpperCase()}` : (lastMsg?.folio || `PROS-${contactId.slice(-6).toUpperCase()}`)
+
+            const msgText = lastMsg?.content || 'Sin mensajes'
+            const isUrgent = /(?:dolor|duele|muela|urgente|emergencia|sangr|inflamad)/i.test(msgText) || lastMsg?.metadata?.urgencyLevel === 'Urgente'
+
+            let chType: 'voice_call' | 'whatsapp' | 'web_chat' = 'web_chat'
+            if (lastMsg?.channel_type) chType = lastMsg.channel_type
+            else if (lastMsg?.metadata?.channel_type) chType = lastMsg.metadata.channel_type
+            else if (msgText.includes('Llamada de Voz') || lastMsg?.senderName?.includes('Voice')) chType = 'voice_call'
+            else if (lastMsg?.channel === 'whatsapp' || lastMsg?.metadata?.channel === 'whatsapp') chType = 'whatsapp'
+
+            directoryList.push({
+              id: contactId,
+              name: cleanName || 'Paciente Sin Nombre',
+              phone: phone || 'Sin teléfono',
+              folio,
+              isRegistered: isReg,
+              channel_type: chType,
+              lastMessage: msgText,
+              lastTime: lastMsg?.timestamp || lastMsg?.time || 'Hoy',
+              isUrgent,
+              consultationReason: lastMsg?.metadata?.consultationReason,
+              emergencyContact: regData?.emergency_contact_name ? `${regData.emergency_contact_name} (${regData.emergency_contact_phone || ''})` : undefined
+            })
           })
-          setMessages(prev => ({ ...prev, ...mapped }))
+
+          setMessages(mappedMessages)
+
+          // Si el directorio tiene items, actualizar
+          if (directoryList.length > 0) {
+            setPatients(directoryList)
+            // Si la URL traía un paciente específico, seleccionarlo
+            if (urlPatientId && directoryList.some(p => p.id === urlPatientId)) {
+              setSelectedPatientId(urlPatientId)
+            } else if (!selectedPatientId) {
+              setSelectedPatientId(directoryList[0].id)
+            }
+          }
         }
       }
-    } catch {}
+    } catch (e: any) {
+      console.warn('Error cargando historial de chat:', e?.message)
+    } finally {
+      setLoadingPatients(false)
+    }
   }
 
+  // Carga inicial y respuesta a parámetros de URL
   useEffect(() => {
-    loadStoredOmnichannelMessages()
+    loadOmnichannelHistory()
+  }, [])
 
-    // Escucha en tiempo real de mensajes entrantes del paciente
+  useEffect(() => {
+    if (urlPatientId) {
+      setSelectedPatientId(urlPatientId)
+      setUnreadPatients(prev => {
+        const next = new Set(prev)
+        next.delete(urlPatientId)
+        return next
+      })
+    }
+  }, [urlPatientId])
+
+  // Scroll automático en hilo de mensajes
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, selectedPatientId])
+
+  // 2. Suscripción a Realtime de mensajes entrantes y llamadas de voz
+  useEffect(() => {
     const channel = supabase
       .channel('chat_omnichannel_sync')
       .on('broadcast', { event: 'incoming_patient_message' }, ({ payload }) => {
-        if (payload && payload.targetPatientId) {
+        if (!payload) return
+        playTone('arrival')
+        const targetId = payload.targetPatientId || payload.patientId || `prospect_${Date.now()}`
+        const nowTime = payload.timestamp || 'Ahora'
+
+        const incomingMsg: ChatMessageItem = {
+          id: payload.id || `msg-${Date.now()}`,
+          senderName: payload.senderName || 'Paciente',
+          senderRole: 'patient',
+          channel_type: payload.channel_type || 'web_chat',
+          content: payload.content,
+          time: nowTime,
+          isOwn: false,
+          metadata: {
+            consultationReason: payload.consultationReason,
+            urgencyLevel: payload.urgencyLevel,
+            phone: payload.phone
+          }
+        }
+
+        setMessages(prev => ({
+          ...prev,
+          [targetId]: [...(prev[targetId] || []), incomingMsg]
+        }))
+
+        // Actualizar o insertar paciente en el directorio
+        setPatients(prev => {
+          const index = prev.findIndex(p => p.id === targetId)
+          const isUrgent = payload.urgencyLevel === 'Urgente' || /(?:dolor|duele|muela|urgente)/i.test(payload.content)
+          if (index >= 0) {
+            const updated = [...prev]
+            updated[index] = {
+              ...updated[index],
+              lastMessage: payload.content,
+              lastTime: nowTime,
+              isUrgent: updated[index].isUrgent || isUrgent
+            }
+            return updated
+          } else {
+            const newPat: PatientDirectoryItem = {
+              id: targetId,
+              name: payload.senderName?.replace(/\(.*?prospecto.*?\)/gi, '').trim() || 'Nuevo Contacto',
+              phone: payload.phone || 'Sin número',
+              folio: payload.folio || (payload.isRegistered ? 'EXP-PACIENTE' : 'PROS-NUEVO'),
+              isRegistered: Boolean(payload.isRegistered),
+              channel_type: payload.channel_type || 'web_chat',
+              lastMessage: payload.content,
+              lastTime: nowTime,
+              isUrgent,
+              consultationReason: payload.consultationReason
+            }
+            return [newPat, ...prev]
+          }
+        })
+
+        if (selectedPatientId !== targetId) {
+          setUnreadPatients(prev => new Set(prev).add(targetId))
+        }
+      })
+      .on('broadcast', { event: 'voice_call_event' }, ({ payload }) => {
+        if (!payload) return
+        const targetId = payload.targetPatientId || payload.patientId || 'prospect_voice'
+        const nowTime = payload.timestamp || 'Ahora'
+
+        if (payload.status === 'active') {
           playTone('arrival')
-          const incomingMsg: Message = {
-            id: payload.id || String(Date.now()),
-            senderName: payload.senderName || 'Paciente',
-            senderInitials: 'PAC',
-            content: payload.content,
-            time: payload.timestamp || 'Ahora',
+          const callStartMsg: ChatMessageItem = {
+            id: `call-start-${Date.now()}`,
+            senderName: 'Asistente de Voz (Aura AI)',
+            senderRole: 'ai',
+            channel_type: 'voice_call',
+            content: `📞 [Llamada de Voz Iniciada]: El paciente ${payload.patientName || 'Paciente'} se encuentra en llamada de voz con Aura IA.`,
+            time: nowTime,
             isOwn: false
+          }
+          setMessages(prev => ({
+            ...prev,
+            [targetId]: [...(prev[targetId] || []), callStartMsg]
+          }))
+          setUnreadPatients(prev => new Set(prev).add(targetId))
+        } else if (payload.status === 'ended') {
+          playTone('arrival')
+          const voiceCard: ChatMessageItem = {
+            id: `voice-ended-${Date.now()}`,
+            senderName: 'Asistente de Voz (Aura AI)',
+            senderRole: 'ai',
+            channel_type: 'voice_call',
+            content: payload.summary || `Llamada finalizada con ${payload.patientName || 'Paciente'}`,
+            time: nowTime,
+            isOwn: false,
+            metadata: {
+              channel_type: 'voice_call',
+              durationSeconds: payload.durationSeconds || 45,
+              consultationReason: payload.consultationReason || 'Solicitud de Cita Médica por Voz',
+              urgencyLevel: payload.urgencyLevel || 'Urgente',
+              transcription: payload.transcription,
+              dialogue: payload.dialogue,
+              summary: payload.summary,
+              patientName: payload.patientName,
+              phone: payload.phone
+            }
           }
 
           setMessages(prev => ({
             ...prev,
-            [payload.targetPatientId]: [...(prev[payload.targetPatientId] || []), incomingMsg]
+            [targetId]: [...(prev[targetId] || []), voiceCard]
           }))
 
-          // Asegurar que el prospecto aparezca en la lista de pacientes si es nuevo
           setPatients(prev => {
-            if (prev.some(p => p.id === payload.targetPatientId)) return prev
-            const isRegistered = Boolean(payload.isRegistered)
-            const newEntry: PatientDetails = {
-              id: payload.targetPatientId,
-              name: payload.senderName || (isRegistered ? 'Paciente Registrado' : '🟠 Prospecto Nuevo'),
-              phone: payload.phone || 'Sin número',
-              referralsMade: [],
-              familyMembers: []
+            const index = prev.findIndex(p => p.id === targetId)
+            if (index >= 0) {
+              const updated = [...prev]
+              updated[index] = {
+                ...updated[index],
+                lastMessage: `📞 ${payload.summary || 'Llamada de voz finalizada'}`,
+                lastTime: nowTime,
+                isUrgent: true,
+                channel_type: 'voice_call'
+              }
+              return updated
             }
-            return [newEntry, ...prev]
+            return prev
           })
-
-          // Si el paciente no es el que actualmente está seleccionado con el chat abierto, o para dar alerta visible
-          setUnreadPatients(prev => {
-            const next = new Set(prev)
-            next.add(payload.targetPatientId)
-            return next
-          })
-        }
-      })
-      .on('broadcast', { event: 'voice_call_event' }, ({ payload }) => {
-        if (payload && payload.patientId) {
-          if (payload.status === 'active') {
-            playTone('arrival')
-            const callNotice: Message = {
-              id: `call-start-${Date.now()}`,
-              senderName: 'Asistente de Voz Aura IA',
-              senderInitials: 'IA',
-              content: `📞 [Llamada de Voz Iniciada]: El paciente ${payload.patientName || 'Ricardo Sánchez'} ha iniciado una conversación de voz con Aura IA.`,
-              time: payload.timestamp || 'Ahora',
-              isOwn: false
-            }
-            setMessages(prev => ({
-              ...prev,
-              [payload.patientId]: [...(prev[payload.patientId] || []), callNotice]
-            }))
-            setUnreadPatients(prev => {
-              const next = new Set(prev)
-              next.add(payload.patientId)
-              return next
-            })
-          } else if (payload.status === 'ended') {
-            playTone('message')
-            const callSummary: Message = {
-              id: `call-end-${Date.now()}`,
-              senderName: 'Resumen Aura IA Voice',
-              senderInitials: 'IA',
-              content: `🎙️ [Llamada Finalizada]: ${payload.summary || 'Consulta por voz concluida con el paciente.'}`,
-              time: payload.timestamp || 'Ahora',
-              isOwn: false
-            }
-            setMessages(prev => ({
-              ...prev,
-              [payload.patientId]: [...(prev[payload.patientId] || []), callSummary]
-            }))
-          }
         }
       })
       .subscribe()
@@ -335,129 +350,118 @@ export function ChatInterface() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [playTone, supabase])
+  }, [selectedPatientId, playTone, supabase])
 
-  // Enviar mensaje desde el panel de la doctora hacia el portal del paciente
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return
-
-    playTone('message')
+  // 3. Envío de mensaje desde el panel (Respuesta médica al paciente o Nota Privada)
+  const handleSendMessage = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    if (!inputMessage.trim() || !selectedPatientId || sendingMessage) return
 
     const messageText = inputMessage.trim()
     const nowFormatted = new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date())
 
-    const newMsg: Message = {
-      id: Date.now().toString(),
-      senderName: 'Dra. Aura Estudillo',
-      senderInitials: 'AE',
+    const newMsg: ChatMessageItem = {
+      id: `doctor-${Date.now()}`,
+      senderName: isPrivateNote ? 'Nota Interna (Dra. Aura)' : 'Dra. Aura Estudillo',
+      senderRole: 'doctor',
+      channel_type: 'web_chat',
       content: messageText,
       time: nowFormatted,
       isOwn: true,
-      isCascadeNotice: selectedRecipients.length > 0
+      isPrivateNote
     }
 
-    const currentKey = mainTab === 'external' ? selectedPatientId : `internal-${internalTab}`
-
+    // Reflejo local inmediato
     setMessages(prev => ({
       ...prev,
-      [currentKey]: [...(prev[currentKey] || []), newMsg]
+      [selectedPatientId]: [...(prev[selectedPatientId] || []), newMsg]
     }))
 
     setInputMessage('')
+    setSendingMessage(true)
+    playTone('message')
 
-    // Si es chat con paciente externo, persistir y emitir evento Realtime al paciente
-    if (mainTab === 'external' && selectedPatientId) {
-      try {
-        const payloadMsg = {
-          id: newMsg.id,
-          senderName: 'Dra. Aura Estudillo',
-          senderRole: 'doctor',
-          content: messageText,
+    try {
+      if (!isPrivateNote) {
+        // Enviar vía /api/chat para disparar Supabase Realtime y WhatsApp dual
+        await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientId: selectedPatientId,
+            message: {
+              id: newMsg.id,
+              senderName: 'Dra. Aura Estudillo',
+              senderRole: 'doctor',
+              channel_type: 'web_chat',
+              content: messageText,
+              timestamp: nowFormatted,
+              isDoctor: true
+            }
+          })
+        })
+      } else {
+        // Guardar nota privada interna en el storage
+        const { data: file } = await supabase.storage.from('audenti_database').download('chat_omnichannel.json')
+        let allChats: Record<string, any[]> = {}
+        if (file) {
+          const text = await file.text()
+          if (text) allChats = JSON.parse(text)
+        }
+        allChats[selectedPatientId] = [...(allChats[selectedPatientId] || []), {
+          ...newMsg,
           timestamp: nowFormatted,
           isDoctor: true,
-          targetPatientId: selectedPatientId
-        }
-
-        // 1. Guardar en Storage (chat_omnichannel.json)
-        try {
-          const { data: file } = await supabase.storage.from('audenti_database').download('chat_omnichannel.json')
-          let allChats: Record<string, any[]> = {}
-          if (file) {
-            const text = await file.text()
-            if (text) allChats = JSON.parse(text)
-          }
-          allChats[selectedPatientId] = [...(allChats[selectedPatientId] || []), payloadMsg]
-          await supabase.storage.from('audenti_database').upload(
-            'chat_omnichannel.json',
-            JSON.stringify(allChats, null, 2),
-            { upsert: true, contentType: 'application/json' }
-          )
-        } catch {}
-
-        // 2. Disparar Realtime hacia el canal exclusivo del paciente
-        await supabase.channel(`patient_chat_${selectedPatientId}`).send({
-          type: 'broadcast',
-          event: 'doctor_reply',
-          payload: payloadMsg
-        })
-
-        // 3. Disparar Realtime en canal de sincronización global
-        await supabase.channel('chat_omnichannel_sync').send({
-          type: 'broadcast',
-          event: 'sync_patient_message',
-          payload: payloadMsg
-        })
-      } catch (err: any) {
-        console.warn('Error sincronizando mensaje de la doctora:', err?.message)
+          isPrivateNote: true
+        }]
+        await supabase.storage.from('audenti_database').upload(
+          'chat_omnichannel.json',
+          JSON.stringify(allChats, null, 2),
+          { upsert: true, contentType: 'application/json' }
+        )
       }
+    } catch (err: any) {
+      console.warn('Error enviando mensaje:', err?.message)
+    } finally {
+      setSendingMessage(false)
     }
   }
 
+  // Paciente Activo Seleccionado
+  const activePatient = patients.find(p => p.id === selectedPatientId) || patients[0] || null
+  const currentChatMessages = (selectedPatientId ? messages[selectedPatientId] : null) || []
+
+  // Filtrado de la bandeja
+  const filteredPatients = patients.filter(p => {
+    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          p.phone.includes(searchTerm) ||
+                          p.folio.toLowerCase().includes(searchTerm.toLowerCase())
+    if (!matchesSearch) return false
+
+    if (activeFilter === 'voice_call') return p.channel_type === 'voice_call'
+    if (activeFilter === 'whatsapp') return p.channel_type === 'whatsapp'
+    if (activeFilter === 'web_chat') return p.channel_type === 'web_chat'
+    if (activeFilter === 'urgent') return p.isUrgent
+    return true
+  })
+
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col h-[760px]">
-      {/* Barra Superior de Control Omni-Canal & Alertas Sonoras */}
-      <div className="bg-[#202D4C] px-6 py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 text-white border-b border-white/10">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setMainTab('external')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-              mainTab === 'external' ? 'bg-amber-400 text-slate-950 shadow-sm' : 'text-slate-200 hover:text-white hover:bg-white/10'
-            }`}
-          >
-            <HeartHandshake className="w-4 h-4" />
-            A. Pacientes &amp; Familias
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setMainTab('internal')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-              mainTab === 'internal' ? 'bg-amber-400 text-slate-950 shadow-sm' : 'text-slate-200 hover:text-white hover:bg-white/10'
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            B. Staff Interno
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setMainTab('aura_ai_history')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-              mainTab === 'aura_ai_history' ? 'bg-amber-400 text-slate-950 shadow-sm' : 'text-slate-200 hover:text-white hover:bg-white/10'
-            }`}
-          >
-            <Sparkles className="w-4 h-4 text-cyan-300" />
-            C. Historial Aura AI (Pacientes Web &amp; Urgencias)
-            {auraAiSessions.length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 text-white font-mono">
-                {auraAiSessions.length}
-              </span>
-            )}
-          </button>
+    <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col h-[780px]">
+      {/* Barra de Estado y Control Superior */}
+      <div className="bg-[#0F172A] px-6 py-3 flex items-center justify-between text-white border-b border-slate-800">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="text-xs font-black tracking-wide uppercase text-slate-200">
+              Centro Multicanal Audenti
+            </span>
+          </div>
+          <span className="text-slate-500 text-xs">|</span>
+          <span className="text-xs text-slate-300 font-medium hidden sm:inline">
+            Voz Aura AI • WhatsApp Business • Web Chat
+          </span>
         </div>
 
-        {/* Controles de Sonido Web Audio API & Notificaciones */}
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -465,611 +469,529 @@ export function ChatInterface() {
               setSoundEnabled(!soundEnabled)
               if (!soundEnabled) playTone('arrival')
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors border ${
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all border ${
               soundEnabled
                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
                 : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
             }`}
           >
             {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
-            <span>Alertas Sonoras: {soundEnabled ? 'Activas' : 'Mute'}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => playTone('arrival')}
-            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-slate-200"
-            title="Probar sonido de llegada de paciente"
-          >
-            <Bell className="w-3.5 h-3.5 text-amber-300" />
+            <span>Alertas: {soundEnabled ? 'On' : 'Mute'}</span>
           </button>
         </div>
       </div>
 
-      {/* Cuerpo Principal Dividido */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* =========================================================================
-            COLUMNA IZQUIERDA: DIRECTORIO O JERARQUÍA SEGÚN TAB
-        ========================================================================= */}
-        <div className="w-80 border-r border-slate-200/80 flex flex-col shrink-0 bg-slate-50/50">
-          {mainTab === 'external' ? (
-            // Directorio de Pacientes
-            <>
-              <div className="p-3.5 border-b border-slate-200/80">
-                <div className="relative">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    placeholder="Buscar paciente o código de red..."
-                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-white border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400"
-                  />
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                {loadingPatients ? (
-                  <div className="p-8 text-center text-xs text-slate-400">
-                    Cargando pacientes de Supabase...
-                  </div>
-                ) : patients.length === 0 ? (
-                  <div className="p-8 text-center space-y-2">
-                    <Users className="w-8 h-8 text-slate-300 mx-auto" />
-                    <p className="text-xs font-bold text-slate-700">Sin pacientes en la base</p>
-                    <p className="text-[11px] text-slate-500">
-                      No hay pacientes registrados todavía. El canal omni-canal iniciará en cuanto registres un paciente.
-                    </p>
-                  </div>
-                ) : (
-                  patients
-                    .filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.phone.includes(searchTerm))
-                    .map(p => {
-                      const isSelected = selectedPatientId === p.id
-                      const isUnread = unreadPatients.has(p.id)
-                      return (
-                        <button
-                          key={p.id}
-                          onClick={() => {
-                            setSelectedPatientId(p.id);
-                            setSelectedRecipients([]);
-                            setUnreadPatients(prev => {
-                              const next = new Set(prev)
-                              next.delete(p.id)
-                              return next
-                            })
-                          }}
-                          className={`w-full flex items-start gap-3 p-3 rounded-xl text-left transition-all relative ${
-                            isUnread
-                              ? 'bg-rose-50/90 border-2 border-rose-400 shadow-md ring-2 ring-rose-200'
-                              : isSelected
-                              ? 'bg-amber-100/70 border border-amber-300 shadow-2xs'
-                              : 'hover:bg-white border border-transparent'
-                          }`}
-                        >
-                          <div className={`w-10 h-10 rounded-xl text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs ${
-                            isUnread ? 'bg-rose-600 animate-pulse' : 'bg-[#202D4C]'
-                          }`}>
-                            {p.name.substring(0, 2).toUpperCase()}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-bold text-slate-900 truncate">{p.name}</span>
-                              {isUnread ? (
-                                <span className="inline-flex items-center gap-1 text-[10px] text-white font-bold bg-rose-600 px-2 py-0.5 rounded-full shadow-xs animate-bounce">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
-                                  Nuevo
-                                </span>
-                              ) : p.familyMembers.length > 0 ? (
-                                <span className="text-[10px] text-amber-800 font-bold bg-amber-50 px-1.5 rounded">
-                                  {p.familyMembers.length} contactos
-                                </span>
-                              ) : null}
-                            </div>
-                            <span className="text-[11px] text-slate-500 block">{p.phone}</span>
-                            <div className="flex items-center gap-1.5 mt-1 text-[10px] font-bold">
-                              {p.id.startsWith('prospect_') || p.name.includes('Prospecto') ? (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 border border-amber-300 font-bold">
-                                  🟠 PROSPECTO NUEVO
-                                </span>
-                              ) : isUnread ? (
-                                <span className="text-rose-600 flex items-center gap-1">
-                                  <Radio className="w-3 h-3 animate-spin" />
-                                  ¡Mensaje entrante pendiente!
-                                </span>
-                              ) : (
-                                <span className="text-emerald-700 flex items-center gap-1">
-                                  <TrendingUp className="w-3 h-3" />
-                                  🟢 PACIENTE REGISTRADO
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </button>
-                      )
-                    })
-                )}
-              </div>
-            </>
-          ) : mainTab === 'aura_ai_history' ? (
-            // Directorio de Sesiones Web con Aura AI
-            <>
-              <div className="p-3.5 border-b border-slate-200/80 bg-slate-900 text-white flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-cyan-300 animate-pulse" />
-                  <span className="text-xs font-bold uppercase tracking-wide">Sesiones Web Aura AI</span>
-                </div>
-                <button
-                  onClick={fetchAuraAiHistory}
-                  className="text-[10px] text-amber-300 hover:underline font-mono"
-                >
-                  Refrescar
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-                {loadingAuraSessions && auraAiSessions.length === 0 ? (
-                  <div className="p-8 text-center text-xs text-slate-400">
-                    Sincronizando chats de pacientes con Aura AI...
-                  </div>
-                ) : auraAiSessions.length === 0 ? (
-                  <div className="p-8 text-center space-y-2">
-                    <Sparkles className="w-8 h-8 text-slate-300 mx-auto" />
-                    <p className="text-xs font-bold text-slate-700">Sin conversaciones registradas</p>
-                    <p className="text-[11px] text-slate-500">
-                      Cuando un paciente interactúe con el widget web de Aura AI, la conversación se registrará aquí en tiempo real.
-                    </p>
-                  </div>
-                ) : (
-                  auraAiSessions.map(session => {
-                    const isSelected = selectedSessionId === session.sessionId
-                    const isRedAlert = session.urgencyLevel === 'red'
-                    const isYellowAlert = session.urgencyLevel === 'yellow'
-
-                    return (
-                      <button
-                        key={session.sessionId}
-                        onClick={() => setSelectedSessionId(session.sessionId)}
-                        className={`w-full p-3 rounded-xl text-left transition-all border ${
-                          isSelected
-                            ? 'bg-amber-100/80 border-amber-400 shadow-2xs'
-                            : isRedAlert
-                            ? 'bg-rose-50/70 border-rose-300 hover:bg-rose-100/50'
-                            : 'bg-white border-slate-200/80 hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-1 mb-1">
-                          <span className="text-xs font-bold text-slate-900 truncate">
-                            {isRedAlert && '🔴 '}{isYellowAlert && '🟡 '}
-                            {session.patientName}
-                          </span>
-                          <span className="text-[10px] font-mono text-slate-400 shrink-0">
-                            {session.lastTimestamp}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-600 line-clamp-1 italic">
-                          "{session.lastMessage}"
-                        </p>
-                        <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-slate-100 text-[10px]">
-                          <span className="font-mono text-slate-500 font-semibold">{session.phone}</span>
-                          <span className="px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 font-bold">
-                            {session.messageCount} msgs
-                          </span>
-                        </div>
-                      </button>
-                    )
-                  })
-                )}
-              </div>
-            </>
-          ) : (
-            // Jerarquía Interna
-            <div className="p-3 space-y-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 block">
-                Jerarquía Organizacional
-              </span>
-
-              {[
-                { id: 'peer', label: 'Colega a Colega (Interconsulta)', desc: 'Chat privado médico', icon: Stethoscope, unread: 1 },
-                { id: 'specialty_board', label: 'Junta de Especialistas', desc: 'Ortodoncia + Cirugía + Prótesis', icon: Users, unread: 0 },
-                { id: 'reception', label: 'Canal Directo Recepción', desc: 'Avisos de sala y sillón', icon: Radio, unread: 2 },
-                { id: 'management', label: 'Alto Mando (Dirección/Dueño)', desc: 'Reportes de gastos y equipo', icon: Shield, unread: 0 },
-              ].map(sub => {
-                const Icon = sub.icon
-                const isSelected = internalTab === sub.id
-                return (
-                  <button
-                    key={sub.id}
-                    onClick={() => setInternalTab(sub.id as InternalSubTab)}
-                    className={`w-full flex items-start gap-3 p-3 rounded-xl text-left transition-all ${
-                      isSelected ? 'bg-amber-100/70 border border-amber-300 shadow-2xs' : 'hover:bg-white border border-transparent'
-                    }`}
-                  >
-                    <div className="w-10 h-10 rounded-xl bg-slate-200/80 text-slate-800 flex items-center justify-center shrink-0">
-                      <Icon className="w-5 h-5 text-slate-700" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-900 truncate">{sub.label}</span>
-                        {sub.unread > 0 && (
-                          <span className="w-4 h-4 rounded-full bg-amber-400 text-slate-950 text-[10px] font-bold flex items-center justify-center">
-                            {sub.unread}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">{sub.desc}</p>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </div>
+      {/* ARQUITECTURA DE 3 PANELES */}
+      <div className="flex-1 grid grid-cols-12 overflow-hidden divide-x divide-slate-200/80">
 
         {/* =========================================================================
-            COLUMNA CENTRAL: CHAT ACTIVO Y MENSAJERÍA MULTIDIRECCIONAL
+            PANEL 1 (Izquierdo - Columnas 1 a 4): FILTROS Y BANDEJA DE CANALES
         ========================================================================= */}
-        <div className="flex-1 flex flex-col min-w-0 bg-white border-r border-slate-200/80">
-          {/* Cabecera del chat */}
-          <div className="h-16 px-6 border-b border-slate-200/80 flex items-center justify-between shrink-0 bg-slate-50/30">
-            <div>
-              {mainTab === 'aura_ai_history' ? (
-                (() => {
-                  const currentSession = auraAiSessions.find(s => s.sessionId === selectedSessionId)
-                  return (
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-bold text-slate-900">
-                          {currentSession ? currentSession.patientName : 'Historial de Chat Aura AI'}
-                        </h3>
-                        {currentSession?.urgencyLevel === 'red' && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
-                            🔴 Urgencia 24/7 (Fast-Track)
-                          </span>
-                        )}
-                        {currentSession?.urgencyLevel === 'yellow' && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
-                            🟡 Cita Prioritaria
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-slate-500">
-                        {currentSession?.phone || 'Sin WhatsApp'} • ID de Sesión: {selectedSessionId || 'Ninguna'}
-                      </p>
-                    </div>
-                  )
-                })()
-              ) : mainTab === 'external' ? (
-                activePatient ? (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-bold text-slate-900">{activePatient.name}</h3>
-                      {selectedRecipients.length > 0 && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
-                          Envío en conjunto a {selectedRecipients.length} personas
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-slate-500">{activePatient.phone} • Trazabilidad activa</p>
-                  </>
-                ) : (
-                  <>
-                    <h3 className="text-sm font-bold text-slate-900">Canal de Pacientes</h3>
-                    <p className="text-[11px] text-slate-500">Selecciona o da de alta un paciente para iniciar conversación</p>
-                  </>
-                )
-              ) : (
-                <>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    {internalTab === 'peer' ? selectedInternalTarget :
-                     internalTab === 'specialty_board' ? 'Junta Médica Multidisciplinaria' :
-                     internalTab === 'reception' ? 'Recepción Central & Asistencia' : 'Dirección General & Dueño'}
-                  </h3>
-                  <p className="text-[11px] text-slate-500">Canal encriptado interno de alta disponibilidad</p>
-                </>
-              )}
+        <div className="col-span-12 md:col-span-4 lg:col-span-4 flex flex-col bg-slate-50/70 h-full overflow-hidden">
+          {/* Filtros Superiores por Canal */}
+          <div className="p-3 border-b border-slate-200/80 space-y-2 bg-white">
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                placeholder="Buscar por paciente, teléfono o folio..."
+                className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-100/80 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-white transition-all"
+              />
             </div>
 
-            <div className="flex items-center gap-2">
-              <button type="button" className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100" title="Videollamada">
-                <Video className="w-4 h-4" />
+            {/* Chips de Canales y Filtros */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-1 scrollbar-none text-[11px] font-bold">
+              <button
+                type="button"
+                onClick={() => setActiveFilter('all')}
+                className={`px-2.5 py-1 rounded-lg transition-all shrink-0 ${
+                  activeFilter === 'all'
+                    ? 'bg-[#0F172A] text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                Todas ({patients.length})
               </button>
-              <button type="button" className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100">
-                <MoreVertical className="w-4 h-4" />
+              <button
+                type="button"
+                onClick={() => setActiveFilter('voice_call')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg transition-all shrink-0 ${
+                  activeFilter === 'voice_call'
+                    ? 'bg-amber-500 text-slate-950 shadow-xs'
+                    : 'bg-amber-50 text-amber-900 hover:bg-amber-100'
+                }`}
+              >
+                <Phone className="w-3 h-3" />
+                Voz
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveFilter('whatsapp')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg transition-all shrink-0 ${
+                  activeFilter === 'whatsapp'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-emerald-50 text-emerald-900 hover:bg-emerald-100'
+                }`}
+              >
+                <MessageSquare className="w-3 h-3" />
+                WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveFilter('web_chat')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg transition-all shrink-0 ${
+                  activeFilter === 'web_chat'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-blue-50 text-blue-900 hover:bg-blue-100'
+                }`}
+              >
+                💬 Web
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveFilter('urgent')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg transition-all shrink-0 ${
+                  activeFilter === 'urgent'
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : 'bg-rose-50 text-rose-900 hover:bg-rose-100'
+                }`}
+              >
+                🚨 Urgentes
               </button>
             </div>
           </div>
 
-          {/* Mensajes */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/20">
-            {mainTab === 'aura_ai_history' ? (
-              (() => {
-                const currentSession = auraAiSessions.find(s => s.sessionId === selectedSessionId)
-                const sessionMsgs = currentSession?.messages || []
+          {/* Lista de Conversaciones */}
+          <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+            {loadingPatients ? (
+              <div className="p-8 text-center text-xs text-slate-400">
+                Sincronizando bandeja omnicanal con Supabase...
+              </div>
+            ) : filteredPatients.length === 0 ? (
+              <div className="p-8 text-center space-y-2">
+                <MessageSquare className="w-8 h-8 text-slate-300 mx-auto" />
+                <p className="text-xs font-bold text-slate-700">Sin mensajes en este filtro</p>
+                <p className="text-[11px] text-slate-400">
+                  Las llamadas de voz con Aura IA y chats de WhatsApp se registrarán aquí automáticamente.
+                </p>
+              </div>
+            ) : (
+              filteredPatients.map(patient => {
+                const isSelected = selectedPatientId === patient.id
+                const isUnread = unreadPatients.has(patient.id)
 
-                if (sessionMsgs.length === 0) {
-                  return (
-                    <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-3">
-                      <div className="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-600">
-                        <Sparkles className="w-6 h-6" />
+                return (
+                  <button
+                    key={patient.id}
+                    onClick={() => {
+                      setSelectedPatientId(patient.id)
+                      setUnreadPatients(prev => {
+                        const next = new Set(prev)
+                        next.delete(patient.id)
+                        return next
+                      })
+                    }}
+                    className={`w-full p-3 rounded-2xl text-left transition-all border relative cursor-pointer ${
+                      isSelected
+                        ? 'bg-amber-50/80 border-amber-400 shadow-xs ring-1 ring-amber-300'
+                        : isUnread
+                        ? 'bg-rose-50/90 border-rose-300 shadow-xs ring-2 ring-rose-200'
+                        : 'bg-white border-slate-200/70 hover:bg-slate-50/80'
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      {/* Avatar con Canal */}
+                      <div className="relative shrink-0">
+                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-xs text-white shadow-xs ${
+                          patient.isUrgent ? 'bg-rose-600' : 'bg-[#0F172A]'
+                        }`}>
+                          {patient.name.substring(0, 2).toUpperCase()}
+                        </div>
+                        {/* Badge de Canal */}
+                        <span className={`absolute -bottom-1 -right-1 p-0.5 rounded-full text-[9px] shadow-xs border ${
+                          patient.channel_type === 'voice_call'
+                            ? 'bg-amber-400 text-slate-950 border-amber-300'
+                            : patient.channel_type === 'whatsapp'
+                            ? 'bg-emerald-500 text-white border-emerald-400'
+                            : 'bg-blue-500 text-white border-blue-400'
+                        }`}>
+                          {patient.channel_type === 'voice_call' ? '📞' : patient.channel_type === 'whatsapp' ? '📱' : '💬'}
+                        </span>
                       </div>
-                      <h4 className="text-sm font-bold text-slate-800">Selecciona una sesión de Aura AI</h4>
-                      <p className="text-xs text-slate-500 max-w-sm">
-                        Selecciona cualquier conversación de la lista lateral para inspeccionar el historial completo de mensajes entre el paciente y Aura AI.
-                      </p>
+
+                      {/* Info del Paciente */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-1">
+                          <h4 className="text-xs font-bold text-slate-900 truncate">
+                            {patient.name}
+                          </h4>
+                          <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                            {patient.lastTime}
+                          </span>
+                        </div>
+
+                        {/* Insignia: Paciente Registrado vs Prospecto Nuevo */}
+                        <div className="flex items-center gap-1.5 mt-1">
+                          {patient.isRegistered ? (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-[9px] font-black">
+                              🟢 PACIENTE REGISTRADO
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[9px] font-black">
+                              🟠 PROSPECTO NUEVO
+                            </span>
+                          )}
+
+                          {patient.isUrgent && (
+                            <span className="px-1.5 py-0.2 rounded-md bg-rose-100 text-rose-800 text-[9px] font-black animate-pulse">
+                              🚨 URGENCIA
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Extracto del último mensaje */}
+                        <p className="text-[11px] text-slate-500 mt-1 line-clamp-1 leading-snug">
+                          {patient.lastMessage}
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                )
+              })
+            )}
+          </div>
+        </div>
+
+        {/* =========================================================================
+            PANEL 2 (Central - Columnas 5 a 9): HILO UNIFICADO DE CONVERSACIÓN
+        ========================================================================= */}
+        <div className="col-span-12 md:col-span-5 lg:col-span-5 flex flex-col bg-white h-full overflow-hidden">
+          {/* Header del Hilo */}
+          <div className="p-4 border-b border-slate-200/80 bg-slate-50/50 flex items-center justify-between">
+            {activePatient ? (
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#0F172A] text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                  {activePatient.name.substring(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-slate-900">{activePatient.name}</h3>
+                    <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                      {activePatient.folio}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
+                    <span>{activePatient.phone}</span>
+                    <span>•</span>
+                    <span className="capitalize font-semibold text-amber-700">
+                      Canal: {activePatient.channel_type === 'voice_call' ? '📞 Llamada de Voz' : activePatient.channel_type === 'whatsapp' ? '📱 WhatsApp' : '💬 Chat Web'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <span className="text-xs text-slate-400">Selecciona una conversación</span>
+            )}
+          </div>
+
+          {/* Hilo de Mensajes con Render Especial para Llamadas de Voz */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
+            {currentChatMessages.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-2">
+                <MessageSquare className="w-10 h-10 text-slate-300" />
+                <h4 className="text-sm font-bold text-slate-700">Sin mensajes en este hilo</h4>
+                <p className="text-xs text-slate-400 max-w-xs">
+                  Escribe una respuesta médica o espera la interacción del paciente por voz o chat.
+                </p>
+              </div>
+            ) : (
+              currentChatMessages.map((msg, idx) => {
+                const isVoice = msg.channel_type === 'voice_call' || msg.metadata?.channel_type === 'voice_call' || msg.content.includes('Llamada de Voz')
+                const isDoctor = msg.isOwn || msg.senderRole === 'doctor'
+                const isPrivate = msg.isPrivateNote
+
+                // RENDER ESPECIAL DE LLAMADAS DE VOZ (Contenedor Destacado Profesional)
+                if (isVoice) {
+                  const dialogue = msg.metadata?.dialogue || []
+                  const duration = msg.metadata?.durationSeconds || 45
+                  const reason = msg.metadata?.consultationReason || 'Solicitud de Cita Médica por Voz'
+                  const urgency = msg.metadata?.urgencyLevel || 'Urgente'
+
+                  return (
+                    <div key={msg.id || idx} className="w-full my-3 p-4 rounded-3xl bg-[#0F172A] text-white border-2 border-amber-400/80 shadow-xl space-y-3">
+                      {/* Encabezado de la Tarjeta de Voz */}
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold shadow-xs">
+                            <Phone className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <h4 className="text-xs font-black uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                              📞 Llamada de Voz (Aura AI)
+                            </h4>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              Duración: {Math.floor(duration / 60)}m {duration % 60}s • {msg.time}
+                            </span>
+                          </div>
+                        </div>
+
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                          urgency === 'Urgente'
+                            ? 'bg-rose-500/30 text-rose-300 border border-rose-500/50 animate-pulse'
+                            : 'bg-emerald-500/20 text-emerald-300'
+                        }`}>
+                          🚨 {urgency}
+                        </span>
+                      </div>
+
+                      {/* Motivo de Consulta Sintetizado */}
+                      <div className="bg-slate-900/90 p-3 rounded-2xl border border-white/5 space-y-1">
+                        <p className="text-xs text-slate-300">
+                          🎯 <strong>Motivo Identificado:</strong> <span className="text-white font-bold">{reason}</span>
+                        </p>
+                        {msg.metadata?.summary && (
+                          <p className="text-[11px] text-slate-400 pt-1 leading-snug">
+                            {msg.metadata.summary}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Diálogo / Transcripción Completa */}
+                      <div className="space-y-2 pt-1">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                          Transcripción Completa del Diálogo:
+                        </span>
+                        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                          {dialogue.length > 0 ? (
+                            dialogue.map((turn, tIdx) => (
+                              <div
+                                key={tIdx}
+                                className={`p-2 rounded-xl text-xs leading-relaxed ${
+                                  turn.role === 'user'
+                                    ? 'bg-slate-800/80 border border-slate-700 text-slate-200'
+                                    : 'bg-amber-400/10 border border-amber-400/30 text-amber-200'
+                                }`}
+                              >
+                                <span className="font-bold block text-[10px] opacity-75 uppercase">
+                                  {turn.role === 'user' ? (msg.metadata?.patientName || activePatient?.name || 'Paciente') : 'Aura AI'}:
+                                </span>
+                                {turn.text}
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-xs text-slate-300 italic p-2.5 bg-slate-800/60 rounded-xl">
+                              &ldquo;{msg.content}&rdquo;
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )
                 }
 
-                return sessionMsgs.map((msg: any) => {
-                  const isUser = msg.sender === 'user'
-                  return (
-                    <div key={msg.id} className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 shadow-2xs ${
-                        isUser ? 'bg-amber-400 text-slate-950' : 'bg-cyan-700 text-white'
-                      }`}>
-                        {isUser ? 'PAC' : 'AI'}
-                      </div>
-                      <div className={`max-w-[78%] space-y-1 ${isUser ? 'items-end' : ''}`}>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[11px] font-bold text-slate-700 pl-1">
-                            {isUser ? (msg.patientName || 'Paciente') : 'Aura AI (Asistente Virtual)'}
-                          </span>
-                        </div>
-                        <div className={`px-4 py-2.5 rounded-2xl text-xs leading-relaxed shadow-2xs whitespace-pre-wrap ${
-                          isUser
-                            ? 'bg-slate-900 text-white rounded-tr-xs'
-                            : 'bg-white text-slate-900 border border-slate-200/80 rounded-tl-xs'
-                        }`}>
-                          {msg.messageText}
-                        </div>
-                        <div className={`flex items-center gap-1 text-[10px] text-slate-400 ${isUser ? 'justify-end pr-1' : 'pl-1'}`}>
-                          <span>{msg.timestamp} hrs</span>
-                          {isUser && <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })
-              })()
-            ) : ((mainTab === 'external' ? messages[selectedPatientId] : messages[`internal-${internalTab}`]) || []).length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400">
-                  <MessageSquare className="w-6 h-6" />
-                </div>
-                <h4 className="text-sm font-bold text-slate-800">Canal en Blanco (Sin Mensajes)</h4>
-                <p className="text-xs text-slate-500 max-w-sm">
-                  {mainTab === 'external'
-                    ? activePatient
-                      ? `Inicia la conversación clínica directa con ${activePatient.name}. Los mensajes se sincronizan en tiempo real.`
-                      : 'No hay paciente seleccionado. Elige un paciente del directorio izquierdo o da de alta uno nuevo.'
-                    : 'Canal interno de comunicación clínica. Escribe un mensaje para coordinar con el equipo dental.'}
-                </p>
-              </div>
-            ) : (
-              (messages[mainTab === 'external' ? selectedPatientId : `internal-${internalTab}`] || []).map(msg => (
-                <div key={msg.id} className={`flex gap-3 ${msg.isOwn ? 'flex-row-reverse' : ''}`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 shadow-2xs ${
-                    msg.isOwn ? 'bg-amber-400 text-slate-950' : 'bg-[#202D4C] text-white'
-                  }`}>
-                    {msg.senderInitials}
-                  </div>
-                  <div className={`max-w-[75%] space-y-1 ${msg.isOwn ? 'items-end' : ''}`}>
-                    <div className="flex items-center gap-2">
-                      {!msg.isOwn && (
-                        <span className="text-[11px] font-bold text-slate-700 pl-1">{msg.senderName}</span>
-                      )}
-                      {msg.isCascadeNotice && (
-                        <span className="text-[9px] font-bold bg-amber-100 text-amber-900 border border-amber-200 px-1.5 py-0.2 rounded-md">
-                          Difusión en Conjunto
+                // BURBUJAS DE MENSAJES ORDINARIOS (Doctor o Paciente)
+                return (
+                  <div
+                    key={msg.id || idx}
+                    className={`flex flex-col ${isDoctor ? 'items-end' : 'items-start'}`}
+                  >
+                    <div className="flex items-center gap-1.5 mb-1 px-1">
+                      <span className="text-[10px] font-bold text-slate-400">
+                        {msg.senderName}
+                      </span>
+                      <span className="text-[9px] text-slate-400 font-mono">
+                        {msg.time}
+                      </span>
+                      {isPrivate && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-200 flex items-center gap-0.5">
+                          <Lock className="w-2.5 h-2.5" /> Nota Privada
                         </span>
                       )}
                     </div>
-                    {msg.content.includes('[Llamada Finalizada]') || msg.content.includes('[Llamada de Voz con') ? (
-                      <div className="bg-[#0f172a] border-2 border-amber-400/80 rounded-2xl p-4 text-white space-y-3 shadow-lg">
-                        <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                          <span className="text-[11px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                            <Sparkles className="w-3.5 h-3.5" /> Ficha de Triaje IA • Llamada de Voz
-                          </span>
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">
-                            Paciente Registrado
-                          </span>
-                        </div>
 
-                        <div className="space-y-1.5 text-xs">
-                          <p className="text-slate-300">
-                            👤 <strong className="text-white">Paciente:</strong> {activePatient?.name || 'Ricardo Sánchez'} ({activePatient?.phone || '55 2242 7769'})
-                          </p>
-                          <p className="text-slate-300">
-                            📌 <strong className="text-white">Motivo Principal:</strong> Solicitud de Cita Odontológica / Consulta de Valoración
-                          </p>
-                          <p className="text-amber-300 font-semibold">
-                            🕒 <strong className="text-white">Horario Propuesto:</strong> Mañana 11:30 AM (Sede Chalma de Guadalupe)
-                          </p>
-                          <div className="p-2.5 rounded-xl bg-slate-900/90 border border-white/10 text-[11px] text-slate-300 italic">
-                            {msg.content.replace(/^🎙️\s*\[.*?\]:?/, '').trim()}
-                          </div>
-                        </div>
-
-                        {/* Botones de Acción Rápida para la Dra. Aura */}
-                        <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-white/10">
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              playTone('message')
-                              const confirmText = `¡Hola ${activePatient?.name || 'Ricardo'}! He revisado tu solicitud de cita por voz. Tu horario ha quedado CONFIRMADO para mañana a las 11:30 AM en nuestra Sede Chalma de Guadalupe. Te esperamos puntualmente.`
-                              setInputMessage(confirmText)
-                            }}
-                            className="flex-1 min-w-[140px] px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs text-center transition-all shadow-md active:scale-95"
-                          >
-                            ✓ Aprobar Horario (11:30 AM)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              playTone('message')
-                              const adjustText = `¡Hola ${activePatient?.name || 'Ricardo'}! Recibí tu solicitud. ¿Te funcionaría mejor a las 04:00 PM o prefieres en horario matutino a las 10:00 AM?`
-                              setInputMessage(adjustText)
-                            }}
-                            className="flex-1 min-w-[130px] px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs text-center transition-all shadow-md active:scale-95"
-                          >
-                            ✏️ Ajustar Horario
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className={`px-4 py-2.5 rounded-2xl text-xs leading-relaxed shadow-2xs ${
-                        msg.isOwn
-                          ? 'bg-slate-900 text-white rounded-tr-xs'
-                          : 'bg-white text-slate-900 border border-slate-200/80 rounded-tl-xs'
-                      }`}>
-                        {msg.content}
-                      </div>
-                    )}
-                    <div className={`flex items-center gap-1 text-[10px] text-slate-400 ${msg.isOwn ? 'justify-end pr-1' : 'pl-1'}`}>
-                      <span>{msg.time}</span>
-                      {msg.isOwn && <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />}
+                    <div
+                      className={`max-w-[85%] rounded-2xl px-4 py-3 text-xs leading-relaxed shadow-xs ${
+                        isPrivate
+                          ? 'bg-amber-50 border-2 border-amber-300 text-amber-950 font-medium'
+                          : isDoctor
+                          ? 'bg-[#0F172A] text-white rounded-br-xs'
+                          : 'bg-white border border-slate-200 text-slate-800 rounded-bl-xs'
+                      }`}
+                    >
+                      {msg.content}
                     </div>
                   </div>
-                </div>
-              ))
+                )
+              })
             )}
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Barra de Entrada y Destinatarios Dinámicos */}
-          <div className="p-4 border-t border-slate-200/80 bg-white">
-            {mainTab === 'external' && selectedRecipients.length > 0 && (
-              <div className="mb-2 p-2 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-between text-xs">
-                <span className="text-amber-950 font-medium">
-                  Enviando en conjunto a: <strong>{selectedRecipients.join(', ')}</strong>
-                </span>
-                <button
-                  type="button"
-                  onClick={clearSelection}
-                  className="text-amber-800 hover:underline font-bold text-xs"
-                >
-                  Limpiar selección
-                </button>
-              </div>
-            )}
-
+          {/* Editor Inferior con Selector de Respuesta / Nota Privada */}
+          <div className="p-3 border-t border-slate-200/80 bg-white space-y-2">
+            {/* Selector: Respuesta al Paciente vs Nota Privada Interna */}
             <div className="flex items-center gap-2">
-              <button type="button" className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100">
-                <Paperclip className="w-4 h-4" />
+              <button
+                type="button"
+                onClick={() => setIsPrivateNote(false)}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                  !isPrivateNote
+                    ? 'bg-[#0F172A] text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                💬 Respuesta al Paciente
               </button>
+              <button
+                type="button"
+                onClick={() => setIsPrivateNote(true)}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  isPrivateNote
+                    ? 'bg-amber-400 text-slate-950 shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                <Lock className="w-3 h-3" />
+                Nota Privada Interna
+              </button>
+            </div>
+
+            <form onSubmit={handleSendMessage} className="flex items-center gap-2">
               <input
                 value={inputMessage}
                 onChange={e => setInputMessage(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
                 placeholder={
-                  selectedRecipients.length > 0
-                    ? `Enviar mensaje grupal a ${selectedRecipients.length} personas...`
-                    : activePatient
-                    ? `Escribe un mensaje para ${activePatient.name}...`
-                    : 'Escribe un mensaje para el canal...'
+                  isPrivateNote
+                    ? 'Escribe una nota interna para el equipo médico (no visible al paciente)...'
+                    : `Responder a ${activePatient?.name || 'paciente'} por WhatsApp o Chat Web...`
                 }
-                className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200/80 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-white placeholder:text-slate-400"
+                className={`flex-1 px-4 py-2.5 rounded-2xl border text-xs focus:outline-none transition-all ${
+                  isPrivateNote
+                    ? 'bg-amber-50/70 border-amber-300 text-amber-950 focus:ring-2 focus:ring-amber-400 placeholder:text-amber-800/50'
+                    : 'bg-slate-50 border-slate-200 text-slate-900 focus:ring-2 focus:ring-[#0F172A] focus:bg-white'
+                }`}
               />
+
               <button
-                type="button"
-                onClick={handleSendMessage}
-                disabled={!inputMessage.trim()}
-                className="p-2.5 rounded-xl bg-amber-400 text-slate-950 hover:bg-amber-300 transition-colors disabled:opacity-40 shadow-xs"
+                type="submit"
+                disabled={sendingMessage || !inputMessage.trim()}
+                className={`px-4 py-2.5 rounded-2xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95 disabled:opacity-40 cursor-pointer ${
+                  isPrivateNote
+                    ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+                    : 'bg-[#0F172A] hover:bg-slate-800 text-white'
+                }`}
               >
-                <Send className="w-4 h-4" />
+                <Send className="w-3.5 h-3.5" />
+                <span>Enviar</span>
               </button>
-            </div>
+            </form>
           </div>
         </div>
 
         {/* =========================================================================
-            COLUMNA DERECHA: SELECCIÓN DINÁMICA DE RED, FAMILIA Y CHECKBOXES
+            PANEL 3 (Derecho - Columnas 10 a 12): FICHA CLÍNICA & ACCIONES RÁPIDAS
         ========================================================================= */}
-        {mainTab === 'external' && (
-          <div className="w-88 p-5 space-y-5 overflow-y-auto bg-slate-50/70 shrink-0 border-l border-slate-200/80 hidden xl:block">
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 block mb-1">
-                Ficha de Red Relacional &amp; Familias
-              </span>
-              <h4 className="text-sm font-bold text-slate-900">Selección Dinámica de Destinatarios</h4>
-            </div>
-
-            {!activePatient ? (
-              <div className="p-6 text-center space-y-2 bg-white rounded-xl border border-slate-200">
-                <Users className="w-8 h-8 text-slate-300 mx-auto" />
-                <p className="text-xs font-bold text-slate-700">Sin paciente activo</p>
-                <p className="text-[11px] text-slate-500">
-                  Selecciona un paciente del directorio para visualizar sus contactos de emergencia o familiares asociados.
-                </p>
-              </div>
-            ) : (
-              <>
-                {/* Origen / Embajador */}
-                <div className="p-4 rounded-xl bg-white border border-slate-200/80 space-y-1.5 shadow-2xs">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Origen / Registro</span>
-                  <div className="flex items-center gap-2.5 pt-0.5">
-                    <div className="w-8 h-8 rounded-lg bg-amber-400 text-slate-950 font-bold text-xs flex items-center justify-center">
-                      {activePatient.name.substring(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold text-slate-900 block">{activePatient.name}</span>
-                      <span className="text-[10px] text-slate-500 font-mono">Folio: AUD-{activePatient.id.slice(0, 6).toUpperCase()}</span>
-                    </div>
-                  </div>
+        <div className="col-span-12 md:col-span-3 lg:col-span-3 flex flex-col bg-slate-50/60 h-full overflow-y-auto p-4 space-y-5">
+          {activePatient ? (
+            <>
+              {/* Resumen del Perfil */}
+              <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs text-center space-y-2">
+                <div className="w-16 h-16 rounded-2xl bg-[#0F172A] text-white flex items-center justify-center font-black text-xl mx-auto shadow-sm">
+                  {activePatient.name.substring(0, 2).toUpperCase()}
                 </div>
-
-                {/* 1. Contacto Familiar / Emergencia con Checkboxes */}
-                <div className="p-4 rounded-xl bg-white border border-slate-200/80 space-y-3 shadow-2xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-900">Contactos Registrados ({activePatient.familyMembers.length})</span>
-                    {activePatient.familyMembers.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={selectAllFamily}
-                        className="text-[11px] font-bold text-amber-800 hover:underline"
-                      >
-                        Seleccionar Todo
-                      </button>
-                    )}
-                  </div>
-
-                  {activePatient.familyMembers.length === 0 ? (
-                    <div className="p-3 bg-slate-50 rounded-lg text-slate-400 text-xs text-center">
-                      Sin familiares o contacto de emergencia registrado
-                    </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">{activePatient.name}</h3>
+                  <span className="text-[10px] font-mono font-bold text-slate-500 block">
+                    Folio: {activePatient.folio}
+                  </span>
+                </div>
+                <div className="pt-1">
+                  {activePatient.isRegistered ? (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 text-[10px] font-black">
+                      🟢 Paciente Registrado
+                    </span>
                   ) : (
-                    <div className="space-y-2">
-                      {activePatient.familyMembers.map(m => {
-                        const isChecked = selectedRecipients.includes(m.name)
-                        return (
-                          <div
-                            key={m.id}
-                            onClick={() => toggleRecipient(m.name)}
-                            className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2 ${
-                              isChecked ? 'bg-amber-50/70 border-amber-300' : 'bg-slate-50 border-slate-200 hover:bg-slate-100/60'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2.5">
-                              {isChecked ? (
-                                <CheckSquare className="w-4 h-4 text-amber-600" />
-                              ) : (
-                                <Square className="w-4 h-4 text-slate-400" />
-                              )}
-                              <div>
-                                <span className="text-xs font-bold text-slate-900 block">{m.name}</span>
-                                <span className="text-[10px] text-slate-500">{m.relationship} • {m.lastVisit}</span>
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-black">
+                      🟠 Prospecto Nuevo
+                    </span>
                   )}
                 </div>
-              </>
-            )}
-          </div>
-        )}
+              </div>
+
+              {/* Datos de Contacto */}
+              <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3">
+                <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-400">
+                  Datos de Contacto
+                </h4>
+                <div className="space-y-2 text-xs">
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Teléfono Principal:</span>
+                    <span className="font-mono font-bold text-slate-800">{activePatient.phone}</span>
+                  </div>
+                  {activePatient.emergencyContact && (
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Contacto de Emergencia:</span>
+                      <span className="font-medium text-slate-700">{activePatient.emergencyContact}</span>
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-slate-400 block text-[10px]">Sede de Atención:</span>
+                    <span className="font-medium text-slate-700">Sucursal Valbuena (Matriz)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Acciones Clínicas Directas */}
+              <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5">
+                <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-400">
+                  Acciones Rápidas
+                </h4>
+
+                <Link
+                  href={`/dashboard/calendar?patientId=${encodeURIComponent(activePatient.id)}`}
+                  className="w-full flex items-center justify-between p-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 text-xs font-bold transition-all cursor-pointer"
+                >
+                  <span className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-amber-600" />
+                    Agendar Cita
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-amber-500" />
+                </Link>
+
+                <Link
+                  href={activePatient.isRegistered ? `/dashboard/expediente?patientId=${encodeURIComponent(activePatient.id)}` : `/dashboard/pacientes`}
+                  className="w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-all cursor-pointer"
+                >
+                  <span className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-slate-600" />
+                    Abrir Expediente
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    playTone('message')
+                    alert(`El caso de ${activePatient.name} ha sido marcado como atendido y resuelto.`)
+                  }}
+                  className="w-full flex items-center justify-between p-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 text-xs font-bold transition-all cursor-pointer"
+                >
+                  <span className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    Marcar como Resuelto
+                  </span>
+                  <CheckCheck className="w-4 h-4 text-emerald-500" />
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="p-6 text-center text-xs text-slate-400">
+              Selecciona un paciente para ver su ficha clínica.
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

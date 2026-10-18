@@ -411,13 +411,13 @@ export function AuraVoiceWidget({ className = '', defaultOpen = false }: AuraVoi
               </p>
             </div>
 
-            {/* Controles de Llamada y Micrófono */}
-            <div className="flex items-center gap-3 pt-1">
+              {/* Controles de Llamada y Micrófono */}
+            <div className="flex items-center gap-3 pt-1 w-full max-w-xs">
               {isConnected ? (
                 <>
                   <button
                     onClick={() => setMicMuted(!micMuted)}
-                    className={`p-3 rounded-full border transition-all ${
+                    className={`p-3 rounded-2xl border transition-all ${
                       micMuted
                         ? 'bg-rose-500/20 border-rose-400 text-rose-300 hover:bg-rose-500/30'
                         : 'bg-emerald-500/20 border-emerald-400 text-emerald-300 hover:bg-emerald-500/30'
@@ -429,7 +429,7 @@ export function AuraVoiceWidget({ className = '', defaultOpen = false }: AuraVoi
 
                   <button
                     onClick={handleToggleCall}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-lg shadow-rose-600/40 transition-all"
+                    className="flex-1 flex items-center justify-center gap-2 py-3.5 px-5 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-lg shadow-rose-600/30 transition-all"
                   >
                     <PhoneOff className="w-4 h-4" />
                     Finalizar Llamada
@@ -439,9 +439,9 @@ export function AuraVoiceWidget({ className = '', defaultOpen = false }: AuraVoi
                 <button
                   disabled={isConnecting}
                   onClick={handleToggleCall}
-                  className="flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-bold text-xs shadow-lg shadow-amber-400/30 transition-all hover:scale-105 disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2.5 py-3.5 px-6 rounded-2xl bg-[#202D4C] hover:bg-[#2A3A60] border border-amber-400/40 text-white font-bold text-xs shadow-lg transition-all hover:scale-[1.01] active:scale-95 disabled:opacity-50"
                 >
-                  <PhoneCall className="w-4 h-4" />
+                  <PhoneCall className="w-4 h-4 text-amber-400" />
                   {isConnecting ? 'Conectando con Aura...' : 'Iniciar Conversación de Voz'}
                 </button>
               )}
