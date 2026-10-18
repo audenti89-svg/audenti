@@ -102,6 +102,7 @@ export function ChatInterface() {
   // Mensajería dinámica
   const [inputMessage, setInputMessage] = useState('')
   const [messages, setMessages] = useState<Record<string, Message[]>>({})
+  const [unreadPatients, setUnreadPatients] = useState<Set<string>>(new Set())
 
   // Historial de Conversaciones de Aura AI (CRM Directo)
   const [auraAiSessions, setAuraAiSessions] = useState<any[]>([])
@@ -268,6 +269,13 @@ export function ChatInterface() {
             ...prev,
             [payload.targetPatientId]: [...(prev[payload.targetPatientId] || []), incomingMsg]
           }))
+
+          // Si el paciente no es el que actualmente está seleccionado con el chat abierto, o para dar alerta visible
+          setUnreadPatients(prev => {
+            const next = new Set(prev)
+            next.add(payload.targetPatientId)
+            return next
+          })
         }
       })
       .subscribe()
@@ -465,30 +473,59 @@ export function ChatInterface() {
                     .filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.phone.includes(searchTerm))
                     .map(p => {
                       const isSelected = selectedPatientId === p.id
+                      const isUnread = unreadPatients.has(p.id)
                       return (
                         <button
                           key={p.id}
-                          onClick={() => { setSelectedPatientId(p.id); setSelectedRecipients([]); }}
-                          className={`w-full flex items-start gap-3 p-3 rounded-xl text-left transition-all ${
-                            isSelected ? 'bg-amber-100/70 border border-amber-300 shadow-2xs' : 'hover:bg-white border border-transparent'
+                          onClick={() => {
+                            setSelectedPatientId(p.id);
+                            setSelectedRecipients([]);
+                            setUnreadPatients(prev => {
+                              const next = new Set(prev)
+                              next.delete(p.id)
+                              return next
+                            })
+                          }}
+                          className={`w-full flex items-start gap-3 p-3 rounded-xl text-left transition-all relative ${
+                            isUnread
+                              ? 'bg-rose-50/90 border-2 border-rose-400 shadow-md ring-2 ring-rose-200'
+                              : isSelected
+                              ? 'bg-amber-100/70 border border-amber-300 shadow-2xs'
+                              : 'hover:bg-white border border-transparent'
                           }`}
                         >
-                          <div className="w-10 h-10 rounded-xl bg-[#202D4C] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                          <div className={`w-10 h-10 rounded-xl text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs ${
+                            isUnread ? 'bg-rose-600 animate-pulse' : 'bg-[#202D4C]'
+                          }`}>
                             {p.name.substring(0, 2).toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-bold text-slate-900 truncate">{p.name}</span>
-                              {p.familyMembers.length > 0 && (
+                              {isUnread ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] text-white font-bold bg-rose-600 px-2 py-0.5 rounded-full shadow-xs animate-bounce">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
+                                  Nuevo
+                                </span>
+                              ) : p.familyMembers.length > 0 ? (
                                 <span className="text-[10px] text-amber-800 font-bold bg-amber-50 px-1.5 rounded">
                                   {p.familyMembers.length} contactos
                                 </span>
-                              )}
+                              ) : null}
                             </div>
                             <span className="text-[11px] text-slate-500 block">{p.phone}</span>
-                            <div className="flex items-center gap-1.5 mt-1 text-[10px] text-emerald-700 font-bold">
-                              <TrendingUp className="w-3 h-3" />
-                              <span>Expediente Activo</span>
+                            <div className="flex items-center gap-1.5 mt-1 text-[10px] font-bold">
+                              {isUnread ? (
+                                <span className="text-rose-600 flex items-center gap-1">
+                                  <Radio className="w-3 h-3 animate-spin" />
+                                  ¡Mensaje entrante pendiente!
+                                </span>
+                              ) : (
+                                <span className="text-emerald-700 flex items-center gap-1">
+                                  <TrendingUp className="w-3 h-3" />
+                                  Expediente Activo
+                                </span>
+                              )}
                             </div>
                           </div>
                         </button>

@@ -33,6 +33,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { PublicAiChatWidget } from '@/components/ai/PublicAiChatWidget'
 import { SmileAuditTool } from '@/components/landing/SmileAuditTool'
 import { SeniorAccessibilityBanner } from '@/components/ui/SeniorAccessibilityBanner'
+import { AuraVoiceWidget } from '@/components/voice/AuraVoiceWidget'
 
 // ASSETS OFICIALES OBLIGATORIOS
 const ASSETS = {
@@ -1307,6 +1308,9 @@ export default function LandingPage() {
         onClose={() => setAuthModalOpen(false)}
         defaultMode={authMode}
       />
+
+      {/* Widget de Asistencia por Voz Aura IA (Fish Audio Streaming) */}
+      <AuraVoiceWidget className="bottom-24 right-6" />
 
       {/* Widget de Conversión IA Pública (Llama 3.1 8B Groq) */}
       <PublicAiChatWidget />

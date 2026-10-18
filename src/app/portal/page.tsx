@@ -30,6 +30,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import PatientOdontogram from '@/components/PatientOdontogram';
 import { PatientDirectChatWidget } from '@/components/chat/PatientDirectChatWidget';
+import { AuraVoiceWidget } from '@/components/voice/AuraVoiceWidget';
 
 // Constantes oficiales de Sedes y Sedes Clínicas Audenti
 const BRANCH_DETAILS: Record<string, { name: string; address: string; mapUrl: string; hours: string; phone: string }> = {
@@ -498,7 +499,10 @@ export default function PatientPortalPage() {
           </div>
         </div>
 
-        {/* 6. WIDGET DE CHAT DIRECTO EN TIEMPO REAL CON LA DRA. AURA Y RECEPCIÓN */}
+        {/* 6. WIDGET DE ASISTENCIA POR VOZ DE AURA IA (FISH AUDIO) */}
+        <AuraVoiceWidget className="bottom-24 right-6" />
+
+        {/* 7. WIDGET DE CHAT DIRECTO EN TIEMPO REAL CON LA DRA. AURA Y RECEPCIÓN */}
         <PatientDirectChatWidget
           patient={{
             id: patient?.id,

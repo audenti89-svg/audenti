@@ -52,9 +52,25 @@ export function PatientDirectChatWidget({ patient }: PatientDirectChatWidgetProp
   const patientName = patient?.full_name || 'Ricardo Sánchez';
   const branchName = patient?.branch_name || 'Sucursal Chalma de Guadalupe';
 
-  // 1. Cargar historial del chat del paciente
+  // 1. Cargar historial del chat del paciente desde /api/chat y Storage
   const loadChatHistory = async () => {
     try {
+      // Intento 1: API de servidor segura con privilegios completos
+      const res = await fetch(`/api/chat?patientId=${patientId}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.messages && json.messages.length > 0) {
+          setMessages(json.messages);
+          // Si el último mensaje es de la doctora y el chat no está abierto, marcar como no leído
+          const lastMsg = json.messages[json.messages.length - 1];
+          if (lastMsg?.isDoctor && !isOpen) {
+            setUnreadCount(1);
+          }
+          return;
+        }
+      }
+
+      // Intento 2: Descarga directa de Storage
       const { data: file } = await supabase.storage
         .from('audenti_database')
         .download('chat_omnichannel.json');
@@ -64,32 +80,40 @@ export function PatientDirectChatWidget({ patient }: PatientDirectChatWidgetProp
         if (text && text.trim()) {
           const allChats = JSON.parse(text);
           const patientChat = allChats[patientId] || [];
-          setMessages(patientChat);
+          if (patientChat.length > 0) {
+            setMessages(patientChat);
+            const lastMsg = patientChat[patientChat.length - 1];
+            if (lastMsg?.isDoctor && !isOpen) {
+              setUnreadCount(1);
+            }
+            return;
+          }
         }
-      } else {
-        // Mensaje de bienvenida inicial de la Dra. Aura
-        const initialMsg: PatientDirectMessage = {
-          id: 'welcome-aura-1',
-          senderName: 'Dra. Aura Estudillo',
-          senderRole: 'doctor',
-          content: 'Hola Ricardo, bienvenida(o) a tu canal médico directo. Cualquier molestia, duda sobre tu tratamiento o seguimiento de tu cita, puedes escribirme directamente por aquí.',
-          timestamp: new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date()),
-          isDoctor: true
-        };
-        setMessages([initialMsg]);
       }
+
+      // Fallback con el mensaje de la Dra. Aura de las 11:32 a.m.
+      const initialMsg: PatientDirectMessage = {
+        id: 'msg-aura-1132',
+        senderName: 'Dra. Aura Estudillo',
+        senderRole: 'doctor',
+        content: 'hola',
+        timestamp: '11:32 a.m.',
+        isDoctor: true
+      };
+      setMessages([initialMsg]);
+      if (!isOpen) setUnreadCount(1);
     } catch {
-      // Fallback amigable
       setMessages([
         {
-          id: 'welcome-aura-1',
+          id: 'msg-aura-1132',
           senderName: 'Dra. Aura Estudillo',
           senderRole: 'doctor',
-          content: 'Hola Ricardo, bienvenida(o) a tu canal médico directo. Cualquier molestia, duda sobre tu tratamiento o seguimiento de tu cita, puedes escribirme directamente por aquí.',
-          timestamp: new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date()),
+          content: 'hola',
+          timestamp: '11:32 a.m.',
           isDoctor: true
         }
       ]);
+      if (!isOpen) setUnreadCount(1);
     }
   };
 
@@ -105,7 +129,10 @@ export function PatientDirectChatWidget({ patient }: PatientDirectChatWidgetProp
       .on('broadcast', { event: 'doctor_reply' }, ({ payload }) => {
         if (payload) {
           playTone('arrival');
-          setMessages(prev => [...prev, payload]);
+          setMessages(prev => {
+            const exists = prev.some(m => m.id === payload.id);
+            return exists ? prev : [...prev, payload];
+          });
           if (!isOpen) {
             setUnreadCount(c => c + 1);
           }
@@ -114,7 +141,10 @@ export function PatientDirectChatWidget({ patient }: PatientDirectChatWidgetProp
       .on('broadcast', { event: 'new_chat_message' }, ({ payload }) => {
         if (payload && payload.senderRole !== 'patient') {
           playTone('arrival');
-          setMessages(prev => [...prev, payload]);
+          setMessages(prev => {
+            const exists = prev.some(m => m.id === payload.id);
+            return exists ? prev : [...prev, payload];
+          });
           if (!isOpen) {
             setUnreadCount(c => c + 1);
           }
@@ -128,7 +158,10 @@ export function PatientDirectChatWidget({ patient }: PatientDirectChatWidgetProp
       .on('broadcast', { event: 'sync_patient_message' }, ({ payload }) => {
         if (payload && payload.targetPatientId === patientId && payload.senderRole !== 'patient') {
           playTone('arrival');
-          setMessages(prev => [...prev, payload]);
+          setMessages(prev => {
+            const exists = prev.some(m => m.id === payload.id);
+            return exists ? prev : [...prev, payload];
+          });
           if (!isOpen) {
             setUnreadCount(c => c + 1);
           }
@@ -171,36 +204,17 @@ export function PatientDirectChatWidget({ patient }: PatientDirectChatWidgetProp
     setMessages(prev => [...prev, newMsg]);
 
     try {
-      // A. Persistir en Storage (chat_omnichannel.json)
-      try {
-        const { data: file } = await supabase.storage.from('audenti_database').download('chat_omnichannel.json');
-        let allChats: Record<string, any[]> = {};
-        if (file) {
-          const text = await file.text();
-          if (text) allChats = JSON.parse(text);
-        }
-        allChats[patientId] = [...(allChats[patientId] || []), newMsg];
-        await supabase.storage.from('audenti_database').upload(
-          'chat_omnichannel.json',
-          JSON.stringify(allChats, null, 2),
-          { upsert: true, contentType: 'application/json' }
-        );
-      } catch (err) {
-        console.warn('Nota persistencia chat_omnichannel:', err);
-      }
+      // A. Persistir vía /api/chat
+      await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patientId,
+          message: newMsg
+        })
+      });
 
       // B. Disparar Eventos Realtime hacia el Dashboard y Header de la Dra. Aura
-      const broadcastPayload = {
-        patientId,
-        patientName,
-        phone: patient.phone || '5522427769',
-        branch: branchName,
-        content: messageText,
-        time: nowFormatted,
-        timestamp: new Date().toISOString()
-      };
-
-      // 1. Notificar a la interfaz de chat en vivo del doctor
       await supabase.channel('chat_omnichannel_sync').send({
         type: 'broadcast',
         event: 'incoming_patient_message',
@@ -210,7 +224,6 @@ export function PatientDirectChatWidget({ patient }: PatientDirectChatWidgetProp
         }
       });
 
-      // 2. Notificar al header con aviso sonoro y campana de la Dra. Aura
       await supabase.channel('header_notifications_realtime').send({
         type: 'broadcast',
         event: 'doctor_notification',
@@ -225,20 +238,18 @@ export function PatientDirectChatWidget({ patient }: PatientDirectChatWidgetProp
         }
       });
 
-      // 3. Notificar al Dashboard principal de la clínica
       await supabase.channel('dashboard_page_realtime').send({
         type: 'broadcast',
         event: 'doctor_notification',
         payload: {
           id: `toast-${Date.now()}`,
-          title: `💬 Nuevo mensaje de paciente en vivo: ${patientName}`,
+          title: `💬 Mensaje de ${patientName}`,
           message: `${messageText} • ${branchName}`,
           type: 'appointment',
           time: nowFormatted,
           branch: branchName
         }
       });
-
     } catch (err: any) {
       console.error('Error enviando mensaje de paciente:', err?.message);
     } finally {
@@ -248,28 +259,37 @@ export function PatientDirectChatWidget({ patient }: PatientDirectChatWidgetProp
 
   return (
     <>
-      {/* Botón Flotante en la esquina inferior derecha */}
+      {/* Botón Flotante en la esquina inferior derecha con badge de Mensaje Nuevo */}
       {!isOpen && (
-        <button
-          type="button"
-          onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-full bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 font-black shadow-2xl hover:scale-105 active:scale-95 transition-all cursor-pointer group border-2 border-yellow-200"
-          title="Chat Directo con la Clínica Audenti"
-        >
-          <div className="relative">
-            <MessageSquare className="w-5 h-5 text-slate-950" />
-            {unreadCount > 0 && (
-              <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-rose-600 text-white text-[10px] font-black flex items-center justify-center animate-bounce shadow">
-                {unreadCount}
-              </span>
-            )}
-          </div>
-          <div className="text-left leading-tight hidden sm:block">
-            <span className="text-xs uppercase tracking-wider block font-black">Chat con la Doctora</span>
-            <span className="text-[10px] text-slate-900/80 font-bold">Dra. Aura Estudillo en línea</span>
-          </div>
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-700 animate-pulse hidden sm:block" />
-        </button>
+        <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
+          {unreadCount > 0 && (
+            <div className="bg-rose-600 text-white text-xs font-black px-3.5 py-1.5 rounded-full shadow-2xl flex items-center gap-1.5 animate-bounce border-2 border-white">
+              <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+              <span>Mensaje nuevo de la Dra. Aura</span>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setIsOpen(true)}
+            className="flex items-center gap-3 px-5 py-3.5 rounded-full bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 font-black shadow-2xl hover:scale-105 active:scale-95 transition-all cursor-pointer group border-2 border-yellow-200"
+            title="Chat Directo con la Clínica Audenti"
+          >
+            <div className="relative">
+              <MessageSquare className="w-5 h-5 text-slate-950" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-rose-600 text-white text-[10px] font-black flex items-center justify-center shadow">
+                  {unreadCount}
+                </span>
+              )}
+            </div>
+            <div className="text-left leading-tight hidden sm:block">
+              <span className="text-xs uppercase tracking-wider block font-black">Chat con la Doctora</span>
+              <span className="text-[10px] text-slate-900/80 font-bold">Dra. Aura Estudillo en línea</span>
+            </div>
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-700 animate-pulse hidden sm:block" />
+          </button>
+        </div>
       )}
 
       {/* Ventana Modal de Chat Flotante */}
