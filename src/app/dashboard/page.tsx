@@ -21,6 +21,7 @@ import { createClient } from '@/utils/supabase/client'
 import { QuickActions } from '@/components/dashboard/QuickActions'
 import { DoctorLiveTriageAlert } from '@/components/dashboard/DoctorLiveTriageAlert'
 import { useNotificationSound } from '@/hooks/useNotificationSound'
+import { formatDateInMexico } from '@/utils/timezone'
 import Link from 'next/link'
 
 interface ToastAlert {
@@ -112,6 +113,15 @@ export default function DashboardPage() {
         return true
       })
 
+      // FILTRADO ESTRICTO DE FECHA LOCAL (GMT-6 / America/Mexico_City):
+      // Únicamente citas cuya fecha programada sea exactamente hoy (YYYY-MM-DD local).
+      // Si hoy Domingo 18 no hay citas, CITAS DE HOY = 0 (no mezclar con Lunes 19).
+      const todayMexico = formatDateInMexico() // ej. "2026-10-18"
+      const todayAppointmentsList = appList.filter((a: any) => {
+        const appointmentDate = (a.start_time || '').split('T')[0]
+        return appointmentDate === todayMexico
+      })
+
       const inChairAppointment = appList.find((a: any) => a.status === 'in_chair')
       const inWaitingCount = appList.filter((a: any) => a.status === 'in_waiting').length
 
@@ -131,7 +141,7 @@ export default function DashboardPage() {
       }
 
       setKpis({
-        todayAppointments: appList.length,
+        todayAppointments: todayAppointmentsList.length,
         activeInChair: getPatientName(inChairAppointment?.patients) || 'Sin paciente activo',
         inChairProcedure: inChairAppointment?.treatment_type || 'Gabinete preparado',
         dailyRevenue: totalRevenue,
