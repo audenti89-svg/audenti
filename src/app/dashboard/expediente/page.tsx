@@ -16,7 +16,8 @@ import {
   RefreshCw,
   Search,
   Save,
-  X
+  X,
+  HeartPulse
 } from 'lucide-react'
 import { Odontogram } from '@/components/clinical/Odontogram'
 import { FamilyNucleusManager } from '@/components/clinical/FamilyNucleusManager'
@@ -205,6 +206,41 @@ export default function ExpedientePage() {
 
   return (
     <div className="flex flex-col w-full space-y-6 pb-12">
+      {/* ALERTA CLÍNICA DE BIOSEGURIDAD (Prevención de Riesgos de la Dra. Aura) */}
+      <div className="bg-rose-50 border-2 border-rose-400 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-sm animate-pulse">
+            <HeartPulse className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black uppercase tracking-wider text-rose-800 bg-rose-200/80 px-2.5 py-0.5 rounded-full border border-rose-300">
+                ALERTA CLÍNICA DE BIOSEGURIDAD (NOM-004-SSA3)
+              </span>
+              <span className="text-[11px] font-bold text-rose-700">Verificar antes de infiltrar anestesia o recetar</span>
+            </div>
+            <p className="text-sm font-bold text-rose-950 mt-1">
+              {Array.isArray(selectedPatient.allergies_medication) && selectedPatient.allergies_medication.length > 0
+                ? `Alergias Reportadas: ${selectedPatient.allergies_medication.join(', ')}`
+                : (Array.isArray(selectedPatient.allergies) && selectedPatient.allergies.length > 0
+                    ? `Alergias Reportadas: ${selectedPatient.allergies.join(', ')}`
+                    : 'Sin alergias medicamentosas conocidas reportadas por el paciente.')}
+            </p>
+            {selectedPatient.medical_conditions && selectedPatient.medical_conditions.length > 0 && (
+              <p className="text-xs font-semibold text-rose-900 mt-0.5">
+                Condiciones Sistémicas: {Array.isArray(selectedPatient.medical_conditions) ? selectedPatient.medical_conditions.join(', ') : selectedPatient.medical_conditions}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-white/80 border border-rose-200 rounded-xl px-3.5 py-2 text-xs text-rose-900 self-stretch sm:self-auto text-left sm:text-right shrink-0">
+          <span className="text-[10px] uppercase font-bold text-slate-500 block">Contacto de Emergencia</span>
+          <span className="font-bold text-slate-900">{selectedPatient.emergency_contact_name || 'No especificado'}</span>
+          <p className="font-mono text-slate-700 text-[11px]">{selectedPatient.emergency_contact_phone || selectedPatient.emergency_phone || 'Sin teléfono'}</p>
+        </div>
+      </div>
+
       {/* Header con Selector de Pacientes y Botones Funcionales */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>

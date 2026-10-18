@@ -181,19 +181,26 @@ export default function PatientPortalPage() {
 
   return (
     <div className="min-h-screen bg-[#0A0F1D] text-white selection:bg-amber-400 selection:text-slate-950 pb-20">
-      {/* 1. Header Institucional del Portal */}
-      <header className="border-b border-gray-800 bg-[#0d1322]/90 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-8 py-3.5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <AudentiLogo className="w-8 h-8 text-amber-400" />
-          <div>
-            <h1 className="text-base font-black text-white tracking-tight flex items-center gap-2">
-              AUDENTI CLINICAL <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-300 border border-amber-400/30">Portal del Paciente</span>
-            </h1>
-            <p className="text-[11px] text-gray-400">Dra. Aura Estudillo • Céd. Prof. 8492019</p>
+      {/* 1. Header Institucional del Portal Limpio y Sin Amontonamiento */}
+      <header className="border-b border-gray-800 bg-[#0d1322]/95 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-8 py-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <AudentiLogo className="w-9 h-9 text-amber-400 shrink-0" />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-black text-white tracking-tight uppercase">
+                Audenti Clinical
+              </span>
+              <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-400/15 text-amber-300 border border-amber-400/40">
+                Portal del Paciente
+              </span>
+            </div>
+            <p className="text-[11px] text-gray-400 truncate">
+              Dra. Aura Estudillo • Céd. Prof. 8492019
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0 ml-auto sm:ml-0">
           <span className="hidden sm:inline-block text-xs text-gray-400">
             👤 Hola, <strong className="text-white">{patientName.split(' ')[0]}</strong>
           </span>
@@ -207,7 +214,53 @@ export default function PatientPortalPage() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
+      {/* 2. Banner Superior de Bioseguridad Clínica */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4">
+        {Array.isArray(patient?.allergies_medication) && patient.allergies_medication.length > 0 ? (
+          <div className="bg-rose-950/60 border border-rose-500/50 rounded-2xl p-4 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 shrink-0">
+                <HeartPulse className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs font-black uppercase tracking-wider text-rose-300">
+                  Alerta Médica de Alergias Reportadas
+                </p>
+                <p className="text-sm font-bold text-white mt-0.5">
+                  {patient.allergies_medication.join(', ')}
+                </p>
+              </div>
+            </div>
+            <div className="text-xs text-gray-300 bg-rose-900/30 px-3 py-1.5 rounded-xl border border-rose-500/30 self-stretch sm:self-auto text-center sm:text-right">
+              <span className="text-gray-400 text-[10px] block font-bold uppercase">Contacto de Emergencia</span>
+              <strong className="text-white">{patient.emergency_contact_name || 'Familiar'}</strong> • {patient.emergency_phone || patient.emergency_contact_phone || 'Sin número'}
+            </div>
+          </div>
+        ) : (
+          <div className="bg-emerald-950/40 border border-emerald-500/40 rounded-2xl p-3.5 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+                <ShieldCheck className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400">
+                  Bioseguridad Validada
+                </span>
+                <p className="text-xs font-bold text-emerald-200">
+                  Sin alergias reportadas (Paciente Apto para Tratamiento Clínico)
+                </p>
+              </div>
+            </div>
+            <div className="text-xs text-gray-300 flex items-center gap-2">
+              <span className="text-gray-400 text-[11px]">Contacto de Emergencia:</span>
+              <span className="text-white font-semibold">{patient?.emergency_contact_name || 'Registrado'}</span>
+              <span className="text-gray-400">({patient?.emergency_phone || patient?.emergency_contact_phone || patient?.phone || 'Sin teléfono'})</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 space-y-6">
         {/* Banner de Bienvenida y Sincronización de Sede */}
         <div className="bg-[#121824] border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>

@@ -95,30 +95,53 @@ export default function PatientOdontogram({
               className="w-[320px] max-w-full h-auto mx-auto object-contain block select-none pointer-events-none"
             />
 
-            {/* Puntos de interacción sobre piezas 18 a 28 */}
+            {/* Zonas Hotspot con Resplandor Luminoso (Glow) sin números fijos tapa-vistas */}
             {Object.entries(UPPER_TEETH_COORDS).map(([numStr, coords]) => {
               const toothNum = parseInt(numStr, 10);
               const isSelected = selectedTooth === toothNum;
               const hasTreatment = diagnosisMap[toothNum]?.condition && diagnosisMap[toothNum]?.condition !== 'healthy';
 
               return (
-                <button
+                <div
                   key={toothNum}
-                  type="button"
-                  onClick={() => setSelectedTooth(toothNum)}
                   style={{ top: coords.top, left: coords.left }}
-                  className={cn(
-                    'absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 rounded-full text-[10px] font-black transition-all flex items-center justify-center cursor-pointer shadow-md border',
-                    isSelected
-                      ? 'bg-yellow-400 text-slate-950 scale-125 z-20 ring-4 ring-yellow-400/40 border-yellow-300'
-                      : hasTreatment
-                      ? 'bg-blue-600/90 text-white hover:bg-blue-500 border-blue-400 z-10'
-                      : 'bg-emerald-600/80 text-white hover:bg-emerald-500 border-emerald-400 z-0'
-                  )}
-                  title={`Pieza ${toothNum} - ${coords.label}`}
+                  className="absolute -translate-x-1/2 -translate-y-1/2 group z-10"
                 >
-                  {toothNum}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTooth(toothNum)}
+                    className={cn(
+                      'w-7 h-7 sm:w-8 sm:h-8 rounded-full transition-all duration-300 cursor-pointer flex items-center justify-center',
+                      isSelected
+                        ? 'bg-amber-400/50 border-2 border-yellow-300 shadow-[0_0_20px_rgba(251,191,36,0.9)] scale-125 z-30'
+                        : hasTreatment
+                        ? 'bg-blue-500/25 border border-blue-400/80 shadow-[0_0_12px_rgba(59,130,246,0.7)] hover:bg-blue-500/50 hover:scale-115'
+                        : 'bg-emerald-500/20 border border-emerald-400/70 shadow-[0_0_10px_rgba(16,185,129,0.6)] hover:bg-emerald-500/40 hover:scale-115'
+                    )}
+                    aria-label={`Pieza #${toothNum} - ${coords.label}`}
+                  >
+                    <span
+                      className={cn(
+                        'w-2 h-2 rounded-full transition-all',
+                        isSelected
+                          ? 'bg-amber-300 shadow-[0_0_8px_#fde047]'
+                          : hasTreatment
+                          ? 'bg-blue-300/80'
+                          : 'bg-emerald-300/80'
+                      )}
+                    />
+                  </button>
+
+                  {/* Tooltip flotante al pasar el cursor (hover) */}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center pointer-events-none z-40 whitespace-nowrap animate-in fade-in zoom-in-90 duration-150">
+                    <div className="bg-slate-900/95 text-white border border-gray-700 text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-xl flex items-center gap-1.5">
+                      <span className="text-amber-400">Pieza #{toothNum}</span>
+                      <span className="text-gray-400 font-normal">|</span>
+                      <span className="text-gray-300">{coords.label.split(' ')[0]}</span>
+                    </div>
+                    <div className="w-1.5 h-1.5 bg-slate-900 border-r border-b border-gray-700 rotate-45 -mt-1" />
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -137,30 +160,53 @@ export default function PatientOdontogram({
               className="w-[320px] max-w-full h-auto mx-auto object-contain block select-none pointer-events-none"
             />
 
-            {/* Puntos de interacción sobre piezas 48 a 38 */}
+            {/* Zonas Hotspot con Resplandor Luminoso (Glow) sin números fijos tapa-vistas */}
             {Object.entries(LOWER_TEETH_COORDS).map(([numStr, coords]) => {
               const toothNum = parseInt(numStr, 10);
               const isSelected = selectedTooth === toothNum;
               const hasTreatment = diagnosisMap[toothNum]?.condition && diagnosisMap[toothNum]?.condition !== 'healthy';
 
               return (
-                <button
+                <div
                   key={toothNum}
-                  type="button"
-                  onClick={() => setSelectedTooth(toothNum)}
                   style={{ top: coords.top, left: coords.left }}
-                  className={cn(
-                    'absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 rounded-full text-[10px] font-black transition-all flex items-center justify-center cursor-pointer shadow-md border',
-                    isSelected
-                      ? 'bg-yellow-400 text-slate-950 scale-125 z-20 ring-4 ring-yellow-400/40 border-yellow-300'
-                      : hasTreatment
-                      ? 'bg-blue-600/90 text-white hover:bg-blue-500 border-blue-400 z-10'
-                      : 'bg-emerald-600/80 text-white hover:bg-emerald-500 border-emerald-400 z-0'
-                  )}
-                  title={`Pieza ${toothNum} - ${coords.label}`}
+                  className="absolute -translate-x-1/2 -translate-y-1/2 group z-10"
                 >
-                  {toothNum}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTooth(toothNum)}
+                    className={cn(
+                      'w-7 h-7 sm:w-8 sm:h-8 rounded-full transition-all duration-300 cursor-pointer flex items-center justify-center',
+                      isSelected
+                        ? 'bg-amber-400/50 border-2 border-yellow-300 shadow-[0_0_20px_rgba(251,191,36,0.9)] scale-125 z-30'
+                        : hasTreatment
+                        ? 'bg-blue-500/25 border border-blue-400/80 shadow-[0_0_12px_rgba(59,130,246,0.7)] hover:bg-blue-500/50 hover:scale-115'
+                        : 'bg-emerald-500/20 border border-emerald-400/70 shadow-[0_0_10px_rgba(16,185,129,0.6)] hover:bg-emerald-500/40 hover:scale-115'
+                    )}
+                    aria-label={`Pieza #${toothNum} - ${coords.label}`}
+                  >
+                    <span
+                      className={cn(
+                        'w-2 h-2 rounded-full transition-all',
+                        isSelected
+                          ? 'bg-amber-300 shadow-[0_0_8px_#fde047]'
+                          : hasTreatment
+                          ? 'bg-blue-300/80'
+                          : 'bg-emerald-300/80'
+                      )}
+                    />
+                  </button>
+
+                  {/* Tooltip flotante al pasar el cursor (hover) */}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:flex flex-col items-center pointer-events-none z-40 whitespace-nowrap animate-in fade-in zoom-in-90 duration-150">
+                    <div className="bg-slate-900/95 text-white border border-gray-700 text-[11px] font-bold px-2.5 py-1 rounded-lg shadow-xl flex items-center gap-1.5">
+                      <span className="text-amber-400">Pieza #{toothNum}</span>
+                      <span className="text-gray-400 font-normal">|</span>
+                      <span className="text-gray-300">{coords.label.split(' ')[0]}</span>
+                    </div>
+                    <div className="w-1.5 h-1.5 bg-slate-900 border-r border-b border-gray-700 rotate-45 -mt-1" />
+                  </div>
+                </div>
               );
             })}
           </div>

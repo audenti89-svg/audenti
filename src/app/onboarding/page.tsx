@@ -26,6 +26,8 @@ export default function OnboardingPage() {
     emergency_contact_phone: '',
     drug_allergies: '',
     medical_conditions: '',
+    referral_source: 'Recomendación de familiar o amigo',
+    referred_by: '',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -62,6 +64,8 @@ export default function OnboardingPage() {
         medical_conditions: formData.medical_conditions
           ? formData.medical_conditions.split(',').map((s) => s.trim()).filter(Boolean)
           : [],
+        referral_source: formData.referral_source,
+        referred_by: formData.referral_source === 'Recomendación de familiar o amigo' ? formData.referred_by.trim() : null,
         onboarding_completed: true,
       };
 
@@ -311,6 +315,44 @@ export default function OnboardingPage() {
               value={formData.medical_conditions}
               onChange={(e) => setFormData({ ...formData, medical_conditions: e.target.value})}
             />
+          </div>
+
+          {/* 1. CAPTURA DE ORIGEN Y REDES SOCIALES */}
+          <div className="pt-2 border-t border-slate-800 space-y-3">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
+                ¿Cómo te enteraste de nosotros? *
+              </label>
+              <select
+                value={formData.referral_source}
+                onChange={(e) => setFormData({ ...formData, referral_source: e.target.value })}
+                className="w-full bg-[#0d1322] border border-gray-800 rounded-xl px-4 py-3 text-white text-xs font-semibold focus:outline-none focus:border-amber-500 cursor-pointer"
+                required
+              >
+                <option value="Recomendación de familiar o amigo">Recomendación de familiar o amigo</option>
+                <option value="YouTube">YouTube</option>
+                <option value="Facebook">Facebook</option>
+                <option value="Instagram">Instagram</option>
+                <option value="TikTok">TikTok</option>
+                <option value="Búsqueda en Google / Otro">Búsqueda en Google / Otro</option>
+              </select>
+            </div>
+
+            {formData.referral_source === 'Recomendación de familiar o amigo' && (
+              <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                <label className="block text-xs font-bold uppercase tracking-wider text-amber-400 mb-1.5">
+                  ¿Quién te recomendó? (Nombre del paciente o familiar referente) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Carlos Martínez (Hermano / Amigo)"
+                  value={formData.referred_by}
+                  onChange={(e) => setFormData({ ...formData, referred_by: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-amber-500/50 text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition-all text-xs"
+                />
+              </div>
+            )}
           </div>
 
           <button
