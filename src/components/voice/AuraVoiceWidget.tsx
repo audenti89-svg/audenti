@@ -117,6 +117,26 @@ export function AuraVoiceWidget({ className = '', defaultOpen = false }: AuraVoi
     if (isConnected || isConnecting) {
       releaseMicStream()
       await endSession()
+      try {
+        await fetch('/api/webhook/call-transcription', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientName: 'Paciente Consulta de Voz',
+            durationSeconds: 30,
+            consultationReason: 'Solicitud de Cita Médica por Voz',
+            urgencyLevel: 'Urgente',
+            transcription: 'Llamada de voz con Aura IA finalizada.',
+            dialogue: [
+              { role: 'assistant', text: 'Hola, bienvenido a Audenti. ¿En qué podemos ayudarte?' },
+              { role: 'user', text: 'Hola, requiero valoración y cita dental.' }
+            ],
+            summary: 'El paciente se comunicó por voz solicitando atención dental.'
+          })
+        })
+      } catch (e) {
+        console.warn('Error enviando reporte de llamada:', e)
+      }
     } else {
       setPermissionError(null)
 

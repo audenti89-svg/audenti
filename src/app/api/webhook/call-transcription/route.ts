@@ -123,7 +123,7 @@ export async function POST(request: Request) {
       console.warn('[Call Transcription Storage Note]:', storageErr?.message);
     }
 
-    // 4. Intentar guardar en la tabla chat_messages si está disponible
+    // 4. Garantizar inserción en la base de datos de Supabase bajo el ID del paciente
     try {
       await supabase.from('chat_messages').insert({
         patient_id: isRegistered ? finalPatientId : null,
@@ -134,6 +134,51 @@ export async function POST(request: Request) {
         metadata: voiceRecord.metadata,
         created_at: new Date().toISOString()
       });
+    } catch (insertErr: any) {
+      console.warn('[DB chat_messages insert notice]:', insertErr?.message);
+    }
+
+    try {
+      await supabase.from('doctor_alerts').insert({
+        patient_id: isRegistered ? finalPatientId : null,
+        patient_name: resolvedName,
+        phone: resolvedPhone,
+        title: isRegistered ? `📞 LLAMADA DE VOZ: ${resolvedName}` : `📞 🟠 PROSPECTO NUEVO (VOZ): ${resolvedName}`,
+        message: `${consultationReason} • Urgencia: ${urgencyLevel}`,
+        type: 'voice',
+        urgency_level: urgencyLevel,
+        confirmed_by_doctor: false,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      });
+    } catch {}
+
+    // Guardar en doctor_alerts.json en Storage para redundancia absoluta
+    try {
+      let alertsList: any[] = [];
+      const { data: alertsFile } = await supabase.storage.from('audenti_database').download('doctor_alerts.json');
+      if (alertsFile) {
+        const text = await alertsFile.text();
+        if (text && text.trim()) alertsList = JSON.parse(text);
+      }
+      alertsList.unshift({
+        id: `alert-voice-${Date.now()}`,
+        type: 'voice',
+        patient_name: resolvedName,
+        phone: resolvedPhone,
+        title: isRegistered ? `📞 LLAMADA DE VOZ: ${resolvedName}` : `📞 🟠 PROSPECTO NUEVO (VOZ): ${resolvedName}`,
+        message: `${consultationReason} • Urgencia: ${urgencyLevel}`,
+        urgency_level: urgencyLevel,
+        channel_type: 'voice_call',
+        targetPatientId: finalPatientId,
+        time: nowFormatted,
+        link: `/dashboard/chat?patientId=${encodeURIComponent(finalPatientId)}`
+      });
+      await supabase.storage.from('audenti_database').upload(
+        'doctor_alerts.json',
+        JSON.stringify(alertsList.slice(0, 50), null, 2),
+        { upsert: true, contentType: 'application/json' }
+      );
     } catch {}
 
     // 5. Emitir eventos Realtime para el Dashboard de la Doctora y el Badge de Comunicación

@@ -106,7 +106,8 @@ export default function CalendarPage() {
         name,
         day: dayNum,
         fullDate,
-        isToday: fullDate === todayStr
+        isToday: fullDate === todayStr,
+        isSelected: fullDate === selectedDate
       }
     })
   })()
@@ -482,10 +483,22 @@ export default function CalendarPage() {
                   GMT-6
                 </div>
                 {weekDays.map(d => (
-                  <div key={d.fullDate} className="p-3 border-r border-slate-200/70 last:border-r-0">
-                    <span className="text-[10px] font-bold uppercase text-slate-400 block">{d.name}</span>
+                  <div
+                    key={d.fullDate}
+                    onClick={() => setSelectedDate(d.fullDate)}
+                    className={`p-3 border-r border-slate-200/70 last:border-r-0 cursor-pointer transition-colors ${
+                      d.isSelected ? 'bg-amber-100/60 ring-2 ring-inset ring-amber-400' : 'hover:bg-slate-100/60'
+                    }`}
+                  >
+                    <span className={`text-[10px] font-bold uppercase block ${d.isSelected ? 'text-amber-900 font-black' : 'text-slate-400'}`}>
+                      {d.name}
+                    </span>
                     <span className={`text-base font-bold inline-block h-7 w-7 rounded-full leading-7 mt-0.5 ${
-                      d.isToday ? 'bg-amber-400 text-slate-950 shadow-xs' : 'text-slate-800'
+                      d.isSelected
+                        ? 'bg-amber-400 text-slate-950 font-black shadow-xs ring-2 ring-white'
+                        : d.isToday
+                        ? 'border border-amber-500 text-amber-900 font-bold bg-amber-50'
+                        : 'text-slate-800'
                     }`}>
                       {d.day}
                     </span>
@@ -519,7 +532,9 @@ export default function CalendarPage() {
                         <div
                           key={d.fullDate}
                           onClick={() => handleSlotClick(d.fullDate, hour)}
-                          className="border-r border-slate-200/60 last:border-r-0 p-1 hover:bg-slate-50/60 transition-colors relative cursor-pointer"
+                          className={`border-r border-slate-200/60 last:border-r-0 p-1 transition-colors relative cursor-pointer ${
+                            d.isSelected ? 'bg-amber-50/40 hover:bg-amber-50/70' : 'hover:bg-slate-50/60'
+                          }`}
                         >
                           {slotAppointments.map(app => (
                             <div
