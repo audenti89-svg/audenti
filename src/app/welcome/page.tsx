@@ -594,7 +594,7 @@ export default function LandingPresentationPage() {
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
             <Link
-              href="/auth/login"
+              href="/portal"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition-colors"
             >
               Portal del Paciente

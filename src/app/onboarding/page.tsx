@@ -116,8 +116,9 @@ export default function OnboardingPage() {
         // Soporte adicional silencioso
       }
 
-      // Redirigir al dashboard con sesión médica confirmada
-      router.push('/dashboard');
+      // Redirigir al Portal del Paciente en lugar del Dashboard administrativo
+      router.push('/portal');
+      router.refresh();
     } catch (err: any) {
       console.error('Error al guardar datos de onboarding:', err);
       setErrorMsg(err?.message || 'Hubo un error al guardar tu información médica obligatoria.');

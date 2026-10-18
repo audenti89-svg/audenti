@@ -92,6 +92,25 @@ export async function updateSession(request: NextRequest) {
       return supabaseResponse;
     }
 
+    // Verificación de rol y protección de rutas administrativas:
+    const userRole = user.user_metadata?.role || user.app_metadata?.role || (isStaffOrOwner ? 'staff' : 'patient');
+
+    if (userRole === 'patient') {
+      // Si es un paciente tratando de entrar a rutas de administración, redirigir a su propio portal
+      if (
+        redirectUrl.pathname.startsWith('/dashboard/pacientes') ||
+        redirectUrl.pathname.startsWith('/dashboard/finanzas') ||
+        redirectUrl.pathname.startsWith('/dashboard/crm') ||
+        redirectUrl.pathname.startsWith('/dashboard/inventario') ||
+        redirectUrl.pathname.startsWith('/dashboard/configuracion') ||
+        redirectUrl.pathname.startsWith('/admin') ||
+        redirectUrl.pathname.startsWith('/patients')
+      ) {
+        redirectUrl.pathname = '/mi-expediente';
+        return NextResponse.redirect(redirectUrl);
+      }
+    }
+
     // Para pacientes: verificar registro médico en la tabla `patients`
     const { data: patient } = await supabase
       .from('patients')
@@ -101,15 +120,15 @@ export async function updateSession(request: NextRequest) {
 
     const hasCompletedOnboarding = patient?.onboarding_completed === true;
 
-    // Si es paciente y no ha completado el onboarding e intenta entrar al dashboard -> redirigir a /onboarding
-    if (!hasCompletedOnboarding && isDashboardRoute) {
+    // Si es paciente y no ha completado el onboarding e intenta entrar a rutas protegidas -> redirigir a /onboarding
+    if (!hasCompletedOnboarding && (isDashboardRoute || redirectUrl.pathname.startsWith('/portal') || redirectUrl.pathname.startsWith('/mi-expediente'))) {
       redirectUrl.pathname = '/onboarding';
       return NextResponse.redirect(redirectUrl);
     }
 
-    // Si ya completó el onboarding e intenta entrar a login u onboarding -> redirigir a /dashboard
+    // Si ya completó el onboarding e intenta entrar a login u onboarding -> redirigir a /mi-expediente
     if (hasCompletedOnboarding && (isAuthRoute || isOnboardingRoute)) {
-      redirectUrl.pathname = '/dashboard';
+      redirectUrl.pathname = '/mi-expediente';
       return NextResponse.redirect(redirectUrl);
     }
   }

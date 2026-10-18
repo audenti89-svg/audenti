@@ -84,12 +84,13 @@ export function AuthModal({
         router.push('/dashboard');
         router.refresh();
       } else {
-        // Registro
+        // Registro: Al registrar al paciente, asignar el rol correspondiente
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password,
           options: {
             data: {
+              role: 'patient', // Rol de paciente
               full_name: fullName.trim(),
             },
           },
