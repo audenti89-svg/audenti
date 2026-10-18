@@ -102,6 +102,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [unconfirmedCount, setUnconfirmedCount] = useState(0)
 
   useEffect(() => {
+    try {
+      const saved = localStorage.getItem('audenti_frozen_omnipresent_toasts')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed)) setUnconfirmedCount(parsed.length)
+      }
+    } catch {}
+
     const handleUnconfirmedChange = (e: any) => {
       const count = e?.detail?.unconfirmedCount ?? 0
       setUnconfirmedCount(count)

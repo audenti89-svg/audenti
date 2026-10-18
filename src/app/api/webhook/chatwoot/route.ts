@@ -81,17 +81,83 @@ export async function POST(request: Request) {
       console.warn('[Chatwoot DB Check Note]:', dbErr?.message);
     }
 
-    // 2. Ejecutar Triaje Inteligente con Aura IA (Captain AI)
+    // 2. Extracción Obligatoria de Metadatos de Prospecto Nuevo / Consulta
+    // 👤 Nombre Completo
+    let prospectName = senderName;
+    const nameMatch = messageContent.match(/(?:me llamo|mi nombre es|soy)\s+([a-zA-ZáéíóúÁÉÍÓÚñÑ]{2,25}(?:\s+[a-zA-ZáéíóúÁÉÍÓÚñÑ]{2,25})?)/i);
+    if (nameMatch && nameMatch[1]) {
+      prospectName = nameMatch[1].trim();
+    }
+
+    // 📱 Número de Teléfono
+    let prospectPhone = senderPhone;
+    if (!prospectPhone) {
+      const phoneMatch = messageContent.match(/\b\d{10}\b/) || messageContent.match(/\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/);
+      if (phoneMatch) {
+        prospectPhone = phoneMatch[0].replace(/\D/g, '');
+      }
+    }
+
+    // 🎯 Motivo / Objetivo Exacto de la Consulta
+    let consultationReason = 'Valoración General Odontológica';
+    const lowerContent = messageContent.toLowerCase();
+    if (lowerContent.includes('limpieza') || lowerContent.includes('profilaxis')) {
+      consultationReason = 'Limpieza Dental (Profilaxis Ultrasónica)';
+    } else if (lowerContent.includes('dolor') || lowerContent.includes('duele') || lowerContent.includes('muela') || lowerContent.includes('molestia')) {
+      consultationReason = 'Dolor Dental Agudo / Molestia';
+    } else if (lowerContent.includes('ortodoncia') || lowerContent.includes('brackets') || lowerContent.includes('alineadores')) {
+      consultationReason = 'Ortodoncia / Alineación Dental';
+    } else if (lowerContent.includes('blanqueamiento')) {
+      consultationReason = 'Blanqueamiento Dental Estético';
+    } else if (lowerContent.includes('implante')) {
+      consultationReason = 'Implantología / Prótesis';
+    } else if (lowerContent.includes('resina') || lowerContent.includes('caries')) {
+      consultationReason = 'Restauración / Resina Estética';
+    } else if (lowerContent.includes('cita') || lowerContent.includes('agendar')) {
+      consultationReason = 'Solicitud de Cita Médica';
+    }
+
+    // 🚨 Nivel de Urgencia (Urgente vs. No Urgente)
+    const isUrgent = /(?:dolor|duele|muela|aguanto|urgente|urgencia|emergencia|sangr|hinchad|inflamad|infecci|ca[ií]da|golpe|quebr|fractur|absceso|pus)/i.test(messageContent);
+    const urgencyLevel: 'Urgente' | 'No Urgente' = isUrgent ? 'Urgente' : 'No Urgente';
+
+    // Si el usuario no existe en Supabase, registrar al prospecto en la base de datos de pacientes si tiene teléfono
+    if (!isRegistered && prospectPhone) {
+      try {
+        const cleanPhone = prospectPhone.replace(/\D/g, '').slice(-10);
+        const { data: newProspect } = await supabase
+          .from('patients')
+          .insert({
+            full_name: prospectName !== 'Prospecto Omnicanal' ? prospectName : `Prospecto (${cleanPhone})`,
+            phone: cleanPhone,
+            onboarding_completed: false,
+            status: 'prospecto_nuevo'
+          })
+          .select('id, full_name, phone')
+          .maybeSingle();
+
+        if (newProspect) {
+          patientRecord = newProspect;
+          folio = `PROS-${newProspect.id.slice(0, 8).toUpperCase()}`;
+        }
+      } catch (insertErr: any) {
+        console.warn('[Prospect Insert Note]:', insertErr?.message);
+      }
+    }
+
+    // 3. Ejecutar Triaje Inteligente con Aura IA (Captain AI)
     let aiTriageResponse = '';
     try {
       const aiResult = await executeAIAgent({
         domain: 'patient_chat',
         prompt: messageContent,
         contextData: {
-          patientName: isRegistered ? patientRecord.full_name : senderName,
-          patientPhone: senderPhone,
+          patientName: isRegistered ? patientRecord.full_name : prospectName,
+          patientPhone: prospectPhone,
           channel: channelType,
           isRegistered,
+          consultationReason,
+          urgencyLevel,
           folio: folio || 'PROSPECTO-NUEVO',
           clinicName: 'Audenti Odontología (Dra. Aura Estudillo)'
         }
@@ -101,11 +167,13 @@ export async function POST(request: Request) {
         ? aiResult.result
         : (aiResult.result?.result || aiResult.result?.content || JSON.stringify(aiResult.result));
     } catch (aiErr: any) {
-      aiTriageResponse = '¡Hola! En Audenti estamos a tu disposición. La Dra. Aura Estudillo y nuestro equipo han recibido tu mensaje y te responderán a la brevedad.';
+      aiTriageResponse = isUrgent
+        ? `${prospectName}, he activado la alerta de urgencia prioritaria en la pantalla de la Dra. Aura Estudillo. Tus datos y tu caso ya están en su panel para que evalúe recibirte de inmediato.`
+        : '¡Hola! En Audenti estamos a tu disposición. La Dra. Aura Estudillo y nuestro equipo han recibido tu mensaje y te responderán a la brevedad.';
     }
 
-    // 3. Persistir en chat_omnichannel.json de Supabase Storage para reflejar en /dashboard/chat
-    const targetPatientId = patientRecord?.id || `prospect_${senderPhone.replace(/\D/g, '') || conversationId || Date.now()}`;
+    // 4. Persistir en chat_omnichannel.json de Supabase Storage para reflejar en /dashboard/chat
+    const targetPatientId = patientRecord?.id || `prospect_${prospectPhone.replace(/\D/g, '') || conversationId || Date.now()}`;
     const nowFormatted = new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date());
 
     try {
@@ -118,14 +186,21 @@ export async function POST(request: Request) {
 
       const clientMsg = {
         id: `cw-msg-${payload.id || Date.now()}`,
-        senderName: isRegistered ? patientRecord.full_name : `${senderName} (Prospecto)`,
+        senderName: isRegistered ? patientRecord.full_name : `${prospectName} (Prospecto)`,
         senderRole: 'patient',
         content: messageContent,
         timestamp: nowFormatted,
         isDoctor: false,
         isRegistered,
-        folio: folio || 'PROSPECTO',
-        channel: channelType
+        folio: folio || 'PROSPECTO-NUEVO',
+        channel: channelType,
+        metadata: {
+          patientName: isRegistered ? patientRecord.full_name : prospectName,
+          phone: prospectPhone,
+          consultationReason,
+          urgencyLevel,
+          classification: isRegistered ? '🟢 PACIENTE REGISTRADO' : '🟠 PROSPECTO NUEVO'
+        }
       };
 
       const aiReplyMsg = {
@@ -148,18 +223,20 @@ export async function POST(request: Request) {
       console.warn('[Chatwoot Storage Note]:', storageErr?.message);
     }
 
-    // 4. Emitir eventos Realtime para el Dashboard de la Doctora y el Badge del Menú Lateral
+    // 5. Emitir eventos Realtime para el Dashboard de la Doctora y el Badge del Menú Lateral
     await supabase.channel('chat_omnichannel_sync').send({
       type: 'broadcast',
       event: 'incoming_patient_message',
       payload: {
         targetPatientId,
-        senderName: isRegistered ? patientRecord.full_name : `${senderName} (${senderPhone || 'Prospecto'})`,
+        senderName: isRegistered ? patientRecord.full_name : `${prospectName} (${prospectPhone || 'Prospecto'})`,
         content: messageContent,
         timestamp: nowFormatted,
         isRegistered,
-        folio: folio || 'PROSPECTO',
-        phone: senderPhone
+        folio: folio || 'PROSPECTO-NUEVO',
+        phone: prospectPhone,
+        consultationReason,
+        urgencyLevel
       }
     });
 
@@ -168,20 +245,23 @@ export async function POST(request: Request) {
       event: 'doctor_notification',
       payload: {
         id: `notif-cw-${Date.now()}`,
-        title: isRegistered ? `🟢 PACIENTE REGISTRADO: ${patientRecord.full_name}` : `🟠 PROSPECTO NUEVO: ${senderName}`,
-        message: messageContent,
-        type: 'general',
-        patient_name: isRegistered ? patientRecord.full_name : senderName,
+        title: isRegistered ? `🟢 PACIENTE REGISTRADO: ${patientRecord.full_name}` : `🟠 PROSPECTO NUEVO: ${prospectName}`,
+        message: `${consultationReason} [${urgencyLevel.toUpperCase()}] • "${messageContent}"`,
+        type: isUrgent ? 'emergency' : 'general',
+        patient_name: isRegistered ? patientRecord.full_name : prospectName,
+        phone: prospectPhone,
+        consultationReason,
+        urgencyLevel,
         time: nowFormatted
       }
     });
 
-    // 5. Notificación Dual a WhatsApp (Aviso a la Dra. Aura para monitoreo en ruta)
+    // 6. Notificación Dual a WhatsApp (Aviso a la Dra. Aura para monitoreo en ruta)
     await sendDoctorWhatsAppAlert({
-      title: isRegistered ? `🟢 MENSAJE DE PACIENTE REGISTRADO (${folio})` : `🟠 NUEVO PROSPECTO EN CHATWOOT`,
-      patientName: isRegistered ? `${patientRecord.full_name} (${folio})` : `${senderName} [${senderPhone || 'Web'}]`,
-      message: messageContent,
-      type: 'chat_message'
+      title: isRegistered ? `🟢 MENSAJE DE PACIENTE REGISTRADO (${folio})` : `🟠 NUEVO PROSPECTO EN CHATWOOT (${urgencyLevel.toUpperCase()})`,
+      patientName: isRegistered ? `${patientRecord.full_name} (${folio})` : `${prospectName} [${prospectPhone || 'Web'}]`,
+      message: `🎯 Motivo: ${consultationReason}\n🚨 Urgencia: ${urgencyLevel}\n💬 Mensaje: ${messageContent}`,
+      type: isUrgent ? 'voice_call' : 'chat_message'
     });
 
     return NextResponse.json({

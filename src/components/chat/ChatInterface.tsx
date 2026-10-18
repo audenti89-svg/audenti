@@ -270,6 +270,20 @@ export function ChatInterface() {
             [payload.targetPatientId]: [...(prev[payload.targetPatientId] || []), incomingMsg]
           }))
 
+          // Asegurar que el prospecto aparezca en la lista de pacientes si es nuevo
+          setPatients(prev => {
+            if (prev.some(p => p.id === payload.targetPatientId)) return prev
+            const isRegistered = Boolean(payload.isRegistered)
+            const newEntry: PatientDetails = {
+              id: payload.targetPatientId,
+              name: payload.senderName || (isRegistered ? 'Paciente Registrado' : '🟠 Prospecto Nuevo'),
+              phone: payload.phone || 'Sin número',
+              referralsMade: [],
+              familyMembers: []
+            }
+            return [newEntry, ...prev]
+          })
+
           // Si el paciente no es el que actualmente está seleccionado con el chat abierto, o para dar alerta visible
           setUnreadPatients(prev => {
             const next = new Set(prev)
@@ -553,7 +567,11 @@ export function ChatInterface() {
                             </div>
                             <span className="text-[11px] text-slate-500 block">{p.phone}</span>
                             <div className="flex items-center gap-1.5 mt-1 text-[10px] font-bold">
-                              {isUnread ? (
+                              {p.id.startsWith('prospect_') || p.name.includes('Prospecto') ? (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-700 border border-amber-300 font-bold">
+                                  🟠 PROSPECTO NUEVO
+                                </span>
+                              ) : isUnread ? (
                                 <span className="text-rose-600 flex items-center gap-1">
                                   <Radio className="w-3 h-3 animate-spin" />
                                   ¡Mensaje entrante pendiente!
@@ -561,7 +579,7 @@ export function ChatInterface() {
                               ) : (
                                 <span className="text-emerald-700 flex items-center gap-1">
                                   <TrendingUp className="w-3 h-3" />
-                                  Expediente Activo
+                                  🟢 PACIENTE REGISTRADO
                                 </span>
                               )}
                             </div>

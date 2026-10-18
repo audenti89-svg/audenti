@@ -5,6 +5,7 @@ import './globals.css'
 import { SmartPwaFloatingBanner } from '@/components/ui/SmartPwaFloatingBanner'
 import { AccessibilityProvider } from '@/context/AccessibilityContext'
 import { LocationPermissionBanner } from '@/components/ui/LocationPermissionBanner'
+import { ChatwootWidget } from '@/components/chat/ChatwootWidget'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -119,6 +120,7 @@ export default function RootLayout({
           {children}
           <SmartPwaFloatingBanner />
           <LocationPermissionBanner />
+          <ChatwootWidget />
         </AccessibilityProvider>
       </body>
     </html>
