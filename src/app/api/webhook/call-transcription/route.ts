@@ -1,19 +1,25 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendDoctorWhatsAppAlert } from '@/lib/notifications/whatsapp-doctor';
+import { evaluateIntentionAndUrgency, formatTimeInMexico, getNowInMexico } from '@/utils/timezone';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 interface CallTranscriptionPayload {
   patientId?: string;
+  patient_name?: string;
   patientName?: string;
+  phone?: string;
   patientPhone?: string;
   durationSeconds?: number;
+  reason?: string;
   consultationReason?: string;
+  urgency_level?: 'Urgente' | 'No Urgente';
   urgencyLevel?: 'Urgente' | 'No Urgente';
   transcription?: string;
   dialogue?: Array<{ role: 'user' | 'assistant'; text: string }>;
+  full_transcript?: Array<{ speaker: string; text: string }>;
   summary?: string;
   timestamp?: string;
 }
@@ -23,24 +29,47 @@ export async function POST(request: Request) {
     const body: CallTranscriptionPayload = await request.json();
     const {
       patientId: rawPatientId,
-      patientName = 'Paciente Consulta de Voz',
-      patientPhone = '',
+      patient_name: aliasPatientName,
+      patientName: originalPatientName,
+      phone: aliasPhone,
+      patientPhone: originalPhone = '',
       durationSeconds = 0,
-      consultationReason = 'Solicitud de Cita Médica por Voz',
-      urgencyLevel = 'Urgente',
+      reason: aliasReason,
+      consultationReason: originalReason,
+      urgency_level: aliasUrgency,
+      urgencyLevel: originalUrgency,
       transcription = '',
       dialogue = [],
+      full_transcript = [],
       summary = '',
       timestamp
     } = body;
 
+    const patientName = aliasPatientName || originalPatientName || 'Paciente Consulta de Voz';
+    const patientPhone = aliasPhone || originalPhone || '';
+
+    // Normalizar diálogo desde full_transcript o dialogue
+    const normalizedDialogue: Array<{ role: 'user' | 'assistant'; text: string }> = dialogue.length > 0
+      ? dialogue
+      : (full_transcript.length > 0
+          ? full_transcript.map(t => ({
+              role: t.speaker.toLowerCase().includes('aura') ? 'assistant' : 'user',
+              text: t.text
+            }))
+          : []);
+
+    // Evaluar matriz de intención y urgencia inteligente (Horarios CDMX: L-V 9-18h, Sáb 9-14h, Dom cerrado)
+    const callTextCorpus = `${summary} ${transcription} ${normalizedDialogue.map(d => d.text).join(' ')}`;
+    const evaluation = evaluateIntentionAndUrgency(callTextCorpus, timestamp || new Date());
+
+    const finalConsultationReason = aliasReason || originalReason || evaluation.suggestedReason || 'Solicitud de Cita Médica por Voz';
+    // Si la evaluación detecta Urgencia Médica o molestia fuera de horario, se fuerza 'Urgente'
+    const finalUrgencyLevel = evaluation.urgencyLevel === 'Urgente' ? 'Urgente' : (aliasUrgency || originalUrgency || 'No Urgente');
+
     const supabase = createAdminClient();
-    const nowFormatted = timestamp || new Intl.DateTimeFormat('es-MX', {
-      hour: '2-digit',
-      minute: '2-digit',
-      day: '2-digit',
-      month: '2-digit'
-    }).format(new Date());
+    const nowFormatted = timestamp
+      ? formatTimeInMexico(timestamp)
+      : formatTimeInMexico(getNowInMexico());
 
     // 1. Identificar o vincular paciente en Supabase
     let finalPatientId = rawPatientId;
@@ -83,15 +112,15 @@ export async function POST(request: Request) {
       senderRole: 'ai' as const,
       isDoctor: false,
       timestamp: nowFormatted,
-      content: summary || `📞 Llamada de voz finalizada con ${resolvedName}. Motivo: ${consultationReason}`,
+      content: summary || `📞 Llamada de voz finalizada con ${resolvedName}. Motivo: ${finalConsultationReason}`,
       // Metadatos de la transcripción
       metadata: {
         channel_type: 'voice_call',
         durationSeconds,
-        consultationReason,
-        urgencyLevel,
-        transcription: transcription || (dialogue.length > 0 ? dialogue.map(d => `${d.role === 'user' ? resolvedName : 'Aura AI'}: ${d.text}`).join('\n') : ''),
-        dialogue: dialogue.length > 0 ? dialogue : [
+        consultationReason: finalConsultationReason,
+        urgencyLevel: finalUrgencyLevel,
+        transcription: transcription || (normalizedDialogue.length > 0 ? normalizedDialogue.map(d => `${d.role === 'user' ? resolvedName : 'Aura AI'}: ${d.text}`).join('\n') : ''),
+        dialogue: normalizedDialogue.length > 0 ? normalizedDialogue : [
           { role: 'assistant', text: 'Hola, bienvenido a Audenti. ¿En qué podemos ayudarte hoy?' },
           { role: 'user', text: summary || 'Solicitud de valoración y cita médica.' }
         ],
@@ -99,7 +128,9 @@ export async function POST(request: Request) {
         patientName: resolvedName,
         phone: resolvedPhone,
         folio: folio || 'PROSPECTO-VOZ',
-        isRegistered
+        isRegistered,
+        isOutsideHours: evaluation.isOutsideHours,
+        intention: evaluation.intention
       }
     };
 
@@ -144,9 +175,9 @@ export async function POST(request: Request) {
         patient_name: resolvedName,
         phone: resolvedPhone,
         title: isRegistered ? `📞 LLAMADA DE VOZ: ${resolvedName}` : `📞 🟠 PROSPECTO NUEVO (VOZ): ${resolvedName}`,
-        message: `${consultationReason} • Urgencia: ${urgencyLevel}`,
+        message: `${finalConsultationReason} • Urgencia: ${finalUrgencyLevel}`,
         type: 'voice',
-        urgency_level: urgencyLevel,
+        urgency_level: finalUrgencyLevel,
         confirmed_by_doctor: false,
         status: 'pending',
         created_at: new Date().toISOString()
@@ -167,8 +198,8 @@ export async function POST(request: Request) {
         patient_name: resolvedName,
         phone: resolvedPhone,
         title: isRegistered ? `📞 LLAMADA DE VOZ: ${resolvedName}` : `📞 🟠 PROSPECTO NUEVO (VOZ): ${resolvedName}`,
-        message: `${consultationReason} • Urgencia: ${urgencyLevel}`,
-        urgency_level: urgencyLevel,
+        message: `${finalConsultationReason} • Urgencia: ${finalUrgencyLevel}`,
+        urgency_level: finalUrgencyLevel,
         channel_type: 'voice_call',
         targetPatientId: finalPatientId,
         time: nowFormatted,
@@ -190,8 +221,8 @@ export async function POST(request: Request) {
       isRegistered,
       folio,
       channel_type: 'voice_call',
-      consultationReason,
-      urgencyLevel,
+      consultationReason: finalConsultationReason,
+      urgencyLevel: finalUrgencyLevel,
       durationSeconds,
       summary: voiceRecord.content,
       transcription: voiceRecord.metadata.transcription,
@@ -212,12 +243,12 @@ export async function POST(request: Request) {
       payload: {
         id: `notif-voice-${Date.now()}`,
         title: isRegistered ? `📞 LLAMADA DE VOZ: ${resolvedName}` : `📞 🟠 PROSPECTO NUEVO (VOZ): ${resolvedName}`,
-        message: `${consultationReason} • Urgencia: ${urgencyLevel}`,
+        message: `${finalConsultationReason} • Urgencia: ${finalUrgencyLevel}`,
         type: 'voice',
         patient_name: resolvedName,
         phone: resolvedPhone,
-        consultationReason,
-        urgencyLevel,
+        consultationReason: finalConsultationReason,
+        urgencyLevel: finalUrgencyLevel,
         channel_type: 'voice_call',
         targetPatientId: finalPatientId,
         url: `/dashboard/chat?patientId=${encodeURIComponent(finalPatientId)}`,
@@ -227,9 +258,9 @@ export async function POST(request: Request) {
 
     // 6. Alerta WhatsApp hacia la Dra. Aura
     await sendDoctorWhatsAppAlert({
-      title: `📞 LLAMADA DE VOZ FINALIZADA (${urgencyLevel.toUpperCase()})`,
+      title: `📞 LLAMADA DE VOZ FINALIZADA (${finalUrgencyLevel.toUpperCase()})`,
       patientName: `${resolvedName} [${resolvedPhone || 'Web Voice'}]`,
-      message: `🎯 Motivo: ${consultationReason}\n⏱️ Duración: ${durationSeconds}s\n🎙️ Resumen: ${voiceRecord.content}`,
+      message: `🎯 Motivo: ${finalConsultationReason}\n⏱️ Duración: ${durationSeconds}s\n🎙️ Resumen: ${voiceRecord.content}`,
       type: 'voice_call'
     });
 

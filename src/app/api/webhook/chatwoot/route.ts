@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { executeAIAgent } from '@/lib/ai/router';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendDoctorWhatsAppAlert } from '@/lib/notifications/whatsapp-doctor';
+import { evaluateIntentionAndUrgency } from '@/utils/timezone';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -98,13 +99,13 @@ export async function POST(request: Request) {
       }
     }
 
-    // 🎯 Motivo / Objetivo Exacto de la Consulta
-    let consultationReason = 'Valoración General Odontológica';
+    // 🎯 Evaluación Inteligente de Intención, Horario de México y Urgencia
+    const evaluation = evaluateIntentionAndUrgency(messageContent, new Date());
+    let consultationReason = evaluation.suggestedReason;
     const lowerContent = messageContent.toLowerCase();
+
     if (lowerContent.includes('limpieza') || lowerContent.includes('profilaxis')) {
       consultationReason = 'Limpieza Dental (Profilaxis Ultrasónica)';
-    } else if (lowerContent.includes('dolor') || lowerContent.includes('duele') || lowerContent.includes('muela') || lowerContent.includes('molestia')) {
-      consultationReason = 'Dolor Dental Agudo / Molestia';
     } else if (lowerContent.includes('ortodoncia') || lowerContent.includes('brackets') || lowerContent.includes('alineadores')) {
       consultationReason = 'Ortodoncia / Alineación Dental';
     } else if (lowerContent.includes('blanqueamiento')) {
@@ -113,13 +114,11 @@ export async function POST(request: Request) {
       consultationReason = 'Implantología / Prótesis';
     } else if (lowerContent.includes('resina') || lowerContent.includes('caries')) {
       consultationReason = 'Restauración / Resina Estética';
-    } else if (lowerContent.includes('cita') || lowerContent.includes('agendar')) {
-      consultationReason = 'Solicitud de Cita Médica';
     }
 
-    // 🚨 Nivel de Urgencia (Urgente vs. No Urgente)
-    const isUrgent = /(?:dolor|duele|muela|aguanto|urgente|urgencia|emergencia|sangr|hinchad|inflamad|infecci|ca[ií]da|golpe|quebr|fractur|absceso|pus)/i.test(messageContent);
-    const urgencyLevel: 'Urgente' | 'No Urgente' = isUrgent ? 'Urgente' : 'No Urgente';
+    // 🚨 Nivel de Urgencia (Urgente vs. No Urgente) conforme a Matriz Horaria
+    const urgencyLevel: 'Urgente' | 'No Urgente' = evaluation.urgencyLevel;
+    const isUrgent = urgencyLevel === 'Urgente';
 
     // Si el usuario no existe en Supabase, registrar al prospecto en la base de datos de pacientes si tiene teléfono
     if (!isRegistered && prospectPhone) {

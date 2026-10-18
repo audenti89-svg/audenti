@@ -138,12 +138,16 @@ export function VoiceAssistantModal({
     }
   }
 
-  // Notificar backend y persistir transcripción
+  // Notificar backend y persistir transcripción con garantía obligatoria antes de cerrar
   const handleEndCall = async () => {
     releaseMicStream()
     const formattedDialogue = (transcripts || []).map((t: any) => ({
       role: (t.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
       text: t.text || ''
+    }))
+    const fullTranscriptSpeakers = formattedDialogue.map((t: any) => ({
+      speaker: t.role === 'user' ? patientName : 'Aura AI',
+      text: t.text
     }))
     const summaryText = formattedDialogue.length > 0
       ? formattedDialogue.map((t: any) => `${t.role === 'user' ? patientName : 'Aura AI'}: ${t.text}`).slice(-4).join(' | ')
@@ -151,29 +155,77 @@ export function VoiceAssistantModal({
 
     await endSession()
 
-    // Persistir automáticamente en la base de datos de Supabase y emitir eventos realtime
+    const callPayload = {
+      patientId,
+      patient_name: patientName,
+      patientName,
+      phone: patientPhone,
+      patientPhone,
+      reason: 'Solicitud de Cita Médica por Voz',
+      consultationReason: 'Solicitud de Cita Médica por Voz',
+      urgency_level: 'Urgente',
+      urgencyLevel: 'Urgente',
+      durationSeconds: callDuration || 1,
+      transcription: formattedDialogue.map((d: any) => `${d.role === 'user' ? patientName : 'Aura AI'}: ${d.text}`).join('\n'),
+      dialogue: formattedDialogue,
+      full_transcript: fullTranscriptSpeakers,
+      summary: summaryText,
+      timestamp: new Date().toISOString()
+    }
+
+    // Persistir de forma síncrona en Supabase antes de cerrar modal
     try {
-      await fetch('/api/webhook/call-transcription', {
+      const res = await fetch('/api/webhook/call-transcription', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          patientId,
-          patientName,
-          patientPhone,
-          durationSeconds: callDuration || 1,
-          consultationReason: 'Solicitud de Cita Médica por Voz',
-          urgencyLevel: 'Urgente',
-          transcription: formattedDialogue.map((d: any) => `${d.role === 'user' ? patientName : 'Aura AI'}: ${d.text}`).join('\n'),
-          dialogue: formattedDialogue,
-          summary: summaryText
-        })
+        body: JSON.stringify(callPayload)
       })
+      if (!res.ok) {
+        throw new Error(`Error en webhook: ${res.statusText}`)
+      }
     } catch (e) {
-      console.warn('Error guardando transcripción de voz:', e)
+      console.warn('[VoiceAssistantModal]: Error o demora en webhook, guardando en localStorage para reintento automático:', e)
+      try {
+        const pending = JSON.parse(localStorage.getItem('audenti_pending_transcripts') || '[]')
+        pending.push(callPayload)
+        localStorage.setItem('audenti_pending_transcripts', JSON.stringify(pending))
+      } catch {}
     }
 
     onClose()
   }
+
+  // Reintento automático de transcripciones pendientes en localStorage
+  useEffect(() => {
+    const retryPending = async () => {
+      try {
+        const pendingStr = localStorage.getItem('audenti_pending_transcripts')
+        if (!pendingStr) return
+        const pending = JSON.parse(pendingStr)
+        if (Array.isArray(pending) && pending.length > 0) {
+          const remaining = []
+          for (const item of pending) {
+            try {
+              const res = await fetch('/api/webhook/call-transcription', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(item)
+              })
+              if (!res.ok) remaining.push(item)
+            } catch {
+              remaining.push(item)
+            }
+          }
+          if (remaining.length > 0) {
+            localStorage.setItem('audenti_pending_transcripts', JSON.stringify(remaining))
+          } else {
+            localStorage.removeItem('audenti_pending_transcripts')
+          }
+        }
+      } catch {}
+    }
+    retryPending()
+  }, [])
 
   const handleStartCall = async () => {
     setPermissionError(null)

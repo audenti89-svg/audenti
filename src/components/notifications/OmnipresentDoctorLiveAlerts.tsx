@@ -63,12 +63,12 @@ export function OmnipresentDoctorLiveAlerts() {
     })
   }
 
-  // Dismiss y auto-confirmación (Supabase confirmed_by_doctor = true)
+  // Dismiss y auto-confirmación formal vía /api/alerts/confirm (Supabase confirmed_by_doctor = true & confirmed_at)
   const dismissAlert = async (id: string, targetUrl?: string) => {
     // 1. Quitar toast inmediatamente de la UI y del storage persistente
     updateToastsPersistently(prev => prev.filter(item => item.id !== id))
     
-    // 2. Registrar en lista de notificaciones atendidas
+    // 2. Registrar en lista de notificaciones atendidas localmente
     try {
       const savedRead = localStorage.getItem('audenti_attended_notifications')
       const readIds = savedRead ? JSON.parse(savedRead) : []
@@ -78,22 +78,23 @@ export function OmnipresentDoctorLiveAlerts() {
       }
     } catch {}
 
-    // 3. Actualizar en Supabase confirmed_by_doctor = true
+    // 3. Ejecutar petición formal a /api/alerts/confirm para grabar en Supabase confirmed_by_doctor = true y confirmed_at
     try {
-      const cleanAlertId = id.replace(/^(toast-|voice-end-|notif-)/, '')
-      // Intentar actualizar en doctor_alerts
-      await supabase
-        .from('doctor_alerts')
-        .update({ confirmed_by_doctor: true, status: 'confirmed' })
-        .or(`id.eq.${cleanAlertId},reference_id.eq.${cleanAlertId}`)
-
-      // Intentar actualizar en chat_messages si corresponde
-      await supabase
-        .from('chat_messages')
-        .update({ confirmed_by_doctor: true })
-        .eq('id', cleanAlertId)
+      await fetch('/api/alerts/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      })
     } catch (err) {
-      console.warn('[dismissAlert confirmation sync]:', err)
+      console.warn('[dismissAlert confirmation endpoint error]:', err)
+      // Fallback directo con cliente supabase
+      try {
+        const cleanAlertId = id.replace(/^(toast-|voice-end-|notif-)/, '')
+        await supabase
+          .from('doctor_alerts')
+          .update({ confirmed_by_doctor: true, status: 'confirmed', confirmed_at: new Date().toISOString() })
+          .or(`id.eq.${cleanAlertId},reference_id.eq.${cleanAlertId}`)
+      } catch {}
     }
 
     // 4. Si se especificó una URL, navegar
