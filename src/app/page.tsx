@@ -30,7 +30,6 @@ import {
 import { AudentiLogo } from '@/components/ui/AudentiLogo'
 import { AuthModal } from '@/components/auth/AuthModal'
 import { QRCodeSVG } from 'qrcode.react'
-import { PublicAiChatWidget } from '@/components/ai/PublicAiChatWidget'
 import { SmileAuditTool } from '@/components/landing/SmileAuditTool'
 import { SeniorAccessibilityBanner } from '@/components/ui/SeniorAccessibilityBanner'
 import { UnifiedCommunicationWidget } from '@/components/chat/UnifiedCommunicationWidget'
@@ -1309,11 +1308,8 @@ export default function LandingPage() {
         defaultMode={authMode}
       />
 
-      {/* Ecosistema Unificado de Voz y Chat Directo con la Clínica */}
+      {/* Ecosistema Maestro Unificado de Comunicación Flotante (Voz Aura IA Streaming + Chat Directo) */}
       <UnifiedCommunicationWidget />
-
-      {/* Widget de Conversión IA Pública (Llama 3.1 8B Groq) */}
-      <PublicAiChatWidget />
 
       {/* Banner y Control de Modo Accesibilidad 50+ */}
       <SeniorAccessibilityBanner />
