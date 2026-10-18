@@ -29,6 +29,7 @@ import {
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import PatientOdontogram from '@/components/PatientOdontogram';
+import { PatientDirectChatWidget } from '@/components/chat/PatientDirectChatWidget';
 
 // Constantes oficiales de Sedes y Sedes Clínicas Audenti
 const BRANCH_DETAILS: Record<string, { name: string; address: string; mapUrl: string; hours: string; phone: string }> = {
@@ -496,6 +497,17 @@ export default function PatientPortalPage() {
             </div>
           </div>
         </div>
+
+        {/* 6. WIDGET DE CHAT DIRECTO EN TIEMPO REAL CON LA DRA. AURA Y RECEPCIÓN */}
+        <PatientDirectChatWidget
+          patient={{
+            id: patient?.id,
+            full_name: patientName,
+            phone: patient?.phone,
+            branch_name: branchInfo.name,
+            tenant_id: patient?.tenant_id
+          }}
+        />
       </main>
     </div>
   );

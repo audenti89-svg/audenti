@@ -218,18 +218,80 @@ export function ChatInterface() {
     setBroadcastTarget('custom')
   }
 
-  // Enviar mensaje
-  const handleSendMessage = () => {
+  // Cargar mensajes persistidos de cada paciente desde chat_omnichannel.json
+  const loadStoredOmnichannelMessages = async () => {
+    try {
+      const { data: file } = await supabase.storage
+        .from('audenti_database')
+        .download('chat_omnichannel.json')
+
+      if (file) {
+        const text = await file.text()
+        if (text && text.trim()) {
+          const stored = JSON.parse(text)
+          const mapped: Record<string, Message[]> = {}
+          Object.keys(stored).forEach(patId => {
+            mapped[patId] = (stored[patId] || []).map((m: any) => ({
+              id: m.id || String(Math.random()),
+              senderName: m.senderName,
+              senderInitials: m.isDoctor ? 'AE' : 'PAC',
+              content: m.content,
+              time: m.timestamp,
+              isOwn: m.isDoctor
+            }))
+          })
+          setMessages(prev => ({ ...prev, ...mapped }))
+        }
+      }
+    } catch {}
+  }
+
+  useEffect(() => {
+    loadStoredOmnichannelMessages()
+
+    // Escucha en tiempo real de mensajes entrantes del paciente
+    const channel = supabase
+      .channel('chat_omnichannel_sync')
+      .on('broadcast', { event: 'incoming_patient_message' }, ({ payload }) => {
+        if (payload && payload.targetPatientId) {
+          playTone('arrival')
+          const incomingMsg: Message = {
+            id: payload.id || String(Date.now()),
+            senderName: payload.senderName || 'Paciente',
+            senderInitials: 'PAC',
+            content: payload.content,
+            time: payload.timestamp || 'Ahora',
+            isOwn: false
+          }
+
+          setMessages(prev => ({
+            ...prev,
+            [payload.targetPatientId]: [...(prev[payload.targetPatientId] || []), incomingMsg]
+          }))
+        }
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [playTone, supabase])
+
+  // Enviar mensaje desde el panel de la doctora hacia el portal del paciente
+  const handleSendMessage = async () => {
     if (!inputMessage.trim()) return
 
     playTone('message')
+
+    const messageText = inputMessage.trim()
+    const nowFormatted = new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date())
 
     const newMsg: Message = {
       id: Date.now().toString(),
       senderName: 'Dra. Aura Estudillo',
       senderInitials: 'AE',
-      content: inputMessage.trim(),
-      time: new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date()),
+      content: messageText,
+      time: nowFormatted,
       isOwn: true,
       isCascadeNotice: selectedRecipients.length > 0
     }
@@ -242,6 +304,53 @@ export function ChatInterface() {
     }))
 
     setInputMessage('')
+
+    // Si es chat con paciente externo, persistir y emitir evento Realtime al paciente
+    if (mainTab === 'external' && selectedPatientId) {
+      try {
+        const payloadMsg = {
+          id: newMsg.id,
+          senderName: 'Dra. Aura Estudillo',
+          senderRole: 'doctor',
+          content: messageText,
+          timestamp: nowFormatted,
+          isDoctor: true,
+          targetPatientId: selectedPatientId
+        }
+
+        // 1. Guardar en Storage (chat_omnichannel.json)
+        try {
+          const { data: file } = await supabase.storage.from('audenti_database').download('chat_omnichannel.json')
+          let allChats: Record<string, any[]> = {}
+          if (file) {
+            const text = await file.text()
+            if (text) allChats = JSON.parse(text)
+          }
+          allChats[selectedPatientId] = [...(allChats[selectedPatientId] || []), payloadMsg]
+          await supabase.storage.from('audenti_database').upload(
+            'chat_omnichannel.json',
+            JSON.stringify(allChats, null, 2),
+            { upsert: true, contentType: 'application/json' }
+          )
+        } catch {}
+
+        // 2. Disparar Realtime hacia el canal exclusivo del paciente
+        await supabase.channel(`patient_chat_${selectedPatientId}`).send({
+          type: 'broadcast',
+          event: 'doctor_reply',
+          payload: payloadMsg
+        })
+
+        // 3. Disparar Realtime en canal de sincronización global
+        await supabase.channel('chat_omnichannel_sync').send({
+          type: 'broadcast',
+          event: 'sync_patient_message',
+          payload: payloadMsg
+        })
+      } catch (err: any) {
+        console.warn('Error sincronizando mensaje de la doctora:', err?.message)
+      }
+    }
   }
 
   return (
