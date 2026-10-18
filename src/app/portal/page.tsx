@@ -144,19 +144,17 @@ export default function PatientPortalPage() {
     const rawBranchName = (patient?.branch_name || '').toLowerCase();
     const tid = patient?.tenant_id || '';
 
+    // Si tiene asignada Balbuena
     if (
-      rawBranchName.includes('chalma') ||
-      rawBranchName.includes('guadalupe') ||
-      tid === '00000000-0000-0000-0000-000000000002'
+      rawBranchName.includes('valbuena') ||
+      rawBranchName.includes('balbuena') ||
+      tid === '00000000-0000-0000-0000-000000000001'
     ) {
-      return BRANCH_DETAILS['00000000-0000-0000-0000-000000000002'];
+      return BRANCH_DETAILS['00000000-0000-0000-0000-000000000001'];
     }
 
-    if (tid && BRANCH_DETAILS[tid]) {
-      return BRANCH_DETAILS[tid];
-    }
-
-    return BRANCH_DETAILS['00000000-0000-0000-0000-000000000001'];
+    // Por defecto y si es Chalma de Guadalupe (o paciente recién registrado)
+    return BRANCH_DETAILS['00000000-0000-0000-0000-000000000002'];
   }, [patient]);
 
   // Próxima Cita Activa
@@ -195,43 +193,39 @@ export default function PatientPortalPage() {
 
   return (
     <div className="min-h-screen bg-[#0A0F1D] text-white selection:bg-amber-400 selection:text-slate-950 pb-20">
-      {/* 1. Header Institucional del Portal - Limpio, Espacioso y Sin Amontonamiento */}
-      <header className="border-b border-gray-800 bg-[#0d1322] sticky top-0 z-40 px-4 sm:px-8 py-4">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
-          {/* Lado Izquierdo: Logotipo y Marca */}
-          <div className="flex items-center gap-4">
-            <div className="p-2 rounded-xl bg-amber-400/10 border border-amber-400/30 shrink-0">
-              <AudentiLogo className="w-8 h-8 text-amber-400" />
-            </div>
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-3">
-                <span className="text-base font-black tracking-wide text-white uppercase">
-                  Audenti Clinical
-                </span>
-                <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40">
-                  Portal del Paciente
-                </span>
-              </div>
-              <p className="text-xs text-gray-400 font-medium">
-                Dra. Aura Estudillo • Cédula Profesional 8492019
-              </p>
-            </div>
+      {/* 1. Header Institucional del Portal - PatientHeader Oficial Limpio y Separado */}
+      <header className="w-full bg-[#0d1322] border-b border-gray-800 px-6 py-4 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-40">
+        {/* Isotipo + Identidad de la Clínica */}
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center shrink-0">
+            <AudentiLogo className="w-6 h-6 text-yellow-400" />
           </div>
+          <div className="flex flex-col justify-center">
+            <h1 className="text-base font-bold tracking-wider text-white leading-none">
+              AUDENTI CLINICAL
+            </h1>
+            <span className="text-xs text-yellow-400 mt-1 font-medium">
+              Dra. Aura Estudillo • Cédula Profesional 8492019
+            </span>
+          </div>
+        </div>
 
-          {/* Lado Derecho: Usuario y Salir */}
-          <div className="flex items-center justify-between md:justify-end gap-4 border-t md:border-t-0 border-gray-800/80 pt-3 md:pt-0">
-            <div className="text-xs text-gray-300 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Sesión activa: <strong className="text-white font-bold">{patientName}</strong></span>
-            </div>
-            <button
-              onClick={handleSignOut}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-200 hover:text-white text-xs font-bold border border-gray-700 transition-all cursor-pointer shadow-xs"
-            >
-              <LogOut className="w-3.5 h-3.5 text-amber-400" />
-              Cerrar Sesión
-            </button>
+        {/* Badges y Sesión */}
+        <div className="flex items-center gap-4 flex-wrap">
+          <span className="bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap">
+            PORTAL DEL PACIENTE
+          </span>
+          <div className="text-xs text-gray-300 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Sesión activa: <strong className="text-white font-bold">{patientName}</strong></span>
           </div>
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-200 hover:text-white text-xs font-bold border border-gray-700 transition-all cursor-pointer shadow-xs ml-2"
+          >
+            <LogOut className="w-3.5 h-3.5 text-amber-400" />
+            Cerrar Sesión
+          </button>
         </div>
       </header>
 

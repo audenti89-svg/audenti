@@ -104,6 +104,38 @@ export default function PatientOdontogram({
               className="w-full h-auto mx-auto object-contain block select-none pointer-events-none drop-shadow-[0_10px_20px_rgba(0,0,0,0.6)]"
             />
 
+            {/* Capa de indicadores/punteros finos SVG */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none z-10" viewBox="0 0 100 100" preserveAspectRatio="none">
+              {UPPER_TEETH.map((tooth) => {
+                const diag = diagnosisMap[tooth.num];
+                const isSelected = selectedTooth === tooth.num;
+                const hasTreatment = diag?.condition && diag.condition !== 'healthy';
+                if (!isSelected && !hasTreatment) return null;
+
+                const x1 = parseFloat(tooth.pointerLeft);
+                const y1 = parseFloat(tooth.pointerTop);
+                const x2 = parseFloat(tooth.targetLeft);
+                const y2 = parseFloat(tooth.targetTop);
+                const strokeColor = isSelected ? '#fbbf24' : '#3b82f6';
+
+                return (
+                  <g key={`svg-upper-${tooth.num}`}>
+                    <line
+                      x1={x1}
+                      y1={y1}
+                      x2={x2}
+                      y2={y2}
+                      stroke={strokeColor}
+                      strokeWidth="0.6"
+                      strokeDasharray={isSelected ? 'none' : '1.5 1.5'}
+                      strokeOpacity="0.85"
+                    />
+                    <circle cx={x2} cy={y2} r="1" fill={strokeColor} />
+                  </g>
+                );
+              })}
+            </svg>
+
             {/* Punteros / Flechas Finas Externas que apuntan desde afuera sin tapar */}
             {UPPER_TEETH.map((tooth) => {
               const diag = diagnosisMap[tooth.num];
@@ -162,6 +194,38 @@ export default function PatientOdontogram({
               alt="Mandíbula Inferior 3D"
               className="w-full h-auto mx-auto object-contain block select-none pointer-events-none drop-shadow-[0_10px_20px_rgba(0,0,0,0.6)]"
             />
+
+            {/* Capa de indicadores/punteros finos SVG */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none z-10" viewBox="0 0 100 100" preserveAspectRatio="none">
+              {LOWER_TEETH.map((tooth) => {
+                const diag = diagnosisMap[tooth.num];
+                const isSelected = selectedTooth === tooth.num;
+                const hasTreatment = diag?.condition && diag.condition !== 'healthy';
+                if (!isSelected && !hasTreatment) return null;
+
+                const x1 = parseFloat(tooth.pointerLeft);
+                const y1 = parseFloat(tooth.pointerTop);
+                const x2 = parseFloat(tooth.targetLeft);
+                const y2 = parseFloat(tooth.targetTop);
+                const strokeColor = isSelected ? '#fbbf24' : '#3b82f6';
+
+                return (
+                  <g key={`svg-lower-${tooth.num}`}>
+                    <line
+                      x1={x1}
+                      y1={y1}
+                      x2={x2}
+                      y2={y2}
+                      stroke={strokeColor}
+                      strokeWidth="0.6"
+                      strokeDasharray={isSelected ? 'none' : '1.5 1.5'}
+                      strokeOpacity="0.85"
+                    />
+                    <circle cx={x2} cy={y2} r="1" fill={strokeColor} />
+                  </g>
+                );
+              })}
+            </svg>
 
             {/* Punteros / Flechas Finas Externas */}
             {LOWER_TEETH.map((tooth) => {
