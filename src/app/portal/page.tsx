@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import PatientOdontogram from '@/components/PatientOdontogram';
 
 // Constantes oficiales de Sedes y Sedes Clínicas Audenti
 const BRANCH_DETAILS: Record<string, { name: string; address: string; mapUrl: string; hours: string; phone: string }> = {
@@ -352,175 +353,36 @@ export default function PatientPortalPage() {
           </div>
         </div>
 
-        {/* 4. ODONTOGRAMA PERSONAL INTERACTIVO (Modo Consulta / Explicativo) */}
-        <div className="bg-[#121824] border border-gray-800 rounded-2xl p-6 shadow-xl space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-800/80 pb-4">
-            <div>
-              <h3 className="font-bold text-base text-amber-400 flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-400" /> Mi Odontograma Personal (Consulta Interactiva)
-              </h3>
-              <p className="text-xs text-gray-400 mt-1">
-                Haz clic en cualquiera de tus piezas dentales para consultar su estado clínico y tratamientos aplicados por la Dra. Aura.
-              </p>
+        {/* 4. ODONTOGRAMA PERSONAL INTERACTIVO 3D (Modo Consulta / Explicativo) */}
+        <PatientOdontogram
+          patientData={{
+            branch_name: branchInfo.name,
+            ...patient
+          }}
+          selectedTooth={selectedTooth}
+          setSelectedTooth={setSelectedTooth}
+          diagnosisMap={DEFAULT_DIAGNOSIS_MAP}
+        />
+
+        {/* Tarjeta de Detalle de la Pieza Seleccionada */}
+        <div className="p-5 bg-[#121824] border border-gray-800 rounded-2xl shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="text-base font-black text-white">Pieza #{selectedTooth}</span>
+              <span className={cn('text-[10px] font-bold px-2.5 py-0.5 rounded-full border', activeToothDiagnosis.badgeColor)}>
+                {activeToothDiagnosis.label}
+              </span>
+              {activeToothDiagnosis.appliedDate && (
+                <span className="text-[11px] text-gray-400 font-medium">({activeToothDiagnosis.appliedDate})</span>
+              )}
             </div>
-            <span className="text-[10px] text-gray-400 bg-gray-800/80 border border-gray-700 px-3 py-1 rounded-full self-start sm:self-auto">
-              Solo Lectura • Validez NOM-004-SSA3
-            </span>
+            <p className="text-sm text-amber-300 font-bold">{activeToothDiagnosis.treatmentName}</p>
+            <p className="text-xs text-gray-300">{activeToothDiagnosis.notes}</p>
           </div>
 
-          {/* Gráfico de Piezas Dentales */}
-          <div className="bg-[#0A0F1D] border border-gray-800 rounded-xl p-5 sm:p-6 overflow-x-auto">
-            <div className="min-w-[620px] space-y-6">
-              {/* Maxilar Superior */}
-              <div>
-                <p className="text-[10px] uppercase font-bold tracking-wider text-gray-400 text-center mb-3">
-                  Maxilar Superior (Arcada Superior)
-                </p>
-                <div className="flex justify-center items-center gap-2">
-                  {/* Cuadrante 1: 18 - 11 */}
-                  <div className="flex gap-1.5 bg-slate-900/60 p-2 rounded-xl border border-gray-800">
-                    {ADULT_TEETH.upperRight.map((tooth) => {
-                      const diag = DEFAULT_DIAGNOSIS_MAP[tooth];
-                      const isSelected = selectedTooth === tooth;
-                      return (
-                        <button
-                          key={tooth}
-                          onClick={() => setSelectedTooth(tooth)}
-                          className={cn(
-                            'w-8 h-12 rounded-lg flex flex-col items-center justify-between p-1 transition-all cursor-pointer',
-                            isSelected ? 'ring-2 ring-amber-400 bg-amber-400/20 scale-105' : 'bg-gray-800/70 hover:bg-gray-700/80'
-                          )}
-                        >
-                          <span className="text-[9px] font-bold text-gray-300">{tooth}</span>
-                          <div
-                            className="w-4 h-5 rounded-sm border"
-                            style={{
-                              backgroundColor: diag ? diag.fillColor : '#10b981',
-                              borderColor: isSelected ? '#fbbf24' : '#4b5563'
-                            }}
-                          />
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <div className="w-px h-12 bg-gray-700 mx-1" />
-
-                  {/* Cuadrante 2: 21 - 28 */}
-                  <div className="flex gap-1.5 bg-slate-900/60 p-2 rounded-xl border border-gray-800">
-                    {ADULT_TEETH.upperLeft.map((tooth) => {
-                      const diag = DEFAULT_DIAGNOSIS_MAP[tooth];
-                      const isSelected = selectedTooth === tooth;
-                      return (
-                        <button
-                          key={tooth}
-                          onClick={() => setSelectedTooth(tooth)}
-                          className={cn(
-                            'w-8 h-12 rounded-lg flex flex-col items-center justify-between p-1 transition-all cursor-pointer',
-                            isSelected ? 'ring-2 ring-amber-400 bg-amber-400/20 scale-105' : 'bg-gray-800/70 hover:bg-gray-700/80'
-                          )}
-                        >
-                          <span className="text-[9px] font-bold text-gray-300">{tooth}</span>
-                          <div
-                            className="w-4 h-5 rounded-sm border"
-                            style={{
-                              backgroundColor: diag ? diag.fillColor : '#10b981',
-                              borderColor: isSelected ? '#fbbf24' : '#4b5563'
-                            }}
-                          />
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* Maxilar Inferior */}
-              <div>
-                <p className="text-[10px] uppercase font-bold tracking-wider text-gray-400 text-center mb-3">
-                  Mandíbula (Arcada Inferior)
-                </p>
-                <div className="flex justify-center items-center gap-2">
-                  {/* Cuadrante 4: 48 - 41 */}
-                  <div className="flex gap-1.5 bg-slate-900/60 p-2 rounded-xl border border-gray-800">
-                    {ADULT_TEETH.lowerRight.map((tooth) => {
-                      const diag = DEFAULT_DIAGNOSIS_MAP[tooth];
-                      const isSelected = selectedTooth === tooth;
-                      return (
-                        <button
-                          key={tooth}
-                          onClick={() => setSelectedTooth(tooth)}
-                          className={cn(
-                            'w-8 h-12 rounded-lg flex flex-col items-center justify-between p-1 transition-all cursor-pointer',
-                            isSelected ? 'ring-2 ring-amber-400 bg-amber-400/20 scale-105' : 'bg-gray-800/70 hover:bg-gray-700/80'
-                          )}
-                        >
-                          <div
-                            className="w-4 h-5 rounded-sm border"
-                            style={{
-                              backgroundColor: diag ? diag.fillColor : '#10b981',
-                              borderColor: isSelected ? '#fbbf24' : '#4b5563'
-                            }}
-                          />
-                          <span className="text-[9px] font-bold text-gray-300">{tooth}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <div className="w-px h-12 bg-gray-700 mx-1" />
-
-                  {/* Cuadrante 3: 31 - 38 */}
-                  <div className="flex gap-1.5 bg-slate-900/60 p-2 rounded-xl border border-gray-800">
-                    {ADULT_TEETH.lowerLeft.map((tooth) => {
-                      const diag = DEFAULT_DIAGNOSIS_MAP[tooth];
-                      const isSelected = selectedTooth === tooth;
-                      return (
-                        <button
-                          key={tooth}
-                          onClick={() => setSelectedTooth(tooth)}
-                          className={cn(
-                            'w-8 h-12 rounded-lg flex flex-col items-center justify-between p-1 transition-all cursor-pointer',
-                            isSelected ? 'ring-2 ring-amber-400 bg-amber-400/20 scale-105' : 'bg-gray-800/70 hover:bg-gray-700/80'
-                          )}
-                        >
-                          <div
-                            className="w-4 h-5 rounded-sm border"
-                            style={{
-                              backgroundColor: diag ? diag.fillColor : '#10b981',
-                              borderColor: isSelected ? '#fbbf24' : '#4b5563'
-                            }}
-                          />
-                          <span className="text-[9px] font-bold text-gray-300">{tooth}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Tarjeta de Detalle de la Pieza Seleccionada */}
-          <div className="p-4 bg-slate-900/80 border border-gray-800 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-black text-white">Pieza #{selectedTooth}</span>
-                <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full border', activeToothDiagnosis.badgeColor)}>
-                  {activeToothDiagnosis.label}
-                </span>
-                {activeToothDiagnosis.appliedDate && (
-                  <span className="text-[10px] text-gray-400">({activeToothDiagnosis.appliedDate})</span>
-                )}
-              </div>
-              <p className="text-xs text-amber-300 font-semibold">{activeToothDiagnosis.treatmentName}</p>
-              <p className="text-[11px] text-gray-300">{activeToothDiagnosis.notes}</p>
-            </div>
-
-            <div className="flex items-center gap-2 text-[10px] text-gray-400 bg-gray-800/60 px-3 py-1.5 rounded-lg border border-gray-700/80 self-stretch sm:self-auto justify-center">
-              <Info className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span>Diagnóstico avalado por la Dra. Aura Estudillo</span>
-            </div>
+          <div className="flex items-center gap-2 text-[11px] text-gray-400 bg-gray-800/60 px-3.5 py-2 rounded-xl border border-gray-700/80 self-stretch sm:self-auto justify-center">
+            <Info className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>Diagnóstico avalado por la Dra. Aura Estudillo (Solo Lectura)</span>
           </div>
         </div>
 
