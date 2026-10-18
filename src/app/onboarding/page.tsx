@@ -6,9 +6,8 @@ import { createClient } from '@/utils/supabase/client';
 import { ShieldCheck, UserCheck, HeartPulse, PhoneCall, AlertTriangle } from 'lucide-react';
 
 const BRANCHES = [
-  { id: '00000000-0000-0000-0000-000000000001', name: 'Sucursal Balbuena (Matriz)' },
-  { id: '00000000-0000-0000-0000-000000000002', name: 'Sucursal Roma Norte' },
-  { id: '00000000-0000-0000-0000-000000000003', name: 'Sucursal Polanco' }
+  { id: '00000000-0000-0000-0000-000000000001', name: 'Sucursal Valbuena (Matriz)' },
+  { id: '00000000-0000-0000-0000-000000000002', name: 'Sucursal Chalma de Guadalupe' }
 ];
 
 export default function OnboardingPage() {

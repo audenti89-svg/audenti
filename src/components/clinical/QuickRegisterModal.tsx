@@ -17,9 +17,8 @@ import { useBranchStore, BranchId, BRANCHES_DATA } from '@/stores/branchStore'
 
 // Lista de sucursales disponibles para la selección del paciente con UUIDs de tenant:
 export const BRANCHES = [
-  { id: '00000000-0000-0000-0000-000000000001', name: 'Sucursal Balbuena (Matriz)' },
-  { id: '00000000-0000-0000-0000-000000000002', name: 'Sucursal Roma Norte' },
-  { id: '00000000-0000-0000-0000-000000000003', name: 'Sucursal Polanco' }
+  { id: '00000000-0000-0000-0000-000000000001', name: 'Sucursal Valbuena (Matriz)' },
+  { id: '00000000-0000-0000-0000-000000000002', name: 'Sucursal Chalma de Guadalupe' }
 ];
 export const branches = BRANCHES; // Compatibilidad
 
@@ -53,7 +52,7 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
   // Sincronizar con la sucursal activa al abrir
   useEffect(() => {
     if (isOpen) {
-      if (currentBranchId === 'colonia-roma') {
+      if (currentBranchId === 'guadalupe-chalma') {
         setFormData(prev => ({ ...prev, tenant_id: BRANCHES[1].id, selectedBranchId: currentBranchId }))
       } else {
         setFormData(prev => ({ ...prev, tenant_id: BRANCHES[0].id, selectedBranchId: currentBranchId }))
