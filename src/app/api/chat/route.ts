@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { sendDoctorWhatsAppAlert } from '@/lib/notifications/whatsapp-doctor';
 
 export const runtime = 'nodejs';
 
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
       throw uploadError;
     }
 
-    // 4. Emitir eventos Realtime
+    // 4. Emitir eventos Realtime y Notificación WhatsApp
     try {
       if (message.senderRole === 'patient') {
         // Notificar a la doctora en vivo
@@ -60,6 +61,22 @@ export async function POST(request: Request) {
             patient_name: message.senderName,
             time: message.timestamp
           }
+        });
+
+        // Alerta WhatsApp para cuando la doctora va conduciendo o no está frente a la PC
+        await sendDoctorWhatsAppAlert({
+          title: `Nuevo Mensaje en Portal Clínico`,
+          patientName: message.senderName || 'Paciente',
+          message: message.content,
+          type: 'chat_message'
+        });
+      } else if (message.senderRole === 'ai' && message.content.includes('Llamada de Voz')) {
+        // Alerta de Resumen de Voz para WhatsApp
+        await sendDoctorWhatsAppAlert({
+          title: `📞 Resumen de Llamada de Voz Finalizada`,
+          patientName: message.senderName || 'Paciente',
+          message: message.content,
+          type: 'voice_call'
         });
       } else {
         // Notificar al paciente en vivo
