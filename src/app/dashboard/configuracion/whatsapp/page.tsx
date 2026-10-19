@@ -16,6 +16,7 @@ import {
   RefreshCw,
   Info
 } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
 
 export default function WhatsAppSettingsPage() {
   const [phoneNumber, setPhoneNumber] = useState('525522427769')
@@ -27,6 +28,11 @@ export default function WhatsAppSettingsPage() {
   const [chatbotEnabled, setChatbotEnabled] = useState(true)
   const [chatbotMode, setChatbotMode] = useState<'autonomous' | 'suggestion' | 'disabled'>('autonomous')
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
+
+  // Estado de WAHA QR (DeskcommCRM Adapter)
+  const [wahaQr, setWahaQr] = useState<string | null>(null)
+  const [wahaStatus, setWahaStatus] = useState<string>('DISCONNECTED')
+  const [wahaLoading, setWahaLoading] = useState(false)
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -128,6 +134,44 @@ export default function WhatsAppSettingsPage() {
     }
   }
 
+  // Cargar QR de WhatsApp Web WAHA (DeskcommCRM Adapter)
+  const handleLoadWahaQr = async () => {
+    setWahaLoading(true)
+    try {
+      const res = await fetch('/api/settings/whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'get_qr' })
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        setWahaQr(data.qr || null)
+        setWahaStatus(data.status || 'SCAN_QR_CODE')
+      }
+    } catch (e: any) {
+      console.warn('Error obteniendo QR WAHA:', e)
+    } finally {
+      setWahaLoading(false)
+    }
+  }
+
+  const handleLogoutWaha = async () => {
+    setWahaLoading(true)
+    try {
+      await fetch('/api/settings/whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'logout_waha' })
+      })
+      setWahaQr(null)
+      setWahaStatus('DISCONNECTED')
+    } catch (e) {
+      console.warn('Error desconectando WAHA:', e)
+    } finally {
+      setWahaLoading(false)
+    }
+  }
+
   return (
     <div className="flex flex-col w-full space-y-6 pb-16 max-w-5xl mx-auto">
       {/* Header */}
@@ -154,6 +198,92 @@ export default function WhatsAppSettingsPage() {
             <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
             {chatbotEnabled ? 'Chatbot Activo 24/7' : 'Chatbot Pausado'}
           </span>
+        </div>
+      </div>
+
+      {/* MÓDULO DE VINCULACIÓN POR CÓDIGO QR (WAHA / DESKCOMMCRM ADAPTER) */}
+      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-200">
+              <QrCode className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                Vinculación de WhatsApp Web por Código QR (WAHA)
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-200">
+                  DeskcommCRM Engine
+                </span>
+              </h3>
+              <p className="text-xs text-slate-500">
+                Escanea el código QR desde tu celular (Dispositivos Vinculados) para habilitar mensajería bidireccional instantánea.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className={`px-2.5 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5 ${
+              wahaStatus === 'WORKING'
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                : wahaStatus === 'SCAN_QR_CODE'
+                ? 'bg-amber-50 text-amber-800 border-amber-300'
+                : 'bg-slate-100 text-slate-600 border-slate-200'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${
+                wahaStatus === 'WORKING' ? 'bg-emerald-500 animate-pulse' : wahaStatus === 'SCAN_QR_CODE' ? 'bg-amber-500 animate-ping' : 'bg-slate-400'
+              }`} />
+              {wahaStatus === 'WORKING' ? 'Sesión Conectada' : wahaStatus === 'SCAN_QR_CODE' ? 'Esperando Escaneo' : 'Desconectado'}
+            </span>
+          </div>
+        </div>
+
+        <div className="p-6 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex-1 space-y-3">
+            <h4 className="text-sm font-bold text-slate-900">Pasos para conectar:</h4>
+            <ol className="text-xs text-slate-600 space-y-2 list-decimal list-inside leading-relaxed">
+              <li>Abre <strong>WhatsApp</strong> en el teléfono oficial de la Dra. Aura Estudillo.</li>
+              <li>Toca <strong>Menú</strong> (Android) o <strong>Configuración</strong> (iPhone) y selecciona <strong>Dispositivos Vinculados</strong>.</li>
+              <li>Presiona <strong>Vincular un Dispositivo</strong> y apunta la cámara hacia el código QR mostrado a la derecha.</li>
+              <li>Audenti comenzará a recibir y contestar mensajes automáticamente con Aura IA.</li>
+            </ol>
+
+            <div className="pt-2 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleLoadWahaQr}
+                disabled={wahaLoading}
+                className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-xs transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+              >
+                {wahaLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />}
+                <span>{wahaQr ? 'Actualizar Código QR' : 'Generar Código QR de Vinculación'}</span>
+              </button>
+
+              {wahaStatus === 'WORKING' && (
+                <button
+                  type="button"
+                  onClick={handleLogoutWaha}
+                  disabled={wahaLoading}
+                  className="px-3.5 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 transition-colors cursor-pointer"
+                >
+                  Desvincular Sesión
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="w-64 h-64 p-4 rounded-2xl bg-slate-50 border-2 border-dashed border-amber-300 flex flex-col items-center justify-center text-center shadow-inner shrink-0">
+            {wahaQr ? (
+              <div className="bg-white p-3 rounded-xl shadow-md border border-slate-200 flex flex-col items-center">
+                <QRCodeSVG value={wahaQr} size={180} level="M" />
+                <span className="text-[10px] text-slate-500 font-mono mt-2 animate-pulse">Escanea desde WhatsApp</span>
+              </div>
+            ) : (
+              <div className="space-y-2 text-slate-400">
+                <QrCode className="w-12 h-12 mx-auto stroke-1" />
+                <p className="text-xs font-medium">Haz clic en &ldquo;Generar Código QR&rdquo; para vincular</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

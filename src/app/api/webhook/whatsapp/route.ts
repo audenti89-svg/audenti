@@ -121,7 +121,118 @@ export async function POST(request: Request) {
         }
       });
     } catch (dbErr: any) {
-      console.warn('[WhatsApp Webhook DB Note]:', dbErr.message);
+      console.warn('[WhatsApp Webhook Prisma Note]:', dbErr.message);
+    }
+
+    // Persistencia Directa en Supabase PostgreSQL (chat_messages & chat_omnichannel.json)
+    try {
+      const { createAdminClient } = await import('@/lib/supabase/admin');
+      const supabase = createAdminClient();
+
+      const cleanPhone = patientPhone.replace(/\D/g, '').slice(-10);
+      let targetPatientId = '';
+      let isRegistered = false;
+
+      const { data: found } = await supabase
+        .from('patients')
+        .select('id, full_name, phone')
+        .ilike('phone', `%${cleanPhone}%`)
+        .maybeSingle();
+
+      if (found) {
+        targetPatientId = found.id;
+        isRegistered = true;
+      } else {
+        targetPatientId = `prospect_${patientPhone.replace(/\D/g, '') || Date.now()}`;
+      }
+
+      const nowFormatted = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+      // Inserción del mensaje entrante del paciente
+      await supabase.from('chat_messages').insert({
+        patient_id: isRegistered ? targetPatientId : null,
+        sender_role: 'patient',
+        sender_name: patientName,
+        content: patientMessage,
+        channel_type: 'whatsapp',
+        metadata: {
+          channel_type: 'whatsapp',
+          phone: patientPhone,
+          isRegistered,
+          patientName
+        },
+        created_at: new Date().toISOString()
+      });
+
+      // Inserción de la respuesta de Aura IA
+      await supabase.from('chat_messages').insert({
+        patient_id: isRegistered ? targetPatientId : null,
+        sender_role: 'ai',
+        sender_name: 'Aura AI',
+        content: replyText,
+        channel_type: 'whatsapp',
+        metadata: {
+          channel_type: 'whatsapp',
+          phone: patientPhone,
+          isRegistered
+        },
+        created_at: new Date().toISOString()
+      });
+
+      // Redundancia en Storage chat_omnichannel.json
+      try {
+        let allChats: Record<string, any[]> = {};
+        const { data: file } = await supabase.storage.from('audenti_database').download('chat_omnichannel.json');
+        if (file) {
+          const text = await file.text();
+          if (text && text.trim()) allChats = JSON.parse(text);
+        }
+        const patientHistory = allChats[targetPatientId] || [];
+        patientHistory.push({
+          id: `msg-in-${Date.now()}`,
+          channel_type: 'whatsapp',
+          senderName: patientName,
+          senderRole: 'patient',
+          isDoctor: false,
+          timestamp: nowFormatted,
+          content: patientMessage
+        });
+        patientHistory.push({
+          id: `msg-out-${Date.now() + 1}`,
+          channel_type: 'whatsapp',
+          senderName: 'Aura AI',
+          senderRole: 'ai',
+          isDoctor: false,
+          timestamp: nowFormatted,
+          content: replyText
+        });
+        allChats[targetPatientId] = patientHistory;
+        await supabase.storage.from('audenti_database').upload(
+          'chat_omnichannel.json',
+          JSON.stringify(allChats, null, 2),
+          { upsert: true, contentType: 'application/json' }
+        );
+      } catch (stErr: any) {
+        console.warn('[WhatsApp Storage Sync Note]:', stErr?.message);
+      }
+
+      // Emisión de Realtime Broadcast
+      await supabase.channel('chat_omnichannel_sync').send({
+        type: 'broadcast',
+        event: 'sync_patient_message',
+        payload: {
+          targetPatientId,
+          patientId: targetPatientId,
+          patientName,
+          phone: patientPhone,
+          channel_type: 'whatsapp',
+          message: patientMessage,
+          reply: replyText,
+          timestamp: nowFormatted
+        }
+      });
+    } catch (supaErr: any) {
+      console.warn('[WhatsApp Supabase Sync Note]:', supaErr?.message);
     }
 
     // Si está configurada la pasarela QR, despachar el mensaje

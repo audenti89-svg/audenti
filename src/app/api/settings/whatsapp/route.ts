@@ -70,6 +70,25 @@ export async function POST(request: Request) {
       action
     } = body;
 
+    // Acción especial: Obtener QR de Vinculación WAHA (DeskcommCRM Adapter)
+    if (action === 'get_qr') {
+      const { wahaClient } = await import('@/lib/waha/client');
+      const sessionResult = await wahaClient.getOrStartSession('audenti_default');
+      return NextResponse.json({
+        success: true,
+        ...sessionResult
+      });
+    }
+
+    if (action === 'logout_waha') {
+      const { wahaClient } = await import('@/lib/waha/client');
+      await wahaClient.logoutSession('audenti_default');
+      return NextResponse.json({
+        success: true,
+        message: 'Sesión WAHA cerrada correctamente'
+      });
+    }
+
     // Acción especial: Verificar Webhook y Token de Meta
     if (action === 'verify_connection') {
       const isTokenPresent = Boolean(meta_access_token && meta_access_token.trim().length > 10);
