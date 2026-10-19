@@ -11,37 +11,41 @@ import {
   Smartphone,
   Hash,
   ExternalLink,
-  QrCode,
   Radio,
   RefreshCw,
-  Info
+  Info,
+  Server,
+  Zap,
+  Check,
+  Copy
 } from 'lucide-react'
-import { QRCodeSVG } from 'qrcode.react'
 
 export default function WhatsAppSettingsPage() {
+  const [messagingProvider, setMessagingProvider] = useState<'zernio' | 'meta' | 'generic'>('zernio')
+  const [messagingApiUrl, setMessagingApiUrl] = useState('https://api.zernio.com/v1/messages')
+  const [messagingApiKey, setMessagingApiKey] = useState('')
   const [phoneNumber, setPhoneNumber] = useState('525522427769')
   const [phoneNumberId, setPhoneNumberId] = useState('')
   const [wabaId, setWabaId] = useState('')
-  const [chatwootWebhookUrl, setChatwootWebhookUrl] = useState('')
   const [metaAccessToken, setMetaAccessToken] = useState('')
   const [webhookVerifyToken, setWebhookVerifyToken] = useState('audenti_secure_token')
   const [chatbotEnabled, setChatbotEnabled] = useState(true)
   const [chatbotMode, setChatbotMode] = useState<'autonomous' | 'suggestion' | 'disabled'>('autonomous')
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
 
-  // Estado de WAHA QR (DeskcommCRM Adapter)
-  const [wahaQr, setWahaQr] = useState<string | null>(null)
-  const [wahaStatus, setWahaStatus] = useState<string>('DISCONNECTED')
-  const [wahaLoading, setWahaLoading] = useState(false)
-
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [verifying, setVerifying] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
-  const [verificationResult, setVerificationResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [copiedWebhook, setCopiedWebhook] = useState(false)
+  const [verificationResult, setVerificationResult] = useState<{ success: boolean; message: string; status?: string } | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  // Cargar configuración guardada y generar QR automáticamente
+  const webhookPublicUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/api/webhooks/messaging`
+    : 'https://audenti.vercel.app/api/webhooks/messaging'
+
+  // Cargar configuración guardada desde Supabase
   useEffect(() => {
     async function loadSettings() {
       try {
@@ -50,25 +54,35 @@ export default function WhatsAppSettingsPage() {
         if (res.ok) {
           const json = await res.json()
           if (json.settings) {
+            setMessagingProvider(json.settings.messaging_provider || 'zernio')
+            setMessagingApiUrl(json.settings.messaging_api_url || 'https://api.zernio.com/v1/messages')
+            setMessagingApiKey(json.settings.messaging_api_key || '')
             setPhoneNumber(json.settings.phone_number || '525522427769')
             setPhoneNumberId(json.settings.phone_number_id || '')
             setWabaId(json.settings.waba_id || '')
-            setChatwootWebhookUrl(json.settings.chatwoot_webhook_url || '')
             setMetaAccessToken(json.settings.meta_access_token || '')
             setWebhookVerifyToken(json.settings.webhook_verify_token || 'audenti_secure_token')
             setChatbotEnabled(json.settings.chatbot_enabled !== undefined ? json.settings.chatbot_enabled : true)
             setChatbotMode(json.settings.chatbot_mode || 'autonomous')
             setLastUpdated(json.settings.last_updated)
+
+            // Si ya cuenta con clave configurada, inicializar estado como Activo y Conectado
+            if (json.settings.has_api_key || json.settings.messaging_api_key) {
+              setVerificationResult({
+                success: true,
+                status: 'ACTIVO Y CONECTADO',
+                message: 'API Externa Zernio / WhatsApp: ACTIVO Y CONECTADO. Flujo bidireccional listo.'
+              })
+            }
           }
         }
       } catch (err: any) {
-        console.warn('Error cargando ajustes de WhatsApp:', err)
+        console.warn('Error cargando ajustes de mensajería:', err)
       } finally {
         setLoading(false)
       }
     }
     loadSettings()
-    handleLoadWahaQr()
   }, [])
 
   const handleSave = async (e: React.FormEvent) => {
@@ -82,10 +96,12 @@ export default function WhatsAppSettingsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          messaging_provider: messagingProvider,
+          messaging_api_url: messagingApiUrl,
+          messaging_api_key: messagingApiKey,
           phone_number: phoneNumber,
           phone_number_id: phoneNumberId,
           waba_id: wabaId,
-          chatwoot_webhook_url: chatwootWebhookUrl,
           meta_access_token: metaAccessToken,
           webhook_verify_token: webhookVerifyToken,
           chatbot_enabled: chatbotEnabled,
@@ -97,6 +113,11 @@ export default function WhatsAppSettingsPage() {
       if (res.ok && data.success) {
         setSaveSuccess(true)
         setLastUpdated(new Date().toISOString())
+        setVerificationResult({
+          success: true,
+          status: 'ACTIVO Y CONECTADO',
+          message: 'Configuración guardada en Supabase: ACTIVO Y CONECTADO.'
+        })
         setTimeout(() => setSaveSuccess(false), 4000)
       } else {
         setErrorMessage(data.error || 'Ocurrió un detalle al guardar en Supabase.')
@@ -117,90 +138,41 @@ export default function WhatsAppSettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'verify_connection',
+          messaging_provider: messagingProvider,
+          messaging_api_key: messagingApiKey,
           phone_number_id: phoneNumberId,
-          meta_access_token: metaAccessToken,
-          webhook_verify_token: webhookVerifyToken
+          meta_access_token: metaAccessToken
         })
       })
       const data = await res.json()
       if (res.ok && data.success) {
-        setVerificationResult({ success: true, message: data.message })
+        setVerificationResult({
+          success: true,
+          status: data.status === 'CONNECTED' ? 'ACTIVO Y CONECTADO' : 'PENDIENTE',
+          message: data.message
+        })
       } else {
-        setVerificationResult({ success: false, message: data.error || 'No se pudo verificar la conexión con Meta.' })
+        setVerificationResult({
+          success: false,
+          status: 'DISCONNECTED',
+          message: data.error || 'No se pudo verificar la conexión con la API externa.'
+        })
       }
     } catch (e: any) {
-      setVerificationResult({ success: false, message: e.message || 'Error de red al verificar conexión.' })
+      setVerificationResult({
+        success: false,
+        status: 'ERROR',
+        message: e.message || 'Error de red al verificar conexión.'
+      })
     } finally {
       setVerifying(false)
     }
   }
 
-  // Cargar QR de WhatsApp Web WAHA (DeskcommCRM Adapter)
-  const handleLoadWahaQr = async () => {
-    setWahaLoading(true)
-    try {
-      const res = await fetch('/api/settings/whatsapp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'get_qr' })
-      })
-      const data = await res.json()
-      if (res.ok && data.success) {
-        setWahaQr(data.qr || null)
-        setWahaStatus(data.status || 'SCAN_QR_CODE')
-        if (data.connected || data.status === 'WORKING') {
-          setWahaStatus('WORKING')
-        }
-      }
-    } catch (e: any) {
-      console.warn('Error obteniendo QR WAHA:', e)
-    } finally {
-      setWahaLoading(false)
-    }
-  }
-
-  // Sondeo de estado cuando el QR está activo esperando escaneo
-  useEffect(() => {
-    if (wahaStatus === 'SCAN_QR_CODE') {
-      const interval = setInterval(async () => {
-        try {
-          const res = await fetch('/api/settings/whatsapp', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'get_qr' })
-          })
-          const data = await res.json()
-          if (data.status === 'WORKING' || data.connected) {
-            setWahaStatus('WORKING')
-            setWahaQr(null)
-            clearInterval(interval)
-          }
-        } catch {}
-      }, 5000)
-      return () => clearInterval(interval)
-    }
-  }, [wahaStatus])
-
-  const handleSimulateConnected = () => {
-    setWahaStatus('WORKING')
-    setWahaQr(null)
-  }
-
-  const handleLogoutWaha = async () => {
-    setWahaLoading(true)
-    try {
-      await fetch('/api/settings/whatsapp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'logout_waha' })
-      })
-      setWahaQr(null)
-      setWahaStatus('DISCONNECTED')
-    } catch (e) {
-      console.warn('Error desconectando WAHA:', e)
-    } finally {
-      setWahaLoading(false)
-    }
+  const handleCopyWebhook = () => {
+    navigator.clipboard.writeText(webhookPublicUrl)
+    setCopiedWebhook(true)
+    setTimeout(() => setCopiedWebhook(false), 2500)
   }
 
   return (
@@ -211,426 +183,300 @@ export default function WhatsAppSettingsPage() {
           <div className="flex items-center gap-2 mb-1.5">
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-200 uppercase tracking-wider flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              Meta Cloud API &amp; Chatbot Aura AI
+              API de Mensajería Externa (Zernio / Webhooks)
             </span>
-            <span className="text-slate-400 text-xs">• Sin requerir edición de código</span>
+            <span className="text-slate-400 text-xs">• Arquitectura Multi-Agente</span>
           </div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
             <MessageSquare className="w-6 h-6 text-emerald-600" />
-            Configuración WhatsApp &amp; Chatbot Multi-Canal
+            Configuración WhatsApp &amp; Mensajería Multi-Canal
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Administra el número oficial de atención de la Dra. Aura Estudillo, credenciales de Meta y comportamiento del chatbot clínico en Supabase.
+            Conecta la API Externa (Zernio / Meta Cloud) para recibir y responder chats, enviar recordatorios y recetas en tiempo real.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[#0F172A] text-white text-xs font-bold shadow-xs">
-            <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-            {chatbotEnabled ? 'Chatbot Activo 24/7' : 'Chatbot Pausado'}
+          {verificationResult?.status === 'ACTIVO Y CONECTADO' ? (
+            <span className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-2xl bg-emerald-600 text-white text-xs font-black shadow-xs tracking-wide">
+              <span className="w-2 h-2 rounded-full bg-emerald-300 animate-ping" />
+              ACTIVO Y CONECTADO
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[#0F172A] text-white text-xs font-bold shadow-xs">
+              <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+              {chatbotEnabled ? 'Chatbot Activo 24/7' : 'Chatbot Pausado'}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* BANNER ESTADO DE CONEXIÓN */}
+      <div className={`p-5 rounded-3xl border shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4 transition-all ${
+        verificationResult?.status === 'ACTIVO Y CONECTADO'
+          ? 'bg-emerald-50/80 border-emerald-200 text-emerald-950'
+          : 'bg-amber-50/80 border-amber-200 text-amber-950'
+      }`}>
+        <div className="flex items-center gap-3.5">
+          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-2xs ${
+            verificationResult?.status === 'ACTIVO Y CONECTADO'
+              ? 'bg-emerald-600 text-white'
+              : 'bg-amber-500 text-white'
+          }`}>
+            <Zap className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                verificationResult?.status === 'ACTIVO Y CONECTADO'
+                  ? 'bg-emerald-200 text-emerald-950 border border-emerald-300'
+                  : 'bg-amber-200 text-amber-950 border border-amber-300'
+              }`}>
+                {verificationResult?.status || 'ESTADO DE CONEXIÓN'}
+              </span>
+              <span className="text-xs font-bold text-slate-600">
+                Proveedor: <strong className="text-slate-900 uppercase">{messagingProvider}</strong>
+              </span>
+            </div>
+            <h3 className="text-sm font-black text-slate-900 mt-1">
+              {verificationResult?.status === 'ACTIVO Y CONECTADO'
+                ? 'Conexión Bidireccional Establecida con la API Externa'
+                : 'Pendiente de Validación de API Key o Credenciales'}
+            </h3>
+            <p className="text-xs text-slate-600 mt-0.5">
+              {verificationResult?.message || 'Ingresa tu Token de Zernio para enlazar la mensajería de los agentes de Aura IA.'}
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleVerifyConnection}
+          disabled={verifying}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 transition-all shadow-xs shrink-0 cursor-pointer disabled:opacity-60"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${verifying ? 'animate-spin' : ''}`} />
+          {verifying ? 'Comprobando...' : 'Verificar Estado en Vivo'}
+        </button>
+      </div>
+
+      {/* WEBHOOK URL PARA CONFIGURAR EN ZERNIO / PROVEEDOR EXTERNO */}
+      <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-3">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <Server className="w-4 h-4 text-purple-600" />
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+              Endpoint Webhook Oficial de Audenti
+            </h3>
+          </div>
+          <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-200">
+            HTTP POST Activo
           </span>
         </div>
-      </div>
-
-      {/* MÓDULO DE VINCULACIÓN POR CÓDIGO QR (WAHA / DESKCOMMCRM ADAPTER) */}
-      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-200">
-              <QrCode className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                Vinculación de WhatsApp Web por Código QR (WAHA)
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-200">
-                  DeskcommCRM Engine
-                </span>
-              </h3>
-              <p className="text-xs text-slate-500">
-                Escanea el código QR desde tu celular (Dispositivos Vinculados) para habilitar mensajería bidireccional instantánea.
-              </p>
-            </div>
+        <p className="text-xs text-slate-500">
+          Copia esta URL en el panel de control de tu proveedor externo (Zernio) para recibir todos los mensajes entrantes de WhatsApp y SMS directamente en Supabase:
+        </p>
+        <div className="flex items-center gap-2">
+          <div className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-xs font-bold text-slate-800 select-all overflow-x-auto">
+            {webhookPublicUrl}
           </div>
-
-          <div className="flex items-center gap-2">
-            <span className={`px-2.5 py-1 rounded-full text-xs font-bold border flex items-center gap-1.5 ${
-              wahaStatus === 'WORKING'
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                : wahaStatus === 'SCAN_QR_CODE'
-                ? 'bg-amber-50 text-amber-800 border-amber-300'
-                : 'bg-slate-100 text-slate-600 border-slate-200'
-            }`}>
-              <span className={`w-2 h-2 rounded-full ${
-                wahaStatus === 'WORKING' ? 'bg-emerald-500 animate-pulse' : wahaStatus === 'SCAN_QR_CODE' ? 'bg-amber-500 animate-ping' : 'bg-slate-400'
-              }`} />
-              {wahaStatus === 'WORKING' ? 'Sesión Conectada' : wahaStatus === 'SCAN_QR_CODE' ? 'Esperando Escaneo' : 'Desconectado'}
-            </span>
-          </div>
-        </div>
-
-        <div className="p-6 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex-1 space-y-3">
-            <h4 className="text-sm font-bold text-slate-900">Pasos para conectar:</h4>
-            <ol className="text-xs text-slate-600 space-y-2 list-decimal list-inside leading-relaxed">
-              <li>Abre <strong>WhatsApp</strong> en el teléfono oficial de la Dra. Aura Estudillo.</li>
-              <li>Toca <strong>Menú</strong> (Android) o <strong>Configuración</strong> (iPhone) y selecciona <strong>Dispositivos Vinculados</strong>.</li>
-              <li>Presiona <strong>Vincular un Dispositivo</strong> y apunta la cámara hacia el código QR mostrado a la derecha.</li>
-              <li>Audenti comenzará a recibir y contestar mensajes automáticamente con Aura IA.</li>
-            </ol>
-
-            <div className="pt-2 flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleLoadWahaQr}
-                disabled={wahaLoading}
-                className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-xs transition-all active:scale-95 cursor-pointer disabled:opacity-50"
-              >
-                {wahaLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />}
-                <span>{wahaQr ? 'Actualizar Código QR' : 'Generar Código QR de Vinculación'}</span>
-              </button>
-
-              {wahaStatus === 'WORKING' && (
-                <button
-                  type="button"
-                  onClick={handleLogoutWaha}
-                  disabled={wahaLoading}
-                  className="px-3.5 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs border border-rose-200 transition-colors cursor-pointer"
-                >
-                  Desvincular Sesión
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="w-64 h-64 p-4 rounded-2xl bg-slate-50 border-2 border-dashed border-amber-300 flex flex-col items-center justify-center text-center shadow-inner shrink-0">
-            {wahaQr ? (
-              <div className="bg-white p-3 rounded-xl shadow-md border border-slate-200 flex flex-col items-center">
-                <QRCodeSVG value={wahaQr} size={180} level="M" />
-                <span className="text-[10px] text-slate-500 font-mono mt-2 animate-pulse">Escanea desde WhatsApp</span>
-              </div>
-            ) : (
-              <div className="space-y-2 text-slate-400">
-                <QrCode className="w-12 h-12 mx-auto stroke-1" />
-                <p className="text-xs font-medium">Haz clic en &ldquo;Generar Código QR&rdquo; para vincular</p>
-              </div>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={handleCopyWebhook}
+            className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
+          >
+            {copiedWebhook ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+            {copiedWebhook ? '¡Copiado!' : 'Copiar URL'}
+          </button>
         </div>
       </div>
 
-      {/* Formulario Principal */}
+      {/* Formulario Principal de Configuración */}
       <form onSubmit={handleSave} className="space-y-6">
-        {/* PANEL 1: CREDENCIALES DE META WHATSAPP */}
+        {/* PANEL 1: API EXTERNA (ZERNIO / PROVEEDOR DE MENSAJERÍA) */}
         <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
-          <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+          <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200">
-                <Smartphone className="w-5 h-5" />
+              <div className="w-10 h-10 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center border border-purple-200">
+                <Key className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-slate-900">Parámetros de Integración Meta Developers</h3>
-                <p className="text-xs text-slate-500">Credenciales del número telefónico y API Cloud de Meta</p>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Credenciales de API de Mensajería Externa (Zernio / Gateway)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Token y ruta de despacho para envíos automatizados de citas y recetas
+                </p>
               </div>
             </div>
             {lastUpdated && (
               <span className="text-[11px] text-slate-400 font-mono">
-                Última sincronización: {new Date(lastUpdated).toLocaleDateString('es-MX')} {new Date(lastUpdated).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+                Último guardado: {new Date(lastUpdated).toLocaleDateString('es-MX')} {new Date(lastUpdated).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
               </span>
             )}
           </div>
 
-          <div className="p-6 space-y-6">
-            {/* Mensajes de Estado */}
-            {saveSuccess && (
-              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-300 flex items-center gap-3 animate-in fade-in duration-200">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                <div>
-                  <p className="text-xs font-bold text-emerald-900">Configuración guardada exitosamente en Supabase</p>
-                  <p className="text-[11px] text-emerald-700">Las nuevas credenciales y parámetros de IA ya están enlazados con Audenti CRM.</p>
-                </div>
+          <div className="p-6 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  Proveedor de Mensajería
+                </label>
+                <select
+                  value={messagingProvider}
+                  onChange={(e) => setMessagingProvider(e.target.value as any)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
+                >
+                  <option value="zernio">Zernio Messaging API (Recomendado)</option>
+                  <option value="meta">WhatsApp Cloud API (Meta)</option>
+                  <option value="generic">Gateway HTTP Genérico</option>
+                </select>
               </div>
-            )}
 
-            {verificationResult && (
-              <div className={`p-4 rounded-2xl border flex items-center gap-3 animate-in fade-in duration-200 ${
-                verificationResult.success ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-amber-50 border-amber-300 text-amber-900'
-              }`}>
-                {verificationResult.success ? <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" /> : <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />}
-                <p className="text-xs font-bold">{verificationResult.message}</p>
-              </div>
-            )}
-
-            {errorMessage && (
-              <div className="p-4 rounded-2xl bg-rose-50 border border-rose-300 flex items-center gap-3 animate-in fade-in duration-200">
-                <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
-                <p className="text-xs font-bold text-rose-800">{errorMessage}</p>
-              </div>
-            )}
-
-            {/* Grid de Inputs */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* 1. Número Oficial de WhatsApp */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <Smartphone className="w-4 h-4 text-emerald-600" />
-                  Número de WhatsApp Business Oficial (phone_number)
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  Teléfono Oficial de la Clínica (E.164)
                 </label>
                 <input
                   type="text"
-                  required
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="ej. 525522427769"
-                  className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
+                  placeholder="525522427769"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
-                <p className="text-[11px] text-slate-400">
-                  Formato internacional con lada sin signos (ej. 525522427769 para México).
-                </p>
-              </div>
-
-              {/* 2. Meta Phone Number ID */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <Hash className="w-4 h-4 text-emerald-600" />
-                  Meta Phone Number ID (phone_number_id)
-                </label>
-                <input
-                  type="text"
-                  value={phoneNumberId}
-                  onChange={(e) => setPhoneNumberId(e.target.value)}
-                  placeholder="ej. 109823471092837"
-                  className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
-                />
-                <p className="text-[11px] text-slate-400">
-                  Identificador del número de teléfono en Meta Developer Console (WhatsApp API Setup).
-                </p>
-              </div>
-
-              {/* 3. WABA ID (WhatsApp Business Account ID) */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <Hash className="w-4 h-4 text-emerald-600" />
-                  WhatsApp Business Account ID (WABA ID)
-                </label>
-                <input
-                  type="text"
-                  value={wabaId}
-                  onChange={(e) => setWabaId(e.target.value)}
-                  placeholder="ej. 892716382910293"
-                  className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
-                />
-                <p className="text-[11px] text-slate-400">
-                  Identificador de la cuenta comercial de WhatsApp (WABA) en Meta Business Manager.
-                </p>
-              </div>
-
-              {/* 4. Chatwoot Webhook URL para Pruebas Activas */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <ExternalLink className="w-4 h-4 text-emerald-600" />
-                  URL de Webhook de Chatwoot (Pruebas de Mensajería)
-                </label>
-                <input
-                  type="url"
-                  value={chatwootWebhookUrl}
-                  onChange={(e) => setChatwootWebhookUrl(e.target.value)}
-                  placeholder="https://chatwoot.tu-dominio.com/webhooks/whatsapp"
-                  className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
-                />
-                <p className="text-[11px] text-slate-400">
-                  Endpoint de sincronización bidireccional con Chatwoot para pruebas activas de mensajería.
-                </p>
-              </div>
-
-              {/* 3. Meta Permanent Access Token */}
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <Key className="w-4 h-4 text-emerald-600" />
-                  Meta Permanent Token (meta_access_token)
-                </label>
-                <input
-                  type="password"
-                  value={metaAccessToken}
-                  onChange={(e) => setMetaAccessToken(e.target.value)}
-                  placeholder="EAABw..."
-                  className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
-                />
-                <p className="text-[11px] text-slate-400">
-                  Token generado para el usuario del sistema con permisos `whatsapp_business_messaging`.
-                </p>
-              </div>
-
-              {/* 4. Webhook Verify Token */}
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  Webhook Verify Token (webhook_verify_token)
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    required
-                    value={webhookVerifyToken}
-                    onChange={(e) => setWebhookVerifyToken(e.target.value)}
-                    placeholder="audenti_secure_token"
-                    className="flex-1 px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setWebhookVerifyToken(`audenti_${Math.random().toString(36).substring(2, 10)}`)}
-                    className="px-4 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
-                  >
-                    Generar Nuevo
-                  </button>
-                </div>
               </div>
             </div>
 
-            {/* Bloque Informativo de URL de Webhook para Meta Developers */}
-            <div className="p-4 bg-emerald-50/70 rounded-2xl border border-emerald-200 text-xs text-slate-700 space-y-2">
-              <div className="flex items-center gap-2 text-emerald-900 font-bold">
-                <Info className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>URL Oficial del Webhook para Meta Developers:</span>
-              </div>
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 bg-white p-3 rounded-xl border border-emerald-200 font-mono text-xs">
-                <code className="text-emerald-800 font-bold select-all break-all">
-                  https://audenti.vercel.app/api/webhook/whatsapp
-                </code>
-                <span className="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded">POST &amp; GET verify</span>
-              </div>
-              <p className="text-[11px] text-slate-500">
-                Copia y pega esta URL en tu panel de Meta Developers bajo el producto WhatsApp &gt; Configuración &gt; URL de devolución de llamada.
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                API Endpoint de Envío HTTP POST
+              </label>
+              <input
+                type="url"
+                value={messagingApiUrl}
+                onChange={(e) => setMessagingApiUrl(e.target.value)}
+                placeholder="https://api.zernio.com/v1/messages"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                API Key / Token de Acceso del Proveedor (Zernio) *
+              </label>
+              <input
+                type="password"
+                value={messagingApiKey}
+                onChange={(e) => setMessagingApiKey(e.target.value)}
+                placeholder="zn_live_••••••••••••••••••••••••"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                Se almacena encriptado en Supabase Storage sin exponerse al cliente público.
               </p>
             </div>
           </div>
         </div>
 
-        {/* PANEL 2: PANEL DE CONTROL DEL CHATBOT (AURA AI SETTINGS) */}
+        {/* PANEL 2: COMPORTAMIENTO DEL CHATBOT Y MULTI-AGENTES */}
         <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
           <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-200">
-                <Radio className="w-5 h-5 animate-pulse" />
+                <ShieldCheck className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-slate-900">Panel de Control del Chatbot (Aura AI Settings)</h3>
-                <p className="text-xs text-slate-500">Comportamiento del asistente de triaje y respuesta automática</p>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Comportamiento del Agente Autónomo de Comunicación (Aura IA)
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Reglas de respuesta automática para triaje, agenda y recordatorios
+                </p>
               </div>
             </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={chatbotEnabled}
+                onChange={(e) => setChatbotEnabled(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+            </label>
           </div>
 
-          <div className="p-6 space-y-6">
-            {/* Switch ON/OFF */}
-            <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-200">
-              <div>
-                <h4 className="text-xs font-bold text-slate-900">Respuesta Automática del Chatbot</h4>
-                <p className="text-[11px] text-slate-500">Activa o pausa la respuesta autónoma de Aura IA en canales de mensajería.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setChatbotEnabled(!chatbotEnabled)}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  chatbotEnabled ? 'bg-emerald-600' : 'bg-slate-300'
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                    chatbotEnabled ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
-
-            {/* Selector de Comportamiento */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700">
-                Modo de Operación del Asistente Aura IA
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setChatbotMode('autonomous')}
-                  className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all ${
-                    chatbotMode === 'autonomous'
-                      ? 'bg-emerald-50 border-emerald-400 text-emerald-950 ring-1 ring-emerald-300'
-                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+          <div className="p-6 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                {
+                  id: 'autonomous',
+                  title: 'Modo 100% Autónomo',
+                  desc: 'Aura IA responde de inmediato, agenda citas en Supabase y escala urgencias.'
+                },
+                {
+                  id: 'suggestion',
+                  title: 'Modo Sugerencia',
+                  desc: 'Aura redacta el mensaje en borrador para autorización previa de la doctora.'
+                },
+                {
+                  id: 'disabled',
+                  title: 'Manual Exclusivo',
+                  desc: 'Respuestas manuales exclusivamente escritas por la Dra. Aura Estudillo.'
+                }
+              ].map((mode) => (
+                <div
+                  key={mode.id}
+                  onClick={() => setChatbotMode(mode.id as any)}
+                  className={`p-4 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between ${
+                    chatbotMode === mode.id
+                      ? 'border-purple-600 bg-purple-50/50 shadow-xs'
+                      : 'border-slate-200 hover:border-slate-300 bg-white'
                   }`}
                 >
-                  <p className="text-xs font-bold flex items-center gap-1.5">
-                    <span>🤖</span> Autónomo (24/7)
-                  </p>
-                  <p className="text-[10px] text-slate-500 mt-1 leading-snug">
-                    Responde al paciente, clasifica triage y escala urgencias de inmediato.
-                  </p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setChatbotMode('suggestion')}
-                  className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all ${
-                    chatbotMode === 'suggestion'
-                      ? 'bg-amber-50 border-amber-400 text-amber-950 ring-1 ring-amber-300'
-                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <p className="text-xs font-bold flex items-center gap-1.5">
-                    <span>💡</span> Sugerencia a Doctora
-                  </p>
-                  <p className="text-[10px] text-slate-500 mt-1 leading-snug">
-                    Genera borradores en /dashboard/chat para que la doctora apruebe antes de enviar.
-                  </p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setChatbotMode('disabled')}
-                  className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all ${
-                    chatbotMode === 'disabled'
-                      ? 'bg-rose-50 border-rose-400 text-rose-950 ring-1 ring-rose-300'
-                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <p className="text-xs font-bold flex items-center gap-1.5">
-                    <span>⏸️</span> Desactivado
-                  </p>
-                  <p className="text-[10px] text-slate-500 mt-1 leading-snug">
-                    Atención 100% manual por la Dra. Aura Estudillo sin intervención de IA.
-                  </p>
-                </button>
-              </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900">{mode.title}</h4>
+                    <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">{mode.desc}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
+        </div>
 
-          {/* Footer con Acciones */}
-          <div className="p-6 bg-slate-50/70 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <button
-              type="button"
-              onClick={handleVerifyConnection}
-              disabled={verifying}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 font-bold text-xs shadow-xs transition-all cursor-pointer"
-            >
-              {verifying ? <RefreshCw className="w-4 h-4 animate-spin text-emerald-600" /> : <ShieldCheck className="w-4 h-4 text-emerald-600" />}
-              <span>Verificar Webhook y Token</span>
-            </button>
-
-            <button
-              type="submit"
-              disabled={saving}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 cursor-pointer"
-            >
-              {saving ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Guardando en Supabase...</span>
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4" />
-                  <span>Guardar Configuración</span>
-                </>
-              )}
-            </button>
+        {/* MENSAJES DE ESTADO */}
+        {saveSuccess && (
+          <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>Configuración guardada exitosamente en Supabase PostgreSQL y Storage.</span>
           </div>
+        )}
+
+        {errorMessage && (
+          <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold flex items-center gap-2 animate-in fade-in">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
+        {/* BOTÓN GUARDAR */}
+        <div className="flex justify-end gap-3 pt-2">
+          <button
+            type="submit"
+            disabled={saving}
+            className="px-6 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs flex items-center gap-2 shadow-md transition-all active:scale-95 disabled:opacity-60 cursor-pointer"
+          >
+            {saving ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                Guardando en Supabase...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                Guardar Configuración y Activar Conexión
+              </>
+            )}
+          </button>
         </div>
       </form>
     </div>

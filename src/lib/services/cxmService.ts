@@ -40,8 +40,19 @@ export async function processCXMFollowUps() {
         ? aiResult.result
         : (aiResult.result?.result || aiResult.result?.content || JSON.stringify(aiResult.result));
 
-      // 3. Disparamos el envío por WhatsApp (Simulado / Integración API)
-      console.log(`[CXM 24h] Enviando a ${patientPhone}: ${messageContent}`);
+      // 3. Disparamos el envío por WhatsApp vía API Externa (Zernio / WhatsApp Cloud)
+      try {
+        const { sendExternalMessage } = await import('@/lib/messaging/external-client');
+        await sendExternalMessage({
+          to: patientPhone,
+          message: messageContent,
+          patientId: apt.patient_id,
+          patientName,
+          metadata: { type: 'cxm_followup_24h', appointmentId: apt.id }
+        });
+      } catch (sendErr: any) {
+        console.warn(`[CXM 24h] Error enviando mensaje a ${patientPhone}:`, sendErr.message);
+      }
 
       // 4. Marcamos el seguimiento como enviado en Supabase
       try {
