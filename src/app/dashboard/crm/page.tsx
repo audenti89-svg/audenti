@@ -551,6 +551,14 @@ export default function CrmPage() {
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
                             {p.onboarding_completed ? 'Bioseguridad Verificada' : 'Onboarding Pendiente'}
                           </span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-800 border border-blue-200">
+                            Canal: {p.source_channel || p.referral_source || 'Boca en Boca'}
+                          </span>
+                          {p.referred_by && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-800 border border-purple-200">
+                              Ref: {p.referred_by}
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs text-slate-600">Teléfono: {p.phone || 'Sin número'}</p>
                         <p className="text-xs font-semibold text-slate-900">

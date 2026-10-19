@@ -780,7 +780,7 @@ export default function ExpedientePage() {
 
       {activeTab === 'family' && (
         <div className="space-y-4">
-          <FamilyNucleusManager />
+          <FamilyNucleusManager patient={selectedPatient} patientName={selectedPatient.full_name} />
         </div>
       )}
 

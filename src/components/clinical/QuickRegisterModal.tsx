@@ -91,7 +91,8 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
           ? formData.medicalConditions.split(',').map(s => s.trim()).filter(Boolean)
           : [],
         referral_source: formData.referralSource,
-        referred_by: formData.referralSource === 'Recomendación de familiar o amigo' ? formData.referredBy.trim() : null,
+        source_channel: formData.referralSource,
+        referred_by: formData.referralSource === 'Boca en Boca / Familiar' || formData.referralSource === 'Recomendación de familiar o amigo' ? formData.referredBy.trim() : null,
         onboarding_completed: true,
       }
 
@@ -341,7 +342,7 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
           <div className="pt-2 border-t border-slate-100 space-y-2.5">
             <div>
               <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">
-                ¿Cómo te enteraste de nosotros? *
+                ¿Cómo te enteraste de nosotros? (Canal de Captación) *
               </label>
               <select
                 value={formData.referralSource}
@@ -349,24 +350,26 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
                 className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#202D4C] focus:bg-white transition-all cursor-pointer"
                 required
               >
-                <option value="Recomendación de familiar o amigo">Recomendación de familiar o amigo</option>
+                <option value="Boca en Boca / Familiar">Boca en Boca / Familiar</option>
+                <option value="WhatsApp Directo">WhatsApp Directo</option>
                 <option value="YouTube">YouTube</option>
-                <option value="Facebook">Facebook</option>
-                <option value="Instagram">Instagram</option>
                 <option value="TikTok">TikTok</option>
-                <option value="Búsqueda en Google / Otro">Búsqueda en Google / Otro</option>
+                <option value="Instagram">Instagram</option>
+                <option value="Facebook">Facebook</option>
+                <option value="Google Ads">Google Ads</option>
+                <option value="Otro">Otro</option>
               </select>
             </div>
 
-            {formData.referralSource === 'Recomendación de familiar o amigo' && (
+            {formData.referralSource === 'Boca en Boca / Familiar' && (
               <div className="animate-in fade-in duration-200">
                 <label className="block text-[11px] font-bold uppercase text-amber-700 mb-1">
-                  ¿Quién te recomendó? (Nombre de paciente referente) *
+                  ¿Quién te recomendó? (Nombre del paciente o referente) *
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="Ej. Roberto Sánchez Gómez"
+                  placeholder="Ej. María de los Ángeles Sánchez Rivera"
                   value={formData.referredBy}
                   onChange={e => setFormData({ ...formData, referredBy: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-amber-50/50 border border-amber-300 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white transition-all"

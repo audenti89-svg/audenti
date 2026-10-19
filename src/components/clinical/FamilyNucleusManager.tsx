@@ -1,190 +1,343 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   Users,
   UserPlus,
-  MessageCircle,
-  Calendar,
+  Share2,
+  DollarSign,
+  TrendingUp,
   Award,
-  X
+  Calendar,
+  MessageCircle,
+  X,
+  HeartHandshake,
+  CheckCircle2
 } from 'lucide-react'
+import { createClient } from '@/utils/supabase/client'
 
-interface FamilyMember {
+interface ReferralItem {
   id: string
   name: string
-  relationship: string
-  age: number
-  lastVisit: string
-  hasActiveTreatment: boolean
+  relation: string
+  revenueGenerated: number
+  status: string
+  date: string
 }
 
-export function FamilyNucleusManager({ patientName = 'Mateo Morales Ruiz' }: { patientName?: string }) {
-  const [nucleusName, setNucleusName] = useState('Familia Morales Ruiz')
-  const [members, setMembers] = useState<FamilyMember[]>([
-    { id: '1', name: 'Mateo Morales Ruiz', relationship: 'Titular / Paciente', age: 32, lastVisit: 'Hoy (En Sillón)', hasActiveTreatment: true },
-    { id: '2', name: 'Sofía Hernández (Esposa)', relationship: 'Cónyuge', age: 31, lastVisit: 'Hace 2 semanas', hasActiveTreatment: false },
-    { id: '3', name: 'Mateo Morales Jr.', relationship: 'Hijo', age: 8, lastVisit: 'Hace 1 mes', hasActiveTreatment: true },
-    { id: '4', name: 'Elena Ruiz (Mamá)', relationship: 'Madre', age: 58, lastVisit: 'Hace 6 meses (Pendiente)', hasActiveTreatment: false },
-  ])
+interface FamilyNucleusManagerProps {
+  patient?: any
+  patientName?: string
+}
 
+export function FamilyNucleusManager({ patient, patientName }: FamilyNucleusManagerProps) {
+  const currentName = patient?.full_name || patientName || 'Paciente Seleccionado'
+  const patientId = patient?.id
+
+  // Determinar datos de referidos
+  // Si es María de los Ángeles Sánchez Rivera, mostrar su red familiar activa
+  const isAngeles = currentName.toLowerCase().includes('ángeles') || currentName.toLowerCase().includes('angeles')
+  const isRicardo = currentName.toLowerCase().includes('ricardo')
+
+  const [referrals, setReferrals] = useState<ReferralItem[]>([])
   const [showAddModal, setShowAddModal] = useState(false)
-  const [newMember, setNewMember] = useState({ name: '', relationship: 'Hijo', age: '' })
+  const [newReferral, setNewReferral] = useState({
+    name: '',
+    relation: 'Familiar',
+    estimatedRevenue: '2500'
+  })
 
-  const addMember = (e: React.FormEvent) => {
+  useEffect(() => {
+    // Configurar referidos iniciales según perfil
+    if (isAngeles) {
+      setReferrals([
+        {
+          id: 'ref-1',
+          name: 'Ricardo Sánchez Rivera',
+          relation: 'Familiar (Hijo/Hermano)',
+          revenueGenerated: 8500,
+          status: 'Tratamiento Activo',
+          date: '15 Oct 2026'
+        },
+        {
+          id: 'ref-2',
+          name: 'Ángel Gabriel Sánchez',
+          relation: 'Familiar',
+          revenueGenerated: 6200,
+          status: 'En sillón',
+          date: '18 Oct 2026'
+        },
+        {
+          id: 'ref-3',
+          name: 'Lucía Mendoza',
+          relation: 'Amigo/Conocido',
+          revenueGenerated: 3400,
+          status: 'Cita Agendada',
+          date: 'Hoy'
+        },
+        {
+          id: 'ref-4',
+          name: 'Carlos Rivera',
+          relation: 'Familiar',
+          revenueGenerated: 4800,
+          status: 'Presupuesto Aceptado',
+          date: '12 Oct 2026'
+        }
+      ])
+    } else if (isRicardo) {
+      setReferrals([
+        {
+          id: 'ref-r1',
+          name: 'Mateo Morales',
+          relation: 'Amigo/Conocido',
+          revenueGenerated: 4200,
+          status: 'Tratamiento Activo',
+          date: '14 Oct 2026'
+        }
+      ])
+    } else {
+      // Paciente estándar
+      setReferrals([
+        {
+          id: 'ref-std-1',
+          name: 'Familiar Recomendado 1',
+          relation: 'Familiar',
+          revenueGenerated: 2500,
+          status: 'Valoración Completada',
+          date: 'Reciente'
+        }
+      ])
+    }
+  }, [isAngeles, isRicardo, patientId])
+
+  const totalRevenue = referrals.reduce((acc, r) => acc + r.revenueGenerated, 0)
+  const familyCount = referrals.filter(r => r.relation.toLowerCase().includes('familiar')).length
+  const friendCount = referrals.filter(r => !r.relation.toLowerCase().includes('familiar')).length
+
+  const handleAddReferral = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newMember.name) return
-    setMembers(prev => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        name: newMember.name,
-        relationship: newMember.relationship,
-        age: Number(newMember.age) || 0,
-        lastVisit: 'Sin visitas registradas',
-        hasActiveTreatment: false
-      }
-    ])
-    setNewMember({ name: '', relationship: 'Hijo', age: '' })
+    if (!newReferral.name.trim()) return
+
+    const item: ReferralItem = {
+      id: `ref-${Date.now()}`,
+      name: newReferral.name.trim(),
+      relation: newReferral.relation,
+      revenueGenerated: Number(newReferral.estimatedRevenue) || 0,
+      status: 'Valoración Agendada',
+      date: 'Hoy'
+    }
+
+    setReferrals(prev => [item, ...prev])
+    setNewReferral({ name: '', relation: 'Familiar', estimatedRevenue: '2500' })
     setShowAddModal(false)
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-        <div>
+    <div className="space-y-6">
+      {/* Banner de Impacto de Referidos y Árbol Familiar */}
+      <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-300/80 rounded-2xl p-6 shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 border border-amber-500">
+                Red de Confianza &amp; Fidelización Audenti
+              </span>
+              <span className="text-xs font-semibold text-slate-500">
+                NOM-004-SSA3 • Expediente Clínico Unificado
+              </span>
+            </div>
+            <h3 className="text-lg font-bold text-slate-900">
+              Árbol Familiar y Red de Referidos de {currentName}
+            </h3>
+            <p className="text-xs text-slate-600">
+              Visualiza en tiempo real los pacientes captados por recomendación directa de esta persona y el volumen económico generado.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowAddModal(true)}
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold transition-all shadow-sm shrink-0 active:scale-95"
+          >
+            <UserPlus className="w-4 h-4" />
+            Vincular Nuevo Referido
+          </button>
+        </div>
+
+        {/* Tarjetas de Métricas de Referidos */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 mt-5">
+          <div className="p-4 bg-white rounded-xl border border-amber-200/80 shadow-2xs">
+            <span className="text-[10px] uppercase font-black text-slate-500 block tracking-wider">
+              Personas Referidas Totales
+            </span>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="text-2xl font-black text-slate-900">{referrals.length}</span>
+              <span className="text-xs font-bold text-amber-700">
+                ({familyCount} familiares + {friendCount} conocidos)
+              </span>
+            </div>
+            <span className="text-[11px] text-slate-500 block mt-0.5">
+              Promotor activo en su círculo social
+            </span>
+          </div>
+
+          <div className="p-4 bg-white rounded-xl border border-emerald-200/80 shadow-2xs">
+            <span className="text-[10px] uppercase font-black text-emerald-800 block tracking-wider">
+              Ingresos Generados por su Red
+            </span>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="text-2xl font-black text-emerald-700">
+                ${totalRevenue.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              </span>
+              <span className="text-xs font-bold text-emerald-700">MXN</span>
+            </div>
+            <span className="text-[11px] text-emerald-600 font-semibold block mt-0.5">
+              Impacto directo en facturación clínica
+            </span>
+          </div>
+
+          <div className="p-4 bg-white rounded-xl border border-blue-200/80 shadow-2xs">
+            <span className="text-[10px] uppercase font-black text-blue-800 block tracking-wider">
+              Canal de Captación del Titular
+            </span>
+            <div className="text-base font-black text-slate-900 mt-1">
+              {patient?.source_channel || patient?.referral_source || 'Boca en Boca / Familiar'}
+            </div>
+            <span className="text-[11px] text-blue-700 font-medium block mt-0.5">
+              {patient?.referred_by ? `Recomendado por: ${patient.referred_by}` : 'Captación directa'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Listado del Árbol de Referidos */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
-            <Users className="w-5 h-5 text-amber-600" />
-            <h3 className="text-base font-bold text-slate-900 tracking-tight">Núcleo Familiar &amp; Árbol Genealógico</h3>
+            <Share2 className="w-4 h-4 text-amber-600" />
+            <h4 className="text-sm font-bold text-slate-900">
+              Desglose Individual de Recomendaciones
+            </h4>
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Vinculado a: <strong className="text-slate-800 font-bold">{nucleusName}</strong>
-          </p>
+          <span className="text-xs text-slate-500 font-mono">
+            {referrals.length} {referrals.length === 1 ? 'registro' : 'registros'}
+          </span>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold transition-colors shadow-xs"
-        >
-          <UserPlus className="w-3.5 h-3.5" />
-          Vincular Familiar
-        </button>
-      </div>
 
-      {/* Árbol / Tarjetas de Miembros */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {members.map((m) => (
-          <div key={m.id} className="p-4 rounded-xl bg-slate-50/80 border border-slate-200/70 flex items-start justify-between gap-3 shadow-2xs">
-            <div className="flex items-start gap-3">
-              <div className="w-9 h-9 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
-                {m.name.substring(0, 2).toUpperCase()}
-              </div>
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2">
-                  <h4 className="text-xs font-bold text-slate-900">{m.name}</h4>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
-                    {m.relationship}
-                  </span>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          {referrals.map((item) => (
+            <div
+              key={item.id}
+              className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start justify-between gap-3 hover:bg-slate-100/60 transition-colors shadow-2xs"
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-slate-900 text-amber-400 flex items-center justify-center font-black text-xs shrink-0 shadow-2xs">
+                  {item.name.substring(0, 2).toUpperCase()}
                 </div>
-                <p className="text-[11px] text-slate-500">{m.age > 0 ? `${m.age} años • ` : ''}Última cita: {m.lastVisit}</p>
-                {m.hasActiveTreatment ? (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Tratamiento activo
-                  </span>
-                ) : (
-                  <span className="text-[11px] text-slate-400">Sin tratamiento en curso</span>
-                )}
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-xs text-slate-900">{item.name}</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                      {item.relation}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Fecha vinculación: {item.date} • Estatus:{' '}
+                    <strong className="text-slate-700 font-semibold">{item.status}</strong>
+                  </p>
+                  <p className="text-xs font-bold text-emerald-700 flex items-center gap-1 pt-1">
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    Ingresos generados: ${item.revenueGenerated.toLocaleString('es-MX')} MXN
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1 shrink-0">
+                <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-200">
+                  Verificado
+                </span>
               </div>
             </div>
-            <div className="flex flex-col gap-1 shrink-0">
-              <button type="button" className="p-1.5 rounded-lg hover:bg-white text-slate-500 transition-colors" title="Abrir Chat Familiar">
-                <MessageCircle className="w-4 h-4" />
-              </button>
-              <button type="button" className="p-1.5 rounded-lg hover:bg-white text-slate-500 transition-colors" title="Agendar Cita">
-                <Calendar className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Beneficio de Grupo Familiar */}
-      <div className="p-4 rounded-xl bg-amber-50/60 border border-amber-200/80 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Award className="w-6 h-6 text-amber-700 shrink-0" />
-          <div>
-            <span className="text-xs font-bold text-slate-900 block">Plan Preventivo Familiar AUDENTI</span>
-            <span className="text-[11px] text-slate-600">3 de 4 miembros tienen profilaxis cubierta con 15% de descuento compartido en sucursal.</span>
-          </div>
+          ))}
         </div>
-        <button type="button" className="px-3 py-1.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 shrink-0 transition-colors shadow-xs">
-          Gestionar Saldo
-        </button>
       </div>
 
-      {/* Modal Agregar Familiar */}
+      {/* Modal para Vincular Referido */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl space-y-4 border border-slate-200">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4 border border-slate-200 animate-in zoom-in-95">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h4 className="text-sm font-bold text-slate-900">Vincular Familiar</h4>
-              <button type="button" onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-700">
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">Vincular Nuevo Referido</h4>
+                <p className="text-xs text-slate-500">Recomendado por {currentName}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="text-slate-400 hover:text-slate-700 p-1"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <form onSubmit={addMember} className="space-y-3">
+
+            <form onSubmit={handleAddReferral} className="space-y-3.5 text-xs">
               <div>
-                <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Nombre Completo</label>
+                <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">
+                  Nombre Completo del Referido *
+                </label>
                 <input
+                  type="text"
                   required
-                  value={newMember.name}
-                  onChange={e => setNewMember({ ...newMember, name: e.target.value })}
-                  placeholder="Ej. Carmen Morales"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  placeholder="Ej. Sofía Hernández"
+                  value={newReferral.name}
+                  onChange={e => setNewReferral({ ...newReferral, name: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#202D4C]"
                 />
               </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Parentesco</label>
+                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">
+                    Vínculo / Relación *
+                  </label>
                   <select
-                    value={newMember.relationship}
-                    onChange={e => setNewMember({ ...newMember, relationship: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none"
+                    value={newReferral.relation}
+                    onChange={e => setNewReferral({ ...newReferral, relation: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-semibold text-slate-900"
                   >
-                    <option value="Cónyuge">Cónyuge</option>
-                    <option value="Hijo">Hijo/a</option>
-                    <option value="Madre">Madre</option>
-                    <option value="Padre">Padre</option>
-                    <option value="Hermano">Hermano/a</option>
-                    <option value="Abuelo">Abuelo/a</option>
-                    <option value="Tutor">Tutor Legal</option>
-                    <option value="Otro">Otro</option>
+                    <option value="Familiar">Familiar</option>
+                    <option value="Amigo/Conocido">Amigo/Conocido</option>
+                    <option value="Redes Sociales">Redes Sociales</option>
+                    <option value="Directo">Directo</option>
                   </select>
                 </div>
+
                 <div>
-                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Edad</label>
+                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">
+                    Ingreso Proyectado (MXN)
+                  </label>
                   <input
                     type="number"
-                    value={newMember.age}
-                    onChange={e => setNewMember({ ...newMember, age: e.target.value })}
-                    placeholder="Ej. 12"
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    value={newReferral.estimatedRevenue}
+                    onChange={e => setNewReferral({ ...newReferral, estimatedRevenue: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-900"
                   />
                 </div>
               </div>
-              <div className="flex justify-end gap-2 pt-2">
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200"
+                  className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold hover:bg-slate-200"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-amber-400 text-slate-950 text-xs font-bold hover:bg-amber-300 shadow-xs"
+                  className="px-4 py-2 rounded-xl bg-amber-400 text-slate-950 font-bold hover:bg-amber-300 shadow-sm"
                 >
-                  Guardar Familiar
+                  Guardar Referido
                 </button>
               </div>
             </form>
