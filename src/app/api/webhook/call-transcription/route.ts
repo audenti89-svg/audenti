@@ -63,8 +63,9 @@ export async function POST(request: Request) {
     const evaluation = evaluateIntentionAndUrgency(callTextCorpus, timestamp || new Date());
 
     const finalConsultationReason = aliasReason || originalReason || evaluation.suggestedReason || 'Solicitud de Cita Médica por Voz';
-    // Si la evaluación detecta Urgencia Médica o molestia fuera de horario, se fuerza 'Urgente'
-    const finalUrgencyLevel = evaluation.urgencyLevel === 'Urgente' ? 'Urgente' : (aliasUrgency || originalUrgency || 'No Urgente');
+    // Regla de Oro: Urgencia únicamente ante dolor agudo, trauma o accidente (trafficLight === 'red')
+    const finalUrgencyLevel = evaluation.trafficLight === 'red' ? 'Urgente' : 'No Urgente';
+    const trafficLight = evaluation.trafficLight;
 
     const supabase = createAdminClient();
     const nowFormatted = timestamp
@@ -119,6 +120,7 @@ export async function POST(request: Request) {
         durationSeconds,
         consultationReason: finalConsultationReason,
         urgencyLevel: finalUrgencyLevel,
+        trafficLight,
         transcription: transcription || (normalizedDialogue.length > 0 ? normalizedDialogue.map(d => `${d.role === 'user' ? resolvedName : 'Aura AI'}: ${d.text}`).join('\n') : ''),
         dialogue: normalizedDialogue.length > 0 ? normalizedDialogue : [
           { role: 'assistant', text: 'Hola, bienvenido a Audenti. ¿En qué podemos ayudarte hoy?' },
@@ -223,6 +225,7 @@ export async function POST(request: Request) {
       channel_type: 'voice_call',
       consultationReason: finalConsultationReason,
       urgencyLevel: finalUrgencyLevel,
+      trafficLight,
       durationSeconds,
       summary: voiceRecord.content,
       transcription: voiceRecord.metadata.transcription,
@@ -249,6 +252,7 @@ export async function POST(request: Request) {
         phone: resolvedPhone,
         consultationReason: finalConsultationReason,
         urgencyLevel: finalUrgencyLevel,
+        trafficLight,
         channel_type: 'voice_call',
         targetPatientId: finalPatientId,
         url: `/dashboard/chat?patientId=${encodeURIComponent(finalPatientId)}`,

@@ -94,18 +94,27 @@ export function isOutsideBusinessHoursInMexico(date?: Date | string | number): b
 }
 
 export type IntentionCategory = 'Información' | 'Consulta' | 'Urgencia Médica'
+export type TriageTrafficLight = 'green' | 'yellow' | 'red'
 
 /**
- * Matriz de Intención y Clasificación de Urgencia Inteligente 24/7:
- * - Información / Pregunta: pregunta costos, ubicación o detalles sin dolor ni fecha de cita.
- * - Consulta / Cita: solicita programar procedimiento en horario hábil.
- * - Urgencia Médica: dolor agudo, inflamación, golpe, o si entra FUERA DE HORARIO manifestando molestia.
+ * Matriz Estricta de Semaforización y Triage de Intención Médica (Audenti CRM):
+ * REGLA DE ORO: La intención médica del paciente predomina sobre la hora de contacto.
+ * 
+ * 🟢 VERDE (Consulta / Cita): Si el usuario solicita agendar/programar una cita de valoración,
+ *   limpieza, revisión o tratamiento (incluso si llama un sábado o domingo fuera de horario).
+ * 
+ * 🟡 AMARILLO (Información): Preguntas generales sobre precios, ubicación o servicios
+ *   sin dolor ni urgencia.
+ * 
+ * 🔴 ROJO (Urgencia): ÚNICAMENTE si el paciente reporta dolor agudo, trauma, sangrado,
+ *   inflamación, absceso o accidente dental.
  */
 export function evaluateIntentionAndUrgency(
   text: string,
   timestamp?: Date | string | number
 ): {
   intention: IntentionCategory
+  trafficLight: TriageTrafficLight
   urgencyLevel: 'Urgente' | 'No Urgente'
   isOutsideHours: boolean
   suggestedReason: string
@@ -113,36 +122,43 @@ export function evaluateIntentionAndUrgency(
   const lower = (text || '').toLowerCase()
   const isOutside = isOutsideBusinessHoursInMexico(timestamp)
 
-  const hasPainOrTrauma = /(?:dolor|duele|muela|aguanto|dolores|puntiagudo|fuerte|insoportable|sangr|sangrado|inflamaci|inflamad|hinchad|absceso|pus|golpe|fractur|quebr|rompi|ca[ií]da|accidente|infecci|emergencia|urgente|urgencia)/i.test(lower)
-  const hasDiscomfort = /(?:molestia|molesta|sensibil|sensible|incomodidad|punzada|latido)/i.test(lower)
-  const asksAppointment = /(?:cita|agendar|programar|horario|disponib|turno|apartar|reservar|consulta)/i.test(lower)
+  // Patrones estrictos de dolor agudo, traumatismo, sangrado o inflamación (ROJO)
+  const hasAcutePainOrTrauma = /(?:dolor\s*(?:agudo|fuerte|insoportable|intenso)?|duele\s*(?:mucho|fuerte|horrible)?|muela\s*picada|no\s*aguanto|aguanto|sangr|sangrado|inflamaci|inflamad|hinchad|absceso|pus|flem[oó]n|golpe|trauma|fractur|quebr|rompi|ca[ií]da|accidente|emergencia|urgente|urgencia)/i.test(lower)
 
-  // 1. Urgencia Médica
-  // Si menciona dolor/trauma O entra fuera de horario manifestando molestia/dolor
-  if (hasPainOrTrauma || (isOutside && (hasDiscomfort || hasPainOrTrauma))) {
+  // Patrones de solicitud de cita o tratamiento médico (VERDE)
+  const asksAppointmentOrTreatment = /(?:cita|agendar|programar|horario|disponib|turno|apartar|reservar|consulta|valoraci[oó]n|revisi[oó]n|limpieza|profilaxis|blanqueamiento|resina|ortodoncia|brackets|alineador|implante|corona|endodoncia|extracci[oó]n|pr[oó]tesis)/i.test(lower)
+
+  // 1. 🔴 ROJO: Urgencia Médica (ÚNICAMENTE si el paciente reporta dolor, trauma, sangrado o inflamación)
+  if (hasAcutePainOrTrauma) {
     return {
       intention: 'Urgencia Médica',
+      trafficLight: 'red',
       urgencyLevel: 'Urgente',
       isOutsideHours: isOutside,
-      suggestedReason: hasPainOrTrauma ? 'Dolor Agudo / Traumatismo Dental' : 'Molestia Fuera de Horario Laboral'
+      suggestedReason: 'Urgencia Médica: Dolor Agudo / Traumatismo Dental'
     }
   }
 
-  // 2. Consulta / Cita
-  if (asksAppointment || /(?:limpieza|profilaxis|blanqueamiento|resina|ortodoncia|brackets|implante|corona|endodoncia|extraccion)/i.test(lower)) {
+  // 2. 🟢 VERDE: Consulta / Cita (Solicitud de cita de valoración, limpieza, revisión o tratamiento)
+  // La intención predomina: incluso si llama fuera de horario, es una cita de consulta regular (No Urgente)
+  if (asksAppointmentOrTreatment) {
     return {
       intention: 'Consulta',
-      urgencyLevel: isOutside ? 'Urgente' : 'No Urgente', // Si piden cita de emergencia fuera de horario se prioriza
+      trafficLight: 'green',
+      urgencyLevel: 'No Urgente',
       isOutsideHours: isOutside,
-      suggestedReason: isOutside ? 'Solicitud de Cita Fuera de Horario' : 'Programación de Cita Odontológica'
+      suggestedReason: isOutside
+        ? 'Solicitud de Cita / Valoración Dental (Registro Fuera de Horario)'
+        : 'Programación de Cita / Consulta Odontológica'
     }
   }
 
-  // 3. Información / Pregunta
+  // 3. 🟡 AMARILLO: Información (Preguntas generales de precios, ubicación o servicios sin dolor ni urgencia)
   return {
     intention: 'Información',
+    trafficLight: 'yellow',
     urgencyLevel: 'No Urgente',
     isOutsideHours: isOutside,
-    suggestedReason: 'Consulta de Precios, Ubicación o Servicios'
+    suggestedReason: 'Informes de Precios, Ubicación o Servicios'
   }
 }

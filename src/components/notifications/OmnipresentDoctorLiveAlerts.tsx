@@ -340,30 +340,30 @@ export function OmnipresentDoctorLiveAlerts() {
         </div>
       )}
 
-      {/* Stack de Toasts Flotantes Omnipresentes en la Parte Superior */}
-      <div className="fixed top-20 right-4 sm:right-6 z-50 flex flex-col gap-2.5 max-w-sm sm:max-w-md w-full pointer-events-none">
+      {/* Stack de Toasts Flotantes Omnipresentes en la Parte Superior (Z-Index Máximo y Sin Recortes) */}
+      <div className="fixed top-20 right-3 sm:right-6 z-[9999] flex flex-col gap-3 w-[94vw] sm:w-[440px] max-w-[440px] pointer-events-none overflow-visible">
         {toasts.map(t => (
           <div
             key={t.id}
-            className="pointer-events-auto bg-[#0a1122]/95 border-2 border-amber-400/90 text-white p-3.5 rounded-2xl shadow-2xl backdrop-blur-xl animate-in slide-in-from-top-4 fade-in duration-300 transition-all hover:scale-[1.01]"
+            className="pointer-events-auto overflow-visible bg-[#0a1122]/98 border-2 border-amber-400 text-white p-4 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.85)] backdrop-blur-2xl animate-in slide-in-from-top-4 fade-in duration-300 transition-all hover:scale-[1.01]"
           >
-            <div className="flex items-start justify-between gap-2.5">
-              <div className="flex items-start gap-3">
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-md ${
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3 flex-1 min-w-0">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-md ${
                   t.type === 'voice'
                     ? 'bg-amber-400 text-slate-950 animate-pulse'
                     : 'bg-emerald-500 text-slate-950'
                 }`}>
                   {t.type === 'voice' ? <Phone className="w-5 h-5" /> : <MessageSquare className="w-5 h-5" />}
                 </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-black text-white">{t.title}</span>
-                    <span className="text-[10px] text-amber-300 font-mono">{t.timestamp}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-black text-white truncate">{t.title}</span>
+                    <span className="text-[10px] text-amber-300 font-mono shrink-0">{t.timestamp}</span>
                   </div>
 
                   {/* Clasificación Obligatoria: Paciente Registrado vs Prospecto Nuevo */}
-                  <div className="mt-1.5 flex items-center gap-2">
+                  <div className="mt-1.5 flex items-center gap-2 flex-wrap">
                     {t.isRegistered ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/25 border border-emerald-400/50 text-emerald-300 font-black text-[10px]">
                         🟢 PACIENTE REGISTRADO {t.folio ? `(${t.folio})` : ''}
@@ -375,9 +375,9 @@ export function OmnipresentDoctorLiveAlerts() {
                     )}
                   </div>
 
-                  {/* Metadatos Estrictos de Triaje: Paciente/Prospecto, Motivo y Urgencia */}
-                  <div className="mt-2 space-y-1 text-xs">
-                    <div className="bg-slate-900/80 p-2.5 rounded-xl border border-white/10 space-y-1">
+                  {/* Metadatos Estrictos de Triaje: Paciente/Prospecto, Motivo y Urgencia con Semaforización */}
+                  <div className="mt-2.5 space-y-1 text-xs">
+                    <div className="bg-slate-900/90 p-3 rounded-xl border border-white/10 space-y-1.5">
                       <p className="text-slate-200">
                         👤 <strong>Nombre:</strong> <span className="text-white font-bold">{t.patientName}</span>
                       </p>
@@ -387,20 +387,20 @@ export function OmnipresentDoctorLiveAlerts() {
                         </p>
                       )}
                       <p className="text-slate-300">
-                        🎯 <strong>Motivo:</strong> <span className="text-white">{t.consultationReason || 'Consulta Dental'}</span>
+                        🎯 <strong>Motivo:</strong> <span className="text-white font-medium">{t.consultationReason || 'Consulta Dental'}</span>
                       </p>
-                      <p className="text-[11px] flex items-center gap-1 font-bold">
-                        🚨 <strong>Urgencia:</strong>
-                        <span className={`px-2 py-0.5 rounded-md ${
+                      <div className="text-[11px] flex items-center gap-1.5 pt-0.5">
+                        <span className="text-slate-400 font-bold">🚨 Clasificación:</span>
+                        <span className={`px-2.5 py-0.5 rounded-md font-black text-[10px] uppercase ${
                           t.urgencyLevel === 'Urgente'
-                            ? 'bg-rose-500/30 text-rose-300 border border-rose-500/50 animate-pulse'
-                            : 'bg-emerald-500/20 text-emerald-300'
+                            ? 'bg-rose-500/30 text-rose-300 border border-rose-500/60 animate-pulse'
+                            : 'bg-emerald-500/25 text-emerald-300 border border-emerald-400/50'
                         }`}>
-                          {t.urgencyLevel || 'No Urgente'}
+                          {t.urgencyLevel === 'Urgente' ? '🔴 Urgencia Médica' : '🟢 Consulta / Cita'}
                         </span>
-                      </p>
+                      </div>
                       {t.message && (
-                        <p className="text-slate-400 text-[11px] pt-1.5 border-t border-white/10 italic leading-snug">
+                        <p className="text-slate-300 text-[11px] pt-2 border-t border-white/10 italic leading-snug">
                           &ldquo;{t.message}&rdquo;
                         </p>
                       )}
@@ -410,27 +410,26 @@ export function OmnipresentDoctorLiveAlerts() {
               </div>
 
               <button
-                onClick={() => {
-                  dismissAlert(t.id)
-                }}
-                className="p-1 rounded-lg text-slate-400 hover:text-white shrink-0 cursor-pointer"
+                type="button"
+                onClick={() => dismissAlert(t.id)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 shrink-0 cursor-pointer transition-colors"
                 title="Cerrar notificación"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Acciones Expresas: Confirmar Lectura o Ver en Chat */}
-            <div className="mt-3 pt-2.5 border-t border-white/10 flex items-center justify-between text-[11px] gap-2">
+            {/* Acciones Expresas: Confirmar Lectura o Ver en Chat (Sin Recorte Lateral ni Inferior) */}
+            <div className="mt-3.5 pt-3 border-t border-white/15 flex items-center justify-between gap-3 overflow-visible">
               <button
                 type="button"
                 onClick={() => {
                   dismissAlert(t.id)
                   playTone('message')
                 }}
-                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black transition-all shadow-xs active:scale-95 cursor-pointer flex items-center gap-1.5"
+                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
               >
-                <CheckCircle2 className="w-3.5 h-3.5" />
+                <CheckCircle2 className="w-4 h-4" />
                 ✓ Confirmar Lectura
               </button>
 
@@ -439,9 +438,10 @@ export function OmnipresentDoctorLiveAlerts() {
                 onClick={() => {
                   dismissAlert(t.id, t.url || '/dashboard/chat')
                 }}
-                className="text-amber-400 hover:text-amber-300 font-bold hover:underline flex items-center gap-1 cursor-pointer bg-transparent border-0 p-0"
+                className="px-3 py-2 rounded-xl text-amber-300 hover:text-white hover:bg-amber-400/20 font-bold text-xs transition-colors flex items-center gap-1 cursor-pointer shrink-0"
               >
-                Ver en Chat →
+                <span>Ver en Chat</span>
+                <span className="text-sm">→</span>
               </button>
             </div>
           </div>

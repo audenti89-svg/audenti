@@ -116,9 +116,10 @@ export async function POST(request: Request) {
       consultationReason = 'Restauración / Resina Estética';
     }
 
-    // 🚨 Nivel de Urgencia (Urgente vs. No Urgente) conforme a Matriz Horaria
-    const urgencyLevel: 'Urgente' | 'No Urgente' = evaluation.urgencyLevel;
-    const isUrgent = urgencyLevel === 'Urgente';
+    // 🚨 Nivel de Urgencia (Urgente vs. No Urgente) conforme a Regla de Oro (Predominio de Intención Médica)
+    const trafficLight = evaluation.trafficLight;
+    const isUrgent = trafficLight === 'red';
+    const urgencyLevel: 'Urgente' | 'No Urgente' = isUrgent ? 'Urgente' : 'No Urgente';
 
     // Si el usuario no existe en Supabase, registrar al prospecto en la base de datos de pacientes si tiene teléfono
     if (!isRegistered && prospectPhone) {
