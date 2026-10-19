@@ -42,15 +42,39 @@ export async function POST(request: Request) {
 
     // 3.1 Insertar formalmente en la tabla relacional chat_messages de Supabase
     try {
-      const isRegistered = !patientId.startsWith('prospect_');
+      let resolvedPatientId: string | null = null;
+      let cleanPhone = '';
+
+      if (patientId.startsWith('prospect_')) {
+        cleanPhone = patientId.replace('prospect_', '').slice(-10);
+      } else {
+        // Verificar si es un UUID válido de paciente
+        resolvedPatientId = patientId;
+      }
+
+      // Si no tenemos UUID directo pero hay teléfono, buscar si está registrado
+      if (!resolvedPatientId && cleanPhone) {
+        try {
+          const { data: found } = await supabase
+            .from('patients')
+            .select('id')
+            .ilike('phone', `%${cleanPhone}%`)
+            .maybeSingle();
+          if (found?.id) {
+            resolvedPatientId = found.id;
+          }
+        } catch {}
+      }
+
       await supabase.from('chat_messages').insert({
-        patient_id: isRegistered ? patientId : null,
+        patient_id: resolvedPatientId,
         sender_role: message.senderRole || (message.isDoctor ? 'doctor' : 'patient'),
         sender_name: message.senderName || (message.isDoctor ? 'Dra. Aura Estudillo' : 'Paciente'),
         content: message.content,
         channel_type: message.channel_type || 'web_chat',
         metadata: {
           patientId,
+          phone: cleanPhone || message.metadata?.phone || '',
           ...(message.metadata || {}),
           senderRole: message.senderRole,
           timestamp: message.timestamp
