@@ -41,7 +41,7 @@ export default function WhatsAppSettingsPage() {
   const [verificationResult, setVerificationResult] = useState<{ success: boolean; message: string } | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
-  // Cargar configuración guardada
+  // Cargar configuración guardada y generar QR automáticamente
   useEffect(() => {
     async function loadSettings() {
       try {
@@ -68,6 +68,7 @@ export default function WhatsAppSettingsPage() {
       }
     }
     loadSettings()
+    handleLoadWahaQr()
   }, [])
 
   const handleSave = async (e: React.FormEvent) => {

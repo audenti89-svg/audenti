@@ -252,10 +252,16 @@ export function OmnipresentDoctorLiveAlerts() {
         if (existingIdx !== -1) {
           const existing = prev[existingIdx]
           const isUrgent = payload.urgencyLevel === 'Urgente' || existing.urgencyLevel === 'Urgente' || /(?:dolor|duele|muela|aguanto|urgente)/i.test(content)
+          
+          // Prevenir texto duplicado si ya fue concatenado
+          const cleanNewContent = content.trim()
+          const alreadyContains = existing.message.includes(cleanNewContent)
+          const updatedMessage = alreadyContains ? existing.message : `${existing.message}\n• "${cleanNewContent}"`
+
           const updatedToast: OmnipresentToast = {
             ...existing,
             title: isRegistered ? `💬 Mensaje de ${sender}` : `🟠 PROSPECTO NUEVO: ${sender}`,
-            message: `${existing.message}\n• "${content}"`,
+            message: updatedMessage,
             urgencyLevel: isUrgent ? 'Urgente' : 'No Urgente',
             type: isUrgent ? 'emergency' : existing.type,
             timestamp: time,
@@ -335,11 +341,16 @@ export function OmnipresentDoctorLiveAlerts() {
 
           if (existingIdx !== -1) {
             const existing = prev[existingIdx]
+            const cleanPrevChat = existing.message.replace(/🎙️ Resumen Llamada Aura IA:[\s\S]*/, '').replace(/💬 Chat previo: ?/, '').replace(/^"|"$/g, '').trim()
+            const finalFusedMessage = cleanPrevChat && !cleanPrevChat.includes(voiceSummary)
+              ? `💬 Chat previo: "${cleanPrevChat}"\n\n🎙️ Resumen Llamada Aura IA:\n${voiceSummary}`
+              : `🎙️ Resumen Llamada Aura IA:\n${voiceSummary}`
+
             const fusedToast: OmnipresentToast = {
               ...existing,
               id: existing.id,
               title: `📞 Sesión Unificada (Chat + Llamada): ${patient}`,
-              message: `💬 Chat previo: "${existing.message}"\n\n🎙️ Resumen Llamada Aura IA:\n${voiceSummary}`,
+              message: finalFusedMessage,
               type: 'voice',
               consultationReason: payload.consultationReason || existing.consultationReason || 'Solicitud de Cita Médica por Voz',
               urgencyLevel: payload.urgencyLevel || existing.urgencyLevel || 'Urgente',

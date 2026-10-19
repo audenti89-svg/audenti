@@ -891,6 +891,19 @@ export function ChatInterface() {
             ) : (
               <span className="text-xs text-slate-400">Selecciona una conversación</span>
             )}
+
+            {activePatient && activePatient.phone && activePatient.phone !== 'Sin teléfono' && (
+              <a
+                href={`https://wa.me/521${activePatient.phone.replace(/\D/g, '').slice(-10)}?text=${encodeURIComponent(`Hola ${activePatient.name}, te saluda la Dra. Aura Estudillo de Audenti Clinical.`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs shadow-xs transition-transform active:scale-95 shrink-0"
+                title={`Abrir WhatsApp directo con ${activePatient.name}`}
+              >
+                <MessageSquare className="w-3.5 h-3.5 fill-current" />
+                <span>WhatsApp Directo</span>
+              </a>
+            )}
           </div>
 
           {/* Insignia / Recordatorio Activo de Consulta Pendiente de Agendar */}

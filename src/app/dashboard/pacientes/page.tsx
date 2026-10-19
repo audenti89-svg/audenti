@@ -12,7 +12,8 @@ import {
   CalendarPlus,
   MoreVertical,
   Printer,
-  RefreshCw
+  RefreshCw,
+  MessageCircle
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
@@ -157,14 +158,23 @@ export default function PacientesPage() {
             </button>
           </div>
 
-          <div className="relative">
+          <div className="relative flex-1 sm:w-72">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar por nombre, teléfono o correo..."
-              className="pl-9 pr-4 py-2 rounded-xl bg-slate-50 text-xs border border-slate-200/80 text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400 w-56 focus:bg-white transition-all placeholder:text-slate-400"
+              placeholder="Buscar por Nombre, Teléfono, ID o Folio..."
+              className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-50 text-xs border border-slate-200/80 text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-white transition-all placeholder:text-slate-400"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 font-bold"
+              >
+                ✕
+              </button>
+            )}
           </div>
           <button
             onClick={fetchPatients}
@@ -381,7 +391,21 @@ export default function PacientesPage() {
                           : 'Reciente'}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <div className="inline-flex items-center gap-1">
+                        <div className="inline-flex items-center gap-1.5">
+                          {/* Botón WhatsApp Directo Oficial (wa.me) */}
+                          {p.phone && (
+                            <a
+                              href={`https://wa.me/521${p.phone.replace(/\D/g, '').slice(-10)}?text=${encodeURIComponent(`Hola ${p.full_name}, te saluda la Dra. Aura Estudillo de Audenti Clinical. Me pongo en contacto contigo respecto a tu atención odontológica.`)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[11px] shadow-xs transition-transform active:scale-95"
+                              title={`Abrir WhatsApp directo con ${p.full_name}`}
+                            >
+                              <MessageCircle className="w-3.5 h-3.5 fill-current" />
+                              <span className="hidden xl:inline">WhatsApp</span>
+                            </a>
+                          )}
+
                           <Link
                             href="/dashboard/expediente"
                             className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"

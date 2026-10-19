@@ -22,7 +22,8 @@ import {
   RefreshCw,
   X,
   LayoutGrid,
-  List
+  List,
+  MessageSquare
 } from 'lucide-react'
 import { useNotificationSound } from '@/hooks/useNotificationSound'
 import { createClient } from '@/utils/supabase/client'
@@ -632,6 +633,19 @@ export default function CalendarPage() {
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     Concluir Consulta
                   </button>
+                )}
+
+                {app.phone && (
+                  <a
+                    href={`https://wa.me/521${app.phone.replace(/\D/g, '').slice(-10)}?text=${encodeURIComponent(`Hola ${app.patientName}, te saluda la Dra. Aura Estudillo de Audenti Clinical respecto a tu cita agendada.`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold shadow-xs transition-transform active:scale-95 cursor-pointer"
+                    title={`Abrir WhatsApp con ${app.patientName}`}
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 fill-current" />
+                    <span>WhatsApp</span>
+                  </a>
                 )}
 
                 <Link
