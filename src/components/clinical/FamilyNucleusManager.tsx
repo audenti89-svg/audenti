@@ -35,8 +35,9 @@ export function FamilyNucleusManager({ patient, patientName }: FamilyNucleusMana
   const patientId = patient?.id
 
   // Determinar datos de referidos
-  // Si es María de los Ángeles Sánchez Rivera, mostrar su red familiar activa
-  const isAngeles = currentName.toLowerCase().includes('ángeles') || currentName.toLowerCase().includes('angeles')
+  // Perfiles clave: Ángel Sánchez (4 familiares + 3 amigos), Ángeles Sánchez y Ricardo Sánchez
+  const isAngel = currentName.toLowerCase().includes('ángel') || currentName.toLowerCase().includes('angel')
+  const isAngeles = !isAngel && (currentName.toLowerCase().includes('ángeles') || currentName.toLowerCase().includes('angeles'))
   const isRicardo = currentName.toLowerCase().includes('ricardo')
 
   const [referrals, setReferrals] = useState<ReferralItem[]>([])
@@ -49,12 +50,24 @@ export function FamilyNucleusManager({ patient, patientName }: FamilyNucleusMana
 
   useEffect(() => {
     // Configurar referidos iniciales según perfil
-    if (isAngeles) {
+    if (isAngel) {
+      setReferrals([
+        // 4 Familiares
+        { id: 'ref-a1', name: 'María de los Ángeles Sánchez', relation: 'Familiar (Mamá)', revenueGenerated: 14500, status: 'Tratamiento Activo', date: '01 Oct 2026' },
+        { id: 'ref-a2', name: 'Ricardo Sánchez Rivera', relation: 'Familiar (Hermano)', revenueGenerated: 8500, status: 'Tratamiento Activo', date: '05 Oct 2026' },
+        { id: 'ref-a3', name: 'Elena Sánchez', relation: 'Familiar (Tía)', revenueGenerated: 5200, status: 'En sillón', date: '12 Oct 2026' },
+        { id: 'ref-a4', name: 'Carlos Rivera Sánchez', relation: 'Familiar (Primo)', revenueGenerated: 6800, status: 'Presupuesto Aceptado', date: '15 Oct 2026' },
+        // 3 Amigos / Conocidos
+        { id: 'ref-a5', name: 'Lucía Mendoza', relation: 'Amigo/Conocido', revenueGenerated: 3400, status: 'Cita Agendada', date: '18 Oct 2026' },
+        { id: 'ref-a6', name: 'Fernando Gómez', relation: 'Amigo/Conocido', revenueGenerated: 4200, status: 'Valoración Completada', date: 'Hoy' },
+        { id: 'ref-a7', name: 'Valeria Castro', relation: 'Amigo/Conocido', revenueGenerated: 3900, status: 'Tratamiento Activo', date: '16 Oct 2026' }
+      ])
+    } else if (isAngeles) {
       setReferrals([
         {
           id: 'ref-1',
           name: 'Ricardo Sánchez Rivera',
-          relation: 'Familiar (Hijo/Hermano)',
+          relation: 'Familiar (Hijo)',
           revenueGenerated: 8500,
           status: 'Tratamiento Activo',
           date: '15 Oct 2026'
@@ -62,7 +75,7 @@ export function FamilyNucleusManager({ patient, patientName }: FamilyNucleusMana
         {
           id: 'ref-2',
           name: 'Ángel Gabriel Sánchez',
-          relation: 'Familiar',
+          relation: 'Familiar (Hijo)',
           revenueGenerated: 6200,
           status: 'En sillón',
           date: '18 Oct 2026'
