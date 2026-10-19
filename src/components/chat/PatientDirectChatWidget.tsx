@@ -91,29 +91,10 @@ export function PatientDirectChatWidget({ patient }: PatientDirectChatWidgetProp
         }
       }
 
-      // Fallback con el mensaje de la Dra. Aura de las 11:32 a.m.
-      const initialMsg: PatientDirectMessage = {
-        id: 'msg-aura-1132',
-        senderName: 'Dra. Aura Estudillo',
-        senderRole: 'doctor',
-        content: 'hola',
-        timestamp: '11:32 a.m.',
-        isDoctor: true
-      };
-      setMessages([initialMsg]);
-      if (!isOpen) setUnreadCount(1);
+      // Sin mensajes previos
+      setMessages([]);
     } catch {
-      setMessages([
-        {
-          id: 'msg-aura-1132',
-          senderName: 'Dra. Aura Estudillo',
-          senderRole: 'doctor',
-          content: 'hola',
-          timestamp: '11:32 a.m.',
-          isDoctor: true
-        }
-      ]);
-      if (!isOpen) setUnreadCount(1);
+      setMessages([]);
     }
   };
 

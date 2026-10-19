@@ -194,6 +194,77 @@ export function ChatInterface() {
     }
   }
 
+  // 1.1 Sincronización profunda de mensajes para el paciente seleccionado (Storage + DB chat_messages)
+  const syncSelectedPatientMessages = async (patientId: string) => {
+    if (!patientId) return
+
+    try {
+      // 1. Obtener de la API /api/chat
+      const res = await fetch(`/api/chat?patientId=${encodeURIComponent(patientId)}`)
+      let apiMsgs: ChatMessageItem[] = []
+      if (res.ok) {
+        const json = await res.json()
+        if (Array.isArray(json.messages)) {
+          apiMsgs = json.messages.map((m: any) => ({
+            id: m.id || `msg-${Math.random()}`,
+            senderName: m.senderName || (m.isDoctor ? 'Dra. Aura Estudillo' : 'Paciente'),
+            senderRole: m.senderRole || (m.isDoctor ? 'doctor' : 'patient'),
+            channel_type: m.channel_type || m.metadata?.channel_type || (m.content?.includes('Llamada de Voz') ? 'voice_call' : 'web_chat'),
+            content: m.content,
+            time: m.timestamp || m.time || 'Hoy',
+            isOwn: Boolean(m.isDoctor),
+            isPrivateNote: Boolean(m.isPrivateNote),
+            metadata: m.metadata
+          }))
+        }
+      }
+
+      // 2. Consultar directamente la tabla chat_messages en Supabase si es paciente registrado
+      let dbMsgs: ChatMessageItem[] = []
+      if (!patientId.startsWith('prospect_')) {
+        try {
+          const { data: dbRows } = await supabase
+            .from('chat_messages')
+            .select('*')
+            .eq('patient_id', patientId)
+            .order('created_at', { ascending: true })
+
+          if (dbRows && dbRows.length > 0) {
+            dbMsgs = dbRows.map(r => ({
+              id: r.id,
+              senderName: r.sender_name || (r.sender_role === 'ai' ? 'Asistente de Voz (Aura AI)' : 'Paciente'),
+              senderRole: r.sender_role as any,
+              channel_type: (r.channel_type || 'web_chat') as any,
+              content: r.content,
+              time: r.created_at ? new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date(r.created_at)) : 'Hoy',
+              isOwn: r.sender_role === 'doctor',
+              metadata: r.metadata
+            }))
+          }
+        } catch {}
+      }
+
+      // 3. Fusionar evitando duplicados
+      if (apiMsgs.length > 0 || dbMsgs.length > 0) {
+        setMessages(prev => {
+          const current = prev[patientId] || []
+          const combined = [...current]
+          const existingIds = new Set(combined.map(m => m.id))
+
+          for (const item of [...apiMsgs, ...dbMsgs]) {
+            if (!existingIds.has(item.id)) {
+              existingIds.add(item.id)
+              combined.push(item)
+            }
+          }
+          return { ...prev, [patientId]: combined }
+        })
+      }
+    } catch (err: any) {
+      console.warn('Error sincronizando mensajes de paciente:', err?.message)
+    }
+  }
+
   // Carga inicial y respuesta a parámetros de URL
   useEffect(() => {
     loadOmnichannelHistory()
@@ -209,6 +280,13 @@ export function ChatInterface() {
       })
     }
   }, [urlPatientId])
+
+  // Sincronizar mensajes cada vez que cambia el paciente seleccionado
+  useEffect(() => {
+    if (selectedPatientId) {
+      syncSelectedPatientMessages(selectedPatientId)
+    }
+  }, [selectedPatientId])
 
   // Scroll automático en hilo de mensajes
   useEffect(() => {

@@ -85,17 +85,8 @@ export function UnifiedCommunicationWidget({
         }
       }
     } catch {
-      // Mensaje de bienvenida inicial de la Dra. Aura
-      setMessages([
-        {
-          id: 'msg-aura-1132',
-          senderName: 'Dra. Aura Estudillo',
-          senderRole: 'doctor',
-          content: 'hola',
-          timestamp: '11:32 a.m.',
-          isDoctor: true
-        }
-      ])
+      // Sin mensajes previos
+      setMessages([])
     }
   }
 

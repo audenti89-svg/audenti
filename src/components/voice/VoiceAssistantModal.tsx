@@ -227,6 +227,57 @@ export function VoiceAssistantModal({
     retryPending()
   }, [])
 
+  // Listener de beforeunload para llamadas que terminen abruptamente al cerrar o recargar ventana
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if ((isConnected || isSpeaking) && transcripts && transcripts.length > 0) {
+        try {
+          const formattedDialogue = transcripts.map((t: any) => ({
+            role: (t.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+            text: t.text || ''
+          }))
+          const fullTranscriptSpeakers = formattedDialogue.map((t: any) => ({
+            speaker: t.role === 'user' ? patientName : 'Aura AI',
+            text: t.text
+          }))
+          const abruptPayload = {
+            patientId,
+            patient_name: patientName,
+            patientName,
+            phone: patientPhone,
+            patientPhone,
+            reason: 'Llamada de Voz (Cierre Abrupto)',
+            consultationReason: 'Solicitud de Cita Médica por Voz',
+            urgency_level: 'Urgente',
+            urgencyLevel: 'Urgente',
+            durationSeconds: callDuration || 1,
+            transcription: formattedDialogue.map((d: any) => `${d.role === 'user' ? patientName : 'Aura AI'}: ${d.text}`).join('\n'),
+            dialogue: formattedDialogue,
+            full_transcript: fullTranscriptSpeakers,
+            summary: formattedDialogue.map((t: any) => `${t.role === 'user' ? patientName : 'Aura AI'}: ${t.text}`).slice(-4).join(' | ') || 'Llamada interrumpida por cierre de ventana.',
+            timestamp: new Date().toISOString()
+          }
+
+          // Guardar en localStorage para reenvío garantizado
+          const pending = JSON.parse(localStorage.getItem('audenti_pending_transcripts') || '[]')
+          pending.push(abruptPayload)
+          localStorage.setItem('audenti_pending_transcripts', JSON.stringify(pending))
+
+          // Intentar enviar mediante navigator.sendBeacon
+          if (navigator.sendBeacon) {
+            const blob = new Blob([JSON.stringify(abruptPayload)], { type: 'application/json' })
+            navigator.sendBeacon('/api/webhook/call-transcription', blob)
+          }
+        } catch {}
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [isConnected, isSpeaking, transcripts, patientName, patientPhone, patientId, callDuration])
+
   const handleStartCall = async () => {
     setPermissionError(null)
     if (typeof window === 'undefined' || !navigator?.mediaDevices?.getUserMedia) {
