@@ -600,28 +600,37 @@ export function UnifiedCommunicationWidget({
                   />
                 )}
 
+                {/* Botón/Esfera Visual - Avatar Oficial de la Dra. Aura Estudillo */}
                 <div
-                  className={`w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 shadow-xl ${
+                  className={`w-24 h-24 rounded-full overflow-hidden flex items-center justify-center transition-all duration-300 shadow-xl relative ${
                     isConnected
                       ? isSpeaking
-                        ? 'bg-gradient-to-tr from-amber-400 to-amber-600 text-black scale-105 shadow-amber-500/50'
+                        ? 'scale-105 shadow-amber-500/50 ring-4 ring-amber-400'
                         : isMicActiveAndListening
-                        ? 'bg-emerald-500 text-black scale-110 shadow-emerald-500/50 ring-4 ring-emerald-400/40 animate-pulse'
-                        : 'bg-emerald-700 text-white'
-                      : 'bg-[#F59E0B] text-black hover:scale-105'
+                        ? 'scale-110 shadow-emerald-500/50 ring-4 ring-emerald-400 animate-pulse'
+                        : 'ring-2 ring-emerald-500'
+                      : 'ring-4 ring-amber-400/90 hover:scale-105 shadow-amber-400/30'
                   }`}
                 >
-                  {isConnected ? (
-                    isSpeaking ? (
-                      <Volume2 className="w-10 h-10 animate-bounce" />
-                    ) : isMicActiveAndListening ? (
-                      <Mic className="w-10 h-10 text-black stroke-[2.5]" />
+                  <img
+                    src="/images/dra-aura-estudillo.jpg"
+                    alt="Dra. Aura Estudillo"
+                    className="w-full h-full object-cover object-center"
+                  />
+
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end justify-center pb-1">
+                    {isConnected ? (
+                      isSpeaking ? (
+                        <Volume2 className="w-5 h-5 text-amber-300 animate-bounce" />
+                      ) : isMicActiveAndListening ? (
+                        <Mic className="w-5 h-5 text-emerald-400 stroke-[2.5]" />
+                      ) : (
+                        <MicOff className="w-5 h-5 text-slate-300" />
+                      )
                     ) : (
-                      <MicOff className="w-10 h-10 text-white" />
-                    )
-                  ) : (
-                    <PhoneCall className="w-10 h-10" />
-                  )}
+                      <Sparkles className="w-4 h-4 text-amber-300" />
+                    )}
+                  </div>
                 </div>
               </div>
 

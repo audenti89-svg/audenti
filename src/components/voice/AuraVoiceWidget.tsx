@@ -373,29 +373,37 @@ export function AuraVoiceWidget({ className = '', defaultOpen = false }: AuraVoi
                 />
               )}
 
-              {/* Globo central de estado con cambio dinámico de color */}
+              {/* Globo central de estado con Avatar Oficial de la Dra. Aura */}
               <div
-                className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 ${
+                className={`w-20 h-20 rounded-full overflow-hidden flex items-center justify-center transition-all duration-300 relative ${
                   isConnected
                     ? isSpeaking
-                      ? 'bg-gradient-to-tr from-amber-400 to-amber-600 text-slate-950 scale-105 shadow-lg shadow-amber-500/50'
+                      ? 'scale-105 shadow-lg shadow-amber-500/50 ring-4 ring-amber-400'
                       : isMicActiveAndListening
-                      ? 'bg-emerald-500 text-slate-950 scale-110 shadow-lg shadow-emerald-500/60 ring-4 ring-emerald-400/40 animate-pulse'
-                      : 'bg-emerald-700 text-white shadow-md'
-                    : 'bg-slate-800 text-slate-400'
+                      ? 'scale-110 shadow-lg shadow-emerald-500/60 ring-4 ring-emerald-400 animate-pulse'
+                      : 'ring-2 ring-emerald-500'
+                    : 'ring-3 ring-amber-400/80 shadow-md'
                 }`}
               >
-                {isConnected ? (
-                  isSpeaking ? (
-                    <Volume2 className="w-8 h-8 animate-bounce" />
-                  ) : isMicActiveAndListening ? (
-                    <Mic className="w-8 h-8 text-slate-950 stroke-[2.5]" />
+                <img
+                  src="/images/dra-aura-estudillo.jpg"
+                  alt="Dra. Aura Estudillo"
+                  className="w-full h-full object-cover object-center"
+                />
+
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end justify-center pb-1">
+                  {isConnected ? (
+                    isSpeaking ? (
+                      <Volume2 className="w-5 h-5 text-amber-300 animate-bounce" />
+                    ) : isMicActiveAndListening ? (
+                      <Mic className="w-5 h-5 text-emerald-400 stroke-[2.5]" />
+                    ) : (
+                      <MicOff className="w-5 h-5 text-slate-300" />
+                    )
                   ) : (
-                    <MicOff className="w-8 h-8 text-white" />
-                  )
-                ) : (
-                  <PhoneCall className="w-8 h-8" />
-                )}
+                    <Sparkles className="w-4 h-4 text-amber-300" />
+                  )}
+                </div>
               </div>
             </div>
 

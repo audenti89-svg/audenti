@@ -55,6 +55,7 @@ export interface ChatMessageItem {
     folio?: string
     isRegistered?: boolean
     classification?: string
+    trafficLight?: 'green' | 'yellow' | 'red'
   }
 }
 
@@ -95,6 +96,7 @@ export function ChatInterface() {
   const [inputMessage, setInputMessage] = useState('')
   const [isPrivateNote, setIsPrivateNote] = useState(false)
   const [sendingMessage, setSendingMessage] = useState(false)
+  const [hasPendingAppointment, setHasPendingAppointment] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -133,7 +135,7 @@ export function ChatInterface() {
               senderRole: m.senderRole || (m.isDoctor ? 'doctor' : 'patient'),
               channel_type: m.channel_type || m.metadata?.channel_type || (m.content?.includes('Llamada de Voz') ? 'voice_call' : 'web_chat'),
               content: m.content,
-              time: m.timestamp || m.time || '11:30 a.m.',
+              time: m.timestamp || m.time || (m.created_at ? new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date(m.created_at)) : 'Reciente'),
               isOwn: Boolean(m.isDoctor),
               isPrivateNote: Boolean(m.isPrivateNote),
               metadata: m.metadata
@@ -219,30 +221,36 @@ export function ChatInterface() {
         }
       }
 
-      // 2. Consultar directamente la tabla chat_messages en Supabase si es paciente registrado
+      // 2. Consultar directamente la tabla chat_messages en Supabase (paciente registrado o prospecto)
       let dbMsgs: ChatMessageItem[] = []
-      if (!patientId.startsWith('prospect_')) {
-        try {
-          const { data: dbRows } = await supabase
-            .from('chat_messages')
-            .select('*')
-            .eq('patient_id', patientId)
-            .order('created_at', { ascending: true })
+      try {
+        const query = supabase
+          .from('chat_messages')
+          .select('*')
+          .order('created_at', { ascending: true })
 
-          if (dbRows && dbRows.length > 0) {
-            dbMsgs = dbRows.map(r => ({
-              id: r.id,
-              senderName: r.sender_name || (r.sender_role === 'ai' ? 'Asistente de Voz (Aura AI)' : 'Paciente'),
-              senderRole: r.sender_role as any,
-              channel_type: (r.channel_type || 'web_chat') as any,
-              content: r.content,
-              time: r.created_at ? new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date(r.created_at)) : 'Hoy',
-              isOwn: r.sender_role === 'doctor',
-              metadata: r.metadata
-            }))
-          }
-        } catch {}
-      }
+        if (!patientId.startsWith('prospect_')) {
+          query.or(`patient_id.eq.${patientId},metadata->>patientId.eq.${patientId}`)
+        } else {
+          const rawPhone = patientId.replace('prospect_', '').slice(-10)
+          query.or(`metadata->>patientId.eq.${patientId},metadata->>phone.ilike.%${rawPhone}%`)
+        }
+
+        const { data: dbRows } = await query
+
+        if (dbRows && dbRows.length > 0) {
+          dbMsgs = dbRows.map(r => ({
+            id: r.id,
+            senderName: r.sender_name || (r.sender_role === 'ai' ? 'Asistente de Voz (Aura AI)' : (r.sender_role === 'doctor' ? 'Dra. Aura Estudillo' : 'Paciente')),
+            senderRole: r.sender_role as any,
+            channel_type: (r.channel_type || 'web_chat') as any,
+            content: r.content,
+            time: r.created_at ? new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date(r.created_at)) : 'Hoy',
+            isOwn: r.sender_role === 'doctor',
+            metadata: r.metadata
+          }))
+        }
+      } catch {}
 
       // 3. Fusionar evitando duplicados
       if (apiMsgs.length > 0 || dbMsgs.length > 0) {
@@ -285,8 +293,56 @@ export function ChatInterface() {
   useEffect(() => {
     if (selectedPatientId) {
       syncSelectedPatientMessages(selectedPatientId)
+
+      // Verificar si solicitó cita y si ya existe registrada en la agenda de Supabase
+      const checkAppointmentStatus = async () => {
+        try {
+          const currentMsgs = messages[selectedPatientId] || []
+          const hasRequestedAppt = currentMsgs.some(m => {
+            const txt = (m.content || '').toLowerCase()
+            const reason = (m.metadata?.consultationReason || '').toLowerCase()
+            return m.channel_type === 'voice_call' ||
+              reason.includes('cita') ||
+              reason.includes('consulta') ||
+              txt.includes('cita') ||
+              txt.includes('agendar') ||
+              txt.includes('horario') ||
+              txt.includes('valoración')
+          })
+
+          if (!hasRequestedAppt) {
+            setHasPendingAppointment(false)
+            return
+          }
+
+          // Consultar tabla appointments para este paciente
+          const cleanPhone = (selectedPatientId.startsWith('prospect_') ? selectedPatientId.replace('prospect_', '') : '').slice(-10)
+          let apptQuery = supabase
+            .from('appointments')
+            .select('id, status')
+            .neq('status', 'cancelled')
+            .limit(1)
+
+          if (!selectedPatientId.startsWith('prospect_')) {
+            apptQuery = apptQuery.eq('patient_id', selectedPatientId)
+          } else if (cleanPhone) {
+            apptQuery = apptQuery.ilike('notes', `%${cleanPhone}%`)
+          }
+
+          const { data: appts } = await apptQuery
+          if (appts && appts.length > 0) {
+            setHasPendingAppointment(false)
+          } else {
+            setHasPendingAppointment(true)
+          }
+        } catch {
+          setHasPendingAppointment(false)
+        }
+      }
+
+      checkAppointmentStatus()
     }
-  }, [selectedPatientId])
+  }, [selectedPatientId, messages])
 
   // Scroll automático en hilo de mensajes
   useEffect(() => {
@@ -776,6 +832,26 @@ export function ChatInterface() {
             )}
           </div>
 
+          {/* Insignia / Recordatorio Activo de Consulta Pendiente de Agendar */}
+          {activePatient && hasPendingAppointment && (
+            <div className="px-4 py-2.5 bg-amber-500/15 border-b border-amber-400/40 flex items-center justify-between gap-3 text-amber-900 animate-in fade-in duration-200">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-base shrink-0">⚠️</span>
+                <p className="text-xs font-black truncate">
+                  <span className="uppercase text-amber-950">Recordatorio de Consulta:</span>{' '}
+                  <span className="font-medium text-amber-900">{activePatient.name} solicitó cita pero aún no está agendada.</span>
+                </p>
+              </div>
+              <Link
+                href={`/dashboard/calendar?patientId=${encodeURIComponent(activePatient.id)}`}
+                className="shrink-0 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Agendar Ahora</span>
+              </Link>
+            </div>
+          )}
+
           {/* Hilo de Mensajes con Render Especial para Llamadas de Voz */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
             {currentChatMessages.length === 0 ? (
@@ -792,76 +868,100 @@ export function ChatInterface() {
                 const isDoctor = msg.isOwn || msg.senderRole === 'doctor'
                 const isPrivate = msg.isPrivateNote
 
-                // RENDER ESPECIAL DE LLAMADAS DE VOZ (Contenedor Destacado Profesional)
+                // RENDER ESTÁNDAR OBLIGATORIO DE LLAMADAS DE VOZ (bg-slate-900 border border-slate-700 p-4 rounded-xl shadow-xl)
                 if (isVoice) {
                   const dialogue = msg.metadata?.dialogue || []
                   const duration = msg.metadata?.durationSeconds || 45
                   const reason = msg.metadata?.consultationReason || 'Solicitud de Cita Médica por Voz'
                   const urgency = msg.metadata?.urgencyLevel || 'Urgente'
+                  const trafficLight = msg.metadata?.trafficLight || (urgency === 'Urgente' ? 'red' : 'green')
+                  const agreementSummary = msg.metadata?.summary || msg.content || 'Solicitud de valoración y cita médica con la Dra. Aura Estudillo.'
 
                   return (
-                    <div key={msg.id || idx} className="w-full my-3 p-4 rounded-3xl bg-[#0F172A] text-white border-2 border-amber-400/80 shadow-xl space-y-3">
-                      {/* Encabezado de la Tarjeta de Voz */}
-                      <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold shadow-xs">
-                            <Phone className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <h4 className="text-xs font-black uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
-                              📞 Llamada de Voz (Aura AI)
-                            </h4>
-                            <span className="text-[10px] text-slate-400 font-mono">
-                              Duración: {Math.floor(duration / 60)}m {duration % 60}s • {msg.time}
-                            </span>
-                          </div>
+                    <div key={msg.id || idx} className="w-full my-3 p-4 rounded-xl bg-slate-900 border border-slate-700 text-white shadow-xl space-y-3.5">
+                      {/* Sección 1: Badge de canal, timestamp y etiqueta de Triage */}
+                      <div className="flex items-center justify-between pb-2.5 border-b border-slate-800 flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono text-[11px] font-bold flex items-center gap-1.5">
+                            <Phone className="w-3.5 h-3.5 text-amber-400" />
+                            📞 Voz Aura IA
+                          </span>
+                          <span className="text-[11px] text-slate-400 font-mono">
+                            {msg.time} • {Math.floor(duration / 60)}m {duration % 60}s
+                          </span>
                         </div>
 
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                          urgency === 'Urgente'
-                            ? 'bg-rose-500/30 text-rose-300 border border-rose-500/50 animate-pulse'
-                            : 'bg-emerald-500/20 text-emerald-300'
-                        }`}>
-                          🚨 {urgency}
-                        </span>
-                      </div>
-
-                      {/* Motivo de Consulta Sintetizado */}
-                      <div className="bg-slate-900/90 p-3 rounded-2xl border border-white/5 space-y-1">
-                        <p className="text-xs text-slate-300">
-                          🎯 <strong>Motivo Identificado:</strong> <span className="text-white font-bold">{reason}</span>
-                        </p>
-                        {msg.metadata?.summary && (
-                          <p className="text-[11px] text-slate-400 pt-1 leading-snug">
-                            {msg.metadata.summary}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Diálogo / Transcripción Completa */}
-                      <div className="space-y-2 pt-1">
-                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                          Transcripción Completa del Diálogo:
-                        </span>
-                        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                          {dialogue.length > 0 ? (
-                            dialogue.map((turn, tIdx) => (
-                              <div
-                                key={tIdx}
-                                className={`p-2 rounded-xl text-xs leading-relaxed ${
-                                  turn.role === 'user'
-                                    ? 'bg-slate-800/80 border border-slate-700 text-slate-200'
-                                    : 'bg-amber-400/10 border border-amber-400/30 text-amber-200'
-                                }`}
-                              >
-                                <span className="font-bold block text-[10px] opacity-75 uppercase">
-                                  {turn.role === 'user' ? (msg.metadata?.patientName || activePatient?.name || 'Paciente') : 'Aura AI'}:
-                                </span>
-                                {turn.text}
-                              </div>
-                            ))
+                        {/* Etiqueta de Triage Estándar */}
+                        <div>
+                          {trafficLight === 'red' || urgency === 'Urgente' ? (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-rose-500/30 text-rose-300 border border-rose-500/60 animate-pulse">
+                              🔴 URGENTE
+                            </span>
+                          ) : trafficLight === 'yellow' ? (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-500/30 text-amber-300 border border-amber-500/60">
+                              🟡 INFORMACIÓN
+                            </span>
                           ) : (
-                            <p className="text-xs text-slate-300 italic p-2.5 bg-slate-800/60 rounded-xl">
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/25 text-emerald-300 border border-emerald-400/50">
+                              🟢 CONSULTA / CITA
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Sección 2: Campo 'Motivo Identificado' sintetizado */}
+                      <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+                        <span className="text-[10px] uppercase font-black text-amber-400 tracking-wider block">
+                          🎯 Motivo Identificado:
+                        </span>
+                        <p className="text-xs text-white font-bold leading-snug">
+                          {reason}
+                        </p>
+                      </div>
+
+                      {/* Sección 3: Bloque de síntesis de acuerdos y horario de cita solicitado */}
+                      <div className="bg-slate-950/70 p-3 rounded-lg border border-slate-800 space-y-1">
+                        <span className="text-[10px] uppercase font-black text-emerald-400 tracking-wider block">
+                          📋 Síntesis de Acuerdos & Horario Solicitado:
+                        </span>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                          {agreementSummary}
+                        </p>
+                      </div>
+
+                      {/* Sección 4: TRANSCRIPCIÓN COMPLETA DEL DIÁLOGO (Scroll interno max-h-60) */}
+                      <div className="space-y-2 pt-1">
+                        <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider flex items-center justify-between">
+                          <span>Transcripción Completa del Diálogo:</span>
+                          <span className="text-[9px] text-slate-500 font-normal">Audio a Texto Sincronizado</span>
+                        </span>
+
+                        <div className="max-h-60 overflow-y-auto bg-slate-950/80 p-3 rounded-lg border border-slate-800/80 space-y-2.5 pr-1.5">
+                          {dialogue.length > 0 ? (
+                            dialogue.map((turn, tIdx) => {
+                              const isTurnUser = turn.role === 'user'
+                              return (
+                                <div
+                                  key={tIdx}
+                                  className={`p-2.5 rounded-lg text-xs leading-relaxed border ${
+                                    isTurnUser
+                                      ? 'bg-slate-900/90 border-slate-700/80 text-slate-100'
+                                      : 'bg-amber-950/30 border-amber-500/30 text-amber-100'
+                                  }`}
+                                >
+                                  <span className={`font-black text-[10px] uppercase block mb-1 tracking-wider ${
+                                    isTurnUser ? 'text-cyan-300' : 'text-amber-400'
+                                  }`}>
+                                    {isTurnUser ? `PACIENTE (${msg.metadata?.patientName || activePatient?.name || 'Usuario'}):` : 'AURA AI:'}
+                                  </span>
+                                  <p className="text-xs text-slate-200">
+                                    {turn.text}
+                                  </p>
+                                </div>
+                              )
+                            })
+                          ) : (
+                            <p className="text-xs text-slate-400 italic p-2 bg-slate-900 rounded">
                               &ldquo;{msg.content}&rdquo;
                             </p>
                           )}
@@ -1031,13 +1131,17 @@ export function ChatInterface() {
 
                 <Link
                   href={`/dashboard/calendar?patientId=${encodeURIComponent(activePatient.id)}`}
-                  className="w-full flex items-center justify-between p-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 text-xs font-bold transition-all cursor-pointer"
+                  className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                    hasPendingAppointment
+                      ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 border-amber-500 shadow-md animate-pulse ring-2 ring-amber-400/40'
+                      : 'bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-900'
+                  }`}
                 >
-                  <span className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-amber-600" />
-                    Agendar Cita
+                  <span className="flex items-center gap-2 font-black">
+                    <Calendar className={`w-4 h-4 ${hasPendingAppointment ? 'text-slate-950' : 'text-amber-600'}`} />
+                    {hasPendingAppointment ? '⚠️ Agendar Cita (Pendiente)' : 'Agendar Cita'}
                   </span>
-                  <ChevronRight className="w-4 h-4 text-amber-500" />
+                  <ChevronRight className={`w-4 h-4 ${hasPendingAppointment ? 'text-slate-950' : 'text-amber-500'}`} />
                 </Link>
 
                 <Link

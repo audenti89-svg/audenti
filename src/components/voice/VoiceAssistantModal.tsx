@@ -405,29 +405,46 @@ export function VoiceAssistantModal({
               />
             )}
 
-            {/* Botón/Esfera Visual - Azul Corporativo y Verde Clínico */}
+            {/* Botón/Esfera Visual - Avatar Oficial de la Dra. Aura Estudillo */}
             <div
-              className={`w-28 h-28 rounded-full flex items-center justify-center transition-all duration-300 shadow-2xl ${
+              className={`w-28 h-28 rounded-full overflow-hidden flex items-center justify-center transition-all duration-300 shadow-2xl relative ${
                 isConnected
                   ? isSpeaking
-                    ? 'bg-gradient-to-tr from-cyan-600 to-blue-700 text-white shadow-blue-500/30'
+                    ? 'ring-4 ring-cyan-400 shadow-blue-500/50 scale-105'
                     : isMicActiveAndListening
-                    ? 'bg-emerald-600 text-white shadow-emerald-500/30 ring-4 ring-emerald-400/30 animate-pulse'
-                    : 'bg-slate-700 text-slate-300'
-                  : 'bg-[#1E293B] border-2 border-slate-700 text-slate-300'
+                    ? 'ring-4 ring-emerald-400 shadow-emerald-500/50 animate-pulse'
+                    : 'ring-2 ring-slate-600'
+                  : 'ring-4 ring-amber-400/80 hover:scale-105 shadow-amber-400/30'
               }`}
             >
-              {isConnected ? (
-                isSpeaking ? (
-                  <Volume2 className="w-12 h-12 animate-bounce" />
-                ) : isMicActiveAndListening ? (
-                  <Mic className="w-12 h-12 stroke-[2.5]" />
+              <img
+                src="/images/dra-aura-estudillo.jpg"
+                alt="Dra. Aura Estudillo"
+                className="w-full h-full object-cover object-center"
+              />
+
+              {/* Indicador de estado superpuesto */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end justify-center pb-2">
+                {isConnected ? (
+                  isSpeaking ? (
+                    <span className="p-1 rounded-full bg-cyan-500 text-white shadow-md animate-bounce">
+                      <Volume2 className="w-4 h-4" />
+                    </span>
+                  ) : isMicActiveAndListening ? (
+                    <span className="p-1 rounded-full bg-emerald-500 text-slate-950 shadow-md animate-pulse">
+                      <Mic className="w-4 h-4 stroke-[2.5]" />
+                    </span>
+                  ) : (
+                    <span className="p-1 rounded-full bg-slate-700 text-slate-300">
+                      <MicOff className="w-4 h-4" />
+                    </span>
+                  )
                 ) : (
-                  <MicOff className="w-12 h-12" />
-                )
-              ) : (
-                <PhoneCall className="w-12 h-12 text-amber-400/90" />
-              )}
+                  <span className="p-1.5 rounded-full bg-amber-400 text-slate-950 shadow-md">
+                    <Sparkles className="w-4 h-4" />
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
