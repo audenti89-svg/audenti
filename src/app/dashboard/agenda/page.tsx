@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import { useNotificationSound } from '@/hooks/useNotificationSound'
 import { createClient } from '@/utils/supabase/client'
+import { formatDateInMexico } from '@/utils/timezone'
 import Link from 'next/link'
 import { QuickRegisterModal } from '@/components/clinical/QuickRegisterModal'
 import { StableCalendarView } from '@/components/StableCalendarView'
@@ -118,7 +119,7 @@ export default function CalendarPage() {
           const endDate = new Date(item.end_time || item.start_time)
           const timeStr = `${startDate.toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit' })} - ${endDate.toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit' })}`
           const dateStr = startDate.toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City', day: '2-digit', month: 'short', year: 'numeric' })
-          const rawDate = item.start_time ? item.start_time.split('T')[0] : ''
+          const rawDate = item.start_time ? formatDateInMexico(item.start_time) : ''
           const durationMin = Math.round((endDate.getTime() - startDate.getTime()) / 60000) || 45
 
           return {
@@ -489,9 +490,9 @@ export default function CalendarPage() {
         <>
           {/* Lista de Citas en Tiempo Real Filtradas sin pérdida histórica */}
           {(() => {
-            const todayStr = new Date().toISOString().split('T')[0]
+            const todayStr = formatDateInMexico()
             const filtered = appointments.filter((app) => {
-              // 1. Filtro específico de fecha
+              // 1. Filtro específico de fecha manual
               if (dateFilter && app.rawDate && app.rawDate !== dateFilter) return false
 
               // 2. Filtro de mes
@@ -507,6 +508,8 @@ export default function CalendarPage() {
               }
 
               // 4. Filtro de horizonte temporal (si no se seleccionó fecha manual)
+              // DESBLOQUEO TOTAL: Toda cita del día de hoy (todayStr) permanece SIEMPRE en Presente (Hoy)
+              // sin importar si su hora ya pasó o si ya fue completada.
               if (!dateFilter && horizon !== 'all') {
                 if (horizon === 'present') {
                   return app.rawDate === todayStr || ['in_chair', 'in_waiting'].includes(app.status)
@@ -515,7 +518,7 @@ export default function CalendarPage() {
                   return app.rawDate > todayStr
                 }
                 if (horizon === 'past') {
-                  return app.rawDate < todayStr || app.status === 'completed'
+                  return app.rawDate < todayStr
                 }
               }
 
@@ -566,11 +569,13 @@ export default function CalendarPage() {
                         ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
                         : app.status === 'in_waiting'
                         ? 'bg-amber-50 text-amber-900 border-amber-300'
+                        : app.status === 'completed'
+                        ? 'bg-blue-50 text-blue-800 border-blue-200'
                         : 'bg-slate-100 text-slate-700 border-slate-200'
                     }`}>
                       {app.status === 'in_chair' ? '⚡ En Sillón' :
                        app.status === 'in_waiting' ? '⏳ En Espera' :
-                       app.status === 'completed' ? '✓ Completada' : '📅 Programada'}
+                       app.status === 'completed' ? '✓ Completada / Atendido' : '📅 Programada'}
                     </span>
                   </div>
 
@@ -582,18 +587,19 @@ export default function CalendarPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+                {/* Desbloqueo total de acciones para la doctora: Siempre disponible cambiar a En Sillón, Concluir o Reactivar */}
                 {app.status === 'in_waiting' && (
                   <button
                     type="button"
                     onClick={() => handleCallToChair(app.patientName)}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-xs transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-xs transition-colors"
                   >
                     <Volume2 className="w-3.5 h-3.5 text-amber-400" />
                     Llamar a Sillón
                   </button>
                 )}
 
-                {app.status !== 'in_chair' && app.status !== 'completed' && (
+                {app.status !== 'in_chair' && (
                   <button
                     type="button"
                     onClick={async () => {
@@ -608,13 +614,14 @@ export default function CalendarPage() {
                       } catch {}
                     }}
                     className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                    title="Pasar al paciente al sillón dental ahora"
                   >
                     <Activity className="w-3.5 h-3.5" />
-                    Pasar a Sillón
+                    {app.status === 'completed' ? 'Reabrir a Sillón' : 'Pasar a Sillón'}
                   </button>
                 )}
 
-                {app.status === 'in_chair' && (
+                {app.status !== 'completed' && (
                   <button
                     type="button"
                     onClick={async () => {
@@ -629,9 +636,32 @@ export default function CalendarPage() {
                       } catch {}
                     }}
                     className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                    title="Marcar cita como concluida o atendida"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    Concluir Consulta
+                    Concluir / Atendido
+                  </button>
+                )}
+
+                {app.status === 'completed' && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      playTone('message')
+                      try {
+                        await supabase
+                          .from('appointments')
+                          .update({ status: 'in_waiting' })
+                          .eq('id', app.id)
+                        window.dispatchEvent(new Event('audenti_appointment_refresh'))
+                        fetchAppointments()
+                      } catch {}
+                    }}
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                    title="Regresar cita a lista de espera"
+                  >
+                    <Clock className="w-3.5 h-3.5 text-amber-700" />
+                    Reactivar Turno
                   </button>
                 )}
 
