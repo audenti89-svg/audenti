@@ -181,20 +181,78 @@ export async function GET(request: Request) {
     const patientId = url.searchParams.get('patientId');
 
     const supabase = createAdminClient();
-    const { data: file } = await supabase.storage.from('audenti_database').download('chat_omnichannel.json');
 
-    if (file) {
-      const text = await file.text();
-      if (text && text.trim()) {
-        const allChats = JSON.parse(text);
-        if (patientId) {
-          return NextResponse.json({ success: true, messages: allChats[patientId] || [] });
+    let dbMessages: any[] = [];
+    if (patientId) {
+      try {
+        const query = supabase
+          .from('chat_messages')
+          .select('*')
+          .order('created_at', { ascending: true });
+
+        // Si es UUID de paciente registrado, filtrar por patient_id o por metadata
+        if (!patientId.startsWith('prospect_')) {
+          query.or(`patient_id.eq.${patientId},metadata->>patientId.eq.${patientId}`);
+        } else {
+          const rawPhone = patientId.replace('prospect_', '').slice(-10);
+          query.or(`metadata->>patientId.eq.${patientId},metadata->>phone.ilike.%${rawPhone}%`);
         }
-        return NextResponse.json({ success: true, chats: allChats });
+
+        const { data: rows } = await query;
+        if (rows && rows.length > 0) {
+          dbMessages = rows.map(r => ({
+            id: r.id,
+            senderName: r.sender_name || (r.sender_role === 'ai' ? 'Asistente de Voz (Aura AI)' : (r.sender_role === 'doctor' ? 'Dra. Aura Estudillo' : 'Paciente')),
+            senderRole: r.sender_role,
+            channel_type: r.channel_type || 'web_chat',
+            content: r.content,
+            timestamp: r.created_at ? new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date(r.created_at)) : 'Hoy',
+            time: r.created_at ? new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date(r.created_at)) : 'Hoy',
+            isDoctor: r.sender_role === 'doctor',
+            isOwn: r.sender_role === 'doctor',
+            metadata: r.metadata
+          }));
+        }
+      } catch (dbErr: any) {
+        console.warn('[DB chat_messages query note]:', dbErr?.message);
       }
     }
 
-    return NextResponse.json({ success: true, messages: [] });
+    // Cargar también de Storage para asegurar que nunca falte ningún mensaje
+    let storageMessages: any[] = [];
+    let allChats: Record<string, any[]> = {};
+    try {
+      const { data: file } = await supabase.storage.from('audenti_database').download('chat_omnichannel.json');
+      if (file) {
+        const text = await file.text();
+        if (text && text.trim()) {
+          allChats = JSON.parse(text);
+          if (patientId && allChats[patientId]) {
+            storageMessages = allChats[patientId];
+          }
+        }
+      }
+    } catch {}
+
+    if (patientId) {
+      // Fusionar DB y Storage deduplicando por ID o contenido
+      const combined: any[] = [...storageMessages];
+      const seenIds = new Set(combined.map(m => m.id));
+      const seenContent = new Set(combined.map(m => `${m.content}_${m.time || m.timestamp}`));
+
+      for (const dbm of dbMessages) {
+        const signature = `${dbm.content}_${dbm.time || dbm.timestamp}`;
+        if (!seenIds.has(dbm.id) && !seenContent.has(signature)) {
+          seenIds.add(dbm.id);
+          seenContent.add(signature);
+          combined.push(dbm);
+        }
+      }
+
+      return NextResponse.json({ success: true, messages: combined });
+    }
+
+    return NextResponse.json({ success: true, chats: allChats });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

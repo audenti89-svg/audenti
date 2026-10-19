@@ -19,14 +19,18 @@ import {
 
 export default function WhatsAppSettingsPage() {
   const [phoneNumber, setPhoneNumber] = useState('525522427769')
-  const [wabaId, setWabaId] = useState('')
+  const [phoneNumberId, setPhoneNumberId] = useState('')
   const [metaAccessToken, setMetaAccessToken] = useState('')
   const [webhookVerifyToken, setWebhookVerifyToken] = useState('audenti_secure_token')
+  const [chatbotEnabled, setChatbotEnabled] = useState(true)
+  const [chatbotMode, setChatbotMode] = useState<'autonomous' | 'suggestion' | 'disabled'>('autonomous')
   const [lastUpdated, setLastUpdated] = useState<string | null>(null)
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [verifying, setVerifying] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const [verificationResult, setVerificationResult] = useState<{ success: boolean; message: string } | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   // Cargar configuración guardada
@@ -39,9 +43,11 @@ export default function WhatsAppSettingsPage() {
           const json = await res.json()
           if (json.settings) {
             setPhoneNumber(json.settings.phone_number || '525522427769')
-            setWabaId(json.settings.waba_id || '')
+            setPhoneNumberId(json.settings.phone_number_id || json.settings.waba_id || '')
             setMetaAccessToken(json.settings.meta_access_token || '')
             setWebhookVerifyToken(json.settings.webhook_verify_token || 'audenti_secure_token')
+            setChatbotEnabled(json.settings.chatbot_enabled !== undefined ? json.settings.chatbot_enabled : true)
+            setChatbotMode(json.settings.chatbot_mode || 'autonomous')
             setLastUpdated(json.settings.last_updated)
           }
         }
@@ -66,9 +72,12 @@ export default function WhatsAppSettingsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           phone_number: phoneNumber,
-          waba_id: wabaId,
+          phone_number_id: phoneNumberId,
+          waba_id: phoneNumberId,
           meta_access_token: metaAccessToken,
-          webhook_verify_token: webhookVerifyToken
+          webhook_verify_token: webhookVerifyToken,
+          chatbot_enabled: chatbotEnabled,
+          chatbot_mode: chatbotMode
         })
       })
 
@@ -87,6 +96,33 @@ export default function WhatsAppSettingsPage() {
     }
   }
 
+  const handleVerifyConnection = async () => {
+    setVerifying(true)
+    setVerificationResult(null)
+    try {
+      const res = await fetch('/api/settings/whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'verify_connection',
+          phone_number_id: phoneNumberId,
+          meta_access_token: metaAccessToken,
+          webhook_verify_token: webhookVerifyToken
+        })
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        setVerificationResult({ success: true, message: data.message })
+      } else {
+        setVerificationResult({ success: false, message: data.error || 'No se pudo verificar la conexión con Meta.' })
+      }
+    } catch (e: any) {
+      setVerificationResult({ success: false, message: e.message || 'Error de red al verificar conexión.' })
+    } finally {
+      setVerifying(false)
+    }
+  }
+
   return (
     <div className="flex flex-col w-full space-y-6 pb-16 max-w-5xl mx-auto">
       {/* Header */}
@@ -95,29 +131,30 @@ export default function WhatsAppSettingsPage() {
           <div className="flex items-center gap-2 mb-1.5">
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-200 uppercase tracking-wider flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              Meta Cloud API &amp; Pasarela QR
+              Meta Cloud API &amp; Chatbot Aura AI
             </span>
             <span className="text-slate-400 text-xs">• Sin requerir edición de código</span>
           </div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2.5">
             <MessageSquare className="w-6 h-6 text-emerald-600" />
-            Configuración de WhatsApp Business
+            Configuración WhatsApp &amp; Chatbot Multi-Canal
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Administra el número oficial de atención de la Dra. Aura Estudillo, credenciales de Meta y tokens de webhook sincronizados con Supabase.
+            Administra el número oficial de atención de la Dra. Aura Estudillo, credenciales de Meta y comportamiento del chatbot clínico en Supabase.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-[#0F172A] text-white text-xs font-bold shadow-xs">
             <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-            Canal WhatsApp Activo
+            {chatbotEnabled ? 'Chatbot Activo 24/7' : 'Chatbot Pausado'}
           </span>
         </div>
       </div>
 
       {/* Formulario Principal */}
       <form onSubmit={handleSave} className="space-y-6">
+        {/* PANEL 1: CREDENCIALES DE META WHATSAPP */}
         <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
           <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -125,8 +162,8 @@ export default function WhatsAppSettingsPage() {
                 <Smartphone className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-slate-900">Parámetros de Conexión Oficial</h3>
-                <p className="text-xs text-slate-500">Credenciales del número telefónico y API de Meta Developers</p>
+                <h3 className="text-sm font-bold text-slate-900">Parámetros de Integración Meta Developers</h3>
+                <p className="text-xs text-slate-500">Credenciales del número telefónico y API Cloud de Meta</p>
               </div>
             </div>
             {lastUpdated && (
@@ -142,9 +179,18 @@ export default function WhatsAppSettingsPage() {
               <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-300 flex items-center gap-3 animate-in fade-in duration-200">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
                 <div>
-                  <p className="text-xs font-bold text-emerald-900">Configuración guardada exitosamente</p>
-                  <p className="text-[11px] text-emerald-700">Las nuevas credenciales ya están enlazadas con el asistente de triaje Aura IA en Supabase.</p>
+                  <p className="text-xs font-bold text-emerald-900">Configuración guardada exitosamente en Supabase</p>
+                  <p className="text-[11px] text-emerald-700">Las nuevas credenciales y parámetros de IA ya están enlazados con Audenti CRM.</p>
                 </div>
+              </div>
+            )}
+
+            {verificationResult && (
+              <div className={`p-4 rounded-2xl border flex items-center gap-3 animate-in fade-in duration-200 ${
+                verificationResult.success ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-amber-50 border-amber-300 text-amber-900'
+              }`}>
+                {verificationResult.success ? <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" /> : <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />}
+                <p className="text-xs font-bold">{verificationResult.message}</p>
               </div>
             )}
 
@@ -161,38 +207,36 @@ export default function WhatsAppSettingsPage() {
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                   <Smartphone className="w-4 h-4 text-emerald-600" />
-                  Número Oficial de WhatsApp Business
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    required
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    placeholder="ej. 525522427769"
-                    className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
-                  />
-                </div>
-                <p className="text-[11px] text-slate-400">
-                  Formato internacional con lada sin signos (ej. 52 para México seguido de 10 dígitos: 525522427769).
-                </p>
-              </div>
-
-              {/* 2. WhatsApp Business Account ID (WABA ID) */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <Hash className="w-4 h-4 text-emerald-600" />
-                  WhatsApp Business Account ID (WABA ID)
+                  Número de WhatsApp Business Oficial (phone_number)
                 </label>
                 <input
                   type="text"
-                  value={wabaId}
-                  onChange={(e) => setWabaId(e.target.value)}
+                  required
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="ej. 525522427769"
+                  className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
+                />
+                <p className="text-[11px] text-slate-400">
+                  Formato internacional con lada sin signos (ej. 525522427769 para México).
+                </p>
+              </div>
+
+              {/* 2. Meta Phone Number ID */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <Hash className="w-4 h-4 text-emerald-600" />
+                  Meta Phone Number ID (phone_number_id)
+                </label>
+                <input
+                  type="text"
+                  value={phoneNumberId}
+                  onChange={(e) => setPhoneNumberId(e.target.value)}
                   placeholder="ej. 109823471092837"
                   className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
                 />
                 <p className="text-[11px] text-slate-400">
-                  Identificador de cuenta de WhatsApp Business o ID de número de teléfono en Meta Developer Console.
+                  Identificador del número de teléfono en Meta Developer Console (WhatsApp API Setup).
                 </p>
               </div>
 
@@ -200,7 +244,7 @@ export default function WhatsAppSettingsPage() {
               <div className="space-y-2 md:col-span-2">
                 <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                   <Key className="w-4 h-4 text-emerald-600" />
-                  Meta Access Token (Token Permanente de Sistema)
+                  Meta Permanent Token (meta_access_token)
                 </label>
                 <input
                   type="password"
@@ -210,7 +254,7 @@ export default function WhatsAppSettingsPage() {
                   className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
                 />
                 <p className="text-[11px] text-slate-400">
-                  Token generado para el usuario del sistema con permisos `whatsapp_business_messaging` y `whatsapp_business_management`.
+                  Token generado para el usuario del sistema con permisos `whatsapp_business_messaging`.
                 </p>
               </div>
 
@@ -218,7 +262,7 @@ export default function WhatsAppSettingsPage() {
               <div className="space-y-2 md:col-span-2">
                 <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                   <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  Webhook Verify Token (Token de Validación)
+                  Webhook Verify Token (webhook_verify_token)
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -232,42 +276,155 @@ export default function WhatsAppSettingsPage() {
                   <button
                     type="button"
                     onClick={() => setWebhookVerifyToken(`audenti_${Math.random().toString(36).substring(2, 10)}`)}
-                    className="px-4 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors"
+                    className="px-4 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
                   >
                     Generar Nuevo
                   </button>
                 </div>
-                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70 text-[11px] text-slate-500 space-y-1">
-                  <p><strong>URL de Webhook oficial para Meta Developers:</strong></p>
-                  <code className="text-emerald-700 font-mono font-bold select-all bg-emerald-50 px-2 py-0.5 rounded">
-                    https://audenti-dra-aura-estudillo.vercel.app/api/webhook/whatsapp
-                  </code>
-                </div>
+              </div>
+            </div>
+
+            {/* Bloque Informativo de URL de Webhook para Meta Developers */}
+            <div className="p-4 bg-emerald-50/70 rounded-2xl border border-emerald-200 text-xs text-slate-700 space-y-2">
+              <div className="flex items-center gap-2 text-emerald-900 font-bold">
+                <Info className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>URL Oficial del Webhook para Meta Developers:</span>
+              </div>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 bg-white p-3 rounded-xl border border-emerald-200 font-mono text-xs">
+                <code className="text-emerald-800 font-bold select-all break-all">
+                  https://audenti.vercel.app/api/webhook/whatsapp
+                </code>
+                <span className="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded">POST &amp; GET verify</span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Copia y pega esta URL en tu panel de Meta Developers bajo el producto WhatsApp &gt; Configuración &gt; URL de devolución de llamada.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* PANEL 2: PANEL DE CONTROL DEL CHATBOT (AURA AI SETTINGS) */}
+        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
+          <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-200">
+                <Radio className="w-5 h-5 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Panel de Control del Chatbot (Aura AI Settings)</h3>
+                <p className="text-xs text-slate-500">Comportamiento del asistente de triaje y respuesta automática</p>
               </div>
             </div>
           </div>
 
-          {/* Footer con Botón de Guardado */}
-          <div className="p-6 bg-slate-50/70 border-t border-slate-100 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              <span>Protección y almacenamiento seguro en Supabase Database.</span>
+          <div className="p-6 space-y-6">
+            {/* Switch ON/OFF */}
+            <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-200">
+              <div>
+                <h4 className="text-xs font-bold text-slate-900">Respuesta Automática del Chatbot</h4>
+                <p className="text-[11px] text-slate-500">Activa o pausa la respuesta autónoma de Aura IA en canales de mensajería.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setChatbotEnabled(!chatbotEnabled)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  chatbotEnabled ? 'bg-emerald-600' : 'bg-slate-300'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                    chatbotEnabled ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
             </div>
+
+            {/* Selector de Comportamiento */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700">
+                Modo de Operación del Asistente Aura IA
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setChatbotMode('autonomous')}
+                  className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all ${
+                    chatbotMode === 'autonomous'
+                      ? 'bg-emerald-50 border-emerald-400 text-emerald-950 ring-1 ring-emerald-300'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <p className="text-xs font-bold flex items-center gap-1.5">
+                    <span>🤖</span> Autónomo (24/7)
+                  </p>
+                  <p className="text-[10px] text-slate-500 mt-1 leading-snug">
+                    Responde al paciente, clasifica triage y escala urgencias de inmediato.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setChatbotMode('suggestion')}
+                  className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all ${
+                    chatbotMode === 'suggestion'
+                      ? 'bg-amber-50 border-amber-400 text-amber-950 ring-1 ring-amber-300'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <p className="text-xs font-bold flex items-center gap-1.5">
+                    <span>💡</span> Sugerencia a Doctora
+                  </p>
+                  <p className="text-[10px] text-slate-500 mt-1 leading-snug">
+                    Genera borradores en /dashboard/chat para que la doctora apruebe antes de enviar.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setChatbotMode('disabled')}
+                  className={`p-3.5 rounded-2xl border text-left cursor-pointer transition-all ${
+                    chatbotMode === 'disabled'
+                      ? 'bg-rose-50 border-rose-400 text-rose-950 ring-1 ring-rose-300'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <p className="text-xs font-bold flex items-center gap-1.5">
+                    <span>⏸️</span> Desactivado
+                  </p>
+                  <p className="text-[10px] text-slate-500 mt-1 leading-snug">
+                    Atención 100% manual por la Dra. Aura Estudillo sin intervención de IA.
+                  </p>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer con Acciones */}
+          <div className="p-6 bg-slate-50/70 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <button
+              type="button"
+              onClick={handleVerifyConnection}
+              disabled={verifying}
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 font-bold text-xs shadow-xs transition-all cursor-pointer"
+            >
+              {verifying ? <RefreshCw className="w-4 h-4 animate-spin text-emerald-600" /> : <ShieldCheck className="w-4 h-4 text-emerald-600" />}
+              <span>Verificar Webhook y Token</span>
+            </button>
 
             <button
               type="submit"
               disabled={saving}
-              className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 cursor-pointer"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 cursor-pointer"
             >
               {saving ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Guardando...</span>
+                  <span>Guardando en Supabase...</span>
                 </>
               ) : (
                 <>
                   <Save className="w-4 h-4" />
-                  <span>Guardar Configuración en Supabase</span>
+                  <span>Guardar Configuración</span>
                 </>
               )}
             </button>
