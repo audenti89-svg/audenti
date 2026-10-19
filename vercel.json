@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/cxm-followups",
       "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/cron/autonomous-appointments",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

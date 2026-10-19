@@ -45,6 +45,40 @@ export function OmnipresentDoctorLiveAlerts() {
         }
       }
     } catch {}
+
+    // Ventana de Gracia de 1 Hora y Doble Nivel de Alerta:
+    // Revisar si la doctora dio clic en Confirmar Lectura pero pasaron 60 minutos sin que haya agendado
+    const checkOneHourGraceTimer = () => {
+      try {
+        const savedRead = localStorage.getItem('audenti_attended_notifications_v2')
+        if (!savedRead) return
+        const readMap = JSON.parse(savedRead)
+        const now = Date.now()
+
+        Object.keys(readMap).forEach(key => {
+          const item = readMap[key]
+          // Si pasaron 60 minutos (o 3600 segundos)
+          if (now - item.confirmedAt >= 60 * 60 * 1000 && !item.reminded) {
+            item.reminded = true
+            readMap[key] = item
+            localStorage.setItem('audenti_attended_notifications_v2', JSON.stringify(readMap))
+
+            // Disparar alerta secundaria y native push
+            triggerNativePush(
+              '⚠️ ALERTA DE COBERTURA (1 HORA SIN ATENCIÓN)',
+              'Tienes consultas o citas pendientes de hace 1 hora. Haz clic para atender al paciente antes de que Aura IA asuma la confirmación.',
+              item.targetUrl || '/dashboard/chat'
+            )
+
+            // Invocar el endpoint de confirmación autónoma de Aura IA
+            fetch('/api/cron/autonomous-appointments', { method: 'POST' }).catch(() => {})
+          }
+        })
+      } catch {}
+    }
+
+    const interval = setInterval(checkOneHourGraceTimer, 60000) // Revisar cada minuto
+    return () => clearInterval(interval)
   }, [])
 
   // Guardar en localStorage cada vez que la lista cambie
@@ -68,14 +102,12 @@ export function OmnipresentDoctorLiveAlerts() {
     // 1. Quitar toast inmediatamente de la UI y del storage persistente
     updateToastsPersistently(prev => prev.filter(item => item.id !== id))
     
-    // 2. Registrar en lista de notificaciones atendidas localmente
+    // 2. Registrar en lista de notificaciones atendidas localmente con timestamp para la ventana de 1 hora
     try {
-      const savedRead = localStorage.getItem('audenti_attended_notifications')
-      const readIds = savedRead ? JSON.parse(savedRead) : []
-      if (!readIds.includes(id)) {
-        readIds.push(id)
-        localStorage.setItem('audenti_attended_notifications', JSON.stringify(readIds))
-      }
+      const savedRead = localStorage.getItem('audenti_attended_notifications_v2')
+      const readMap = savedRead ? JSON.parse(savedRead) : {}
+      readMap[id] = { confirmedAt: Date.now(), id, targetUrl }
+      localStorage.setItem('audenti_attended_notifications_v2', JSON.stringify(readMap))
     } catch {}
 
     // 3. Ejecutar petición formal a /api/alerts/confirm para grabar en Supabase confirmed_by_doctor = true y confirmed_at
