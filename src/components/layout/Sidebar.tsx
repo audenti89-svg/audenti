@@ -38,7 +38,7 @@ const businessNav: NavItem[] = [
   { label: 'Finanzas',          path: '/dashboard/finanzas',     icon: CircleDollarSign },
   { label: 'Reportes',          path: '/dashboard/reportes',     icon: BarChart3 },
   { label: 'CRM & Seguimiento', path: '/dashboard/crm',          icon: Contact2 },
-  { label: 'Comunicación',      path: '/dashboard/chat',         icon: MessageSquare },
+  { label: 'Comunicación',      path: '/dashboard/comunicacion', icon: MessageSquare },
   { label: 'Inventario',        path: '/dashboard/inventario',   icon: Package },
   { label: 'Fidelización',      path: '/dashboard/fidelizacion', icon: HeartHandshake },
 ]

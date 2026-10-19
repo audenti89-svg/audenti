@@ -111,21 +111,29 @@ export async function POST(request: Request) {
       });
     }
 
-    // Acción especial: Verificar Webhook y Token de API Externa (Zernio / Meta)
+    // Acción especial: Verificar Webhook y Token de API Externa (OpenWA / Zernio / Meta)
     if (action === 'verify_connection') {
-      const isKeyPresent = Boolean(messaging_api_key && messaging_api_key.trim().length > 5) ||
-                           Boolean(meta_access_token && meta_access_token.trim().length > 10);
+      const isOpenWA = messaging_provider === 'openwa';
+      const isKeyPresent = Boolean(messaging_api_key && messaging_api_key.trim().length > 3) ||
+                           Boolean(meta_access_token && meta_access_token.trim().length > 10) ||
+                           (isOpenWA && Boolean(messaging_api_url));
+
+      const providerLabel = isOpenWA
+        ? 'Pasarela OpenWA (Open-WhatsApp Gateway)'
+        : messaging_provider === 'meta'
+        ? 'WhatsApp Cloud API (Meta)'
+        : 'Zernio Messaging API';
 
       return NextResponse.json({
         success: true,
         verified: true,
         status: isKeyPresent ? 'CONNECTED' : 'DISCONNECTED',
         message: isKeyPresent
-          ? 'API Externa Zernio / WhatsApp: ACTIVO Y CONECTADO. Flujo bidireccional listo.'
-          : 'Formato verificado con advertencia: Ingresa tu API Key para habilitar la transmisión en vivo.',
+          ? `${providerLabel}: ACTIVO Y CONECTADO. Flujo bidireccional listo.`
+          : 'Formato verificado con advertencia: Ingresa tu API Key / URL para habilitar la transmisión en vivo.',
         details: {
           webhookUrl: 'https://audenti.vercel.app/api/webhooks/messaging',
-          provider: messaging_provider || 'zernio',
+          provider: messaging_provider || 'openwa',
           status: isKeyPresent ? 'ACTIVO Y CONECTADO' : 'PENDIENTE',
           timestamp: new Date().toISOString()
         }

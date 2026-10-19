@@ -46,14 +46,33 @@ export async function POST(request: Request) {
     let channel = 'whatsapp';
     let externalEventId = body.id || body.message_id || `evt-${Date.now()}`;
 
-    // A. Formato Zernio / Proveedor Unificado
-    if (body.from || body.sender || body.phone) {
+    // A. Formato Pasarela OpenWA (Open-WhatsApp Gateway / NestJS)
+    if (
+      body.event === 'message.received' ||
+      body.event === 'message' ||
+      body.event === 'onMessage' ||
+      (body.sessionId && (body.data?.body || body.message?.body || body.data?.text)) ||
+      (body.chatId && (body.text || body.body))
+    ) {
+      const openwaMsg = body.data || body.message || body;
+      if (openwaMsg.fromMe || body.fromMe) {
+        return NextResponse.json({ success: true, status: 'ignored_outbound_openwa' }, { status: 200 });
+      }
+      const rawFrom = openwaMsg.from || openwaMsg.chatId || openwaMsg.sender?.id || body.chatId || '';
+      senderPhone = String(rawFrom).replace(/@.*$/, '').trim();
+      messageText = String(openwaMsg.body || openwaMsg.text || openwaMsg.content || '').trim();
+      senderName = openwaMsg.sender?.pushname || openwaMsg.sender?.name || openwaMsg.pushName || 'Paciente WhatsApp';
+      channel = 'whatsapp';
+      externalEventId = openwaMsg.id || body.id || externalEventId;
+    }
+    // B. Formato Zernio / Proveedor Unificado
+    else if (body.from || body.sender || body.phone) {
       senderPhone = String(body.from || body.sender || body.phone || '').trim();
       messageText = String(body.message || body.text || body.content || body.body || '').trim();
       senderName = body.sender_name || body.name || body.profile_name || 'Paciente';
       channel = body.channel || (body.type === 'sms' ? 'sms' : 'whatsapp');
     }
-    // B. Formato WhatsApp Cloud API (Meta)
+    // C. Formato WhatsApp Cloud API (Meta)
     else if (body.entry?.[0]?.changes?.[0]?.value?.messages?.[0]) {
       const msg = body.entry[0].changes[0].value.messages[0];
       const contact = body.entry[0].changes[0].value.contacts?.[0];
@@ -62,7 +81,7 @@ export async function POST(request: Request) {
       senderName = contact?.profile?.name || 'Paciente WhatsApp';
       channel = 'whatsapp';
     }
-    // C. Formato Pasarela QR (Evolution API / WAHA)
+    // D. Formato Pasarela QR (Evolution API / WAHA)
     else if (body.data?.key) {
       if (body.data.key.fromMe) {
         return NextResponse.json({ success: true, status: 'ignored_outbound_echo' }, { status: 200 });

@@ -21,8 +21,8 @@ import {
 } from 'lucide-react'
 
 export default function WhatsAppSettingsPage() {
-  const [messagingProvider, setMessagingProvider] = useState<'zernio' | 'meta' | 'generic'>('zernio')
-  const [messagingApiUrl, setMessagingApiUrl] = useState('https://api.zernio.com/v1/messages')
+  const [messagingProvider, setMessagingProvider] = useState<'openwa' | 'zernio' | 'meta' | 'generic'>('openwa')
+  const [messagingApiUrl, setMessagingApiUrl] = useState('http://localhost:2785')
   const [messagingApiKey, setMessagingApiKey] = useState('')
   const [phoneNumber, setPhoneNumber] = useState('525522427769')
   const [phoneNumberId, setPhoneNumberId] = useState('')
@@ -324,11 +324,20 @@ export default function WhatsAppSettingsPage() {
                 </label>
                 <select
                   value={messagingProvider}
-                  onChange={(e) => setMessagingProvider(e.target.value as any)}
+                  onChange={(e) => {
+                    const val = e.target.value as any
+                    setMessagingProvider(val)
+                    if (val === 'openwa' && messagingApiUrl.includes('zernio')) {
+                      setMessagingApiUrl('http://localhost:2785')
+                    } else if (val === 'zernio' && messagingApiUrl.includes('2785')) {
+                      setMessagingApiUrl('https://api.zernio.com/v1/messages')
+                    }
+                  }}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer"
                 >
-                  <option value="zernio">Zernio Messaging API (Recomendado)</option>
-                  <option value="meta">WhatsApp Cloud API (Meta)</option>
+                  <option value="openwa">Pasarela OpenWA (Recomendado - Auto-hospedado / VPS)</option>
+                  <option value="zernio">Zernio Messaging API (Nube Multi-Agente)</option>
+                  <option value="meta">WhatsApp Cloud API (Meta Oficial)</option>
                   <option value="generic">Gateway HTTP Genérico</option>
                 </select>
               </div>

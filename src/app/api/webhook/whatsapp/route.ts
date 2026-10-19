@@ -32,7 +32,16 @@ export async function POST(request: Request) {
     const value = changes?.value;
     const messageData = value?.messages?.[0];
 
-    // 2. Formato Pasarela QR (Evolution API / Z-API / Baileys)
+    // 2. Formato Pasarela OpenWA (Open-WhatsApp Gateway / NestJS)
+    const isOpenWA = Boolean(
+      body.event === 'message.received' ||
+      body.event === 'message' ||
+      body.event === 'onMessage' ||
+      (body.sessionId && (body.data?.body || body.message?.body || body.data?.text)) ||
+      body.chatId
+    );
+
+    // 3. Formato Pasarela QR (Evolution API / Z-API / Baileys)
     const qrData = body.data;
     const isQrGateway = Boolean(qrData?.key);
 
@@ -40,7 +49,17 @@ export async function POST(request: Request) {
     let patientMessage = '';
     let patientName = 'Paciente WhatsApp';
 
-    if (messageData) {
+    if (isOpenWA) {
+      // Proviene de Pasarela OpenWA
+      const openwaMsg = body.data || body.message || body;
+      if (openwaMsg.fromMe || body.fromMe) {
+        return NextResponse.json({ success: true, status: 'ignored_own_openwa_message' }, { status: 200 });
+      }
+      const rawFrom = openwaMsg.from || openwaMsg.chatId || openwaMsg.sender?.id || body.chatId || '';
+      patientPhone = String(rawFrom).replace(/@.*$/, '').replace(/^521/, '52');
+      patientMessage = String(openwaMsg.body || openwaMsg.text || openwaMsg.content || '').trim();
+      patientName = openwaMsg.sender?.pushname || openwaMsg.sender?.name || openwaMsg.pushName || 'Paciente WhatsApp';
+    } else if (messageData) {
       // Proviene de WhatsApp Cloud API
       patientPhone = messageData.from || '';
       patientMessage = messageData.text?.body || '';

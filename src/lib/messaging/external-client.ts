@@ -20,8 +20,9 @@ export interface ExternalMessagingPayload {
 export interface MessagingConfig {
   apiUrl: string;
   apiKey: string;
-  provider: 'zernio' | 'meta' | 'generic';
+  provider: 'zernio' | 'meta' | 'openwa' | 'generic';
   phoneNumberId?: string;
+  sessionId?: string;
   webhookSecret?: string;
   enabled: boolean;
 }
@@ -41,10 +42,11 @@ export async function getMessagingConfig(): Promise<MessagingConfig> {
       if (text && text.trim()) {
         const parsed = JSON.parse(text);
         return {
-          apiUrl: parsed.messaging_api_url || process.env.MESSAGING_API_URL || process.env.ZERNIO_API_URL || 'https://api.zernio.com/v1/messages',
-          apiKey: parsed.messaging_api_key || process.env.MESSAGING_API_KEY || process.env.ZERNIO_API_KEY || parsed.meta_access_token || '',
-          provider: parsed.messaging_provider || (process.env.ZERNIO_API_KEY ? 'zernio' : 'meta'),
+          apiUrl: parsed.messaging_api_url || process.env.MESSAGING_API_URL || process.env.OPENWA_API_URL || process.env.ZERNIO_API_URL || 'http://localhost:2785',
+          apiKey: parsed.messaging_api_key || process.env.MESSAGING_API_KEY || process.env.OPENWA_API_KEY || process.env.ZERNIO_API_KEY || parsed.meta_access_token || '',
+          provider: parsed.messaging_provider || (process.env.OPENWA_API_KEY ? 'openwa' : process.env.ZERNIO_API_KEY ? 'zernio' : 'meta'),
           phoneNumberId: parsed.phone_number_id || process.env.WHATSAPP_PHONE_NUMBER_ID || '',
+          sessionId: parsed.session_id || process.env.OPENWA_SESSION_ID || 'audenti_default',
           webhookSecret: parsed.webhook_verify_token || process.env.WHATSAPP_VERIFY_TOKEN || 'audenti_secure_token',
           enabled: parsed.chatbot_enabled !== undefined ? parsed.chatbot_enabled : true,
         };
@@ -55,10 +57,11 @@ export async function getMessagingConfig(): Promise<MessagingConfig> {
   }
 
   return {
-    apiUrl: process.env.MESSAGING_API_URL || process.env.ZERNIO_API_URL || 'https://api.zernio.com/v1/messages',
-    apiKey: process.env.MESSAGING_API_KEY || process.env.ZERNIO_API_KEY || process.env.WHATSAPP_ACCESS_TOKEN || '',
-    provider: process.env.ZERNIO_API_KEY ? 'zernio' : 'meta',
+    apiUrl: process.env.MESSAGING_API_URL || process.env.OPENWA_API_URL || process.env.ZERNIO_API_URL || 'http://localhost:2785',
+    apiKey: process.env.MESSAGING_API_KEY || process.env.OPENWA_API_KEY || process.env.ZERNIO_API_KEY || process.env.WHATSAPP_ACCESS_TOKEN || '',
+    provider: (process.env.OPENWA_API_KEY ? 'openwa' : process.env.ZERNIO_API_KEY ? 'zernio' : 'meta') as any,
     phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
+    sessionId: process.env.OPENWA_SESSION_ID || 'audenti_default',
     webhookSecret: process.env.WHATSAPP_VERIFY_TOKEN || 'audenti_secure_token',
     enabled: true,
   };
@@ -82,8 +85,40 @@ export async function sendExternalMessage(payload: ExternalMessagingPayload): Pr
     let apiSuccess = false;
     let messageId = `msg-ext-${Date.now()}`;
 
-    // 1. Despacho HTTP POST al proveedor configurado (Zernio / Proveedor Externo)
-    if (config.apiKey && config.apiUrl) {
+    // 1. Despacho HTTP POST si el proveedor configurado es OpenWA (Open-WhatsApp Gateway)
+    if (config.provider === 'openwa' && config.apiUrl) {
+      try {
+        const sessionId = config.sessionId || 'audenti_default';
+        const openwaUrl = config.apiUrl.includes('/messages/send-text')
+          ? config.apiUrl
+          : `${config.apiUrl.replace(/\/+$/, '')}/api/sessions/${sessionId}/messages/send-text`;
+
+        const openwaRes = await fetch(openwaUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(config.apiKey ? { 'X-API-Key': config.apiKey, 'Authorization': `Bearer ${config.apiKey}` } : {}),
+          },
+          body: JSON.stringify({
+            chatId: `${cleanPhone}@c.us`,
+            text: payload.message,
+          }),
+        });
+
+        if (openwaRes.ok) {
+          const respData = await openwaRes.json().catch(() => ({}));
+          messageId = respData.id || respData.messageId || respData.message_id || messageId;
+          apiSuccess = true;
+        } else {
+          console.warn(`[OpenWA Gateway] Retornó status ${openwaRes.status}. Intentando fallbacks.`);
+        }
+      } catch (openwaErr: any) {
+        console.warn('[OpenWA Gateway] Error conectando con pasarela OpenWA:', openwaErr?.message);
+      }
+    }
+
+    // 2. Despacho HTTP POST al proveedor configurado (Zernio / Proveedor Externo)
+    if (!apiSuccess && config.apiKey && config.apiUrl && config.provider !== 'openwa') {
       try {
         const response = await fetch(config.apiUrl, {
           method: 'POST',
