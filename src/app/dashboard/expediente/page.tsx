@@ -19,7 +19,15 @@ import {
   X,
   HeartPulse,
   AlertTriangle,
-  MessageSquare
+  MessageSquare,
+  Clock,
+  Send,
+  Lock,
+  PhoneCall,
+  Activity,
+  ShieldAlert,
+  ClipboardList,
+  Sparkles
 } from 'lucide-react'
 import { Odontogram } from '@/components/clinical/Odontogram'
 import { FamilyNucleusManager } from '@/components/clinical/FamilyNucleusManager'
@@ -34,6 +42,13 @@ export default function ExpedientePage() {
   const [selectedPatient, setSelectedPatient] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState<'clinical' | 'history' | 'questionnaire' | 'family'>('clinical')
+
+  // Historial de mensajes, notas y llamadas
+  const [messages, setMessages] = useState<any[]>([])
+  const [loadingMessages, setLoadingMessages] = useState(false)
+  const [newNote, setNewNote] = useState('')
+  const [savingNote, setSavingNote] = useState(false)
 
   // Modal para editar ficha
   const [isEditing, setIsEditing] = useState(false)
@@ -47,6 +62,124 @@ export default function ExpedientePage() {
     medicalConditions: '',
   })
   const [savingEdit, setSavingEdit] = useState(false)
+
+  const fetchPatientHistory = async (patient: any) => {
+    if (!patient) return
+    setLoadingMessages(true)
+    try {
+      const cleanPhone = (patient.phone || '').replace(/\D/g, '').slice(-10)
+      
+      // 1. Consultar chat_messages en Supabase
+      const { data: dbMsgs } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .or(`patient_id.eq.${patient.id},metadata->>patientId.eq.${patient.id}${cleanPhone ? `,metadata->>phone.ilike.%${cleanPhone}%` : ''}`)
+        .order('created_at', { ascending: true })
+
+      let merged: any[] = []
+      if (dbMsgs && dbMsgs.length > 0) {
+        merged = dbMsgs.map((m: any) => ({
+          id: m.id,
+          senderName: m.sender_name || (m.sender_role === 'doctor' ? 'Dra. Aura Estudillo' : patient.full_name),
+          senderRole: m.sender_role,
+          content: m.content,
+          channel_type: m.channel_type || 'web_chat',
+          isPrivateNote: Boolean(m.is_private_note || m.metadata?.isPrivateNote),
+          timestamp: m.created_at ? new Date(m.created_at).toLocaleString('es-MX', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }) : 'Hoy',
+          metadata: m.metadata
+        }))
+      }
+
+      // 2. Si hay almacenamiento en storage o fallback de storage, recuperar también
+      try {
+        const { data: file } = await supabase.storage.from('audenti_database').download('chat_omnichannel.json')
+        if (file) {
+          const text = await file.text()
+          if (text) {
+            const allChats = JSON.parse(text)
+            const storageItems = allChats[patient.id] || (cleanPhone ? allChats[`prospect_${cleanPhone}`] : []) || []
+            if (Array.isArray(storageItems) && storageItems.length > 0) {
+              const existingTexts = new Set(merged.map(m => m.content))
+              storageItems.forEach((item: any) => {
+                if (!existingTexts.has(item.content)) {
+                  merged.push({
+                    id: item.id || `storage-${Math.random()}`,
+                    senderName: item.senderName || item.sender_name || (item.isDoctor ? 'Dra. Aura Estudillo' : patient.full_name),
+                    senderRole: item.senderRole || (item.isDoctor ? 'doctor' : 'patient'),
+                    content: item.content,
+                    channel_type: item.channel_type || item.metadata?.channel_type || 'web_chat',
+                    isPrivateNote: Boolean(item.isPrivateNote),
+                    timestamp: item.timestamp || item.time || 'Reciente',
+                    metadata: item.metadata
+                  })
+                }
+              })
+            }
+          }
+        }
+      } catch {}
+
+      setMessages(merged)
+    } catch (err) {
+      console.warn('Error fetching patient history:', err)
+      setMessages([])
+    } finally {
+      setLoadingMessages(false)
+    }
+  }
+
+  const handleSavePrivateNote = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newNote.trim() || !selectedPatient) return
+
+    setSavingNote(true)
+    try {
+      const noteContent = newNote.trim()
+      // Guardar en chat_messages como nota privada
+      const { data, error } = await supabase.from('chat_messages').insert({
+        patient_id: selectedPatient.id,
+        sender_role: 'doctor',
+        sender_name: 'Dra. Aura Estudillo',
+        content: `🔒 [NOTA PRIVADA MÉDICA]: ${noteContent}`,
+        channel_type: 'internal_note',
+        is_private_note: true,
+        metadata: {
+          isPrivateNote: true,
+          patientId: selectedPatient.id,
+          doctorName: 'Dra. Aura Estudillo',
+          createdAt: new Date().toISOString()
+        }
+      }).select().single()
+
+      if (error) {
+        // Fallback a API
+        await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientId: selectedPatient.id,
+            message: {
+              id: `note-${Date.now()}`,
+              senderName: 'Dra. Aura Estudillo',
+              senderRole: 'doctor',
+              content: `🔒 [NOTA PRIVADA MÉDICA]: ${noteContent}`,
+              channel_type: 'internal_note',
+              isPrivateNote: true,
+              isDoctor: true,
+              timestamp: new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+            }
+          })
+        })
+      }
+
+      setNewNote('')
+      fetchPatientHistory(selectedPatient)
+    } catch (err) {
+      console.error('Error al guardar nota privada:', err)
+    } finally {
+      setSavingNote(false)
+    }
+  }
 
   const fetchPatients = async () => {
     setLoading(true)
@@ -63,6 +196,7 @@ export default function ExpedientePage() {
       if (list.length > 0) {
         setSelectedPatient(list[0])
         initEditForm(list[0])
+        fetchPatientHistory(list[0])
       } else {
         setSelectedPatient(null)
       }
@@ -96,6 +230,7 @@ export default function ExpedientePage() {
     if (p) {
       setSelectedPatient(p)
       initEditForm(p)
+      fetchPatientHistory(p)
     }
   }
 
@@ -366,60 +501,252 @@ export default function ExpedientePage() {
         </div>
       </div>
 
-      {/* Grid Superior: Ficha del Paciente y Odontograma */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Columna Izquierda: Datos del Paciente */}
-        <div className="space-y-4">
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-4">
-            <div className="flex items-center gap-3.5">
-              <div className="w-14 h-14 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold text-lg shadow-xs">
-                {initials}
-              </div>
-              <div>
-                <h2 className="text-sm font-bold text-slate-900">{selectedPatient.full_name}</h2>
-                <p className="text-[11px] text-slate-500 font-mono">ID: {selectedPatient.id.slice(0, 8)}</p>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold mt-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  {selectedPatient.onboarding_completed ? 'Bioseguridad Verificada' : 'Onboarding Pendiente'}
-                </span>
-              </div>
-            </div>
+      {/* Selector de Pestañas del Expediente Clínico */}
+      <div className="flex flex-wrap gap-2 p-1.5 bg-slate-100 rounded-2xl w-fit border border-slate-200/70">
+        <button
+          type="button"
+          onClick={() => setActiveTab('clinical')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'clinical'
+              ? 'bg-white text-slate-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Activity className="w-4 h-4 text-emerald-600" />
+          <span>Odontograma &amp; Ficha</span>
+        </button>
 
-            <div className="space-y-2.5 text-xs pt-1 border-t border-slate-100">
-              <div className="flex items-start gap-2.5">
-                <Phone className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+        <button
+          type="button"
+          onClick={() => setActiveTab('history')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'history'
+              ? 'bg-white text-slate-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Clock className="w-4 h-4 text-blue-600" />
+          <span>Historial de Chat, Llamadas &amp; Notas</span>
+          {messages.length > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-blue-100 text-blue-800">
+              {messages.length}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('questionnaire')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'questionnaire'
+              ? 'bg-white text-slate-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <ClipboardList className="w-4 h-4 text-purple-600" />
+          <span>Cuestionario Médico (Anamnesis)</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('family')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'family'
+              ? 'bg-white text-slate-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Users className="w-4 h-4 text-amber-600" />
+          <span>Núcleo Familiar</span>
+        </button>
+      </div>
+
+      {/* Contenido según Pestaña Activa */}
+      {activeTab === 'clinical' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Columna Izquierda: Datos del Paciente */}
+          <div className="space-y-4">
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-4">
+              <div className="flex items-center gap-3.5">
+                <div className="w-14 h-14 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold text-lg shadow-xs">
+                  {initials}
+                </div>
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Teléfono</span>
-                  <p className="text-slate-800 font-medium">{selectedPatient.phone || 'No registrado'}</p>
+                  <h2 className="text-sm font-bold text-slate-900">{selectedPatient.full_name}</h2>
+                  <p className="text-[11px] text-slate-500 font-mono">ID: {selectedPatient.id.slice(0, 8)}</p>
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold mt-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    {selectedPatient.onboarding_completed ? 'Bioseguridad Verificada' : 'Onboarding Pendiente'}
+                  </span>
                 </div>
               </div>
 
-              <div className="flex items-start gap-2.5">
-                <Mail className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Correo Electrónico</span>
-                  <p className="text-slate-800 font-medium">{selectedPatient.email || 'No registrado'}</p>
+              <div className="space-y-2.5 text-xs pt-1 border-t border-slate-100">
+                <div className="flex items-start gap-2.5">
+                  <Phone className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Teléfono</span>
+                    <p className="text-slate-800 font-medium">{selectedPatient.phone || 'No registrado'}</p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex items-start gap-2.5">
-                <Users className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Contacto de Emergencia</span>
-                  <p className="text-slate-800 font-medium">
-                    {selectedPatient.emergency_contact_name || 'No asignado'} • {selectedPatient.emergency_contact_phone || 'Sin tel.'}
-                  </p>
+                <div className="flex items-start gap-2.5">
+                  <Mail className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Correo Electrónico</span>
+                    <p className="text-slate-800 font-medium">{selectedPatient.email || 'No registrado'}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2.5">
+                  <Users className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Contacto de Emergencia</span>
+                    <p className="text-slate-800 font-medium">
+                      {selectedPatient.emergency_contact_name || 'No asignado'} • {selectedPatient.emergency_contact_phone || 'Sin tel.'}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Columna Derecha: Odontograma Vectorial Interactivo */}
-        <div className="lg:col-span-2">
-          <Odontogram />
+          {/* Columna Derecha: Odontograma Vectorial Interactivo */}
+          <div className="lg:col-span-2">
+            <Odontogram />
+          </div>
         </div>
-      </div>
+      )}
+
+      {activeTab === 'history' && (
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+            <div>
+              <div className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-blue-600" />
+                <h3 className="text-base font-bold text-slate-900">Historial de Comunicación, Llamadas &amp; Notas Privadas</h3>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Registro síncrono e inmutable desde Supabase PostgreSQL para {selectedPatient.full_name}.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => fetchPatientHistory(selectedPatient)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingMessages ? 'animate-spin' : ''}`} />
+              Actualizar Historial
+            </button>
+          </div>
+
+          {/* Formulario de Nueva Nota Médica Privada */}
+          <form onSubmit={handleSavePrivateNote} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+              <Lock className="w-3.5 h-3.5 text-amber-600" />
+              <span>Añadir Nota Privada de la Dra. Aura (Confidencial NOM-004)</span>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                placeholder="Escribe una observación clínica, evolución, prescripción o indicación privada..."
+                className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400"
+              />
+              <button
+                type="submit"
+                disabled={savingNote || !newNote.trim()}
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center gap-1.5 shrink-0 disabled:opacity-50 cursor-pointer"
+              >
+                <Send className="w-3.5 h-3.5 text-amber-400" />
+                <span>Guardar Nota</span>
+              </button>
+            </div>
+          </form>
+
+          {/* Lista de Mensajes y Transcripciones */}
+          {loadingMessages ? (
+            <div className="py-12 text-center space-y-2">
+              <div className="w-7 h-7 border-3 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="text-xs font-bold text-slate-600">Consultando mensajes y llamadas desde Supabase...</p>
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="py-12 text-center bg-slate-50/50 rounded-2xl border border-slate-200/60 space-y-2">
+              <MessageSquare className="w-8 h-8 text-slate-300 mx-auto" />
+              <h4 className="text-xs font-bold text-slate-700">Sin mensajes ni llamadas previas con este paciente</h4>
+              <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
+                Los mensajes de WhatsApp, el chat web y las transcripciones de llamadas con Aura IA aparecerán aquí automáticamente.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {messages.map((m, idx) => {
+                const isVoice = m.channel_type === 'voice_call' || m.content?.includes('Llamada de Voz')
+                const isNote = m.isPrivateNote || m.channel_type === 'internal_note' || m.content?.includes('[NOTA PRIVADA')
+                const isDoctor = m.senderRole === 'doctor' || m.senderName?.includes('Aura Estudillo')
+
+                return (
+                  <div
+                    key={m.id || idx}
+                    className={`p-4 rounded-xl border text-xs transition-all ${
+                      isNote
+                        ? 'bg-amber-50/90 border-amber-300 shadow-2xs'
+                        : isVoice
+                        ? 'bg-slate-900 text-white border-slate-800 shadow-xs'
+                        : isDoctor
+                        ? 'bg-slate-50 border-slate-200 ml-6'
+                        : 'bg-emerald-50/50 border-emerald-200 mr-6'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <div className="flex items-center gap-2">
+                        {isVoice ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-slate-950">
+                            <PhoneCall className="w-3 h-3" /> Transcripción de Voz
+                          </span>
+                        ) : isNote ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900 border border-amber-300">
+                            <Lock className="w-3 h-3" /> Nota Médica Privada
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-800">
+                            <MessageSquare className="w-3 h-3 text-slate-600" />
+                            {m.channel_type === 'whatsapp' ? 'WhatsApp' : 'Chat Clínico'}
+                          </span>
+                        )}
+                        <span className={`font-bold ${isVoice ? 'text-amber-400' : 'text-slate-900'}`}>
+                          {m.senderName}
+                        </span>
+                      </div>
+                      <span className={`text-[10px] font-mono ${isVoice ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {m.timestamp}
+                      </span>
+                    </div>
+
+                    <p className={`whitespace-pre-wrap leading-relaxed ${isVoice ? 'text-slate-200' : 'text-slate-800'}`}>
+                      {m.content}
+                    </p>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'questionnaire' && (
+        <div className="space-y-4">
+          <MedicalQuestionnaire />
+        </div>
+      )}
+
+      {activeTab === 'family' && (
+        <div className="space-y-4">
+          <FamilyNucleusManager />
+        </div>
+      )}
 
       {/* Modal Funcional: Editar Ficha */}
       {isEditing && (
