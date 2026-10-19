@@ -111,36 +111,44 @@ export function UnifiedCommunicationWidget({
   // Suscripción Realtime para mensajes de la doctora
   useEffect(() => {
     const channelName = `patient_chat_${patientId}`
+    const handleIncomingDoctorOrAssistantMessage = (payload: any) => {
+      if (!payload) return
+      const targetId = payload.targetPatientId || payload.patientId || payload.conversation_id
+      const isForMe = !targetId || targetId === patientId || String(targetId) === String(patientId)
+      const isFromClinic = payload.senderRole === 'doctor' || payload.senderRole === 'assistant' || payload.senderRole === 'ai' || payload.isDoctor
+
+      if (isForMe && isFromClinic) {
+        playTone('arrival')
+        setMessages(prev => {
+          const exists = prev.some(m => m.id === payload.id)
+          if (exists) return prev
+          return [...prev, {
+            id: payload.id || `msg-${Date.now()}`,
+            senderName: payload.senderName || 'Dra. Aura Estudillo',
+            senderRole: (payload.senderRole as any) || 'doctor',
+            content: payload.content || '',
+            timestamp: payload.timestamp || payload.time || 'Ahora',
+            isDoctor: Boolean(payload.isDoctor || payload.senderRole === 'doctor')
+          }]
+        })
+        if (!isOpen || activeTab !== 'chat') {
+          setUnreadChatCount(c => c + 1)
+        }
+      }
+    }
+
     const chatChannel = supabase
       .channel(channelName)
-      .on('broadcast', { event: 'doctor_reply' }, ({ payload }) => {
-        if (payload) {
-          playTone('arrival')
-          setMessages(prev => {
-            const exists = prev.some(m => m.id === payload.id)
-            return exists ? prev : [...prev, payload]
-          })
-          if (!isOpen || activeTab !== 'chat') {
-            setUnreadChatCount(c => c + 1)
-          }
-        }
-      })
+      .on('broadcast', { event: 'doctor_reply' }, ({ payload }) => handleIncomingDoctorOrAssistantMessage(payload))
+      .on('broadcast', { event: 'chatwoot_message_created' }, ({ payload }) => handleIncomingDoctorOrAssistantMessage(payload))
+      .on('broadcast', { event: 'new_chat_message' }, ({ payload }) => handleIncomingDoctorOrAssistantMessage(payload))
       .subscribe()
 
     const globalChannel = supabase
       .channel('chat_omnichannel_sync')
-      .on('broadcast', { event: 'sync_patient_message' }, ({ payload }) => {
-        if (payload && payload.targetPatientId === patientId && payload.senderRole !== 'patient') {
-          playTone('arrival')
-          setMessages(prev => {
-            const exists = prev.some(m => m.id === payload.id)
-            return exists ? prev : [...prev, payload]
-          })
-          if (!isOpen || activeTab !== 'chat') {
-            setUnreadChatCount(c => c + 1)
-          }
-        }
-      })
+      .on('broadcast', { event: 'sync_patient_message' }, ({ payload }) => handleIncomingDoctorOrAssistantMessage(payload))
+      .on('broadcast', { event: 'chatwoot_message_created' }, ({ payload }) => handleIncomingDoctorOrAssistantMessage(payload))
+      .on('broadcast', { event: 'doctor_reply' }, ({ payload }) => handleIncomingDoctorOrAssistantMessage(payload))
       .subscribe()
 
     return () => {

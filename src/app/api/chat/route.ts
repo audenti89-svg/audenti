@@ -40,7 +40,28 @@ export async function POST(request: Request) {
       throw uploadError;
     }
 
-    // 4. Emitir eventos Realtime y Notificación WhatsApp
+    // 3.1 Insertar formalmente en la tabla relacional chat_messages de Supabase
+    try {
+      const isRegistered = !patientId.startsWith('prospect_');
+      await supabase.from('chat_messages').insert({
+        patient_id: isRegistered ? patientId : null,
+        sender_role: message.senderRole || (message.isDoctor ? 'doctor' : 'patient'),
+        sender_name: message.senderName || (message.isDoctor ? 'Dra. Aura Estudillo' : 'Paciente'),
+        content: message.content,
+        channel_type: message.channel_type || 'web_chat',
+        metadata: {
+          patientId,
+          ...(message.metadata || {}),
+          senderRole: message.senderRole,
+          timestamp: message.timestamp
+        },
+        created_at: new Date().toISOString()
+      });
+    } catch (dbErr: any) {
+      console.warn('[DB chat_messages insert notice]:', dbErr?.message);
+    }
+
+    // 4. Emitir eventos Realtime bidireccionales y Notificación WhatsApp
     try {
       if (message.senderRole === 'patient') {
         // Notificar a la doctora en vivo
@@ -79,17 +100,39 @@ export async function POST(request: Request) {
           type: 'voice_call'
         });
       } else {
-        // Notificar al paciente en vivo en la App Web
+        // NOTIFICAR AL PACIENTE EN VIVO EN SU WIDGET WEB
+        const outgoingPayload = {
+          targetPatientId: patientId,
+          patientId,
+          ...message,
+          senderRole: message.senderRole || 'doctor',
+          senderName: message.senderName || 'Dra. Aura Estudillo'
+        };
+
+        // Canal dedicado por ID de paciente
         await supabase.channel(`patient_chat_${patientId}`).send({
           type: 'broadcast',
           event: 'doctor_reply',
-          payload: message
+          payload: outgoingPayload
+        });
+
+        await supabase.channel(`patient_chat_${patientId}`).send({
+          type: 'broadcast',
+          event: 'chatwoot_message_created',
+          payload: outgoingPayload
+        });
+
+        // Canal omnicanal global y de Chatwoot
+        await supabase.channel('chat_omnichannel_sync').send({
+          type: 'broadcast',
+          event: 'sync_patient_message',
+          payload: outgoingPayload
         });
 
         await supabase.channel('chat_omnichannel_sync').send({
           type: 'broadcast',
-          event: 'sync_patient_message',
-          payload: message
+          event: 'chatwoot_message_created',
+          payload: outgoingPayload
         });
 
         // 5. Sistema de Notificación Dual por Confirmación / Respuesta Médica:
