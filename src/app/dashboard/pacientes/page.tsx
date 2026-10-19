@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import {
   Users,
   CheckCircle2,
@@ -27,8 +27,12 @@ export default function PacientesPage() {
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
   const supabase = createClient()
 
-  const fetchPatients = async () => {
-    setLoading(true)
+  const isInitialLoadRef = useRef(true)
+
+  const fetchPatients = async (showLoadingSpinner = false) => {
+    if (showLoadingSpinner || isInitialLoadRef.current) {
+      setLoading(true)
+    }
     try {
       const { data, error } = await supabase
         .from('patients')
@@ -39,43 +43,43 @@ export default function PacientesPage() {
       setPatients(data || [])
     } catch (err) {
       console.error('Error al cargar pacientes reales de Supabase:', err)
-      setPatients([])
+      if (isInitialLoadRef.current) setPatients([])
     } finally {
-      setLoading(false)
+      if (showLoadingSpinner || isInitialLoadRef.current) {
+        setLoading(false)
+        isInitialLoadRef.current = false
+      }
     }
   }
 
   useEffect(() => {
-    fetchPatients()
+    fetchPatients(true)
 
-    // Suscripción Realtime a inserciones y cambios en la tabla patients
+    // Suscripción Realtime a inserciones y cambios en la tabla patients (sin romper la posición del scroll)
     const patientChannel = supabase
       .channel('dashboard_pacientes_realtime')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'patients' },
         () => {
-          fetchPatients()
+          fetchPatients(false)
         }
       )
       .on('broadcast', { event: 'new_appointment' }, () => {
-        fetchPatients()
+        fetchPatients(false)
       })
       .on('broadcast', { event: 'emergency_triage_alert' }, () => {
-        fetchPatients()
+        fetchPatients(false)
       })
       .subscribe()
 
-    const handleRefresh = () => fetchPatients()
+    const handleRefresh = () => fetchPatients(false)
     window.addEventListener('storage', handleRefresh)
     window.addEventListener('audenti_appointment_refresh', handleRefresh)
     window.addEventListener('audenti_emergency_refresh', handleRefresh)
     window.addEventListener('audenti_patient_created', handleRefresh)
 
-    const interval = setInterval(fetchPatients, 3000)
-
     return () => {
-      clearInterval(interval)
       supabase.removeChannel(patientChannel)
       window.removeEventListener('storage', handleRefresh)
       window.removeEventListener('audenti_appointment_refresh', handleRefresh)
@@ -177,7 +181,8 @@ export default function PacientesPage() {
             )}
           </div>
           <button
-            onClick={fetchPatients}
+            type="button"
+            onClick={() => fetchPatients(true)}
             title="Refrescar lista"
             className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors"
           >

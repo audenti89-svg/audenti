@@ -148,12 +148,42 @@ export default function WhatsAppSettingsPage() {
       if (res.ok && data.success) {
         setWahaQr(data.qr || null)
         setWahaStatus(data.status || 'SCAN_QR_CODE')
+        if (data.connected || data.status === 'WORKING') {
+          setWahaStatus('WORKING')
+        }
       }
     } catch (e: any) {
       console.warn('Error obteniendo QR WAHA:', e)
     } finally {
       setWahaLoading(false)
     }
+  }
+
+  // Sondeo de estado cuando el QR está activo esperando escaneo
+  useEffect(() => {
+    if (wahaStatus === 'SCAN_QR_CODE') {
+      const interval = setInterval(async () => {
+        try {
+          const res = await fetch('/api/settings/whatsapp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'get_qr' })
+          })
+          const data = await res.json()
+          if (data.status === 'WORKING' || data.connected) {
+            setWahaStatus('WORKING')
+            setWahaQr(null)
+            clearInterval(interval)
+          }
+        } catch {}
+      }, 5000)
+      return () => clearInterval(interval)
+    }
+  }, [wahaStatus])
+
+  const handleSimulateConnected = () => {
+    setWahaStatus('WORKING')
+    setWahaQr(null)
   }
 
   const handleLogoutWaha = async () => {
