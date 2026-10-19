@@ -127,6 +127,37 @@ export function ChatInterface() {
             }
           } catch {}
 
+          // Consultar también directamente la tabla relacional chat_messages de Supabase
+          try {
+            const { data: dbChatRows } = await supabase
+              .from('chat_messages')
+              .select('*')
+              .order('created_at', { ascending: true })
+
+            if (dbChatRows && dbChatRows.length > 0) {
+              dbChatRows.forEach((r: any) => {
+                const patId = r.patient_id || r.metadata?.patientId || (r.metadata?.phone ? `prospect_${r.metadata.phone.replace(/\D/g, '')}` : 'prospect_general')
+                if (!stored[patId]) stored[patId] = []
+                const exists = stored[patId].some((m: any) => m.id === r.id || (m.content === r.content && (m.timestamp === r.created_at || m.time === r.created_at)))
+                if (!exists) {
+                  stored[patId].push({
+                    id: r.id,
+                    senderName: r.sender_name || (r.sender_role === 'ai' ? 'Asistente de Voz (Aura AI)' : (r.sender_role === 'doctor' ? 'Dra. Aura Estudillo' : 'Paciente')),
+                    senderRole: r.sender_role,
+                    channel_type: r.channel_type || 'web_chat',
+                    content: r.content,
+                    timestamp: r.created_at ? new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date(r.created_at)) : 'Hoy',
+                    time: r.created_at ? new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date(r.created_at)) : 'Hoy',
+                    isDoctor: r.sender_role === 'doctor',
+                    metadata: r.metadata
+                  })
+                }
+              })
+            }
+          } catch (dbErr: any) {
+            console.warn('[Chat DB Direct Check Note]:', dbErr?.message)
+          }
+
           Object.keys(stored).forEach(contactId => {
             const chatArray = stored[contactId] || []
             mappedMessages[contactId] = chatArray.map((m: any) => ({

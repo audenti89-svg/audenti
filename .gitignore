@@ -46,3 +46,6 @@ DeskcommCRM-main/
 # external chatwoot repo
 chatwoot-develop/
 
+
+.vercel
+.env*
