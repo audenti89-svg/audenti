@@ -61,11 +61,7 @@ export function PatientDirectChatWidget({ patient }: PatientDirectChatWidgetProp
         const json = await res.json();
         if (json.messages && json.messages.length > 0) {
           setMessages(json.messages);
-          // Si el último mensaje es de la doctora y el chat no está abierto, marcar como no leído
-          const lastMsg = json.messages[json.messages.length - 1];
-          if (lastMsg?.isDoctor && !isOpen) {
-            setUnreadCount(1);
-          }
+          setUnreadCount(0);
           return;
         }
       }
@@ -82,10 +78,7 @@ export function PatientDirectChatWidget({ patient }: PatientDirectChatWidgetProp
           const patientChat = allChats[patientId] || [];
           if (patientChat.length > 0) {
             setMessages(patientChat);
-            const lastMsg = patientChat[patientChat.length - 1];
-            if (lastMsg?.isDoctor && !isOpen) {
-              setUnreadCount(1);
-            }
+            setUnreadCount(0);
             return;
           }
         }

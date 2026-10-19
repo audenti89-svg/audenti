@@ -69,7 +69,7 @@ export function UnifiedCommunicationWidget({
   const [isSending, setIsSending] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
-  // Cargar historial de chat
+  // Cargar historial de chat (inicializa en 0 no leídos para evitar falsas alarmas)
   const loadChatHistory = async () => {
     try {
       const res = await fetch(`/api/chat?patientId=${patientId}`)
@@ -77,10 +77,8 @@ export function UnifiedCommunicationWidget({
         const json = await res.json()
         if (json.messages && json.messages.length > 0) {
           setMessages(json.messages)
-          const lastMsg = json.messages[json.messages.length - 1]
-          if (lastMsg?.isDoctor && (!isOpen || activeTab !== 'chat')) {
-            setUnreadChatCount(1)
-          }
+          // El historial previo ya fue visualizado, no generar falsa notificación
+          setUnreadChatCount(0)
           return
         }
       }

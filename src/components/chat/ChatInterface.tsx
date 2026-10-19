@@ -375,9 +375,39 @@ export function ChatInterface() {
     }
   }, [selectedPatientId, messages])
 
-  // Scroll automático en hilo de mensajes
+  // Control de scroll vertical: solo hacer scroll al fondo al cambiar de paciente o enviar mensaje
+  const chatScrollContainerRef = useRef<HTMLDivElement>(null)
+  const prevPatientIdRef = useRef<string>('')
+  const prevMessagesCountRef = useRef<number>(0)
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const currentMessagesCount = (selectedPatientId ? messages[selectedPatientId] : null)?.length || 0
+    const patientChanged = prevPatientIdRef.current !== selectedPatientId
+    const isNewMessageSent = currentMessagesCount > prevMessagesCountRef.current && prevPatientIdRef.current === selectedPatientId
+
+    if (patientChanged) {
+      prevPatientIdRef.current = selectedPatientId
+      prevMessagesCountRef.current = currentMessagesCount
+      // Desplazamiento inicial inmediato al cambiar de paciente
+      setTimeout(() => {
+        if (chatScrollContainerRef.current) {
+          chatScrollContainerRef.current.scrollTop = chatScrollContainerRef.current.scrollHeight
+        }
+      }, 50)
+      return
+    }
+
+    if (isNewMessageSent) {
+      // Si el usuario está cerca del final, mantenerlo al final; si está leyendo arriba, respetar su lectura
+      const container = chatScrollContainerRef.current
+      if (container) {
+        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200
+        if (isNearBottom) {
+          container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' })
+        }
+      }
+      prevMessagesCountRef.current = currentMessagesCount
+    }
   }, [messages, selectedPatientId])
 
   // 2. Suscripción a Realtime de mensajes entrantes y llamadas de voz
@@ -884,7 +914,7 @@ export function ChatInterface() {
           )}
 
           {/* Hilo de Mensajes con Render Especial para Llamadas de Voz */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
+          <div ref={chatScrollContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/30">
             {currentChatMessages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-2">
                 <MessageSquare className="w-10 h-10 text-slate-300" />
