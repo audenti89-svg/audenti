@@ -20,6 +20,8 @@ import {
 export default function WhatsAppSettingsPage() {
   const [phoneNumber, setPhoneNumber] = useState('525522427769')
   const [phoneNumberId, setPhoneNumberId] = useState('')
+  const [wabaId, setWabaId] = useState('')
+  const [chatwootWebhookUrl, setChatwootWebhookUrl] = useState('')
   const [metaAccessToken, setMetaAccessToken] = useState('')
   const [webhookVerifyToken, setWebhookVerifyToken] = useState('audenti_secure_token')
   const [chatbotEnabled, setChatbotEnabled] = useState(true)
@@ -43,7 +45,9 @@ export default function WhatsAppSettingsPage() {
           const json = await res.json()
           if (json.settings) {
             setPhoneNumber(json.settings.phone_number || '525522427769')
-            setPhoneNumberId(json.settings.phone_number_id || json.settings.waba_id || '')
+            setPhoneNumberId(json.settings.phone_number_id || '')
+            setWabaId(json.settings.waba_id || '')
+            setChatwootWebhookUrl(json.settings.chatwoot_webhook_url || '')
             setMetaAccessToken(json.settings.meta_access_token || '')
             setWebhookVerifyToken(json.settings.webhook_verify_token || 'audenti_secure_token')
             setChatbotEnabled(json.settings.chatbot_enabled !== undefined ? json.settings.chatbot_enabled : true)
@@ -73,7 +77,8 @@ export default function WhatsAppSettingsPage() {
         body: JSON.stringify({
           phone_number: phoneNumber,
           phone_number_id: phoneNumberId,
-          waba_id: phoneNumberId,
+          waba_id: wabaId,
+          chatwoot_webhook_url: chatwootWebhookUrl,
           meta_access_token: metaAccessToken,
           webhook_verify_token: webhookVerifyToken,
           chatbot_enabled: chatbotEnabled,
@@ -237,6 +242,42 @@ export default function WhatsAppSettingsPage() {
                 />
                 <p className="text-[11px] text-slate-400">
                   Identificador del número de teléfono en Meta Developer Console (WhatsApp API Setup).
+                </p>
+              </div>
+
+              {/* 3. WABA ID (WhatsApp Business Account ID) */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <Hash className="w-4 h-4 text-emerald-600" />
+                  WhatsApp Business Account ID (WABA ID)
+                </label>
+                <input
+                  type="text"
+                  value={wabaId}
+                  onChange={(e) => setWabaId(e.target.value)}
+                  placeholder="ej. 892716382910293"
+                  className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
+                />
+                <p className="text-[11px] text-slate-400">
+                  Identificador de la cuenta comercial de WhatsApp (WABA) en Meta Business Manager.
+                </p>
+              </div>
+
+              {/* 4. Chatwoot Webhook URL para Pruebas Activas */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <ExternalLink className="w-4 h-4 text-emerald-600" />
+                  URL de Webhook de Chatwoot (Pruebas de Mensajería)
+                </label>
+                <input
+                  type="url"
+                  value={chatwootWebhookUrl}
+                  onChange={(e) => setChatwootWebhookUrl(e.target.value)}
+                  placeholder="https://chatwoot.tu-dominio.com/webhooks/whatsapp"
+                  className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all"
+                />
+                <p className="text-[11px] text-slate-400">
+                  Endpoint de sincronización bidireccional con Chatwoot para pruebas activas de mensajería.
                 </p>
               </div>
 

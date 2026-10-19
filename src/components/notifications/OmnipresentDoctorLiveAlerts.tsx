@@ -185,6 +185,11 @@ export function OmnipresentDoctorLiveAlerts() {
       const content = payload.content || payload.message || 'Nuevo mensaje'
       const time = payload.timestamp || payload.time || new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date())
 
+      // Identificador único de usuario para consolidación
+      const cleanPhone = (payload.phone || '').replace(/\D/g, '')
+      const targetId = payload.targetPatientId || payload.patientId || (cleanPhone ? `prospect_${cleanPhone}` : '')
+      const targetUrl = targetId ? `/dashboard/chat?patientId=${encodeURIComponent(targetId)}` : (payload.url || '/dashboard/chat')
+
       // Verificar si el paciente está registrado en la base de datos
       let isRegistered = false
       let folio = ''
@@ -202,33 +207,64 @@ export function OmnipresentDoctorLiveAlerts() {
         }
       } catch {}
 
-      const targetId = payload.targetPatientId || payload.patientId || ''
-      const targetUrl = targetId ? `/dashboard/chat?patientId=${encodeURIComponent(targetId)}` : (payload.url || '/dashboard/chat')
+      // Lógica de Consolidación por Usuario (Debounce / Single Active Toast):
+      // Si el mismo paciente/teléfono ya tiene una alerta activa, se actualiza y concatena su mensaje
+      updateToastsPersistently(prev => {
+        const existingIdx = prev.findIndex(t => {
+          if (targetId && (t.id.includes(targetId) || (t.url && t.url.includes(encodeURIComponent(targetId))))) return true
+          if (cleanPhone && t.phone && t.phone.replace(/\D/g, '') === cleanPhone) return true
+          if (sender && t.patientName && t.patientName.toLowerCase().trim() === sender.toLowerCase().trim()) return true
+          return false
+        })
 
-      const newToast: OmnipresentToast = {
-        id: `toast-${Date.now()}-${Math.random()}`,
-        title: isRegistered ? `💬 Mensaje de ${sender}` : `🟠 PROSPECTO NUEVO: ${sender}`,
-        message: content,
-        type: payload.urgencyLevel === 'Urgente' ? 'emergency' : 'chat',
-        patientName: sender,
-        phone: payload.phone || '',
-        folio,
-        isRegistered,
-        consultationReason: payload.consultationReason || 'Consulta General',
-        urgencyLevel: payload.urgencyLevel || (/(?:dolor|duele|muela|aguanto|urgente)/i.test(content) ? 'Urgente' : 'No Urgente'),
-        timestamp: time,
-        url: targetUrl
-      }
+        if (existingIdx !== -1) {
+          const existing = prev[existingIdx]
+          const isUrgent = payload.urgencyLevel === 'Urgente' || existing.urgencyLevel === 'Urgente' || /(?:dolor|duele|muela|aguanto|urgente)/i.test(content)
+          const updatedToast: OmnipresentToast = {
+            ...existing,
+            title: isRegistered ? `💬 Mensaje de ${sender}` : `🟠 PROSPECTO NUEVO: ${sender}`,
+            message: `${existing.message}\n• "${content}"`,
+            urgencyLevel: isUrgent ? 'Urgente' : 'No Urgente',
+            type: isUrgent ? 'emergency' : existing.type,
+            timestamp: time,
+            url: targetUrl
+          }
+          const copy = [...prev]
+          copy[existingIdx] = updatedToast
+          return copy
+        }
 
-      // Queda fijo hasta que la doctora confirme expresamente la lectura (Persistencia Congelada)
-      updateToastsPersistently(prev => [newToast, ...prev.filter(t => t.id !== newToast.id)].slice(0, 5))
-      triggerNativePush(newToast.title, `${newToast.consultationReason} • "${content}"`, targetUrl)
+        const newToast: OmnipresentToast = {
+          id: `toast-${targetId || Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          title: isRegistered ? `💬 Mensaje de ${sender}` : `🟠 PROSPECTO NUEVO: ${sender}`,
+          message: content,
+          type: payload.urgencyLevel === 'Urgente' ? 'emergency' : 'chat',
+          patientName: sender,
+          phone: payload.phone || '',
+          folio,
+          isRegistered,
+          consultationReason: payload.consultationReason || 'Consulta General',
+          urgencyLevel: payload.urgencyLevel || (/(?:dolor|duele|muela|aguanto|urgente)/i.test(content) ? 'Urgente' : 'No Urgente'),
+          timestamp: time,
+          url: targetUrl
+        }
+        return [newToast, ...prev].slice(0, 5)
+      })
+
+      triggerNativePush(
+        isRegistered ? `💬 Mensaje de ${sender}` : `🟠 PROSPECTO NUEVO: ${sender}`,
+        `${payload.consultationReason || 'Consulta'} • "${content}"`,
+        targetUrl
+      )
     }
 
     const handleVoiceEvent = async (payload: any) => {
       if (!payload) return
       const patient = payload.patientName || 'Ricardo Sánchez'
       const time = payload.timestamp || 'Ahora'
+      const cleanPhone = (payload.phone || '').replace(/\D/g, '')
+      const voiceTargetId = payload.patientId || payload.targetPatientId || (cleanPhone ? `prospect_${cleanPhone}` : '')
+      const voiceUrl = voiceTargetId ? `/dashboard/chat?patientId=${encodeURIComponent(voiceTargetId)}` : '/dashboard/chat'
 
       // Verificar si existe en la BD
       let isRegistered = false
@@ -252,26 +288,56 @@ export function OmnipresentDoctorLiveAlerts() {
         triggerNativePush(`📞 Llamada de Voz en Curso`, `${patient} está hablando con Aura IA.`, '/dashboard/chat')
       } else if (payload.status === 'ended') {
         playTone('arrival')
-        const voiceTargetId = payload.patientId || payload.targetPatientId || ''
-        const voiceUrl = voiceTargetId ? `/dashboard/chat?patientId=${encodeURIComponent(voiceTargetId)}` : '/dashboard/chat'
 
-        const toast: OmnipresentToast = {
-          id: `voice-end-${Date.now()}`,
-          title: `📞 Llamada de Voz Finalizada con Aura IA`,
-          message: payload.summary || `Solicitud de Cita Médica • Fecha/Horario por confirmar`,
-          type: 'voice',
-          patientName: patient,
-          phone: payload.phone || '',
-          folio,
-          isRegistered,
-          consultationReason: payload.consultationReason || 'Solicitud de Cita Médica por Voz',
-          urgencyLevel: payload.urgencyLevel || 'Urgente',
-          timestamp: time,
-          url: voiceUrl
-        }
+        // FUSIÓN MENSAJE + LLAMADA:
+        // Si el paciente ya tenía una alerta previa de chat/WhatsApp activa, unificar en una sola alerta con informe completo
+        updateToastsPersistently(prev => {
+          const existingIdx = prev.findIndex(t => {
+            if (voiceTargetId && (t.id.includes(voiceTargetId) || (t.url && t.url.includes(encodeURIComponent(voiceTargetId))))) return true
+            if (cleanPhone && t.phone && t.phone.replace(/\D/g, '') === cleanPhone) return true
+            if (patient && t.patientName && t.patientName.toLowerCase().trim() === patient.toLowerCase().trim()) return true
+            return false
+          })
 
-        // Queda fijo en pantalla: CERO borrado automático (Persistencia Congelada)
-        updateToastsPersistently(prev => [toast, ...prev.filter(t => t.id !== toast.id)].slice(0, 5))
+          const voiceSummary = payload.summary || `Solicitud de Cita Médica • Fecha/Horario por confirmar`
+
+          if (existingIdx !== -1) {
+            const existing = prev[existingIdx]
+            const fusedToast: OmnipresentToast = {
+              ...existing,
+              id: existing.id,
+              title: `📞 Sesión Unificada (Chat + Llamada): ${patient}`,
+              message: `💬 Chat previo: "${existing.message}"\n\n🎙️ Resumen Llamada Aura IA:\n${voiceSummary}`,
+              type: 'voice',
+              consultationReason: payload.consultationReason || existing.consultationReason || 'Solicitud de Cita Médica por Voz',
+              urgencyLevel: payload.urgencyLevel || existing.urgencyLevel || 'Urgente',
+              timestamp: time,
+              url: voiceUrl,
+              folio: folio || existing.folio,
+              isRegistered: isRegistered || existing.isRegistered
+            }
+            const copy = [...prev]
+            copy[existingIdx] = fusedToast
+            return copy
+          }
+
+          const toast: OmnipresentToast = {
+            id: `voice-end-${voiceTargetId || Date.now()}`,
+            title: isRegistered ? `📞 Llamada de Voz Finalizada con Aura IA: ${patient}` : `📞 🟠 PROSPECTO NUEVO (VOZ): ${patient}`,
+            message: voiceSummary,
+            type: 'voice',
+            patientName: patient,
+            phone: payload.phone || '',
+            folio,
+            isRegistered,
+            consultationReason: payload.consultationReason || 'Solicitud de Cita Médica por Voz',
+            urgencyLevel: payload.urgencyLevel || 'Urgente',
+            timestamp: time,
+            url: voiceUrl
+          }
+          return [toast, ...prev].slice(0, 5)
+        })
+
         triggerNativePush(
           isRegistered ? `🟢 PACIENTE REGISTRADO: ${patient} (${folio})` : `🟠 PROSPECTO NUEVO: ${patient}`,
           `📌 Motivo: Solicitud de Cita Médica\n⚠️ Acción Requerida: Confirmar fecha/horario de atención disponible.`,
