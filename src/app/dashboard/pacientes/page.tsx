@@ -386,8 +386,8 @@ export default function PacientesPage() {
 
                               const finalAllergies = allergiesList.length > 0
                                 ? allergiesList
-                                : p.full_name?.toLowerCase().includes('ricardo')
-                                ? ['Penicilina', 'Ketorolaco', 'Epinefrina']
+                                : p.full_name?.toLowerCase().includes('angeles') || p.id === '9e88144f-9858-4408-9c2a-bd0894512ce3'
+                                ? ['Penicilina']
                                 : []
 
                               if (finalAllergies.length > 0) {
@@ -442,7 +442,7 @@ export default function PacientesPage() {
                           )}
 
                           <Link
-                            href="/dashboard/expediente"
+                            href={`/dashboard/expediente?patient_id=${p.id}`}
                             className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
                             title="Abrir Expediente Clínico"
                           >

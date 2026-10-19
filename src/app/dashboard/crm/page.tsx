@@ -33,8 +33,11 @@ import {
   Volume2,
   VolumeX,
   AlertTriangle,
-  Lightbulb
+  Lightbulb,
+  Search,
+  FolderOpen
 } from 'lucide-react'
+import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
 import { QuickRegisterModal } from '@/components/clinical/QuickRegisterModal'
 
@@ -45,6 +48,7 @@ export default function CrmPage() {
   const [patients, setPatients] = useState<any[]>([])
   const [appointmentsCount, setAppointmentsCount] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
   const [activeStageFilter, setActiveStageFilter] = useState<CrmStage>('all')
   const [patientStages, setPatientStages] = useState<Record<string, CrmStage>>({})
@@ -307,8 +311,19 @@ export default function CrmPage() {
   }
 
   const filteredPatients = patients.filter(p => {
-    if (activeStageFilter === 'all') return true
-    return (patientStages[p.id] || 'contacto_inicial') === activeStageFilter
+    if (activeStageFilter !== 'all') {
+      const stage = patientStages[p.id] || 'contacto_inicial'
+      if (stage !== activeStageFilter) return false
+    }
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim()
+      const matchesName = (p.full_name || '').toLowerCase().includes(term)
+      const matchesPhone = (p.phone || '').includes(term)
+      const matchesId = (p.id || '').toLowerCase().includes(term)
+      const matchesEmail = (p.email || '').toLowerCase().includes(term)
+      if (!matchesName && !matchesPhone && !matchesId && !matchesEmail) return false
+    }
+    return true
   })
 
   return (
@@ -429,8 +444,28 @@ export default function CrmPage() {
               <h2 className="text-lg font-bold text-slate-900 tracking-tight">Tablero de Seguimiento Activo</h2>
               <p className="text-xs text-slate-500">Acciones programadas para pacientes en seguimiento clínico y presupuestos abiertos.</p>
             </div>
-            {/* Filter Pills */}
-            <div className="flex flex-wrap items-center gap-1.5">
+            {/* Buscador Rápido y Filter Pills */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="search"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Buscar paciente o folio..."
+                  className="pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400 w-48 sm:w-56"
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 font-bold"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
               <button
                 type="button"
                 onClick={() => setActiveStageFilter('all')}
@@ -553,7 +588,7 @@ export default function CrmPage() {
                       </div>
 
                       <a
-                        href={`https://wa.me/${(p.phone || '').replace(/[^0-9]/g, '')}`}
+                        href={`https://wa.me/521${(p.phone || '').replace(/[^0-9]/g, '').slice(-10)}?text=${encodeURIComponent(`Hola ${p.full_name}, te saluda la Dra. Aura Estudillo de Audenti Clinical.`)}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-xs shrink-0 bg-emerald-600 text-white hover:bg-emerald-700"
@@ -561,6 +596,15 @@ export default function CrmPage() {
                         <MessageCircle className="w-3.5 h-3.5" />
                         WhatsApp
                       </a>
+
+                      <Link
+                        href={`/dashboard/expediente?patient_id=${p.id}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-xs shrink-0 bg-slate-100 text-slate-800 hover:bg-slate-200"
+                        title="Abrir Expediente Clínico"
+                      >
+                        <FolderOpen className="w-3.5 h-3.5 text-blue-600" />
+                        Expediente
+                      </Link>
                     </div>
                   </div>
                 )

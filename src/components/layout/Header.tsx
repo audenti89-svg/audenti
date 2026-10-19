@@ -293,17 +293,8 @@ export function Header({ onMenuToggle }: HeaderProps) {
         </div>
       </div>
 
-      {/* Buscador global (Oculto en móvil pequeño) */}
-      <div className="hidden md:block flex-1 max-w-lg mx-4 lg:mx-6">
-        <div className="relative w-full">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="search"
-            placeholder={`Buscar en ${currentBranch.name}... (⌘K)`}
-            className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-50 text-slate-900 text-xs border border-slate-200/80 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:bg-white transition-all placeholder:text-slate-400"
-          />
-        </div>
-      </div>
+      {/* Espacio flexible central */}
+      <div className="flex-1" />
 
       {/* Controles de Perfil y Notificaciones */}
       <div className="flex items-center gap-1.5 sm:gap-2.5">

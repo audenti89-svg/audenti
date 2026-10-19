@@ -23,7 +23,8 @@ import {
   X,
   LayoutGrid,
   List,
-  MessageSquare
+  MessageSquare,
+  Search
 } from 'lucide-react'
 import { useNotificationSound } from '@/hooks/useNotificationSound'
 import { createClient } from '@/utils/supabase/client'
@@ -36,6 +37,7 @@ type TimeHorizon = 'present' | 'past' | 'future'
 
 interface ClinicalAppointment {
   id: string
+  patientId?: string
   date: string
   rawDate: string // YYYY-MM-DD
   isoStart: string
@@ -55,6 +57,7 @@ export default function CalendarPage() {
   const { soundEnabled, setSoundEnabled, playTone } = useNotificationSound()
   const [viewMode, setViewMode] = useState<'flow' | 'units'>('flow')
   const [horizon, setHorizon] = useState<TimeHorizon | 'all'>('present')
+  const [searchTerm, setSearchTerm] = useState('')
   const [dateFilter, setDateFilter] = useState<string>('') // Filtro específico por fecha
   const [monthFilter, setMonthFilter] = useState<string>('all') // Filtro por mes (01-12)
   const [yearFilter, setYearFilter] = useState<string>('all') // Filtro por año (2025, 2026, etc)
@@ -96,12 +99,14 @@ export default function CalendarPage() {
         .from('appointments')
         .select(`
           id,
+          patient_id,
           start_time,
           end_time,
           status,
           treatment_type,
           notes,
           patients (
+            id,
             full_name,
             phone
           ),
@@ -124,6 +129,7 @@ export default function CalendarPage() {
 
           return {
             id: item.id,
+            patientId: item.patient_id || item.patients?.id,
             date: dateStr,
             rawDate,
             isoStart: item.start_time,
@@ -400,6 +406,27 @@ export default function CalendarPage() {
           </button>
         </div>
 
+        {/* Barra de Búsqueda Rápida de Citas y Pacientes */}
+        <div className="relative flex-1 min-w-[220px] max-w-sm">
+          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="search"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Buscar por paciente, teléfono o folio..."
+            className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 font-medium"
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 font-bold"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
         {/* Filtros Históricos por Fecha, Mes y Año */}
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <input
@@ -492,6 +519,16 @@ export default function CalendarPage() {
           {(() => {
             const todayStr = formatDateInMexico()
             const filtered = appointments.filter((app) => {
+              // 0. Filtro por término de búsqueda (nombre, teléfono, folio)
+              if (searchTerm.trim()) {
+                const term = searchTerm.toLowerCase().trim()
+                const matchesName = app.patientName.toLowerCase().includes(term)
+                const matchesPhone = app.phone.includes(term)
+                const matchesId = app.id.toLowerCase().includes(term) || (app.patientId && app.patientId.toLowerCase().includes(term))
+                const matchesTreatment = app.treatment.toLowerCase().includes(term)
+                if (!matchesName && !matchesPhone && !matchesId && !matchesTreatment) return false
+              }
+
               // 1. Filtro específico de fecha manual
               if (dateFilter && app.rawDate && app.rawDate !== dateFilter) return false
 
@@ -679,7 +716,7 @@ export default function CalendarPage() {
                 )}
 
                 <Link
-                  href="/dashboard/expediente"
+                  href={app.patientId ? `/dashboard/expediente?patient_id=${app.patientId}` : "/dashboard/expediente"}
                   className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors"
                 >
                   Expediente
