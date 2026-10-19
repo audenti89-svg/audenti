@@ -51,8 +51,8 @@ export default function FinanzasPage() {
 
   const supabase = createClient()
 
-  const fetchTransactions = async () => {
-    setLoading(true)
+  const fetchTransactions = async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const { data, error } = await supabase
         .from('payments')
@@ -69,8 +69,29 @@ export default function FinanzasPage() {
     }
   }
 
+  // Captura automática de checkout proveniente de la máquina de estados de Citas
   useEffect(() => {
     fetchTransactions()
+
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const action = urlParams.get('action')
+      const patient = urlParams.get('patient')
+      const treatment = urlParams.get('treatment')
+      const apptId = urlParams.get('appointment_id')
+
+      if (action === 'checkout') {
+        setModalType('cobro')
+        setFormData(prev => ({
+          ...prev,
+          patientName: patient ? decodeURIComponent(patient) : '',
+          description: treatment ? `Atención Clínica: ${decodeURIComponent(treatment)} (Folio #${apptId?.slice(0, 8) || 'Cita'})` : 'Consulta y Atención Odontológica',
+          amount: '1800',
+          paymentMethod: 'Efectivo'
+        }))
+        setIsModalOpen(true)
+      }
+    }
   }, [])
 
   // Cálculos contables
@@ -154,6 +175,26 @@ export default function FinanzasPage() {
 
         if (defaultTenant?.id) entry.tenant_id = defaultTenant.id
         await supabase.from('payments').insert([entry])
+
+        // Si provenía de un checkout de cita, marcar la cita en Supabase como 'COMPLETADA_Y_PAGADA'
+        if (typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search)
+          const apptId = urlParams.get('appointment_id')
+          if (apptId) {
+            try {
+              await supabase
+                .from('appointments')
+                .update({
+                  status: 'completed',
+                  notes: `[FOLIO: ${apptId}] Cita COMPLETADA_Y_PAGADA. Cobro registrado en caja: $${val} MXN (${formData.paymentMethod}).`
+                })
+                .eq('id', apptId)
+              window.dispatchEvent(new Event('audenti_appointment_refresh'))
+            } catch (appErr) {
+              console.warn('Nota actualizando cita a pagada:', appErr)
+            }
+          }
+        }
       }
 
       setIsModalOpen(false)
@@ -187,7 +228,7 @@ export default function FinanzasPage() {
 
         <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={fetchTransactions}
+            onClick={() => fetchTransactions()}
             className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors"
             title="Sincronizar caja"
           >

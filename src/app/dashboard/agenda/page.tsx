@@ -30,6 +30,7 @@ import { useNotificationSound } from '@/hooks/useNotificationSound'
 import { createClient } from '@/utils/supabase/client'
 import { formatDateInMexico } from '@/utils/timezone'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { QuickRegisterModal } from '@/components/clinical/QuickRegisterModal'
 import { StableCalendarView } from '@/components/StableCalendarView'
 
@@ -54,6 +55,7 @@ interface ClinicalAppointment {
 }
 
 export default function CalendarPage() {
+  const router = useRouter()
   const { soundEnabled, setSoundEnabled, playTone } = useNotificationSound()
   const [viewMode, setViewMode] = useState<'flow' | 'units'>('flow')
   const [horizon, setHorizon] = useState<TimeHorizon | 'all'>('present')
@@ -92,8 +94,8 @@ export default function CalendarPage() {
     }
   }
 
-  const fetchAppointments = async () => {
-    setLoading(true)
+  const fetchAppointments = async (silent = false) => {
+    if (!silent) setLoading(true)
     try {
       const { data, error } = await supabase
         .from('appointments')
@@ -232,17 +234,17 @@ export default function CalendarPage() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'appointments' },
         () => {
-          fetchAppointments()
+          fetchAppointments(true)
         }
       )
       .on('broadcast', { event: 'new_appointment' }, () => {
-        fetchAppointments()
+        fetchAppointments(true)
       })
       .subscribe()
 
-    // Polling reactivo cada 3 segundos y escucha de eventos locales
-    const interval = setInterval(fetchAppointments, 3000)
-    const handleRefresh = () => fetchAppointments()
+    // Polling de respaldo cada 8 segundos sin parpadeo (silent refresh)
+    const interval = setInterval(() => fetchAppointments(true), 8000)
+    const handleRefresh = () => fetchAppointments(true)
     window.addEventListener('storage', handleRefresh)
     window.addEventListener('audenti_appointment_refresh', handleRefresh)
 
@@ -253,6 +255,95 @@ export default function CalendarPage() {
       supabase.removeChannel(channel)
     }
   }, [])
+
+  // MÁQUINA DE ESTADOS CLÍNICA OPTIMISTA (0 ms de latencia)
+  // 1. "Registrar Llegada" -> EN_ESPERA (in_waiting)
+  const handleRegisterArrival = async (app: ClinicalAppointment) => {
+    playTone('arrival')
+    // Mutación optimista inmediata en estado local
+    setAppointments(prev => prev.map(a => a.id === app.id ? { ...a, status: 'in_waiting' } : a))
+
+    try {
+      await supabase
+        .from('appointments')
+        .update({
+          status: 'in_waiting',
+          notes: `${app.notes ? app.notes + ' | ' : ''}[ESTADO]: Llegada registrada en recepción (${new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })})`
+        })
+        .eq('id', app.id)
+
+      // Notificación sonora y síntesis de voz en recepción
+      handleCallToChair(app.patientName)
+
+      // Enviar notificación a gabinete en Supabase Realtime
+      await supabase.channel('header_notifications_realtime').send({
+        type: 'broadcast',
+        event: 'doctor_notification',
+        payload: {
+          id: `arrival-${app.id}`,
+          title: `🚶 Llegada de Paciente: ${app.patientName}`,
+          message: `El paciente ${app.patientName} ha llegado y está en sala de espera para ${app.treatment}.`,
+          type: 'general',
+          patient_name: app.patientName,
+          time: new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+        }
+      })
+      window.dispatchEvent(new Event('audenti_appointment_refresh'))
+    } catch (err) {
+      console.warn('Error al registrar llegada:', err)
+    }
+  }
+
+  // 2. "Pasar a Sillón" -> EN_SILLON (in_chair) + NAVEGACIÓN AUTOMÁTICA AL EXPEDIENTE
+  const handlePassToChair = async (app: ClinicalAppointment) => {
+    playTone('arrival')
+    // Mutación optimista inmediata
+    setAppointments(prev => prev.map(a => a.id === app.id ? { ...a, status: 'in_chair' } : a))
+
+    try {
+      await supabase
+        .from('appointments')
+        .update({
+          status: 'in_chair',
+          notes: `${app.notes ? app.notes + ' | ' : ''}[ESTADO]: En sillón con la Dra. Aura Estudillo (${new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })})`
+        })
+        .eq('id', app.id)
+
+      window.dispatchEvent(new Event('audenti_appointment_refresh'))
+    } catch (err) {
+      console.warn('Error al pasar a sillón:', err)
+    }
+
+    // Navegación automática sin parpadeo al Expediente Clínico con la Alerta de Bioseguridad visible
+    const targetPatientId = app.patientId || app.id
+    router.push(`/dashboard/expediente?patient_id=${targetPatientId}&alert=biosecurity`)
+  }
+
+  // 3. "Concluir / Atendido" -> ATENDIDO (completed / PENDIENTE_PAGO) + NAVEGACIÓN A FINANZAS
+  const handleConcludeAndCheckout = async (app: ClinicalAppointment) => {
+    playTone('message')
+    // Mutación optimista inmediata
+    setAppointments(prev => prev.map(a => a.id === app.id ? { ...a, status: 'completed' } : a))
+
+    try {
+      await supabase
+        .from('appointments')
+        .update({
+          status: 'completed',
+          notes: `${app.notes ? app.notes + ' | ' : ''}[ESTADO]: Procedimiento atendido. Trasladado a Caja (${new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })})`
+        })
+        .eq('id', app.id)
+
+      window.dispatchEvent(new Event('audenti_appointment_refresh'))
+    } catch (err) {
+      console.warn('Error al concluir cita:', err)
+    }
+
+    // Navegación automática a la ventana de Cobro / Caja con parámetros de checkout
+    const patientQuery = encodeURIComponent(app.patientName)
+    const treatmentQuery = encodeURIComponent(app.treatment)
+    router.push(`/dashboard/finanzas?action=checkout&appointment_id=${app.id}&patient=${patientQuery}&treatment=${treatmentQuery}&patient_id=${app.patientId || ''}`)
+  }
 
   const handleCallToChair = (patientName: string) => {
     playTone('arrival')
@@ -336,7 +427,7 @@ export default function CalendarPage() {
           </button>
 
           <button
-            onClick={fetchAppointments}
+            onClick={() => fetchAppointments()}
             className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors"
             title="Sincronizar Citas"
           >
@@ -624,76 +715,63 @@ export default function CalendarPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
-                {/* Desbloqueo total de acciones para la doctora: Siempre disponible cambiar a En Sillón, Concluir o Reactivar */}
+                {/* 1. REGISTRAR LLEGADA: Cambia a EN_ESPERA (in_waiting) con aviso sonoro y notificación al gabinete */}
+                {app.status === 'scheduled' && (
+                  <button
+                    type="button"
+                    onClick={() => handleRegisterArrival(app)}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-xs transition-transform active:scale-95 cursor-pointer"
+                    title="Registrar llegada del paciente a recepción"
+                  >
+                    <UserCheck className="w-3.5 h-3.5" />
+                    Registrar Llegada
+                  </button>
+                )}
+
+                {/* Si está en espera, botón de llamar a sillón por voz */}
                 {app.status === 'in_waiting' && (
                   <button
                     type="button"
                     onClick={() => handleCallToChair(app.patientName)}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-xs transition-colors"
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                    title="Llamar al paciente por altavoz"
                   >
                     <Volume2 className="w-3.5 h-3.5 text-amber-400" />
                     Llamar a Sillón
                   </button>
                 )}
 
+                {/* 2. PASAR A SILLÓN: Cambia a EN_SILLON (in_chair) y NAVEGA AUTOMÁTICAMENTE a Expediente Clínico */}
                 {app.status !== 'in_chair' && (
                   <button
                     type="button"
-                    onClick={async () => {
-                      playTone('arrival')
-                      try {
-                        await supabase
-                          .from('appointments')
-                          .update({ status: 'in_chair' })
-                          .eq('id', app.id)
-                        window.dispatchEvent(new Event('audenti_appointment_refresh'))
-                        fetchAppointments()
-                      } catch {}
-                    }}
-                    className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
-                    title="Pasar al paciente al sillón dental ahora"
+                    onClick={() => handlePassToChair(app)}
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-transform active:scale-95 cursor-pointer"
+                    title="Pasar al paciente al sillón dental y abrir su Expediente Clínico"
                   >
                     <Activity className="w-3.5 h-3.5" />
                     {app.status === 'completed' ? 'Reabrir a Sillón' : 'Pasar a Sillón'}
                   </button>
                 )}
 
+                {/* 3. CONCLUIR / ATENDIDO: Cambia a ATENDIDO / PENDIENTE_PAGO y NAVEGA AUTOMÁTICAMENTE a Finanzas / Cobro */}
                 {app.status !== 'completed' && (
                   <button
                     type="button"
-                    onClick={async () => {
-                      playTone('message')
-                      try {
-                        await supabase
-                          .from('appointments')
-                          .update({ status: 'completed' })
-                          .eq('id', app.id)
-                        window.dispatchEvent(new Event('audenti_appointment_refresh'))
-                        fetchAppointments()
-                      } catch {}
-                    }}
-                    className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
-                    title="Marcar cita como concluida o atendida"
+                    onClick={() => handleConcludeAndCheckout(app)}
+                    className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-transform active:scale-95 cursor-pointer"
+                    title="Concluir tratamiento y abrir ventana de Cobro en Caja"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     Concluir / Atendido
                   </button>
                 )}
 
+                {/* Reactivar Turno si ya estaba completada */}
                 {app.status === 'completed' && (
                   <button
                     type="button"
-                    onClick={async () => {
-                      playTone('message')
-                      try {
-                        await supabase
-                          .from('appointments')
-                          .update({ status: 'in_waiting' })
-                          .eq('id', app.id)
-                        window.dispatchEvent(new Event('audenti_appointment_refresh'))
-                        fetchAppointments()
-                      } catch {}
-                    }}
+                    onClick={() => handleRegisterArrival(app)}
                     className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold shadow-xs transition-colors cursor-pointer"
                     title="Regresar cita a lista de espera"
                   >
