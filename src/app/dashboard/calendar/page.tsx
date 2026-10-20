@@ -186,7 +186,11 @@ export default function CalendarPage() {
         console.warn('Nota en lectura de storage para calendario:', storageErr)
       }
 
-      setAppointments(allAppointments)
+      setAppointments(allAppointments.filter(a => {
+        const titleLower = (a.title || '').toLowerCase()
+        const patientLower = (a.patientName || '').toLowerCase()
+        return !titleLower.includes('prueba') && !patientLower.includes('prueba')
+      }))
     } catch {
       // Ignorar errores transitorios
     }
@@ -543,7 +547,9 @@ export default function CalendarPage() {
                               onClick={(e) => {
                                 e.stopPropagation()
                                 playTone('arrival')
-                                alert(`Cita: ${app.title}\nPaciente: ${app.patientName}\nDoctor: ${app.doctor}\nSillón: ${app.chair}`)
+                                if (confirm(`¿Deseas eliminar la cita de ${app.patientName} (${app.title})?`)) {
+                                  setAppointments(prev => prev.filter(x => x.id !== app.id))
+                                }
                               }}
                             >
                               <div className="flex items-center justify-between">
