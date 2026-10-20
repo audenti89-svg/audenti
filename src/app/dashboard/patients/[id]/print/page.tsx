@@ -16,12 +16,15 @@ import {
   Sparkles,
   Copy,
   Receipt,
-  FileCheck
+  FileCheck,
+  Plus,
+  Trash2,
+  Edit3
 } from 'lucide-react'
 import { useBranchStore } from '@/stores/branchStore'
 import { AudentiLogo } from '@/components/ui/AudentiLogo'
 
-interface PrescriptionItem {
+export interface PrescriptionItem {
   medication: string
   dose: string
   frequency: string
@@ -29,7 +32,7 @@ interface PrescriptionItem {
   indication: string
 }
 
-interface BudgetProcedure {
+export interface BudgetProcedure {
   code: string
   description: string
   tooth?: string
@@ -39,11 +42,30 @@ interface BudgetProcedure {
   total: number
 }
 
+// Catálogo Oficial de Procedimientos de Audenti
+const CLINIC_CATALOG: { code: string; name: string; price: number }[] = [
+  { code: 'VAL-00', name: 'Valoración Inicial & Diagnóstico Integral', price: 500 },
+  { code: 'PRO-01', name: 'Profilaxis & Limpieza Ultrasónica con Cavitrón', price: 900 },
+  { code: 'RES-01', name: 'Resina Estética Nanohíbrida 1 Superficie', price: 1100 },
+  { code: 'RES-02', name: 'Resina Estética Compleja 2 o más Superficies', price: 1600 },
+  { code: 'RES-04', name: 'Reconstrucción de Muñón con Poste de Fibra de Vidrio', price: 1600 },
+  { code: 'END-01', name: 'Endodoncia Unirradicular Rotatoria', price: 2800 },
+  { code: 'END-02', name: 'Endodoncia Birradicular Rotatoria', price: 3400 },
+  { code: 'END-03', name: 'Endodoncia Multirradicular (Molares)', price: 3800 },
+  { code: 'CIR-01', name: 'Extracción Simple de Pieza Dental', price: 1200 },
+  { code: 'CIR-03', name: 'Cirugía de Tercer Molar (Muela del Juicio Impactada)', price: 3500 },
+  { code: 'BLA-01', name: 'Blanqueamiento Dental Láser Led en Consultorio', price: 3200 },
+  { code: 'COR-01', name: 'Corona de Metal-Porcelana', price: 3900 },
+  { code: 'COR-02', name: 'Corona de Zirconio Monolítico Translúcido CAD/CAM', price: 5200 },
+  { code: 'IMP-01', name: 'Implante Dental Titanio Grado Médico', price: 14000 },
+  { code: 'ORT-01', name: 'Tratamiento de Ortodoncia Autoligado (Enganche)', price: 4500 }
+]
+
 const PRESET_PRESCRIPTIONS: Record<string, PrescriptionItem[]> = {
   'Post-Cirugía / Extracción': [
     { medication: 'Ketorolaco Trometamina', dose: '10 mg', frequency: 'Cada 8 horas', duration: '3 días', indication: 'Tomar después de los alimentos. Para dolor agudo.' },
     { medication: 'Amoxicilina / Ácido Clavulánico', dose: '500/125 mg', frequency: 'Cada 8 horas', duration: '7 días', indication: 'Antibiótico de amplio espectro. Completar ciclo.' },
-    { medication: 'Clorhexidina al 0.12% enjuague', dose: '15 ml', frequency: 'Cada 12 horas', duration: '5 días', indication: 'Enjuagar suavemente sin escupir con fuerza.' },
+    { medication: 'Clorhexidina al 0.12% colutorio', dose: '15 ml', frequency: 'Cada 12 horas', duration: '5 días', indication: 'Enjuagar suavemente sin escupir con fuerza.' },
   ],
   'Endodoncia / Pulpectomía': [
     { medication: 'Ibuprofeno', dose: '600 mg', frequency: 'Cada 8 horas', duration: '4 días', indication: 'Antiinflamatorio no esteroideo para control periapical.' },
@@ -72,20 +94,60 @@ export default function PrintPaperworkPage() {
     date: new Intl.DateTimeFormat('es-MX', { day: '2-digit', month: 'long', year: 'numeric' }).format(new Date()),
   })
 
-  // Receta estado
+  // Receta estado editable dinámico
   const [selectedPreset, setSelectedPreset] = useState<string>('Post-Cirugía / Extracción')
   const [prescriptions, setPrescriptions] = useState<PrescriptionItem[]>(PRESET_PRESCRIPTIONS['Post-Cirugía / Extracción'])
   const [clinicalNotes, setClinicalNotes] = useState('Reposo relativo por 48 horas. Evitar alimentos calientes, grasosos o con semillas. Aplicar compresas frías en las primeras 24 hrs.')
   const [ticketWidth, setTicketWidth] = useState<'letter' | 'half_letter' | 'a4' | 'a2' | '80mm' | '58mm'>('letter')
-  const [isLetterhead, setIsLetterhead] = useState<boolean>(true) // true = Imprimir logotipo y membrete, false = Imprimir en hoja pre-membretada
+  const [isLetterhead, setIsLetterhead] = useState<boolean>(true) // true = Imprimir membrete, false = En hoja ya pre-membretada
 
   // Presupuesto Odontológico
   const [budgetItems, setBudgetItems] = useState<BudgetProcedure[]>([
-    { code: 'END-01', description: 'Tratamiento de Conductos Rotatorio (3 conductos)', tooth: 'Pza 16', qty: 1, unitPrice: 3800, discountPct: 0, total: 3800 },
-    { code: 'RES-04', description: 'Reconstrucción con Poste de Fibra y Muñón Resina', tooth: 'Pza 16', qty: 1, unitPrice: 1600, discountPct: 10, total: 1440 },
-    { code: 'COR-02', description: 'Corona Zirconio Monolítico Translúcido', tooth: 'Pza 16', qty: 1, unitPrice: 5200, discountPct: 0, total: 5200 },
-    { code: 'PRO-01', description: 'Limpieza Ultrasónica con Ultrasonido Satelec', tooth: 'Boca completa', qty: 1, unitPrice: 900, discountPct: 0, total: 900 },
+    { code: 'END-03', description: 'Endodoncia Multirradicular (Molares)', tooth: 'Pza 16', qty: 1, unitPrice: 3800, discountPct: 0, total: 3800 },
+    { code: 'RES-04', description: 'Reconstrucción de Muñón con Poste de Fibra de Vidrio', tooth: 'Pza 16', qty: 1, unitPrice: 1600, discountPct: 10, total: 1440 },
+    { code: 'COR-02', description: 'Corona de Zirconio Monolítico Translúcido CAD/CAM', tooth: 'Pza 16', qty: 1, unitPrice: 5200, discountPct: 0, total: 5200 },
+    { code: 'PRO-01', description: 'Profilaxis & Limpieza Ultrasónica con Cavitrón', tooth: 'Boca completa', qty: 1, unitPrice: 900, discountPct: 0, total: 900 },
   ])
+
+  // Manejo de edición de medicamentos
+  const handleUpdateMedication = (index: number, field: keyof PrescriptionItem, value: string) => {
+    setPrescriptions(prev => {
+      const copy = [...prev]
+      copy[index] = { ...copy[index], [field]: value }
+      return copy
+    })
+  }
+
+  const handleAddMedication = () => {
+    setPrescriptions(prev => [
+      ...prev,
+      { medication: '', dose: '', frequency: '', duration: '', indication: '' }
+    ])
+  }
+
+  const handleRemoveMedication = (index: number) => {
+    setPrescriptions(prev => prev.filter((_, i) => i !== index))
+  }
+
+  // Manejo de presupuesto por catálogo de servicios
+  const handleAddBudgetItem = (serviceCode: string) => {
+    const service = CLINIC_CATALOG.find(c => c.code === serviceCode)
+    if (!service) return
+    const newItem: BudgetProcedure = {
+      code: service.code,
+      description: service.name,
+      tooth: 'Pza / Zona',
+      qty: 1,
+      unitPrice: service.price,
+      discountPct: 0,
+      total: service.price
+    }
+    setBudgetItems(prev => [...prev, newItem])
+  }
+
+  const handleRemoveBudgetItem = (index: number) => {
+    setBudgetItems(prev => prev.filter((_, i) => i !== index))
+  }
 
   const subtotal = budgetItems.reduce((acc, item) => acc + (item.qty * item.unitPrice), 0)
   const totalBudget = budgetItems.reduce((acc, item) => acc + item.total, 0)
@@ -219,6 +281,150 @@ export default function PrintPaperworkPage() {
         </div>
       </div>
 
+      {/* Editor Interactivo Superior para la Doctora (NO visible al imprimir) */}
+      <div className="print:hidden bg-slate-900 text-white rounded-2xl p-5 mb-6 border border-slate-800 space-y-4">
+        {paperType === 'receta' && (
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
+              <div>
+                <h3 className="text-sm font-bold text-amber-400 flex items-center gap-2">
+                  <Edit3 className="w-4 h-4" />
+                  Medicamentos de la Receta (Ajuste Libre y Personalizado)
+                </h3>
+                <p className="text-xs text-slate-400">
+                  La doctora puede escribir cualquier medicamento libremente, dosis y horarios según lo que requiera recetar.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddMedication}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs shadow-xs transition-transform active:scale-95"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Agregar Medicamento
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {prescriptions.map((med, idx) => (
+                <div key={idx} className="bg-slate-800/80 p-3 rounded-xl border border-slate-700 grid grid-cols-1 md:grid-cols-6 gap-2 items-center">
+                  <div className="md:col-span-2">
+                    <label className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Medicamento / Sustancia</label>
+                    <input
+                      value={med.medication}
+                      onChange={e => handleUpdateMedication(idx, 'medication', e.target.value)}
+                      placeholder="Ej. Ketorolaco, Ibuprofeno..."
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-amber-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Dosis</label>
+                    <input
+                      value={med.dose}
+                      onChange={e => handleUpdateMedication(idx, 'dose', e.target.value)}
+                      placeholder="Ej. 10 mg, 500 mg..."
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-amber-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Frecuencia</label>
+                    <input
+                      value={med.frequency}
+                      onChange={e => handleUpdateMedication(idx, 'frequency', e.target.value)}
+                      placeholder="Ej. Cada 8 hrs..."
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-amber-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Duración</label>
+                    <input
+                      value={med.duration}
+                      onChange={e => handleUpdateMedication(idx, 'duration', e.target.value)}
+                      placeholder="Ej. 3 días, 7 días..."
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-amber-400"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <label className="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Indicación</label>
+                      <input
+                        value={med.indication}
+                        onChange={e => handleUpdateMedication(idx, 'indication', e.target.value)}
+                        placeholder="Ej. Tomar con alimentos..."
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none focus:border-amber-400"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveMedication(idx)}
+                      className="p-1.5 mt-4 rounded-lg text-rose-400 hover:text-white hover:bg-rose-600 transition-colors"
+                      title="Eliminar medicamento"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {paperType === 'presupuesto' && (
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
+              <div>
+                <h3 className="text-sm font-bold text-amber-400 flex items-center gap-2">
+                  <FileSpreadsheet className="w-4 h-4" />
+                  Procedimientos Clínicos de la Doctora (Selección desde Catálogo Oficial)
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Selecciona estrictamente dentro de los tratamientos que la doctora ofrece en Audenti.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      handleAddBudgetItem(e.target.value)
+                      e.target.value = ''
+                    }
+                  }}
+                  className="bg-slate-800 text-white border border-slate-700 rounded-xl px-3 py-1.5 text-xs font-semibold outline-none cursor-pointer"
+                  defaultValue=""
+                >
+                  <option value="" disabled>+ Seleccionar Servicio del Catálogo...</option>
+                  {CLINIC_CATALOG.map(s => (
+                    <option key={s.code} value={s.code}>{s.name} — ${s.price.toLocaleString('es-MX')} MXN</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {budgetItems.map((item, idx) => (
+                <div key={idx} className="flex items-center justify-between bg-slate-800/60 p-2.5 rounded-xl border border-slate-700 text-xs">
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-[10px] text-amber-400 font-bold">{item.code}</span>
+                    <span className="font-bold text-white">{item.description}</span>
+                    <span className="text-[11px] text-slate-400">({item.tooth})</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-emerald-400 font-mono font-bold">${item.total.toLocaleString('es-MX')} MXN</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveBudgetItem(idx)}
+                      className="p-1 rounded-lg text-rose-400 hover:text-white hover:bg-rose-600 transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Selector de Plantillas Rápidas (Solo para recetas en pantalla) */}
       {paperType === 'receta' && (
         <div className="print:hidden bg-blue-50/70 border border-blue-200/80 rounded-2xl p-4 mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -258,9 +464,11 @@ export default function PrintPaperworkPage() {
           return (
             <div
               key={copyIndex}
-              className={`bg-white rounded-2xl border border-slate-200/90 shadow-md p-8 md:p-12 mx-auto w-full text-slate-900 relative print:border-none print:shadow-none print:m-0 print:w-full ${
+              className={`bg-white rounded-2xl border border-slate-200/90 shadow-md p-8 md:p-12 mx-auto w-full text-slate-900 relative print:border-none print:shadow-none print:m-0 print:w-full transition-all duration-300 ${
                 ticketWidth === '80mm'
                   ? 'max-w-[80mm] print:max-w-[80mm] p-4 text-xs font-mono'
+                  : ticketWidth === 'half_letter'
+                  ? 'max-w-2xl print:max-w-none p-6 text-xs'
                   : 'max-w-4xl print:max-w-none print:p-8'
               } ${
                 copyIndex > 0 ? 'print:break-before-page mt-8 print:mt-0' : ''
@@ -300,86 +508,84 @@ export default function PrintPaperworkPage() {
                       </div>
                     </div>
 
-                    {/* Datos del Doctor en Turno y Dirección General */}
+                    {/* Datos Profesionales de la Dra. Aura Estudillo */}
                     <div className="text-right shrink-0">
-                      <h3 className="text-sm font-black text-slate-950">Dra. Aura Estudillo</h3>
-                      <p className="text-xs font-bold text-amber-700">Cirujano Dentista / Especialista • Céd. Prof. 8492019</p>
-                      <p className="text-[11px] text-slate-500">Dirección General &amp; Clínica DentalCloud Pro</p>
-                      <p className="text-[10px] text-slate-400">Reg. SSA / COFEPRIS: 21-DNT-0982-DF</p>
+                      <h3 className="text-base font-bold text-slate-950">Dra. Aura Estudillo</h3>
+                      <p className="text-xs font-semibold text-amber-700">Cirujana Dentista &amp; Odontología Estética</p>
+                      <p className="text-[11px] text-slate-500 font-mono mt-0.5">Cédula Profesional: 8492019</p>
+                      <p className="text-[10px] text-slate-400 font-mono">Reg. SSA / COFEPRIS: 24-DF-0921-A</p>
                     </div>
                   </div>
                 </header>
               ) : (
-                <div className="h-28 print:h-32 mb-4 border-b border-dashed border-slate-200 print:border-none flex items-center justify-center text-slate-300 print:hidden text-xs">
-                  [Espacio reservado para membrete pre-impreso de imprenta]
+                <div className="h-28 print:h-28 flex items-center justify-center border border-dashed border-slate-300 rounded-xl mb-6 text-slate-400 text-xs print:border-none print:text-transparent">
+                  [Espacio reservado para el membrete oficial pre-impreso de la clínica]
                 </div>
               )}
 
               {/* FICHA TÉCNICA DEL PACIENTE */}
-              <section className="bg-slate-50/80 rounded-xl p-4 border border-slate-200 text-xs mb-6 grid grid-cols-2 md:grid-cols-4 gap-3 print:bg-slate-50 print:border-slate-300">
-                <div>
-                  <span className="text-[10px] font-bold text-slate-500 block uppercase">Paciente</span>
-                  <span className="font-black text-slate-900">{patient.name}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-slate-500 block uppercase">Expediente / Folio</span>
-                  <span className="font-mono font-bold text-slate-900">{patient.id}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-slate-500 block uppercase">Edad / Sexo</span>
-                  <span className="font-bold text-slate-900">{patient.age} años • {patient.gender}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-slate-500 block uppercase">Fecha de Emisión</span>
-                  <span className="font-bold text-slate-900">{patient.date}</span>
-                </div>
-                <div className="col-span-2 md:col-span-4 pt-1 border-t border-slate-200/60 flex items-center justify-between">
+              <section className="bg-slate-50 rounded-xl p-4 mb-6 border border-slate-200">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
                   <div>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase">Diagnóstico / Motivo: </span>
-                    <span className="font-semibold text-slate-800">{patient.diagnosis}</span>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">Paciente: </span>
+                    <span className="font-bold text-slate-900 block">{patient.name}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">Folio / Edad: </span>
+                    <span className="font-semibold text-slate-800 block">{patient.id} • {patient.age} años</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">Fecha: </span>
+                    <span className="font-semibold text-slate-800 block">{patient.date}</span>
                   </div>
                   <div>
                     <span className="text-[10px] font-bold text-rose-600 uppercase">Alergias: </span>
-                    <span className="font-bold text-slate-800">{patient.allergies}</span>
+                    <span className="font-bold text-slate-800 block">{patient.allergies}</span>
                   </div>
                 </div>
               </section>
 
-              {/* CUERPO 1: RECETA MÉDICA */}
+              {/* CUERPO 1: RECETA MÉDICA CON AUTO-AJUSTE DINÁMICO */}
               {paperType === 'receta' && (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
                     <span className="text-xl font-serif font-black text-slate-950 italic">Rx /</span>
                     <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Prescripción Farmacológica</span>
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {prescriptions.map((item, idx) => (
-                      <div key={idx} className="p-3.5 rounded-xl border border-slate-200 bg-white">
+                      <div key={idx} className="p-3.5 rounded-xl border border-slate-200 bg-white break-inside-avoid">
                         <div className="flex items-baseline justify-between mb-1">
                           <div className="flex items-center gap-2">
                             <span className="w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] font-bold flex items-center justify-center">
                               {idx + 1}
                             </span>
-                            <span className="text-sm font-black text-slate-900">{item.medication}</span>
-                            <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                              {item.dose}
-                            </span>
+                            <span className="text-sm font-black text-slate-900">{item.medication || 'Medicamento prescrito'}</span>
+                            {item.dose && (
+                              <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                {item.dose}
+                              </span>
+                            )}
                           </div>
-                          <span className="text-xs font-bold text-slate-700">Por {item.duration}</span>
+                          {item.duration && <span className="text-xs font-bold text-slate-700">Por {item.duration}</span>}
                         </div>
-                        <p className="text-xs font-semibold text-slate-800 ml-7">
-                          • Posología: <strong>{item.frequency}</strong>
-                        </p>
-                        <p className="text-[11px] text-slate-500 ml-7 italic mt-0.5">
-                          Indicación: {item.indication}
-                        </p>
+                        {item.frequency && (
+                          <p className="text-xs font-semibold text-slate-800 ml-7">
+                            • Posología: <strong>{item.frequency}</strong>
+                          </p>
+                        )}
+                        {item.indication && (
+                          <p className="text-[11px] text-slate-500 ml-7 italic mt-0.5">
+                            Indicación: {item.indication}
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>
 
                   {/* Indicaciones Generales */}
-                  <div className="bg-amber-50/50 rounded-xl p-4 border border-amber-200/80">
+                  <div className="bg-amber-50/50 rounded-xl p-4 border border-amber-200/80 break-inside-avoid">
                     <h4 className="text-xs font-bold text-amber-950 uppercase tracking-wide mb-1">
                       Cuidados &amp; Recomendaciones Clínicas
                     </h4>
@@ -486,7 +692,7 @@ export default function PrintPaperworkPage() {
               )}
 
               {/* PIE DE PÁGINA MEMBRETADO CON FIRMAS Y CÓDIGO QR */}
-              <footer className="mt-16 pt-8 border-t-2 border-slate-900 print:mt-12">
+              <footer className="mt-16 pt-8 border-t-2 border-slate-900 print:mt-12 break-inside-avoid">
                 <div className="grid grid-cols-3 gap-6 items-end">
                   {/* Firma del Médico */}
                   <div className="text-center space-y-1">

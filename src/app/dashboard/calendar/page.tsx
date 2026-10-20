@@ -75,9 +75,32 @@ export default function CalendarPage() {
   const [modalSlot, setModalSlot] = useState({ date: getTodayStr(), time: '12:00' })
   const [newTitle, setNewTitle] = useState('')
   const [newPatient, setNewPatient] = useState('')
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null)
+  const [selectedPatientPhone, setSelectedPatientPhone] = useState('5522427769')
   const [newDoctor, setNewDoctor] = useState('Dra. Aura Estudillo')
   const [newChair, setNewChair] = useState('Gabinete 1 (Principal)')
   const [isFamilyBatch, setIsFamilyBatch] = useState(false)
+  const [registeredPatients, setRegisteredPatients] = useState<any[]>([])
+  const [showPatientSuggestions, setShowPatientSuggestions] = useState(false)
+
+  // Cargar lista de pacientes registrados para autocompletado en tiempo real
+  useEffect(() => {
+    const loadPatients = async () => {
+      try {
+        const supabase = createClient()
+        const { data } = await supabase
+          .from('patients')
+          .select('id, full_name, phone, birth_date, age, allergies_medication')
+          .order('full_name', { ascending: true })
+        if (data && data.length > 0) {
+          setRegisteredPatients(data)
+        }
+      } catch (err) {
+        console.warn('Error cargando pacientes para autocompletado:', err)
+      }
+    }
+    loadPatients()
+  }, [])
 
   // Drag and drop simulado
   const [draggedApptId, setDraggedApptId] = useState<string | null>(null)
@@ -230,6 +253,9 @@ export default function CalendarPage() {
     setModalSlot({ date, time })
     setNewTitle('')
     setNewPatient('')
+    setSelectedPatientId(null)
+    setSelectedPatientPhone('5522427769')
+    setShowPatientSuggestions(false)
     setShowQuickCreateModal(true)
   }
 
@@ -255,7 +281,7 @@ export default function CalendarPage() {
       color: 'bg-amber-100 text-amber-950 border-l-4 border-amber-500',
     }
 
-    setAppointments(prev => [...prev, newAppt])
+    setAppointments(prev => [...prev.filter(x => x.id !== newAppt.id), newAppt])
     setShowQuickCreateModal(false)
     setIsFamilyBatch(false)
 
@@ -266,13 +292,13 @@ export default function CalendarPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           patient_name: newPatient,
-          patient_phone: '5522427769',
+          patient_phone: selectedPatientPhone || '5522427769',
           appointment_date: modalSlot.date,
           appointment_time: modalSlot.time,
           treatment: newTitle,
           branch: 'Sucursal Balbuena (Matriz)',
           status: 'confirmed',
-          notes: `Agendado directamente en Google Calendar de Audenti por la Dra. Aura (${newDoctor})`
+          notes: `Agendado en Google Calendar Audenti por Dra. Aura Estudillo (${newDoctor})`
         })
       })
       await fetchCalendarAppointments()
@@ -749,15 +775,73 @@ export default function CalendarPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Paciente (Autocompletado)</label>
+                <div className="relative">
+                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">
+                    Paciente (Autocompletado)
+                  </label>
                   <input
                     required
                     value={newPatient}
-                    onChange={e => setNewPatient(e.target.value)}
-                    placeholder="Nombre del paciente..."
+                    onChange={e => {
+                      setNewPatient(e.target.value)
+                      setShowPatientSuggestions(true)
+                    }}
+                    onFocus={() => setShowPatientSuggestions(true)}
+                    placeholder="Escribe el nombre del paciente..."
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400"
                   />
+
+                  {/* Menú de sugerencias en tiempo real al escribir cada letra */}
+                  {showPatientSuggestions && newPatient.trim().length > 0 && (
+                    <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl shadow-xl border border-slate-200 max-h-56 overflow-y-auto z-50 py-1 divide-y divide-slate-100">
+                      {registeredPatients
+                        .filter(p => {
+                          const query = newPatient.toLowerCase().trim()
+                          const nameMatch = (p.full_name || '').toLowerCase().includes(query)
+                          const phoneMatch = (p.phone || '').includes(query)
+                          return nameMatch || phoneMatch
+                        })
+                        .map(p => (
+                          <div
+                            key={p.id}
+                            onClick={() => {
+                              setNewPatient(p.full_name)
+                              setSelectedPatientId(p.id)
+                              setSelectedPatientPhone(p.phone || '5522427769')
+                              setShowPatientSuggestions(false)
+                            }}
+                            className="p-2.5 hover:bg-amber-50 cursor-pointer transition-colors"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-slate-900 text-xs">{p.full_name}</span>
+                              {p.age && <span className="text-[10px] text-slate-500">{p.age} años</span>}
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[10px] text-slate-500 font-mono">📱 {p.phone || 'Sin cel'}</span>
+                              {p.allergies_medication && p.allergies_medication.length > 0 && (
+                                <span className="text-[9px] bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded font-bold">
+                                  ⚠️ {Array.isArray(p.allergies_medication) ? p.allergies_medication[0] : p.allergies_medication}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+
+                      {registeredPatients.filter(p => {
+                        const query = newPatient.toLowerCase().trim()
+                        return (p.full_name || '').toLowerCase().includes(query) || (p.phone || '').includes(query)
+                      }).length === 0 && (
+                        <div className="p-3 text-center">
+                          <span className="text-xs text-slate-500 block">
+                            👤 Paciente no registrado con ese nombre
+                          </span>
+                          <span className="text-[10px] text-amber-700 font-bold block mt-1">
+                            Se registrará como nueva cita provisional con este nombre.
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Hora Inicio</label>

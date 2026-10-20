@@ -1,35 +1,86 @@
 /**
  * Generador Universal de Enlaces de WhatsApp para Audenti Cloud Pro
- * - En celulares: Abre directamente la app de WhatsApp o WhatsApp Business instalada
- * - En computadoras: Abre web.whatsapp.com o la app de escritorio de WhatsApp
- * - Maneja automáticamente números mexicanos (con o sin 52 / 521) y números internacionales
- * - Si no hay teléfono registrado, permite consultar o ingresar número provisional
+ * - En Windows Desktop: Lanza el protocolo directo `whatsapp://send?phone=...` que abre
+ *   la aplicación nativa de WhatsApp instalada en Windows.
+ * - Con fallback seguro a WhatsApp Web si no está instalada.
+ * - Maneja automáticamente números mexicanos (10 dígitos -> 521XXXXXXXXXX) e internacionales.
  */
 
-export function formatWhatsAppUrl(rawPhone?: string | null, text?: string): string {
-  if (!rawPhone || !rawPhone.trim()) {
-    const defaultText = text ? `?text=${encodeURIComponent(text)}` : ''
-    return `https://api.whatsapp.com/send${defaultText}`
-  }
+export function cleanMexicanPhoneNumber(rawPhone?: string | null): string {
+  if (!rawPhone || !rawPhone.trim()) return '';
+  const digits = rawPhone.replace(/\D/g, '');
+  if (!digits) return '';
 
-  // Limpiar caracteres no numéricos
-  const digits = rawPhone.replace(/\D/g, '')
-
-  let fullPhone = digits
-
-  // Si tiene 10 dígitos (número estándar mexicano sin lada país)
   if (digits.length === 10) {
-    fullPhone = `521${digits}`
+    return `521${digits}`;
   } else if (digits.length === 12 && digits.startsWith('52')) {
-    // Si ya empieza con 52 y tiene 10 dígitos después, convertir a formato 521 para chat web
-    const nationalNumber = digits.slice(2)
-    fullPhone = `521${nationalNumber}`
+    return `521${digits.slice(2)}`;
   } else if (digits.length === 13 && digits.startsWith('521')) {
-    fullPhone = digits
+    return digits;
+  }
+  return digits;
+}
+
+export function formatWhatsAppUrl(rawPhone?: string | null, text?: string): string {
+  const fullPhone = cleanMexicanPhoneNumber(rawPhone);
+  const encodedText = text ? encodeURIComponent(text) : '';
+
+  if (!fullPhone) {
+    return encodedText ? `whatsapp://send?text=${encodedText}` : `whatsapp://send`;
   }
 
-  const encodedText = text ? `?text=${encodeURIComponent(text)}` : ''
-  
-  // api.whatsapp.com/send redirige limpiamente tanto a la app instalada en móvil/PC como a WhatsApp Web
-  return `https://api.whatsapp.com/send?phone=${fullPhone}${text ? `&text=${encodeURIComponent(text)}` : ''}`
+  // whatsapp://send invoca la app de escritorio de WhatsApp nativa de Windows
+  return `whatsapp://send?phone=${fullPhone}${encodedText ? `&text=${encodedText}` : ''}`;
+}
+
+export function formatWhatsAppWebUrl(rawPhone?: string | null, text?: string): string {
+  const fullPhone = cleanMexicanPhoneNumber(rawPhone);
+  const encodedText = text ? encodeURIComponent(text) : '';
+
+  if (!fullPhone) {
+    return encodedText ? `https://web.whatsapp.com/send?text=${encodedText}` : `https://web.whatsapp.com/`;
+  }
+
+  return `https://web.whatsapp.com/send?phone=${fullPhone}${encodedText ? `&text=${encodedText}` : ''}`;
+}
+
+/**
+ * Función inteligente para abrir WhatsApp en Windows:
+ * 1. Intenta abrir la aplicación de WhatsApp instalada mediante protocolo `whatsapp://`
+ * 2. Si el usuario no tiene la app instalada o tarda en responder, abre WhatsApp Web como fallback
+ */
+export function openWhatsAppDirectly(rawPhone?: string | null, text?: string) {
+  if (typeof window === 'undefined') return;
+
+  const nativeUri = formatWhatsAppUrl(rawPhone, text);
+  const webUri = formatWhatsAppWebUrl(rawPhone, text);
+
+  let hasBlurred = false;
+  const onBlur = () => {
+    hasBlurred = true;
+  };
+
+  window.addEventListener('blur', onBlur, { once: true });
+
+  // Crear un iframe invisible o asignar window.location para lanzar el handler de protocolo sin salir de la página
+  const iframe = document.createElement('iframe');
+  iframe.style.display = 'none';
+  document.body.appendChild(iframe);
+
+  try {
+    iframe.src = nativeUri;
+  } catch {
+    window.location.href = nativeUri;
+  }
+
+  setTimeout(() => {
+    if (document.body.contains(iframe)) {
+      document.body.removeChild(iframe);
+    }
+    window.removeEventListener('blur', onBlur);
+    // Si la ventana no perdió el foco (la app nativa no se abrió), abrir WhatsApp Web
+    if (!hasBlurred) {
+      window.open(webUri, '_blank', 'noopener,noreferrer');
+    }
+  }, 1200);
 }
