@@ -266,22 +266,31 @@ export default function ConfiguracionPage() {
                 )}
               </div>
 
-              {/* Motor de Inteligencia Artificial (Groq SDK & Gateway) */}
+              {/* Motor de Inteligencia Artificial (Groq SDK, Gemini & Ollama Local) */}
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
-                  Motor de Inteligencia Artificial Oficial (Groq SDK Cloud)
+                  Motor de Inteligencia Artificial Oficial (Cloud &amp; Local)
                 </label>
                 <select
                   value={aiModel}
                   onChange={e => setAiModel(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400 font-medium cursor-pointer"
                 >
-                  <option value="llama-3.3-70b-versatile">Groq llama-3.3-70b-versatile (Recomendado • Ultra Rápido Oficial)</option>
-                  <option value="mixtral-8x7b-32768">Groq mixtral-8x7b-32768 (Alta Capacidad de Contexto)</option>
-                  <option value="llama-3.1-8b-instant">Groq llama-3.1-8b-instant (Inferencia Instantánea)</option>
-                  <option value="gc/gemini-2.5-flash">9Router Local (gc/gemini-2.5-flash)</option>
+                  <optgroup label="Modelos Cloud de Inferencia Ultrarrápida">
+                    <option value="llama-3.3-70b-versatile">Groq llama-3.3-70b-versatile (Recomendado • Ultra Rápido Oficial)</option>
+                    <option value="mixtral-8x7b-32768">Groq mixtral-8x7b-32768 (Alta Capacidad de Contexto)</option>
+                    <option value="llama-3.1-8b-instant">Groq llama-3.1-8b-instant (Inferencia Instantánea)</option>
+                    <option value="gc/gemini-2.5-flash">Google Gemini 2.5 Flash (Análisis Multimodal)</option>
+                  </optgroup>
+                  <optgroup label="Servidor Local On-Premise (Ollama AI)">
+                    <option value="ollama/llama3">Ollama AI Local (http://localhost:11434 • llama3)</option>
+                    <option value="ollama/mistral">Ollama AI Local (http://localhost:11434 • mistral)</option>
+                    <option value="ollama/phi3">Ollama AI Local (http://localhost:11434 • phi3)</option>
+                  </optgroup>
                 </select>
-                <span className="text-[10px] text-slate-400 mt-1 block">Conectado a Groq Cloud con Guardrails Temáticos Odontológicos y RBAC activo.</span>
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Permite conmutar fluidamente entre Cloud (Groq/Gemini) y Ollama Local (http://localhost:11434) para máxima privacidad NOM-004-SSA3.
+                </span>
               </div>
 
               {/* Zona de Peligro: Reseteo de Pruebas vs Producción Bloqueada */}

@@ -18,6 +18,7 @@ import {
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
 import { QuickRegisterModal } from '@/components/clinical/QuickRegisterModal'
+import { PatientDirectActionWidget } from '@/components/clinical/PatientDirectActionWidget'
 
 export default function PacientesPage() {
   const [patients, setPatients] = useState<any[]>([])
@@ -426,20 +427,9 @@ export default function PacientesPage() {
                           : 'Reciente'}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <div className="inline-flex items-center gap-1.5">
-                          {/* Botón WhatsApp Directo Oficial (wa.me) */}
-                          {p.phone && (
-                            <a
-                              href={`https://wa.me/521${p.phone.replace(/\D/g, '').slice(-10)}?text=${encodeURIComponent(`Hola ${p.full_name}, te saluda la Dra. Aura Estudillo de Audenti Clinical. Me pongo en contacto contigo respecto a tu atención odontológica.`)}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[11px] shadow-xs transition-transform active:scale-95"
-                              title={`Abrir WhatsApp directo con ${p.full_name}`}
-                            >
-                              <MessageCircle className="w-3.5 h-3.5 fill-current" />
-                              <span className="hidden xl:inline">WhatsApp</span>
-                            </a>
-                          )}
+                        <div className="inline-flex items-center gap-2">
+                          {/* Widget de Acción Directa Operativa (Sillón / Concluir / WhatsApp) */}
+                          <PatientDirectActionWidget patient={p} compact={true} />
 
                           <Link
                             href={`/dashboard/expediente?patient_id=${p.id}`}
@@ -454,13 +444,6 @@ export default function PacientesPage() {
                             title="Imprimir Receta / Presupuesto Membretado"
                           >
                             <Printer className="w-4 h-4" />
-                          </Link>
-                          <Link
-                            href="/dashboard/agenda"
-                            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-                            title="Agendar Cita"
-                          >
-                            <CalendarPlus className="w-4 h-4" />
                           </Link>
                         </div>
                       </td>

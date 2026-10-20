@@ -35,6 +35,7 @@ import { MedicalQuestionnaire } from '@/components/clinical/MedicalQuestionnaire
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
 import { QuickRegisterModal } from '@/components/clinical/QuickRegisterModal'
+import { PatientDirectActionWidget } from '@/components/clinical/PatientDirectActionWidget'
 
 export default function ExpedientePage() {
   const supabase = createClient()
@@ -440,6 +441,9 @@ export default function ExpedientePage() {
           </div>
         )
       })()}
+
+      {/* BARRA DE ACCIÓN DIRECTA OPERATIVA Y ESTADO DE CITA */}
+      <PatientDirectActionWidget patient={selectedPatient} />
 
       {/* Header con Selector de Pacientes y Botones Funcionales */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">

@@ -65,6 +65,53 @@ export async function POST(request: Request) {
       ? resolvedPrompt.replace(/(\bignore\s+all\s+previous\s+instructions\b|\bignora\s+las\s+instrucciones\s+anteriores\b|\brevela\s+el\s+system\s+prompt\b)/gi, '[FILTRADO]')
       : resolvedPrompt
 
+    // Si el proveedor solicitado explícitamente es Ollama o el modelo empieza con ollama/
+    const requestedModel = String(body.model || body.aiModel || '').toLowerCase()
+    const isOllamaRequested = requestedModel.includes('ollama') || body.provider === 'ollama'
+
+    if (isOllamaRequested) {
+      const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || process.env.OLLAMA_HOST || 'http://localhost:11434'
+      const ollamaModel = requestedModel.replace(/^ollama\//, '').replace(/^ollama-local\//, '') || 'llama3'
+
+      try {
+        const ollamaRes = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: ollamaModel,
+            messages: [
+              {
+                role: 'system',
+                content: 'Eres el motor de Inteligencia Artificial Clínica Local de Audenti Odontología, asistiendo a la Dra. Aura Estudillo en diagnóstico, triaje y redacción médica.'
+              },
+              ...resolvedHistory.map((h: any) => ({
+                role: h.role === 'user' ? 'user' : 'assistant',
+                content: typeof h.content === 'string' ? h.content : JSON.stringify(h.content)
+              })),
+              { role: 'user', content: sanitizedPrompt }
+            ],
+            stream: false,
+            options: { temperature: 0.3 }
+          }),
+          signal: AbortSignal.timeout(45000)
+        })
+
+        if (ollamaRes.ok) {
+          const oData = await ollamaRes.json()
+          const replyText = oData.message?.content || oData.response || ''
+          return NextResponse.json({
+            success: true,
+            provider: 'ollama-local',
+            model: ollamaModel,
+            result: replyText,
+            content: replyText
+          }, { status: 200 })
+        }
+      } catch (ollamaErr: any) {
+        console.warn('[AI Route] Ollama local no respondió. Continuando con enrutador central:', ollamaErr.message)
+      }
+    }
+
     // Ejecutamos el enrutador de agentes especializados con historial y Function Calling
     const result = await executeAIAgent({
       domain: resolvedDomain,
