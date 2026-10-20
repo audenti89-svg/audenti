@@ -60,7 +60,7 @@ export default function CalendarPage() {
   const router = useRouter()
   const { soundEnabled, setSoundEnabled, playTone } = useNotificationSound()
   const [viewMode, setViewMode] = useState<'flow' | 'units'>('flow')
-  const [horizon, setHorizon] = useState<TimeHorizon | 'all'>('present')
+  const [horizon, setHorizon] = useState<TimeHorizon | 'all'>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [dateFilter, setDateFilter] = useState<string>('') // Filtro específico por fecha
   const [monthFilter, setMonthFilter] = useState<string>('all') // Filtro por mes (01-12)

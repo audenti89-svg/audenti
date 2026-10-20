@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   ChevronLeft,
   ChevronRight,
@@ -55,6 +56,8 @@ const HOURS = [
 const INITIAL_APPOINTMENTS: CalendarAppointment[] = []
 
 export default function CalendarPage() {
+  const searchParams = useSearchParams()
+  const urlPatientId = searchParams?.get('patientId')
   const { soundEnabled, setSoundEnabled, playTone } = useNotificationSound()
 
   const [currentView, setCurrentView] = useState<CalendarView>('week')
@@ -94,13 +97,23 @@ export default function CalendarPage() {
           .order('full_name', { ascending: true })
         if (data && data.length > 0) {
           setRegisteredPatients(data)
+          // Si venimos referenciados desde la pestaña de Chat con ?patientId=...
+          if (urlPatientId) {
+            const found = data.find(p => p.id === urlPatientId)
+            if (found) {
+              setNewPatient(found.full_name)
+              setSelectedPatientId(found.id)
+              setSelectedPatientPhone(found.phone || '5522427769')
+              setShowQuickCreateModal(true)
+            }
+          }
         }
       } catch (err) {
         console.warn('Error cargando pacientes para autocompletado:', err)
       }
     }
     loadPatients()
-  }, [])
+  }, [urlPatientId])
 
   // Eliminar cita con confirmación y sincronización atómica
   const handleDeleteAppointment = async (appId: string, patientName: string, title: string) => {
