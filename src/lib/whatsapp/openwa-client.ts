@@ -36,7 +36,8 @@ export class OpenWAClient {
   async sendText(sessionId: string, chatId: string, text: string): Promise<boolean> {
     try {
       const cleanChatId = chatId.includes('@') ? chatId : `${chatId.replace(/\D/g, '')}@c.us`;
-      await this.request(`/api/sessions/${sessionId}/messages/send`, {
+      // OpenWA standard endpoint is /api/sessions/{sessionId}/messages/send-text
+      await this.request(`/api/sessions/${sessionId}/messages/send-text`, {
         method: 'POST',
         body: JSON.stringify({
           chatId: cleanChatId,
@@ -46,7 +47,21 @@ export class OpenWAClient {
       return true;
     } catch (err) {
       console.error('[OpenWA Client] SendText Error:', err);
-      return false;
+      // Fallback try to /messages/send
+      try {
+        const cleanChatId = chatId.includes('@') ? chatId : `${chatId.replace(/\D/g, '')}@c.us`;
+        await this.request(`/api/sessions/${sessionId}/messages/send`, {
+          method: 'POST',
+          body: JSON.stringify({
+            chatId: cleanChatId,
+            text: text,
+          }),
+        });
+        return true;
+      } catch (fallbackErr) {
+        console.error('[OpenWA Client] Fallback SendText Error:', fallbackErr);
+        return false;
+      }
     }
   }
 
@@ -55,6 +70,27 @@ export class OpenWAClient {
       return await this.request(`/api/sessions/${sessionId}`);
     } catch (err) {
       console.error('[OpenWA Client] SessionStatus Error:', err);
+      return null;
+    }
+  }
+
+  async getSessionQR(sessionId: string) {
+    try {
+      return await this.request(`/api/sessions/${sessionId}/qr`);
+    } catch (err) {
+      console.error('[OpenWA Client] SessionQR Error:', err);
+      return null;
+    }
+  }
+
+  async createSession(sessionId: string) {
+    try {
+      return await this.request(`/api/sessions`, {
+        method: 'POST',
+        body: JSON.stringify({ name: sessionId })
+      });
+    } catch (err) {
+      console.error('[OpenWA Client] CreateSession Error:', err);
       return null;
     }
   }
