@@ -76,6 +76,7 @@ export default function PrintPaperworkPage() {
   const [selectedPreset, setSelectedPreset] = useState<string>('Post-Cirugía / Extracción')
   const [prescriptions, setPrescriptions] = useState<PrescriptionItem[]>(PRESET_PRESCRIPTIONS['Post-Cirugía / Extracción'])
   const [clinicalNotes, setClinicalNotes] = useState('Reposo relativo por 48 horas. Evitar alimentos calientes, grasosos o con semillas. Aplicar compresas frías en las primeras 24 hrs.')
+  const [ticketWidth, setTicketWidth] = useState<'letter' | '80mm'>('letter')
 
   // Presupuesto Odontológico
   const [budgetItems, setBudgetItems] = useState<BudgetProcedure[]>([
@@ -160,6 +161,30 @@ export default function PrintPaperworkPage() {
             </button>
           </div>
 
+          {/* Formato de Papel: Carta vs Térmica 80mm */}
+          <div className="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200/70 text-xs font-semibold">
+            <button
+              onClick={() => setTicketWidth('letter')}
+              className={`px-2.5 py-1.5 rounded-lg transition-all ${
+                ticketWidth === 'letter'
+                  ? 'bg-white text-slate-900 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Carta Oficial
+            </button>
+            <button
+              onClick={() => setTicketWidth('80mm')}
+              className={`px-2.5 py-1.5 rounded-lg transition-all ${
+                ticketWidth === '80mm'
+                  ? 'bg-white text-slate-900 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Ticketera 80mm
+            </button>
+          </div>
+
           {/* Selector de Copias */}
           <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200 text-xs">
             <Copy className="w-3.5 h-3.5 text-slate-500" />
@@ -224,10 +249,14 @@ export default function PrintPaperworkPage() {
           return (
             <div
               key={copyIndex}
-              className={`bg-white rounded-2xl border border-slate-200/90 shadow-md p-8 md:p-12 mx-auto w-full max-w-4xl text-slate-900 relative print:border-none print:shadow-none print:p-8 print:m-0 print:max-w-none print:w-full ${
+              className={`bg-white rounded-2xl border border-slate-200/90 shadow-md p-8 md:p-12 mx-auto w-full text-slate-900 relative print:border-none print:shadow-none print:m-0 print:w-full ${
+                ticketWidth === '80mm'
+                  ? 'max-w-[80mm] print:max-w-[80mm] p-4 text-xs font-mono'
+                  : 'max-w-4xl print:max-w-none print:p-8'
+              } ${
                 copyIndex > 0 ? 'print:break-before-page mt-8 print:mt-0' : ''
               }`}
-              style={{ minHeight: '270mm' }}
+              style={{ minHeight: ticketWidth === '80mm' ? 'auto' : '270mm' }}
             >
               {/* Marca de agua de copia */}
               <div className="absolute top-4 right-8 text-[11px] font-mono tracking-widest text-slate-400 font-bold uppercase print:text-slate-500">
