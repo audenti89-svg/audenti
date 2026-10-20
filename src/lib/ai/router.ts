@@ -41,6 +41,66 @@ const googleAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 export type AITaskDomain = 'clinical' | 'patient_chat' | 'finance' | 'bi' | 'scheduling';
 export type AITaskType = AITaskDomain;
 
+// Helper para invocar el nodo local de Ollama (http://localhost:11434)
+async function callOllamaLocal(params: {
+  model?: string;
+  prompt: string;
+  systemPrompt?: string;
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  temperature?: number;
+}): Promise<string | null> {
+  const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || process.env.OLLAMA_HOST || 'http://localhost:11434';
+  const OLLAMA_API_KEY = process.env.OLLAMA_API_KEY || '3da15b5f10f74515af889f550d63d947.Ug_qwkUIFI_1r4gond_4IY-T';
+  const model = params.model || process.env.OLLAMA_MODEL || 'llama3';
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  };
+  if (OLLAMA_API_KEY) {
+    headers['Authorization'] = `Bearer ${OLLAMA_API_KEY}`;
+  }
+
+  try {
+    const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+      {
+        role: 'system',
+        content: params.systemPrompt || 'Eres el motor de Inteligencia Artificial Clínica Local de Audenti Odontología para la Dra. Aura Estudillo (NOM-004-SSA3).'
+      }
+    ];
+
+    if (Array.isArray(params.history)) {
+      for (const h of params.history) {
+        messages.push({
+          role: h.role === 'user' ? 'user' : 'assistant',
+          content: typeof h.content === 'string' ? h.content : JSON.stringify(h.content)
+        });
+      }
+    }
+
+    messages.push({ role: 'user', content: params.prompt });
+
+    const res = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: false,
+        options: { temperature: params.temperature ?? 0.2 }
+      }),
+      signal: AbortSignal.timeout(15000) // 15s timeout
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return data.message?.content || data.response || null;
+    }
+  } catch (err: any) {
+    console.warn(`[Ollama Local Engine] No disponible en ${OLLAMA_BASE_URL}:`, err.message);
+  }
+  return null;
+}
+
 export interface AIRequestOptions {
   domain: AITaskDomain;
   prompt: string;
@@ -74,9 +134,28 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
 
   try {
     // ==========================================
-    // 1. DOMINIO CLINICO (Claude 3.5 Sonnet -> Fallback a Groq Llama)
+    // 1. DOMINIO CLINICO & TRIAJE SENSIBLE (OLLAMA LOCAL -> FALLBACK CLAUDE / GROQ)
     // ==========================================
     if (domain === 'clinical') {
+      // 1. Intentar delegar tareas clínicas y de triaje sensible al servidor local de Ollama (http://localhost:11434)
+      const localResult = await callOllamaLocal({
+        prompt: effectivePrompt,
+        systemPrompt: systemPrompt || 'Eres un asistente clínico experto apoyando a personal médico odontológico de la Dra. Aura Estudillo bajo norma NOM-004-SSA3.',
+        history,
+        temperature: 0.2
+      });
+
+      if (localResult) {
+        return {
+          success: true,
+          domain,
+          result: localResult,
+          provider: 'ollama-local/llama3',
+          executionTimeMs: Date.now() - startTime
+        };
+      }
+
+      // Si Ollama local está apagado, conmutación fluida a Claude / Groq Cloud
       try {
         const response = await anthropic.messages.create({
           model: 'claude-3-5-sonnet-20241022',
