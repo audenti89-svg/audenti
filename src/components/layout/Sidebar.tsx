@@ -44,6 +44,7 @@ const businessNav: NavItem[] = [
 ]
 
 const systemNav: NavItem[] = [
+  { label: 'Perfil de la Doctora', path: '/dashboard/perfil', icon: Contact2 },
   { label: 'Configuración General', path: '/dashboard/configuracion', icon: Settings },
   { label: 'Configuración WhatsApp & Chatbot', path: '/dashboard/configuracion/whatsapp', icon: MessageSquare },
 ]
@@ -160,7 +161,11 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
 
         {/* User Footer */}
-        <div className="p-4 border-t border-white/10 bg-black/20 flex items-center justify-between">
+        <Link
+          href="/dashboard/perfil"
+          className="p-4 border-t border-white/10 bg-black/20 hover:bg-white/5 transition flex items-center justify-between cursor-pointer"
+          title="Editar Perfil de la Doctora"
+        >
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-9 h-9 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
               AE
@@ -171,7 +176,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </div>
           </div>
           <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-        </div>
+        </Link>
       </aside>
     </>
   )

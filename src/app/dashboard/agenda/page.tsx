@@ -29,6 +29,7 @@ import {
 } from 'lucide-react'
 import { useNotificationSound } from '@/hooks/useNotificationSound'
 import { createClient } from '@/utils/supabase/client'
+import { createAppointmentAction } from '@/actions/appointments'
 import { formatDateInMexico } from '@/utils/timezone'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -98,130 +99,35 @@ export default function CalendarPage() {
   const fetchAppointments = async (silent = false) => {
     if (!silent) setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('appointments')
-        .select(`
-          id,
-          patient_id,
-          start_time,
-          end_time,
-          status,
-          treatment_type,
-          notes,
-          patients (
-            id,
-            full_name,
-            phone
-          ),
-          users:doctor_id (
-            full_name
-          )
-        `)
-        .order('start_time', { ascending: true })
-
-      if (error) throw error
-
-      if (data && data.length > 0) {
-        const mapped: ClinicalAppointment[] = (data || []).map((item: any) => {
-          const startDate = new Date(item.start_time)
-          const endDate = new Date(item.end_time || item.start_time)
-          const timeStr = `${startDate.toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit' })} - ${endDate.toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit' })}`
-          const dateStr = startDate.toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City', day: '2-digit', month: 'short', year: 'numeric' })
-          const rawDate = item.start_time ? formatDateInMexico(item.start_time) : ''
-          const durationMin = Math.round((endDate.getTime() - startDate.getTime()) / 60000) || 45
-
-          return {
-            id: item.id,
-            patientId: item.patient_id || item.patients?.id,
-            date: dateStr,
-            rawDate,
-            isoStart: item.start_time,
-            time: timeStr,
-            duration: `${durationMin} min`,
-            patientName: item.patients?.full_name || 'Paciente Sin Nombre',
-            phone: item.patients?.phone || 'Sin teléfono',
-            treatment: item.treatment_type || 'Consulta Odontológica General',
-            doctor: item.users?.full_name || 'Dra. Aura Estudillo',
-            chair: 'Gabinete Principal',
+      const res = await fetch('/api/appointments')
+      if (res.ok) {
+        const json = await res.json()
+        if (json.appointments && Array.isArray(json.appointments)) {
+          const mappedStorage: ClinicalAppointment[] = json.appointments.map((item: any) => ({
+            id: item.id || item.folio,
+            patientId: item.patient_id || item.patientId || '72d77609-2035-477b-a1e3-f6ddc52818b1',
+            date: item.appointment_date || '2026-10-21',
+            rawDate: item.appointment_date || '2026-10-21',
+            isoStart: (item.appointment_date || '2026-10-21') + 'T' + (item.appointment_time || '10:00:00'),
+            time: item.appointment_time || '10:00',
+            duration: '45 min',
+            patientName: item.patient_name || item.paciente || 'Paciente Audenti',
+            phone: item.patient_phone || item.telefono || 'Sin teléfono',
+            treatment: item.treatment || item.treatment_type || 'Valoración Odontológica',
+            doctor: item.doctor || 'Dra. Aura Estudillo',
+            chair: item.chair || 'Gabinete Principal',
             status: (item.status as any) || 'scheduled',
             notes: item.notes || 'Cita clínica en plataforma Audenti',
-            commissionDue: 0,
-          }
-        })
-
-        setAppointments(mapped)
-      } else {
-        // Hidratar desde Supabase Storage si la tabla DB no retorna registros
-        try {
-          const { data: storageFile } = await supabase.storage.from('audenti_database').download('appointments.json')
-          if (storageFile) {
-            const text = await storageFile.text()
-            if (text && text.trim()) {
-              const list = JSON.parse(text)
-              if (Array.isArray(list) && list.length > 0) {
-                const mappedStorage: ClinicalAppointment[] = list.map((item: any) => ({
-                  id: item.id || item.folio,
-                  date: item.appointment_date || '2026-10-18',
-                  rawDate: item.appointment_date || '2026-10-18',
-                  isoStart: `${item.appointment_date || '2026-10-18'}T${item.appointment_time || '10:00:00'}`,
-                  time: item.appointment_time || '10:00',
-                  duration: '45 min',
-                  patientName: item.patient_name || item.paciente || 'Paciente Audenti',
-                  phone: item.patient_phone || item.telefono || 'Sin teléfono',
-                  treatment: item.treatment || item.treatment_type || 'Valoración Odontológica',
-                  doctor: 'Dra. Aura Estudillo',
-                  chair: 'Gabinete Principal',
-                  status: (item.status as any) || 'scheduled',
-                  notes: item.notes || 'Cita clínica en plataforma Audenti',
-                  commissionDue: 0
-                }))
-                setAppointments(mappedStorage)
-                return
-              }
-            }
-          }
-        } catch (sErr) {
-          console.warn('Nota en lectura de storage en agenda:', sErr)
+            commissionDue: 0
+          }))
+          setAppointments(mappedStorage)
+          return
         }
-
-        setAppointments([])
       }
     } catch (err) {
-      console.warn('Nota en appointments sync:', err)
-      // Fallback final a storage
-      try {
-        const { data: storageFile } = await supabase.storage.from('audenti_database').download('appointments.json')
-        if (storageFile) {
-          const text = await storageFile.text()
-          if (text && text.trim()) {
-            const list = JSON.parse(text)
-            if (Array.isArray(list) && list.length > 0) {
-              const mappedStorage: ClinicalAppointment[] = list.map((item: any) => ({
-                id: item.id || item.folio,
-                date: item.appointment_date || '2026-10-18',
-                rawDate: item.appointment_date || '2026-10-18',
-                isoStart: `${item.appointment_date || '2026-10-18'}T${item.appointment_time || '10:00:00'}`,
-                time: item.appointment_time || '10:00',
-                duration: '45 min',
-                patientName: item.patient_name || item.paciente || 'Paciente Audenti',
-                phone: item.patient_phone || item.telefono || 'Sin teléfono',
-                treatment: item.treatment || item.treatment_type || 'Valoración Odontológica',
-                doctor: 'Dra. Aura Estudillo',
-                chair: 'Gabinete Principal',
-                status: (item.status as any) || 'scheduled',
-                notes: item.notes || 'Cita clínica en plataforma Audenti',
-                commissionDue: 0
-              }))
-              setAppointments(mappedStorage)
-              return
-            }
-          }
-        }
-      } catch {}
-
-      setAppointments([])
+      console.warn('Nota consultando /api/appointments:', err)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
@@ -370,24 +276,35 @@ export default function CalendarPage() {
 
     setSavingAppointment(true)
     try {
-      const startDateTime = new Date(`${newDate}T${newTime}:00`)
-      const endDateTime = new Date(startDateTime.getTime() + parseInt(newDuration, 10) * 60000)
+      const selectedPatientObj = patientsList.find(p => p.id === newPatientId)
+      const patientFullName = selectedPatientObj?.full_name || 'Paciente'
+      const patientPhone = selectedPatientObj?.phone || '5522427769'
 
-      const { error } = await supabase.from('appointments').insert({
-        patient_id: newPatientId,
-        treatment_type: newTreatment,
-        start_time: startDateTime.toISOString(),
-        end_time: endDateTime.toISOString(),
-        status: 'scheduled',
-        notes: newNotes.trim() || 'Cita generada en consultorio',
+      // Guardar vía API de persistencia permanente (/api/appointments)
+      const res = await fetch('/api/appointments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patient_name: patientFullName,
+          patient_phone: patientPhone,
+          appointment_date: newDate,
+          appointment_time: newTime,
+          treatment: newTreatment,
+          branch: 'Sucursal Balbuena (Matriz)',
+          status: 'confirmed',
+          notes: newNotes.trim() || 'Cita generada en consultorio'
+        })
       })
 
-      if (error) throw error
+      if (!res.ok) {
+        const errorJson = await res.json().catch(() => ({}))
+        throw new Error(errorJson.error || 'Error al guardar cita')
+      }
 
       playTone('message')
       setShowNewModal(false)
       setNewNotes('')
-      fetchAppointments()
+      await fetchAppointments()
     } catch (err: any) {
       console.error('Error al agendar cita:', err)
       alert(err?.message || 'Error al agendar cita')

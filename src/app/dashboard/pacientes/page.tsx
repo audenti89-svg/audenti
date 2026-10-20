@@ -13,7 +13,10 @@ import {
   MoreVertical,
   Printer,
   RefreshCw,
-  MessageCircle
+  MessageCircle,
+  Pencil,
+  X,
+  Save
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
@@ -26,7 +29,82 @@ export default function PacientesPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
+  const [editingPatient, setEditingPatient] = useState<any | null>(null)
+  const [editForm, setEditForm] = useState({
+    fullName: '',
+    phone: '',
+    email: '',
+    emergencyContact: '',
+    allergies: '',
+    age: ''
+  })
+  const [savingEdit, setSavingEdit] = useState(false)
   const supabase = createClient()
+
+  const handleOpenEdit = (p: any) => {
+    setEditingPatient(p)
+    const rawAllergies = p.allergies_medication || p.allergies || []
+    const allergiesStr = Array.isArray(rawAllergies) ? rawAllergies.join(', ') : String(rawAllergies || '')
+    setEditForm({
+      fullName: p.full_name || p.name || '',
+      phone: p.phone || '',
+      email: p.email || '',
+      emergencyContact: p.emergency_contact_name ? `${p.emergency_contact_name} ${p.emergency_contact_phone || ''}`.trim() : '',
+      allergies: allergiesStr,
+      age: p.age !== null && p.age !== undefined ? String(p.age) : ''
+    })
+  }
+
+  const handleSavePatientEdit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingPatient) return
+    setSavingEdit(true)
+    try {
+      const allergyList = editForm.allergies
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean)
+
+      const parsedAge = editForm.age ? parseInt(editForm.age, 10) : null
+
+      const { error } = await supabase
+        .from('patients')
+        .update({
+          full_name: editForm.fullName,
+          phone: editForm.phone,
+          email: editForm.email || null,
+          emergency_contact_name: editForm.emergencyContact || null,
+          allergies_medication: allergyList,
+          age: parsedAge,
+          onboarding_completed: true
+        })
+        .eq('id', editingPatient.id)
+
+      if (error) throw error
+
+      setPatients(prev => prev.map(item => {
+        if (item.id === editingPatient.id) {
+          return {
+            ...item,
+            full_name: editForm.fullName,
+            phone: editForm.phone,
+            email: editForm.email,
+            emergency_contact_name: editForm.emergencyContact,
+            allergies_medication: allergyList,
+            age: parsedAge,
+            onboarding_completed: true
+          }
+        }
+        return item
+      }))
+
+      setEditingPatient(null)
+    } catch (err: any) {
+      alert('Error guardando paciente: ' + (err?.message || 'Error desconocido'))
+    } finally {
+      setSavingEdit(false)
+    }
+  }
 
   const isInitialLoadRef = useRef(true)
 
@@ -431,6 +509,14 @@ export default function PacientesPage() {
                           {/* Widget de Acción Directa Operativa (Sillón / Concluir / WhatsApp) */}
                           <PatientDirectActionWidget patient={p} compact={true} />
 
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(p)}
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-amber-800 hover:bg-amber-50 transition-colors cursor-pointer"
+                            title="Editar Perfil del Paciente"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
                           <Link
                             href={`/dashboard/expediente?patient_id=${p.id}`}
                             className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
@@ -467,6 +553,116 @@ export default function PacientesPage() {
           fetchPatients()
         }}
       />
+
+      {/* Modal Funcional: Editar Perfil de Paciente */}
+      {editingPatient && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+          <div
+            onClick={() => setEditingPatient(null)}
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity"
+          />
+          <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 sm:p-8 text-slate-900 z-10 animate-in zoom-in-95">
+            <button
+              onClick={() => setEditingPatient(null)}
+              className="absolute top-5 right-5 p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h2 className="text-lg font-bold text-[#202D4C] mb-1">Editar Perfil del Paciente</h2>
+            <p className="text-xs text-slate-500 mb-4">Actualiza los datos de contacto, emergencia y bioseguridad NOM-004.</p>
+
+            <form onSubmit={handleSavePatientEdit} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Nombre Completo</label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.fullName}
+                  onChange={e => setEditForm({ ...editForm, fullName: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-400 outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Teléfono</label>
+                  <input
+                    type="tel"
+                    required
+                    value={editForm.phone}
+                    onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-mono focus:bg-white focus:ring-2 focus:ring-amber-400 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Correo Electrónico</label>
+                  <input
+                    type="email"
+                    value={editForm.email}
+                    onChange={e => setEditForm({ ...editForm, email: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-400 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Contacto Emergencia</label>
+                  <input
+                    type="text"
+                    value={editForm.emergencyContact}
+                    onChange={e => setEditForm({ ...editForm, emergencyContact: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-400 outline-none"
+                    placeholder="Ej. Ángeles Sánchez 5522427769"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Edad (Años)</label>
+                  <input
+                    type="number"
+                    value={editForm.age}
+                    onChange={e => setEditForm({ ...editForm, age: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-amber-400 outline-none font-bold"
+                    placeholder="Ej. 48"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase text-rose-700 mb-1">
+                  ⚠️ Alergias Médicas (NOM-004-SSA3)
+                </label>
+                <input
+                  type="text"
+                  value={editForm.allergies}
+                  onChange={e => setEditForm({ ...editForm, allergies: e.target.value })}
+                  placeholder="Ej. Penicilina, Látex, AINEs (separadas por coma)"
+                  className="w-full px-3 py-2 bg-rose-50/50 border border-rose-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-rose-400 outline-none text-rose-900 font-medium"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingPatient(null)}
+                  className="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEdit}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0F172A] hover:bg-slate-800 text-white font-bold transition-all shadow-xs active:scale-95 cursor-pointer disabled:opacity-50"
+                >
+                  <Save className="w-3.5 h-3.5 text-amber-400" />
+                  <span>{savingEdit ? 'Guardando...' : 'Guardar Cambios'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

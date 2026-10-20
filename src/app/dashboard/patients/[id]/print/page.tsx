@@ -76,7 +76,8 @@ export default function PrintPaperworkPage() {
   const [selectedPreset, setSelectedPreset] = useState<string>('Post-Cirugía / Extracción')
   const [prescriptions, setPrescriptions] = useState<PrescriptionItem[]>(PRESET_PRESCRIPTIONS['Post-Cirugía / Extracción'])
   const [clinicalNotes, setClinicalNotes] = useState('Reposo relativo por 48 horas. Evitar alimentos calientes, grasosos o con semillas. Aplicar compresas frías en las primeras 24 hrs.')
-  const [ticketWidth, setTicketWidth] = useState<'letter' | '80mm'>('letter')
+  const [ticketWidth, setTicketWidth] = useState<'letter' | 'half_letter' | 'a4' | 'a2' | '80mm' | '58mm'>('letter')
+  const [isLetterhead, setIsLetterhead] = useState<boolean>(true) // true = Imprimir logotipo y membrete, false = Imprimir en hoja pre-membretada
 
   // Presupuesto Odontológico
   const [budgetItems, setBudgetItems] = useState<BudgetProcedure[]>([
@@ -161,29 +162,37 @@ export default function PrintPaperworkPage() {
             </button>
           </div>
 
-          {/* Formato de Papel: Carta vs Térmica 80mm */}
-          <div className="inline-flex p-1 bg-slate-100 rounded-xl border border-slate-200/70 text-xs font-semibold">
-            <button
-              onClick={() => setTicketWidth('letter')}
-              className={`px-2.5 py-1.5 rounded-lg transition-all ${
-                ticketWidth === 'letter'
-                  ? 'bg-white text-slate-900 shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
+          {/* Formato de Papel Multi-Tamaño */}
+          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200/70 text-xs">
+            <span className="text-[10px] font-bold text-slate-500 uppercase px-1.5">Papel:</span>
+            <select
+              value={ticketWidth}
+              onChange={(e) => setTicketWidth(e.target.value as any)}
+              className="bg-white px-2.5 py-1.5 rounded-lg font-bold text-slate-900 border border-slate-200 shadow-2xs outline-none cursor-pointer"
             >
-              Carta Oficial
-            </button>
-            <button
-              onClick={() => setTicketWidth('80mm')}
-              className={`px-2.5 py-1.5 rounded-lg transition-all ${
-                ticketWidth === '80mm'
-                  ? 'bg-white text-slate-900 shadow-xs font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Ticketera 80mm
-            </button>
+              <option value="letter">Carta Oficial (216x279 mm)</option>
+              <option value="half_letter">Media Carta (140x216 mm) - Recetario</option>
+              <option value="a4">Tamaño A4 (210x297 mm)</option>
+              <option value="a2">Tamaño A2 (Planos/Póster 420x594 mm)</option>
+              <option value="80mm">Térmica 80 mm (Ticket)</option>
+              <option value="58mm">Térmica 58 mm (Miniprinter)</option>
+            </select>
           </div>
+
+          {/* Toggle de Membretado Oficial vs Hoja Pre-membretada */}
+          <button
+            type="button"
+            onClick={() => setIsLetterhead(!isLetterhead)}
+            className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              isLetterhead
+                ? 'bg-amber-100 text-amber-950 border-amber-300 shadow-2xs'
+                : 'bg-slate-100 text-slate-600 border-slate-300'
+            }`}
+            title="Activa o desactiva el membrete impreso para hojas que ya vienen membretadas de imprenta"
+          >
+            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+            <span>{isLetterhead ? 'Con Membrete Oficial' : 'Hoja Pre-Membretada'}</span>
+          </button>
 
           {/* Selector de Copias */}
           <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200 text-xs">
@@ -263,42 +272,48 @@ export default function PrintPaperworkPage() {
                 [{copyLabel}]
               </div>
 
-              {/* ENCABEZADO MEMBRETADO CORPORATIVO */}
-              <header className="border-b-2 border-slate-900 pb-6 mb-6">
-                <div className="flex items-start justify-between gap-6">
-                  {/* Identidad de la Clínica Oficial AUDENTI */}
-                  <div className="flex items-center gap-4">
-                    <AudentiLogo size={58} variant="icon" />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-2xl font-black text-slate-950 tracking-tight">AUDENTI CLINICAL</h2>
-                        <span className="text-[10px] font-black px-2 py-0.5 rounded bg-amber-400 text-slate-950 uppercase tracking-widest">
-                          OFICIAL
-                        </span>
-                      </div>
-                      <p className="text-xs font-semibold text-slate-700 tracking-wide uppercase">
-                        Clínica de Especialidades Odontológicas &amp; Cirugía Maxilofacial
-                      </p>
-                      <div className="flex items-center gap-3 text-[11px] text-slate-500 mt-1">
-                        <span className="flex items-center gap-1">
-                          <Building2 className="w-3.5 h-3.5" />
-                          {currentBranch.name} • {currentBranch.code}
-                        </span>
-                        <span>•</span>
-                        <span>Tel: {currentBranch.phone}</span>
+              {/* ENCABEZADO MEMBRETADO CORPORATIVO (Se oculta si la doctora usa hojas ya pre-membretadas de imprenta) */}
+              {isLetterhead ? (
+                <header className="border-b-2 border-slate-900 pb-6 mb-6">
+                  <div className="flex items-start justify-between gap-6">
+                    {/* Identidad de la Clínica Oficial AUDENTI */}
+                    <div className="flex items-center gap-4">
+                      <AudentiLogo size={58} variant="icon" />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-2xl font-black text-slate-950 tracking-tight">AUDENTI CLINICAL</h2>
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded bg-amber-400 text-slate-950 uppercase tracking-widest">
+                            OFICIAL
+                          </span>
+                        </div>
+                        <p className="text-xs font-semibold text-slate-700 tracking-wide uppercase">
+                          Clínica de Especialidades Odontológicas &amp; Cirugía Maxilofacial
+                        </p>
+                        <div className="flex items-center gap-3 text-[11px] text-slate-500 mt-1">
+                          <span className="flex items-center gap-1">
+                            <Building2 className="w-3.5 h-3.5" />
+                            {currentBranch.name} • {currentBranch.code}
+                          </span>
+                          <span>•</span>
+                          <span>Tel: {currentBranch.phone}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Datos del Doctor en Turno y Dirección General */}
-                  <div className="text-right shrink-0">
-                    <h3 className="text-sm font-black text-slate-950">Dra. Aura Estudillo</h3>
-                    <p className="text-xs font-bold text-amber-700">Cirujano Dentista / Especialista • Céd. Prof. 8492019</p>
-                    <p className="text-[11px] text-slate-500">Dirección General &amp; Clínica DentalCloud Pro</p>
-                    <p className="text-[10px] text-slate-400">Reg. SSA / COFEPRIS: 21-DNT-0982-DF</p>
+                    {/* Datos del Doctor en Turno y Dirección General */}
+                    <div className="text-right shrink-0">
+                      <h3 className="text-sm font-black text-slate-950">Dra. Aura Estudillo</h3>
+                      <p className="text-xs font-bold text-amber-700">Cirujano Dentista / Especialista • Céd. Prof. 8492019</p>
+                      <p className="text-[11px] text-slate-500">Dirección General &amp; Clínica DentalCloud Pro</p>
+                      <p className="text-[10px] text-slate-400">Reg. SSA / COFEPRIS: 21-DNT-0982-DF</p>
+                    </div>
                   </div>
+                </header>
+              ) : (
+                <div className="h-28 print:h-32 mb-4 border-b border-dashed border-slate-200 print:border-none flex items-center justify-center text-slate-300 print:hidden text-xs">
+                  [Espacio reservado para membrete pre-impreso de imprenta]
                 </div>
-              </header>
+              )}
 
               {/* FICHA TÉCNICA DEL PACIENTE */}
               <section className="bg-slate-50/80 rounded-xl p-4 border border-slate-200 text-xs mb-6 grid grid-cols-2 md:grid-cols-4 gap-3 print:bg-slate-50 print:border-slate-300">

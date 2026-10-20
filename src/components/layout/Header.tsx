@@ -253,7 +253,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
   }
 
   return (
-    <header className="fixed top-0 left-0 lg:left-72 right-0 h-20 bg-white/85 backdrop-blur-md border-b border-slate-200/80 z-30 flex items-center justify-between px-4 sm:px-6 lg:px-8 shadow-xs">
+    <header className="fixed top-0 left-0 lg:left-72 right-0 h-16 sm:h-20 bg-white/95 backdrop-blur-md border-b border-slate-200/80 z-30 flex items-center justify-between px-3 sm:px-6 lg:px-8 shadow-xs overflow-x-auto">
       {/* Botón hamburguesa en móvil + Selector de Sucursal Reactivo */}
       <div className="flex items-center gap-2 sm:gap-3">
         {onMenuToggle && (
@@ -266,18 +266,18 @@ export function Header({ onMenuToggle }: HeaderProps) {
             <Menu className="w-5 h-5" />
           </button>
         )}
-        <div className="relative flex items-center bg-slate-50 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl border border-slate-200 hover:border-amber-400 transition-colors shadow-2xs max-w-[200px] sm:max-w-none">
-          <Building2 className="w-4 h-4 text-amber-600 mr-2 shrink-0" />
+        <div className="relative flex items-center bg-slate-50 px-2 sm:px-3 py-1.5 rounded-xl border border-slate-200 hover:border-amber-400 transition-colors shadow-2xs max-w-[160px] sm:max-w-xs md:max-w-none">
+          <Building2 className="w-4 h-4 text-amber-600 mr-1.5 shrink-0" />
           <select
             value={currentBranchId}
             onChange={handleBranchChange}
-            className="bg-transparent text-xs font-bold text-slate-900 pr-7 appearance-none focus:outline-none cursor-pointer"
+            className="bg-transparent text-xs font-bold text-slate-900 pr-6 appearance-none focus:outline-none cursor-pointer truncate"
           >
             <option value="balbuena">Sucursal Balbuena (Matriz) — Dra. Aura Estudillo</option>
             <option value="guadalupe-chalma">Sucursal Guadalupe Chalma — Dr. Ramírez López</option>
             <option value="colonia-roma">Próximamente: Sucursal Colonia Roma</option>
           </select>
-          <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 pointer-events-none text-slate-400" />
+          <ChevronDown className="w-3.5 h-3.5 absolute right-2 pointer-events-none text-slate-400" />
         </div>
 
         {/* Badge Dinámico de Estado de la Sucursal */}
@@ -459,9 +459,13 @@ export function Header({ onMenuToggle }: HeaderProps) {
           <HelpCircle className="w-4 h-4" />
         </button>
 
-        <div className="w-9 h-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold text-xs shadow-xs">
+        <Link
+          href="/dashboard/perfil"
+          className="w-9 h-9 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 flex items-center justify-center font-bold text-xs shadow-xs transition-transform active:scale-95 cursor-pointer"
+          title="Editar Perfil de la Doctora"
+        >
           <User className="w-4 h-4" />
-        </div>
+        </Link>
       </div>
 
       {/* Modal Flotante de Admisión Fast-Track */}

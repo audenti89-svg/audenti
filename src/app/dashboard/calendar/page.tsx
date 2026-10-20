@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { useNotificationSound } from '@/hooks/useNotificationSound'
 import { createClient } from '@/utils/supabase/client'
+import { createAppointmentAction } from '@/actions/appointments'
 
 type CalendarView = 'day' | 'week' | 'month' | 'year'
 
@@ -232,8 +233,8 @@ export default function CalendarPage() {
     setShowQuickCreateModal(true)
   }
 
-  // Guardar cita con alerta sonora
-  const handleCreateAppointment = (e: React.FormEvent) => {
+  // Guardar cita con alerta sonora y persistencia atómica permanente
+  const handleCreateAppointment = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newTitle || !newPatient) return
 
@@ -257,6 +258,27 @@ export default function CalendarPage() {
     setAppointments(prev => [...prev, newAppt])
     setShowQuickCreateModal(false)
     setIsFamilyBatch(false)
+
+    // Persistir permanentemente vía API /api/appointments
+    try {
+      await fetch('/api/appointments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patient_name: newPatient,
+          patient_phone: '5522427769',
+          appointment_date: modalSlot.date,
+          appointment_time: modalSlot.time,
+          treatment: newTitle,
+          branch: 'Sucursal Balbuena (Matriz)',
+          status: 'confirmed',
+          notes: `Agendado directamente en Google Calendar de Audenti por la Dra. Aura (${newDoctor})`
+        })
+      })
+      await fetchCalendarAppointments()
+    } catch (saveErr) {
+      console.warn('Nota persistiendo cita en Supabase desde Calendar:', saveErr)
+    }
   }
 
   return (

@@ -79,25 +79,45 @@ export async function POST(request: Request) {
     let resolvedName = patientName;
     let resolvedPhone = patientPhone;
 
-    if (patientPhone) {
-      const cleanPhone = patientPhone.replace(/\D/g, '').slice(-10);
-      try {
-        const { data: found } = await supabase
+    // Buscar en patients de Supabase por teléfono o por nombre
+    try {
+      if (patientPhone) {
+        const cleanPhone = patientPhone.replace(/\D/g, '').slice(-10);
+        if (cleanPhone) {
+          const { data: found } = await supabase
+            .from('patients')
+            .select('id, full_name, phone')
+            .ilike('phone', `%${cleanPhone}%`)
+            .maybeSingle();
+
+          if (found) {
+            finalPatientId = found.id;
+            isRegistered = true;
+            resolvedName = found.full_name || patientName;
+            resolvedPhone = found.phone || patientPhone;
+            folio = `EXP-${found.id.slice(0, 8).toUpperCase()}`;
+          }
+        }
+      }
+
+      // Si aún no está registrado pero tenemos nombre, buscar por nombre
+      if (!isRegistered && resolvedName && resolvedName !== 'Paciente' && !resolvedName.includes('Consulta de Voz')) {
+        const { data: foundByName } = await supabase
           .from('patients')
           .select('id, full_name, phone')
-          .ilike('phone', `%${cleanPhone}%`)
+          .ilike('full_name', `%${resolvedName.trim()}%`)
           .maybeSingle();
 
-        if (found) {
-          finalPatientId = found.id;
+        if (foundByName) {
+          finalPatientId = foundByName.id;
           isRegistered = true;
-          resolvedName = found.full_name || patientName;
-          resolvedPhone = found.phone || patientPhone;
-          folio = `EXP-${found.id.slice(0, 8).toUpperCase()}`;
+          resolvedName = foundByName.full_name;
+          resolvedPhone = foundByName.phone || resolvedPhone;
+          folio = `EXP-${foundByName.id.slice(0, 8).toUpperCase()}`;
         }
-      } catch (err: any) {
-        console.warn('[Transcription Patient Check Note]:', err?.message);
       }
+    } catch (err: any) {
+      console.warn('[Transcription Patient Check Note]:', err?.message);
     }
 
     if (!finalPatientId) {

@@ -98,112 +98,81 @@ async function handleAutonomousCheck(request: Request) {
         continue;
       }
 
-      // Nivel 1 & 2: Si ya pasaron 60 minutos y no hay cita ni respuesta, Aura IA asume la confirmación
-      const nextDay = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-      const scheduledDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City', year: 'numeric', month: '2-digit', day: '2-digit' }).format(nextDay);
-      const scheduledTime = '11:00';
-      const branch = 'Sede Balbuena';
-      const folio = `AUD-${Math.floor(1000 + Math.random() * 9000)}`;
-      const treatmentType = alert.consultationReason || alert.message?.split('•')[0]?.trim() || 'Consulta / Valoración Dental';
+      // Notificar al paciente recordándole que la doctora está ocupada en atención clínica y en cuanto se desocupe le responderá
+      const followUpWaitMessage = `🦷 Hola ${patientName}, la Dra. Aura Estudillo se encuentra actualmente en procedimiento clínico. En cuanto se desocupe atenderá personalmente tu mensaje para confirmar tu cita y fecha. Agradecemos mucho tu paciencia.`;
 
-      // 1. Insertar la cita en la tabla appointments de Supabase
+      // 1. Guardar en chat_omnichannel.json
       try {
-        const startIso = `${scheduledDate}T${scheduledTime}:00-06:00`;
-        const endIso = `${scheduledDate}T11:45:00-06:00`;
-
-        await supabase.from('appointments').insert({
-          patient_id: patientId && !patientId.startsWith('prospect_') ? patientId : null,
-          treatment_type: treatmentType,
-          status: 'confirmed',
-          start_time: startIso,
-          end_time: endIso,
-          notes: `[FOLIO: ${folio}] [Aura IA] Cita confirmada automáticamente tras 1 hora sin respuesta manual de la doctora. Paciente: ${patientName}. Tel: ${patientPhone}. Sede: ${branch}`
-        });
-      } catch (insertApptErr: any) {
-        console.warn('[Autonomous appointment DB notice]:', insertApptErr?.message);
-      }
-
-      // 2. Registrar en appointments.json de Storage
-      try {
-        let apptList: any[] = [];
-        const { data: file } = await supabase.storage.from('audenti_database').download('appointments.json');
+        let allChats: Record<string, any[]> = {};
+        const { data: file } = await supabase.storage.from('audenti_database').download('chat_omnichannel.json');
         if (file) {
           const text = await file.text();
-          if (text && text.trim()) apptList = JSON.parse(text);
+          if (text && text.trim()) allChats = JSON.parse(text);
         }
-        apptList.unshift({
-          id: folio,
-          folio,
-          patient_name: patientName,
-          patient_phone: patientPhone,
-          appointment_date: scheduledDate,
-          appointment_time: scheduledTime,
-          treatment: treatmentType,
-          treatment_type: treatmentType,
-          branch,
-          status: 'confirmed',
-          notes: `[FOLIO: ${folio}] [Aura IA] Cita confirmada automáticamente tras 1 hora sin respuesta manual de la doctora.`,
-          created_at: new Date().toISOString()
-        });
+        allChats[patientId] = [...(allChats[patientId] || []), {
+          id: `ai-wait-${Date.now()}`,
+          senderName: 'Aura IA (Asistente de la Dra. Aura)',
+          senderRole: 'ai',
+          channel_type: 'web_chat',
+          content: followUpWaitMessage,
+          timestamp: formatTimeInMexico(new Date()),
+          isDoctor: false
+        }];
         await supabase.storage.from('audenti_database').upload(
-          'appointments.json',
-          JSON.stringify(apptList.slice(0, 50), null, 2),
+          'chat_omnichannel.json',
+          JSON.stringify(allChats, null, 2),
           { upsert: true, contentType: 'application/json' }
         );
       } catch {}
 
-      // 3. Insertar mensaje en chat_messages de Supabase
-      const confirmationMessageContent = `🦷 Hola ${patientName}, para asegurar tu atención prioritaria y evitar esperas, Aura IA ha reservado formalmente tu cita con la Dra. Aura Estudillo para el día *${scheduledDate} a las ${scheduledTime} hrs* en ${branch}.\n\n• Folio de Confirmación: *${folio}*\n• Estado: Confirmada por Asistente Clínico Inteligente 24/7.\n¡Te esperamos en clínica!`;
-
+      // 2. Insertar mensaje en chat_messages de Supabase
       try {
         await supabase.from('chat_messages').insert({
           patient_id: patientId && !patientId.startsWith('prospect_') ? patientId : null,
           sender_role: 'ai',
-          sender_name: 'Aura IA (Asistente Clínico)',
-          content: confirmationMessageContent,
+          sender_name: 'Aura IA (Asistente de la Dra. Aura)',
+          content: followUpWaitMessage,
           channel_type: 'web_chat',
           metadata: {
-            folio,
             patientId,
-            autoScheduled: true,
-            note: '[Aura IA] Cita confirmada automáticamente tras 1 hora sin respuesta manual de la doctora.'
+            autoFollowUp: true,
+            note: 'Aviso periódico de doctora ocupada atendiendo pacientes.'
           },
           created_at: new Date().toISOString()
         });
       } catch {}
 
-      // 4. Enviar notificación al WhatsApp del paciente
+      // 3. Enviar notificación al WhatsApp del paciente
       if (patientPhone && patientPhone.length >= 10) {
         try {
           await sendPatientWhatsAppMessage({
             patientPhone,
             patientName,
-            message: confirmationMessageContent
+            message: followUpWaitMessage
           });
         } catch (waErr: any) {
-          console.warn('[WhatsApp Patient Auto Confirm notice]:', waErr?.message);
+          console.warn('[WhatsApp Patient Auto Followup notice]:', waErr?.message);
         }
       }
 
-      // 5. Emitir alerta espejo al WhatsApp de la Dra. Aura
+      // 4. Emitir alerta recordatorio a la Dra. Aura por WhatsApp
       try {
         await sendDoctorWhatsAppAlert({
-          title: '🤖 Cita Agendada Autónomamente (Aura IA)',
+          title: '⏳ RECORDATORIO: Paciente esperando confirmación de cita',
           patientName,
-          message: `Tras 1 hora de ventana sin confirmación manual, Aura IA aseguró la cita de ${patientName} para el ${scheduledDate} a las ${scheduledTime} hrs (Folio: ${folio}).`,
+          message: `El paciente ${patientName} (${patientPhone}) sigue a la espera de que confirmes su fecha/hora en la agenda. Aura IA le informó que estás en consulta y que le responderás a la brevedad.`,
           type: 'info'
         });
       } catch {}
 
-      // 6. Notificar al canal Realtime del paciente y del Dashboard
+      // 5. Notificar al canal Realtime del paciente y del Dashboard
       const broadcastPayload = {
         patientId,
         targetPatientId: patientId,
-        content: confirmationMessageContent,
+        content: followUpWaitMessage,
         senderRole: 'ai',
-        senderName: 'Aura IA (Asistente Clínico)',
-        timestamp: formatTimeInMexico(new Date()),
-        folio
+        senderName: 'Aura IA (Asistente de la Dra. Aura)',
+        timestamp: formatTimeInMexico(new Date())
       };
 
       await supabase.channel(`patient_chat_${patientId}`).send({
@@ -218,13 +187,13 @@ async function handleAutonomousCheck(request: Request) {
         payload: broadcastPayload
       }).catch(() => {});
 
-      results.push({ patientName, folio, scheduledDate, scheduledTime });
+      results.push({ patientName, status: 'wait_message_sent' });
     }
 
     return NextResponse.json({
       success: true,
       processed: results.length,
-      appointmentsCreated: results
+      waitMessagesSent: results
     });
   } catch (error: any) {
     console.error('[Autonomous appointments error]:', error);

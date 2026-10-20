@@ -385,14 +385,14 @@ export async function executeConciergeTool(name: string, args: Record<string, an
             metadata: { type: 'doctor_alert', folio, branch }
           });
 
-          // Confirmación automática al Paciente
+          // Notificación al Paciente informando que la doctora evaluará y confirmará
           if (phone && phone !== 'No provisto' && phone.length >= 10) {
             await sendExternalMessage({
               to: phone,
-              message: `🦷 *Audenti Clinical — Confirmación de Cita*\nHola ${patientName}, tu cita con la Dra. Aura Estudillo ha quedado registrada para el día *${date} a las ${time} hrs* en ${branch}.\n• Folio Oficial: *${folio}*\n¡Te esperamos con gusto en la clínica!`,
+              message: `🦷 *Audenti Clinical*\nHola ${patientName}, recibimos tu solicitud de cita para el día *${date} a las ${time} hrs* en ${branch} (Folio: *${folio}*).\nLa Dra. Aura Estudillo revisará su agenda clínica y te confirmará directamente a la brevedad por este medio.`,
               patientId: patId || folio,
               patientName: patientName,
-              metadata: { type: 'patient_confirmation', folio, branch }
+              metadata: { type: 'patient_confirmation_pending', folio, branch }
             });
           }
         } catch (msgErr: any) {
@@ -411,7 +411,7 @@ export async function executeConciergeTool(name: string, args: Record<string, an
           start_time: startDate.toISOString(),
           treatmentType,
           branch,
-          mensajeConfirmacion: `Tu cita ha quedado agendada con la Dra. Aura Estudillo para el día ${date} a las ${time} hrs en ${branch}. Tu folio es ${folio}. Te esperamos con gusto.`
+          mensajeConfirmacion: `He tomado tu solicitud de cita para el día ${date} a las ${time} hrs (Folio: ${folio}). Se la he transmitido de inmediato a la Dra. Aura Estudillo para que ella revise su agenda y te confirme formalmente la fecha y hora por WhatsApp a la brevedad.`
         };
       } catch (storageErr: any) {
         console.error('Error al persistir cita en Supabase:', storageErr);
