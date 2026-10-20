@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { formatWhatsAppUrl } from '@/lib/whatsapp-link'
 import {
   UserPlus,
   TrendingUp,
@@ -596,7 +597,10 @@ export default function CrmPage() {
                       </div>
 
                       <a
-                        href={`https://wa.me/521${(p.phone || '').replace(/[^0-9]/g, '').slice(-10)}?text=${encodeURIComponent(`Hola ${p.full_name}, te saluda la Dra. Aura Estudillo de Audenti Clinical.`)}`}
+                        href={formatWhatsAppUrl(
+                          p.phone,
+                          `Hola ${p.full_name}, te saluda la Dra. Aura Estudillo de Audenti Clinical.`
+                        )}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-xs shrink-0 bg-emerald-600 text-white hover:bg-emerald-700"

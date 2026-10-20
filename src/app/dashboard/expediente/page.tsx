@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { formatWhatsAppUrl } from '@/lib/whatsapp-link'
 import {
   FileText,
   Edit,
@@ -502,18 +503,19 @@ export default function ExpedientePage() {
             </select>
           )}
 
-          {selectedPatient.phone && (
-            <a
-              href={`https://wa.me/521${selectedPatient.phone.replace(/\D/g, '').slice(-10)}?text=${encodeURIComponent(`Hola ${selectedPatient.full_name}, te saluda la Dra. Aura Estudillo de Audenti Clinical respecto a tu expediente clínico y seguimiento de tratamiento.`)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition-transform active:scale-95 shadow-xs"
-              title={`Contactar a ${selectedPatient.full_name} por WhatsApp`}
-            >
-              <MessageSquare className="w-4 h-4 fill-current" />
-              WhatsApp Directo
-            </a>
-          )}
+          <a
+            href={formatWhatsAppUrl(
+              selectedPatient.phone,
+              `Hola ${selectedPatient.full_name}, te saluda la Dra. Aura Estudillo de Audenti Clinical respecto a tu expediente clínico y seguimiento de tratamiento.`
+            )}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition-transform active:scale-95 shadow-xs"
+            title={`Contactar a ${selectedPatient.full_name} por WhatsApp`}
+          >
+            <MessageSquare className="w-4 h-4 fill-current" />
+            WhatsApp Directo
+          </a>
 
           <Link
             href={`/dashboard/patients/${selectedPatient.id}/print`}

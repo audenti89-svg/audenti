@@ -14,6 +14,7 @@ import {
   Sparkles
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
+import { formatWhatsAppUrl } from '@/lib/whatsapp-link'
 import { useNotificationSound } from '@/hooks/useNotificationSound'
 
 export interface PatientDirectActionWidgetProps {
@@ -274,18 +275,19 @@ export function PatientDirectActionWidget({
           </button>
         )}
 
-        {cleanPhone && (
-          <a
-            href={`https://wa.me/521${cleanPhone}?text=${encodeURIComponent(`Hola ${patient.full_name}, te saluda la Dra. Aura Estudillo de Audenti respecto a tu cita.`)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[11px] shadow-2xs transition-transform active:scale-95"
-            title={`Abrir WhatsApp con ${patient.full_name}`}
-          >
-            <MessageSquare className="w-3.5 h-3.5 fill-current" />
-            <span className="hidden sm:inline">WhatsApp</span>
-          </a>
-        )}
+        <a
+          href={formatWhatsAppUrl(
+            cleanPhone || patient.phone,
+            `Hola ${patient.full_name}, te saluda la Dra. Aura Estudillo de Audenti respecto a tu cita.`
+          )}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-[11px] shadow-2xs transition-transform active:scale-95"
+          title={`Abrir WhatsApp con ${patient.full_name}`}
+        >
+          <MessageSquare className="w-3.5 h-3.5 fill-current" />
+          <span className="hidden sm:inline">WhatsApp</span>
+        </a>
       </div>
     )
   }
@@ -399,18 +401,19 @@ export function PatientDirectActionWidget({
           </button>
         )}
 
-        {cleanPhone && (
-          <a
-            href={`https://wa.me/521${cleanPhone}?text=${encodeURIComponent(`Hola ${patient.full_name}, te saluda la Dra. Aura Estudillo de Audenti Clinical respecto a tu atención médica.`)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs transition-transform active:scale-95"
-            title={`Abrir WhatsApp con ${patient.full_name}`}
-          >
-            <MessageSquare className="w-3.5 h-3.5 fill-current" />
-            <span>WhatsApp Directo</span>
-          </a>
-        )}
+        <a
+          href={formatWhatsAppUrl(
+            cleanPhone || patient.phone,
+            `Hola ${patient.full_name}, te saluda la Dra. Aura Estudillo de Audenti Clinical respecto a tu atención médica.`
+          )}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs transition-transform active:scale-95"
+          title={`Abrir WhatsApp con ${patient.full_name}`}
+        >
+          <MessageSquare className="w-3.5 h-3.5 fill-current" />
+          <span>WhatsApp Directo</span>
+        </a>
       </div>
     </div>
   )
