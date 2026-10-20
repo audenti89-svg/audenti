@@ -102,8 +102,26 @@ export default function CalendarPage() {
     loadPatients()
   }, [])
 
-  // Drag and drop simulado
-  const [draggedApptId, setDraggedApptId] = useState<string | null>(null)
+  // Eliminar cita con confirmación y sincronización atómica
+  const handleDeleteAppointment = async (appId: string, patientName: string, title: string) => {
+    playTone('arrival')
+    if (!confirm(`¿Deseas eliminar la cita de ${patientName} (${title})?`)) {
+      return
+    }
+
+    // 1. Actualización optimista inmediata en la interfaz
+    setAppointments(prev => prev.filter(x => x.id !== appId))
+
+    // 2. Persistir el borrado permanente en /api/appointments
+    try {
+      await fetch(`/api/appointments?id=${encodeURIComponent(appId)}`, {
+        method: 'DELETE'
+      })
+      await fetchCalendarAppointments()
+    } catch (delErr) {
+      console.warn('Error al eliminar cita de la API:', delErr)
+    }
+  }
 
   // Calcular dinámicamente los 7 días de la semana según la fecha seleccionada
   const weekDays = (() => {
@@ -139,76 +157,75 @@ export default function CalendarPage() {
   // Cargar citas persistentes en el calendario estilo Google Calendar
   const fetchCalendarAppointments = async () => {
     try {
-      const supabase = createClient()
-      const { data } = await supabase
-        .from('appointments')
-        .select('id, treatment_type, status, start_time, notes, patients(full_name)')
-        .order('start_time', { ascending: true })
-
       let allAppointments: CalendarAppointment[] = []
 
-      if (data && data.length > 0) {
-        allAppointments = data.map((a: any) => {
-          const d = a.start_time ? new Date(a.start_time) : new Date()
-          const dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
-          const timeStr = d.toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit', hour12: false })
-
-          return {
-            id: a.id,
-            title: a.treatment_type || 'Consulta / Valoración Estética Oral',
-            patientName: a.patients?.full_name || 'Paciente',
-            doctor: 'Dra. Aura Estudillo',
-            chair: 'Gabinete 1 (Principal)',
-            specialty: 'Odontología Integral & Estética',
-            date: dateStr,
-            startTime: timeStr,
-            endTime: '12:00',
-            durationMin: 45,
-            status: a.status || 'confirmed',
-            color: 'bg-amber-100 text-amber-950 border-l-4 border-amber-500'
-          }
-        })
-      }
-
-      // Hidratar desde Supabase Storage para citas agendadas por IA
+      // 1. Cargar desde la API atómica /api/appointments (Supabase Storage)
       try {
-        const { data: storageFile } = await supabase.storage.from('audenti_database').download('appointments.json')
-        if (storageFile) {
-          const text = await storageFile.text()
-          if (text && text.trim()) {
-            const list = JSON.parse(text)
-            if (Array.isArray(list) && list.length > 0) {
-              const existingIds = new Set(allAppointments.map(a => a.id))
-              for (const p of list) {
-                const appId = p.id || p.folio || `apt-${Date.now()}`
-                if (!existingIds.has(appId)) {
-                  const appointmentDate = p.appointment_date || (p.start_time ? p.start_time.split('T')[0] : '2026-10-19')
-                  let rawTime = p.appointment_time || (p.start_time ? p.start_time.split('T')[1]?.substring(0, 5) : '09:00')
-                  if (rawTime.length > 5) rawTime = rawTime.substring(0, 5)
+        const res = await fetch('/api/appointments')
+        if (res.ok) {
+          const json = await res.json()
+          if (json.success && Array.isArray(json.appointments)) {
+            for (const p of json.appointments) {
+              const appId = p.id || p.folio || `apt-${Date.now()}`
+              const appointmentDate = p.appointment_date || (p.start_time ? p.start_time.split('T')[0] : '2026-10-20')
+              let rawTime = p.appointment_time || (p.start_time ? p.start_time.split('T')[1]?.substring(0, 5) : '10:00')
+              if (rawTime.length > 5) rawTime = rawTime.substring(0, 5)
 
-                  allAppointments.push({
-                    id: appId,
-                    title: p.treatment || p.treatment_type || 'Consulta Odontológica',
-                    patientName: p.patient_name || p.paciente || 'Paciente Audenti',
-                    doctor: 'Dra. Aura Estudillo',
-                    chair: 'Gabinete 1 (Principal)',
-                    specialty: 'Odontología Integral',
-                    date: appointmentDate,
-                    startTime: rawTime,
-                    endTime: '10:00',
-                    durationMin: 45,
-                    status: (p.status as any) || 'confirmed',
-                    color: 'bg-amber-100 text-amber-950 border-l-4 border-amber-500'
-                  })
-                  existingIds.add(appId)
-                }
-              }
+              allAppointments.push({
+                id: appId,
+                title: p.treatment || p.treatment_type || 'Consulta Odontológica',
+                patientName: p.patient_name || p.paciente || 'Paciente Audenti',
+                doctor: 'Dra. Aura Estudillo',
+                chair: 'Gabinete 1 (Principal)',
+                specialty: 'Odontología Integral',
+                date: appointmentDate,
+                startTime: rawTime,
+                endTime: '12:00',
+                durationMin: 45,
+                status: (p.status as any) || 'confirmed',
+                color: 'bg-amber-100 text-amber-950 border-l-4 border-amber-500'
+              })
             }
           }
         }
-      } catch (storageErr) {
-        console.warn('Nota en lectura de storage para calendario:', storageErr)
+      } catch (apiErr) {
+        console.warn('Nota consultando /api/appointments:', apiErr)
       }
+
+      // 2. Complementar con tabla appointments de Supabase
+      try {
+        const supabase = createClient()
+        const { data } = await supabase
+          .from('appointments')
+          .select('id, treatment_type, status, start_time, notes, patients(full_name)')
+          .order('start_time', { ascending: true })
+
+        if (data && data.length > 0) {
+          const existingIds = new Set(allAppointments.map(a => a.id))
+          for (const a of data as any[]) {
+            if (!existingIds.has(a.id)) {
+              const d = a.start_time ? new Date(a.start_time) : new Date()
+              const dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
+              const timeStr = d.toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit', hour12: false })
+
+              allAppointments.push({
+                id: a.id,
+                title: a.treatment_type || 'Consulta / Valoración Estética Oral',
+                patientName: (Array.isArray(a.patients) ? a.patients[0]?.full_name : a.patients?.full_name) || 'Paciente',
+                doctor: 'Dra. Aura Estudillo',
+                chair: 'Gabinete 1 (Principal)',
+                specialty: 'Odontología Integral & Estética',
+                date: dateStr,
+                startTime: timeStr,
+                endTime: '12:00',
+                durationMin: 45,
+                status: a.status || 'confirmed',
+                color: 'bg-amber-100 text-amber-950 border-l-4 border-amber-500'
+              })
+            }
+          }
+        }
+      } catch {}
 
       setAppointments(allAppointments.filter(a => {
         const titleLower = (a.title || '').toLowerCase()
@@ -591,13 +608,10 @@ export default function CalendarPage() {
                           {slotAppointments.map(app => (
                             <div
                               key={app.id}
-                              className={`p-2 rounded-xl text-xs font-semibold shadow-2xs mb-1 transition-transform hover:scale-[1.02] cursor-grab ${app.color}`}
+                              className={`p-2 rounded-xl text-xs font-semibold shadow-2xs mb-1 transition-transform hover:scale-[1.02] cursor-pointer ${app.color}`}
                               onClick={(e) => {
                                 e.stopPropagation()
-                                playTone('arrival')
-                                if (confirm(`¿Deseas eliminar la cita de ${app.patientName} (${app.title})?`)) {
-                                  setAppointments(prev => prev.filter(x => x.id !== app.id))
-                                }
+                                handleDeleteAppointment(app.id, app.patientName, app.title)
                               }}
                             >
                               <div className="flex items-center justify-between">
@@ -635,7 +649,11 @@ export default function CalendarPage() {
                     <span className="text-xs font-bold text-slate-900 block border-b pb-2">{chair}</span>
                     <div className="space-y-2">
                       {appointments.filter(a => a.date === selectedDate && a.chair.includes(chair.substring(0, 8))).map(a => (
-                        <div key={a.id} className={`p-3 rounded-xl border text-xs font-semibold shadow-2xs ${a.color}`}>
+                        <div
+                          key={a.id}
+                          className={`p-3 rounded-xl border text-xs font-semibold shadow-2xs cursor-pointer ${a.color}`}
+                          onClick={() => handleDeleteAppointment(a.id, a.patientName, a.title)}
+                        >
                           <div className="flex justify-between items-center">
                             <span className="font-bold">{a.patientName}</span>
                             <span className="font-mono text-[10px]">{a.startTime} - {a.endTime}</span>

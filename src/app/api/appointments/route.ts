@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'El nombre del paciente es obligatorio.' }, { status: 400 });
     }
 
-    const folio = body.folio || `AUD-${Math.floor(1000 + Math.random() * 9000)}`;
+    const folio = body.folio || body.id || `AUD-${Math.floor(1000 + Math.random() * 9000)}`;
     const newAppt = {
       id: folio,
       folio,
@@ -70,6 +70,37 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, appointment: newAppt });
   } catch (err: any) {
     console.error('[API appointments POST Error]:', err);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'ID de la cita requerido.' }, { status: 400 });
+    }
+
+    const current = await getPersistedAppointments();
+    const updated = current.filter((a: any) => a.id !== id && a.folio !== id);
+    await savePersistedAppointments(updated);
+
+    // También intentar borrar de la tabla SQL de appointments si existe
+    try {
+      const supabase = createAdminClient();
+      await supabase.from('appointments').delete().eq('id', id);
+      await supabase.channel('calendar_page_realtime').send({
+        type: 'broadcast',
+        event: 'appointment_deleted',
+        payload: { id }
+      });
+    } catch {}
+
+    return NextResponse.json({ success: true, message: 'Cita eliminada correctamente.' });
+  } catch (err: any) {
+    console.error('[API appointments DELETE Error]:', err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }

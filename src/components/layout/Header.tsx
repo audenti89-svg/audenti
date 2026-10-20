@@ -253,7 +253,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
   }
 
   return (
-    <header className="fixed top-0 left-0 lg:left-72 right-0 h-16 sm:h-20 bg-white/95 backdrop-blur-md border-b border-slate-200/80 z-30 flex items-center justify-between px-3 sm:px-6 lg:px-8 shadow-xs overflow-x-auto">
+    <header className="fixed top-0 left-0 lg:left-72 right-0 h-16 sm:h-20 bg-white/95 backdrop-blur-md border-b border-slate-200/80 z-30 flex items-center justify-between px-3 sm:px-6 lg:px-8 shadow-xs">
       {/* Botón hamburguesa en móvil + Selector de Sucursal Reactivo */}
       <div className="flex items-center gap-2 sm:gap-3">
         {onMenuToggle && (
