@@ -517,38 +517,50 @@ export default function LandingPage() {
         {/* ======================================================== */}
         {/* CAPA DE FONDOS DENTALES EN DESKTOP (Full-Screen) */}
         {/* ======================================================== */}
-        <div className="hidden md:block absolute inset-0 w-full h-full">
+        <div className="hidden md:block absolute inset-0 w-full h-full overflow-hidden pointer-events-none">
           {/* AFTER (Clean cast - 1.webp) */}
-          <div className="absolute inset-0 w-full h-full overflow-visible">
+          <div className="absolute inset-0 w-full h-full">
             <img
               src={ASSETS.after}
               alt="Molde dental después del tratamiento de estética dental de alta precisión"
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[45%] w-auto h-auto max-h-[75vh] scale-105 pointer-events-none transition-transform duration-700 z-20"
+              className="absolute top-[46%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-auto h-auto max-h-[62vh] max-w-[85vw] object-contain drop-shadow-[0_20px_50px_rgba(0,0,0,0.8)] pointer-events-none transition-transform duration-700 z-20"
               draggable={false}
             />
-            <div className="absolute inset-0 bg-linear-to-t from-slate-950/85 via-slate-950/20 to-slate-950/40 pointer-events-none" />
           </div>
 
-          {/* BEFORE (Stained cast - 2.webp) */}
+          {/* BEFORE (Stained cast - 2.webp - Recortado nítido con clip-path exacto) */}
           <div
-            className="absolute inset-y-0 left-0 overflow-visible transition-[width] duration-75 ease-out"
-            style={{ width: `${splitPercent}%` }}
+            className="absolute inset-0 w-full h-full overflow-hidden z-20 transition-[clip-path] duration-75 ease-out"
+            style={{ clipPath: `inset(0 calc(100% - ${splitPercent}%) 0 0)` }}
           >
-            <div
-              className="relative h-full"
-              style={{ width: heroRef.current ? `${heroRef.current.clientWidth}px` : '100vw' }}
-            >
-              <img
-                src={ASSETS.before}
-                alt="Molde dental antes del tratamiento clínico"
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[45%] w-auto h-auto max-h-[75vh] scale-105 pointer-events-none transition-transform duration-700 z-20"
-                draggable={false}
-              />
-              <div className="absolute inset-0 bg-linear-to-t from-slate-950/90 via-slate-950/25 to-slate-950/45 pointer-events-none" />
-            </div>
+            <img
+              src={ASSETS.before}
+              alt="Molde dental antes del tratamiento clínico"
+              className="absolute top-[46%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-auto h-auto max-h-[62vh] max-w-[85vw] object-contain drop-shadow-[0_20px_50px_rgba(0,0,0,0.8)] pointer-events-none transition-transform duration-700"
+              draggable={false}
+            />
           </div>
-        </div>
 
+          {/* LÍNEA DIVISORIA Y MANIJA INTERACTIVA (DESKTOP) */}
+          {splitPercent > 0 && splitPercent < 100 && (
+            <div
+              className="absolute inset-y-0 z-30 pointer-events-none transition-[left] duration-75 ease-out"
+              style={{ left: `${splitPercent}%` }}
+            >
+              {/* Línea luminosa */}
+              <div className="w-[2px] h-full -ml-[1px] bg-gradient-to-b from-transparent via-amber-400 to-transparent shadow-[0_0_12px_rgba(251,191,36,0.9)]" />
+              {/* Botón interactivo central con flechas */}
+              <div className="absolute top-[46%] -translate-y-1/2 -translate-x-1/2 w-7 h-7 rounded-full bg-slate-950/95 border-2 border-amber-400 shadow-[0_0_15px_rgba(251,191,36,0.6)] flex items-center justify-center text-amber-400 backdrop-blur-md">
+                <ChevronLeft className="w-3.5 h-3.5 -mr-1.5" />
+                <ChevronRight className="w-3.5 h-3.5" />
+              </div>
+            </div>
+          )}
+
+          {/* Viñeta de degradado suave full-width (NO se corta por el slider) */}
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-slate-950/70 pointer-events-none z-10" />
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-transparent to-slate-950/80 pointer-events-none z-10" />
+        </div>
         {/* ETIQUETAS FLOTANTES BEFORE / AFTER (Desktop) */}
         <div className="hidden md:block absolute top-24 left-6 z-20 pointer-events-none">
           <span className="px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase bg-slate-900/70 text-slate-300 backdrop-blur-md border border-white/10">
