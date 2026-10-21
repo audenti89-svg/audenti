@@ -1,102 +1,98 @@
-# AUDENTI CLINICAL CRM - MANUAL TÉCNICO Y ARQUITECTURA (.MD)
-
-Documento maestro con la arquitectura completa, variables de entorno requeridas para Vercel y Local, catálogo de bases de datos y orquestación de Agentes de Inteligencia Artificial.
+# DESIGN SYSTEM SPECIFICATION (DESIGN.MD)
+## Audenti Cloud Pro — High-Performance Medical PWA
+*Architecture & Design Lead: Ricardo Sánchez*
+*Framework Standard: VoltAgent / Awesome-Design-MD Specification*
 
 ---
 
-## 1. Variables de Entorno (Vercel & Local)
+## 1. Brand Identity & Vision
+Audenti Cloud Pro es un **Sistema Nervioso Autónomo para Clínicas Dentales y Negocios de Salud/Servicios**. Su diseño combina la precisión y pulcritud de un instrumental quirúrgico con la elegancia minimalista del ecosistema **Vercel / Linear**.
 
-Para configurar el despliegue en Vercel (**Project Settings $\rightarrow$ Environment Variables**) o en tu archivo local `.env.local`:
+- **Atributos de Marca**: Confiable, Quirúrgico, Veloz (0 ms), Resiliente, Soberano.
+- **Público Objetivo**: Cirujanos dentistas, especialistas médicos, recepcionistas clínicas y directores financieros.
 
-| Variable (Key) | Formato / Referencia (Value) | Entorno | Descripción |
+---
+
+## 2. Color Tokens (Vercel Geist & Medical Palette)
+
+### 2.1 Superficies y Neutros
+| Token Name | Hex Code | Uso Principal |
+| :--- | :--- | :--- |
+| `--surface-primary-light` | `#ffffff` | Fondo principal de vistas clínicas en modo día |
+| `--surface-secondary-light` | `#f8fafc` | Fondo de tarjetas y barras laterales |
+| `--surface-border-light` | `#e2e8f0` | Líneas divisorias, bordes de inputs y tablas |
+| `--surface-primary-dark` | `#0a0f1d` | Fondo general en modo noche (Medical Navy) |
+| `--surface-card-dark` | `#111827` | Paneles de expedientes y widgets en modo noche |
+| `--surface-border-dark` | `#1e293b` | Bordes sutiles en modo noche |
+
+### 2.2 Textos y Tipografía
+| Token Name | Hex Code | Uso Principal |
+| :--- | :--- | :--- |
+| `--text-heading` | `#0f172a` | Títulos principales, folios y cifras grandes |
+| `--text-body` | `#334155` | Descripciones clínicas y párrafos de lectura |
+| `--text-muted` | `#64748b` | Fechas, horas, etiquetas técnicas y subtítulos |
+| `--text-inverse` | `#ffffff` | Textos sobre botones primarios o fondos oscuros |
+
+### 2.3 Acentos Clínicos Semánticos
+| Estado / Semántica | Hex Code | Tailwind Equivalent | Aplicación |
 | :--- | :--- | :--- | :--- |
-| `NEXT_PUBLIC_SUPABASE_URL` | `https://ysxcjrxuakfqzzseiaiy.supabase.co` | Production, Preview, Dev | URL de la instancia de Supabase |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `sb_publishable_Wdm8x6Qf...` (Ver en panel Supabase API) | Production, Preview, Dev | Llave pública anónima de Supabase |
-| `SUPABASE_SERVICE_ROLE_KEY` | *(Configurada internamente o ver Supabase Settings)* | Production, Preview, Dev | Llave maestra administrativa con bypass de RLS |
-| `NEXT_PUBLIC_APP_URL` | `https://audenti.vercel.app` | Production | URL canónica de la aplicación en producción |
-| `GROQ_API_KEY` | `gsk_...` (Console Groq Cloud) | Production, Preview, Dev | Llave de Groq (Llama 3.3 70B) para Soporte |
-| `AGROQ` | *(Mismo valor que `GROQ_API_KEY`)* | Production, Preview, Dev | Alias para el despachador de IA (Groq) |
-| `GEMINI_API_KEY` | `AQ....` o `AIzaSy...` (Google AI Studio) | Production, Preview, Dev | Llave de Google Gemini (2.5 Flash) para Ventas |
-| `GEMINI` | *(Mismo valor que `GEMINI_API_KEY`)* | Production, Preview, Dev | Alias para el despachador de IA (Gemini) |
-| `OLLAMA_TUNNEL_URL` | `https://tu-tunel-ngrok-o-localtunnel.loca.lt` | Production, Preview | URL pública del túnel hacia tu Ollama local |
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Dev (Local) | URL por defecto del motor Ollama en Windows |
-| `OPENWA_BASE_URL` | `http://localhost:3001` | Dev / Local | Servidor de mensajería nativa WhatsApp |
-| `DATABASE_URL` | *(Ver cadena Connection String en Supabase Postgres)* | Production, Preview, Dev | Cadena de conexión Postgres con Pooling |
-| `DIRECT_URL` | *(Ver cadena Direct Connection en Supabase Postgres)* | Production, Preview, Dev | Cadena directa sin pooler |
-
-> [!NOTE]
-> Las credenciales completas exactas sin ofuscación se encuentran sincronizadas de forma segura en tu archivo local [`.env.local`](file:///d:/Antigravity%202027/Odontologia/AppWeb%20CRM/audenti/.env.local) para evitar que GitHub Push Protection bloquee los commits.
+| **Brand Identity** | `#0284c7` | `sky-600` / `cyan-600` | Botones primarios, logotipos y enlaces |
+| **Confirmado / Pagado** | `#10b981` | `emerald-500` | Citas confirmadas, pagos liquidados |
+| **Alerta Bioseguridad** | `#ef4444` | `rose-500` | Alergias a penicilina, urgencias |
+| **En Espera / Pendiente**| `#f59e0b` | `amber-500` | Sala de espera, cotización abierta |
+| **En Sillón Dental** | `#8b5cf6` | `purple-500` | Paciente en procedimiento activo |
 
 ---
 
-## 2. Oficina de Inteligencia Artificial (AI Dispatcher Hub)
+## 3. Tipografía & Jerarquía Visual
+- **Fuente Principal Sans**: Inter / Geist Sans (`font-sans`) — Legibilidad extrema en pantallas de iPad o celular.
+- **Fuente Técnica Mono**: Geist Mono / JetBrains Mono (`font-mono`) — Utilizada en Folios (`AUD-6551`), teléfonos (`5522427769`) y códigos de referidos.
 
-El sistema cuenta con un ruteador inteligente multimodelo ([`ai-dispatcher.ts`](file:///d:/Antigravity%202027/Odontologia/AppWeb%20CRM/audenti/src/lib/ai/ai-dispatcher.ts)):
+### Escalas Tipográficas Estándar
+- **Display 1**: `text-4xl md:text-5xl font-black tracking-tight` (Encabezados de impacto)
+- **Heading 1**: `text-2xl md:text-3xl font-extrabold text-slate-900` (Títulos de módulos)
+- **Heading 2**: `text-lg md:text-xl font-bold text-slate-800` (Tarjetas y modales)
+- **Body**: `text-sm leading-relaxed text-slate-600` (Contenido clínico)
+- **Caption / Meta**: `text-xs font-medium text-slate-400` (Horas, estatus, subtítulos)
 
-```
-                   [ Prompt / Mensaje Entrante ]
-                                |
-                                v
-                   [ Security Guard Shield ]
-                  (Bloqueo Inyecciones SQL/AI)
-                                |
-              +-----------------+-----------------+
-              |                 |                 |
-              v                 v                 v
-        [ Agente SOPORTE ] [ Agente VENTAS ] [ Agente CLÍNICO ]
-           (Groq Cloud)     (Google Gemini)      (Ollama Local)
-        Llama-3.3-70b-versatile  Gemini-2.5-Flash     Llama3 / MedLlama
-              |                 |                 |
-              +-----------------+-----------------+
-                                |
-                                v
-               [ JSON / Cita / Notificación Push ]
+---
+
+## 4. Componentes Base Estandarizados
+
+### 4.1 Botones (Buttons)
+```tsx
+// Botón Primario Quirúrgico
+<button className="bg-sky-600 hover:bg-sky-500 active:scale-[0.98] text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-sm transition-all duration-150 flex items-center gap-2">
+  <Icon size={16} /> Acción Primaria
+</button>
+
+// Botón Secundario / Outline
+<button className="bg-white hover:bg-slate-50 border border-slate-200 active:scale-[0.98] text-slate-700 font-semibold text-xs px-4 py-2.5 rounded-xl transition-all">
+  Cancelar / Volver
+</button>
 ```
 
-1. **Agente de Soporte & Triage (Groq / Agroq)**:
-   - **Motor**: `llama-3.3-70b-versatile`.
-   - **Misión**: Respuestas ultrarrápidas (<400ms) a dudas de horarios, ubicación y urgencias dentales.
-2. **Agente de Ventas & Conversión (Gemini)**:
-   - **Motor**: `gemini-2.5-flash`.
-   - **Misión**: Cierre de presupuestos, explicación de implantes, ortodoncia y diseño de sonrisa con alto valor persuasivo.
-3. **Agente Clínico & Diagnóstico (Ollama Tunnel / Local)**:
-   - **Motor**: Ollama ejecutándose en el consultorio.
-   - **Misión**: Privacidad médica, análisis de historiales clínicos y sugerencias de tratamiento.
+### 4.2 Tarjetas Clínicas Bento (Cards)
+- `rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm hover:border-sky-500/50 transition-all duration-200`
+- Esquinas redondeadas suaves y radio amplio (`rounded-2xl` a `rounded-3xl`) para transmitir calidez médica sin rigidez.
+
+### 4.3 Badges de Estado en Cita
+```tsx
+// Estado En Espera
+<span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span> En Espera
+</span>
+
+// Estado En Sillón
+<span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+  <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span> En Sillón
+</span>
+```
 
 ---
 
-## 3. Arquitectura de Almacenamiento y Base de Datos
-
-- **Supabase Storage Bucket**: `audenti_database`
-  - `appointments.json`: Array JSON de citas activas, canceladas y completadas con sincronización en tiempo real.
-  - `doctor_alerts.json`: Registro de llamadas entrantes y triage médico para la campana de notificaciones.
-  - `chat_omnichannel.json`: Historial omnicanal de conversaciones WhatsApp y web.
-- **Bypass de Resiliencia**: El backend implementa decodificación en memoria de la llave `SUPABASE_SERVICE_ROLE_KEY` para garantizar que la API nunca arroje errores 500 ante falta o demora de lectura de variables en Vercel.
-
----
-
-## 4. Comandos de Lanzamiento Local
-
-Para arrancar el ecosistema en tu computadora:
-
-1. **Servidor Web y Dashboard**:
-   ```powershell
-   cd "d:\Antigravity 2027\Odontologia\AppWeb CRM\audenti"
-   npm run dev
-   ```
-   Disponible en: `http://localhost:3000`
-
-2. **Lanzador Automatizado con Túnel e IAs**:
-   Ejecuta el archivo:
-   [`Lanzar_Audenti_IA.bat`](file:///d:/Antigravity%202027/Odontologia/AppWeb%20CRM/audenti/Lanzar_Audenti_IA.bat)
-   (Inicia automáticamente Ollama, el túnel Ngrok/Localtunnel y el servidor Next.js).
-
----
-
-## 5. Repositorio y Despliegue en la Nube
-
-- **GitHub Repository**: `https://github.com/audenti89-svg/audenti.git`
-- **Ramas Principales**: `main` y `master` (ambas sincronizadas).
-- **Vercel Production URL**: [https://audenti.vercel.app](https://audenti.vercel.app)
-- **Vercel Project ID**: `prj_yhrgC95g3VkXtCdzAz3FbOQEkVc5`
-- **Vercel Team ID**: `team_hMlnzfHtBCPbKp9oSj3iSfuV`
+## 5. Directrices Anti-Slop (Taste Guidelines)
+1. **No a la monotonía de tarjetas**: Prohibido crear pantallas con 3 tarjetas idénticas una al lado de la otra con el mismo tamaño y un icono circular arriba. Usar composiciones Bento con métricas destacadas y áreas de trabajo asimétricas.
+2. **Espaciado rítmico**: Márgenes consistentes en múltiplos de 4 (`p-4`, `p-6`, `gap-4`, `gap-6`).
+3. **Optimistic Updates**: Cuando el médico o recepcionista mueva una cita o guarde una alergia, la UI se actualiza inmediatamente sin mostrar pantallas de carga congeladas.
+4. **Respeto a la Norma NOM-004**: Los datos clínicos del expediente nunca se ocultan detrás de interfaces confusas; deben ser legibles de inmediato para cualquier auditoría médica.
