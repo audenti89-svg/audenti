@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audenti Cloud Pro - Dossier Ejecutivo y Portafolio Maestro B2B</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome 6 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+              800: '#075985',
+              900: '#0c4a6e',
+            },
+            corporateNavy: '#0a0f1d',
+            corporateCard: '#111827',
+            goldAccent: '#f59e0b'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @media print {
+      .no-print { display: none !important; }
+      body { background-color: #ffffff; color: #000000; }
+      .page-break { page-break-before: always; }
+    }
+    .gradient-hero {
+      background: radial-gradient(circle at 80% 20%, rgba(14, 165, 233, 0.15) 0%, rgba(10, 15, 29, 1) 70%);
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased selection:bg-brand-500 selection:text-white">
+
+  <!-- Header Maestro y Acciones -->
+  <header class="bg-corporateNavy text-white sticky top-0 z-50 border-b border-slate-800 shadow-2xl">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-brand-600 to-sky-400 flex items-center justify-center text-white text-2xl font-black shadow-lg shadow-brand-500/20">
+          <i class="fa-solid fa-cube"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl md:text-2xl font-black tracking-tight text-white">AUDENTI CLOUD PRO</h1>
+            <span class="bg-brand-500/20 text-brand-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-brand-500/30 uppercase tracking-widest">
+              Universal B2B Dossier
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">Arquitectura de Software Empresarial, PWAs de Alta Velocidad e Inteligencia Artificial</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 no-print">
+        <button onclick="window.print()" class="bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2">
+          <i class="fa-solid fa-file-pdf"></i> Imprimir / Guardar en PDF
+        </button>
+        <button onclick="downloadHTML()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all flex items-center gap-2">
+          <i class="fa-solid fa-download"></i> Descargar Dossier
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Contenedor Maestro -->
+  <main class="max-w-7xl mx-auto px-6 py-10 space-y-16">
+
+    <!-- SECCIÓN 1: FICHA DE AUTORÍA Y PRESENTACIÓN DE LA FIRMA -->
+    <section class="gradient-hero bg-corporateNavy text-white rounded-3xl p-8 md:p-12 shadow-2xl border border-slate-800 relative overflow-hidden">
+      <div class="max-w-4xl space-y-6 relative z-10">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-brand-500/20 text-brand-300 border border-brand-500/30 uppercase tracking-wider">
+          <i class="fa-solid fa-award text-goldAccent"></i> Ficha Oficial de Autoría & Propiedad Intelectual
+        </div>
+
+        <h2 class="text-3xl md:text-5xl font-black tracking-tight leading-tight">
+          Portafolio Maestro de Ingeniería Tecnológica B2B
+        </h2>
+
+        <p class="text-slate-300 text-base md:text-lg leading-relaxed">
+          <strong>Audenti Cloud Pro</strong> representa la cumbre en desarrollo de aplicaciones web progresivas (PWA) de alto rendimiento para el sector empresarial, médico, corporativo y de servicios. Diseñada, arquitectada y desarrollada en su totalidad por <strong>Ricardo Sánchez</strong>, la plataforma trasciende las limitaciones del software tradicional para brindar una infraestructura digital escalable, resiliente y autónoma.
+        </p>
+
+        <!-- Tarjeta de Metadatos de Autoría -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 text-xs">
+          <div class="bg-slate-900/80 p-5 rounded-2xl border border-slate-800">
+            <span class="text-slate-400 block mb-1">Nombre Oficial de la Solución</span>
+            <strong class="text-white text-base">Audenti Cloud Pro</strong>
+            <p class="text-[11px] text-brand-400 mt-1 font-mono">PWA Enterprise Suite v2.6</p>
+          </div>
+          <div class="bg-slate-900/80 p-5 rounded-2xl border border-slate-800">
+            <span class="text-slate-400 block mb-1">Creador y Arquitecto Principal</span>
+            <strong class="text-white text-base">Ricardo Sánchez</strong>
+            <p class="text-[11px] text-slate-400 mt-1">Dirección de Ingeniería & Consultoría B2B</p>
+          </div>
+          <div class="bg-slate-900/80 p-5 rounded-2xl border border-slate-800">
+            <span class="text-slate-400 block mb-1">Posicionamiento de Mercado</span>
+            <strong class="text-white text-base">SaaS Empresarial Universal</strong>
+            <p class="text-[11px] text-slate-400 mt-1">Clínicas, Hospitales, Despachos y Servicios</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECCIÓN 2: SECCIÓN EDUCATIVA: ¿QUÉ ES UNA PWA Y POR QUÉ NO ES "UNA SIMPLE PÁGINA WEB"? -->
+    <section class="space-y-6">
+      <div class="border-b border-slate-200 pb-3">
+        <span class="text-brand-600 font-bold text-xs uppercase tracking-widest block mb-1">Capítulo 01</span>
+        <h3 class="text-2xl md:text-3xl font-black text-slate-900 flex items-center gap-3">
+          <i class="fa-solid fa-lightbulb text-brand-600"></i> Desmitificando el Software: ¿Qué es una PWA y por qué no es una "simple página web"?
+        </h3>
+        <p class="text-xs text-slate-500">Justificación técnica y económica para directores, inversionistas y clientes no técnicos.</p>
+      </div>
+
+      <!-- Cuadro Explicativo No Técnico -->
+      <div class="bg-white p-8 md:p-10 rounded-3xl border border-slate-200 shadow-sm space-y-6">
+        <div class="space-y-3">
+          <h4 class="text-xl font-bold text-slate-900">
+            La diferencia crucial entre un "Folleto Digital" y un "Motor Operativo Empresarial"
+          </h4>
+          <p class="text-sm text-slate-600 leading-relaxed">
+            Con frecuencia, los clientes no técnicos confunden una <strong>Aplicación Web Progresiva (PWA)</strong> con un "sitio web común". Un sitio web común es simplemente un folleto digital estático que muestra fotos y texto. Por el contrario, <strong>Audenti Cloud Pro es un sistema operativo completo</strong> que se ejecuta dentro del navegador web con potencia nativa, sin necesidad de descargas desde la App Store ni Google Play.
+          </p>
+        </div>
+
+        <!-- Tabla Tripartita Comparativa -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+          
+          <div class="p-6 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+            <div class="text-amber-500 text-2xl font-bold"><i class="fa-solid fa-file-code"></i></div>
+            <h5 class="font-bold text-slate-800 text-base">1. Sitio Web Tradicional</h5>
+            <p class="text-xs text-slate-500 leading-relaxed">
+              Es una página estática (WordPress o HTML básico). Si el usuario intenta agendar, guardar un expediente o procesar pagos en tiempo real, la página se recarga lentamente (pantallazo en blanco) y carece de lógica de sincronización.
+            </p>
+            <span class="inline-block bg-slate-200 text-slate-600 text-[10px] font-bold px-2 py-1 rounded">Solo Informativo</span>
+          </div>
+
+          <div class="p-6 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+            <div class="text-rose-500 text-2xl font-bold"><i class="fa-brands fa-apple"></i> / <i class="fa-brands fa-google-play"></i></div>
+            <h5 class="font-bold text-slate-800 text-base">2. App Nativa de Tiendas</h5>
+            <p class="text-xs text-slate-500 leading-relaxed">
+              Exige que el cliente o médico descargue 150 MB de una tienda, actualice constantemente y acepte comisiones abusivas del 15% al 30% impuestas por Apple y Google, además de requerir desarrollos separados para iOS y Android.
+            </p>
+            <span class="inline-block bg-rose-100 text-rose-700 text-[10px] font-bold px-2 py-1 rounded">Costosa & Rígida</span>
+          </div>
+
+          <div class="p-6 rounded-2xl bg-brand-50/80 border-2 border-brand-500 space-y-3 relative">
+            <div class="absolute -top-3 right-4 bg-brand-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase">
+              El Estándar Moderno
+            </div>
+            <div class="text-brand-600 text-2xl font-bold"><i class="fa-solid fa-bolt"></i></div>
+            <h5 class="font-bold text-slate-900 text-base">3. PWA (Audenti Cloud Pro)</h5>
+            <p class="text-xs text-slate-700 leading-relaxed">
+              Se instala con <strong>un solo clic en la pantalla de inicio</strong> de cualquier iPhone, Android, iPad o PC sin pasar por tiendas. Abre en <strong>0 milisegundos</strong>, permite trabajo local-first, envía notificaciones push y consume una fracción ínfima de memoria.
+            </p>
+            <span class="inline-block bg-brand-600 text-white text-[10px] font-bold px-2 py-1 rounded">Máxima Velocidad & Cero Fricción</span>
+          </div>
+
+        </div>
+
+        <!-- El Trabajo Invisible Detrás de Escena -->
+        <div class="bg-slate-900 text-slate-200 p-6 rounded-2xl space-y-4">
+          <h5 class="font-bold text-white text-sm flex items-center gap-2">
+            <i class="fa-solid fa-server text-brand-400"></i> El Trabajo Invisible Detrás de Escena (Lo que justifica la inversión)
+          </h5>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Cuando un cliente adquiere Audenti Cloud Pro, no está pagando por "diseño de pantallas", sino por una compleja maquinaria de ingeniería que funciona las 24 horas del día sin interrupción:
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs pt-1">
+            <div class="bg-slate-800 p-3.5 rounded-xl border border-slate-700">
+              <strong class="text-brand-300 block mb-1"><i class="fa-solid fa-network-wired"></i> Redundancia Cloud</strong>
+              Balanceo de carga en servidores de borde (Edge Servers) con 99.98% de disponibilidad.
+            </div>
+            <div class="bg-slate-800 p-3.5 rounded-xl border border-slate-700">
+              <strong class="text-emerald-300 block mb-1"><i class="fa-solid fa-database"></i> Base Relacional SQL</strong>
+              Supabase PostgreSQL con encriptación SSL de 256 bits y respaldo atómico.
+            </div>
+            <div class="bg-slate-800 p-3.5 rounded-xl border border-slate-700">
+              <strong class="text-amber-300 block mb-1"><i class="fa-solid fa-shield-virus"></i> Escudo Anti-Ataques</strong>
+              Filtro perimetral activo contra inyecciones SQL y ataques de Prompt Injection en IA.
+            </div>
+            <div class="bg-slate-800 p-3.5 rounded-xl border border-slate-700">
+              <strong class="text-purple-300 block mb-1"><i class="fa-solid fa-robot"></i> Inteligencia 24/7</strong>
+              Motores multimodelo que responden, agendan y auditan citas incluso cuando el negocio duerme.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECCIÓN 3: VERSATILIDAD MULTISECTORIAL Y EXPANSIÓN MULTI-SUCURSAL -->
+    <section class="space-y-6">
+      <div class="border-b border-slate-200 pb-3">
+        <span class="text-brand-600 font-bold text-xs uppercase tracking-widest block mb-1">Capítulo 02</span>
+        <h3 class="text-2xl md:text-3xl font-black text-slate-900 flex items-center gap-3">
+          <i class="fa-solid fa-network-wired text-brand-600"></i> Versatilidad Multisectorial y Expansión Multi-Sucursal
+        </h3>
+        <p class="text-xs text-slate-500">Un motor de alta ingeniería aplicable con idéntico éxito a salud, despachos corporativos o empresas de servicios.</p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
+        
+        <!-- Adaptabilidad Universal -->
+        <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+          <h4 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-globe text-brand-600"></i> Adaptabilidad a Cualquier Sector de Citas u Oficios
+          </h4>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Aunque Audenti Cloud Pro nació perfeccionado en el entorno odontológico y médico de alta precisión, la arquitectura central diseñada por Ricardo Sánchez es un <strong>motor universal de gestión operativa</strong>:
+          </p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1">
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <strong class="text-slate-800 block mb-0.5"><i class="fa-solid fa-hospital text-blue-600 mr-1.5"></i> Clínicas & Hospitales</strong>
+              Expedientes médicos, historias clínicas, bioseguridad y gestión de consultorios.
+            </div>
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <strong class="text-slate-800 block mb-0.5"><i class="fa-solid fa-spa text-teal-600 mr-1.5"></i> Spas & Centros Estéticos</strong>
+              Citas por cabina, seguimiento de tratamientos estéticos y fidelización de clientes.
+            </div>
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <strong class="text-slate-800 block mb-0.5"><i class="fa-solid fa-scale-balanced text-amber-600 mr-1.5"></i> Despachos Legales & Fiscales</strong>
+              Expedientes jurídicos, calendario de audiencias y bitácora de cobranza por horas.
+            </div>
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <strong class="text-slate-800 block mb-0.5"><i class="fa-solid fa-wrench text-indigo-600 mr-1.5"></i> Talleres & Servicios Técnicos</strong>
+              Órdenes de servicio, control de estados (En Espera $\rightarrow$ Reparado $\rightarrow$ Entregado).
+            </div>
+          </div>
+        </div>
+
+        <!-- Capacidad Multi-Sucursal -->
+        <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+          <h4 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-diagram-project text-brand-600"></i> Arquitectura Escalable Multi-Sede / Multi-Sucursal
+          </h4>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Las empresas en expansión enfrentan el caos de tener sucursales desconectadas que usan sistemas diferentes. Audenti Cloud Pro implementa de forma nativa la gestión multi-tenant:
+          </p>
+
+          <ul class="text-xs text-slate-700 space-y-2.5">
+            <li class="flex items-start gap-2">
+              <i class="fa-solid fa-check-double text-emerald-500 mt-0.5"></i>
+              <span><strong>Mando Central Unificado:</strong> La dirección general supervisa el rendimiento de todas las sucursales (Sede Norte, Sede Sur, Filiales) desde una sola pantalla.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <i class="fa-solid fa-check-double text-emerald-500 mt-0.5"></i>
+              <span><strong>Aislamiento de Seguridad por Sucursal:</strong> Cada médico o empleado visualiza exclusivamente las citas y pacientes de su sede, previniendo fugas internas de información.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <i class="fa-solid fa-check-double text-emerald-500 mt-0.5"></i>
+              <span><strong>Consolidación Financiera Automática:</strong> Los cortes de caja diarios y mensuales de todas las sedes se integran automáticamente en el módulo de Business Intelligence.</span>
+            </li>
+          </ul>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- SECCIÓN 4: DESGLOSE MÓDULO POR MÓDULO DEL SISTEMA -->
+    <section class="space-y-6">
+      <div class="border-b border-slate-200 pb-3">
+        <span class="text-brand-600 font-bold text-xs uppercase tracking-widest block mb-1">Capítulo 03</span>
+        <h3 class="text-2xl md:text-3xl font-black text-slate-900 flex items-center gap-3">
+          <i class="fa-solid fa-cubes-stacked text-brand-600"></i> Desglose de Capacidades Módulo por Módulo
+        </h3>
+        <p class="text-xs text-slate-500">Un ecosistema de herramientas conectadas que reemplaza de 4 a 6 softwares dispersos por una solución única.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+        <!-- Módulo Agenda -->
+        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3">
+          <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg">
+            <i class="fa-solid fa-calendar-check"></i>
+          </div>
+          <h4 class="font-bold text-slate-900 text-base">Agenda Dinámica & Flujo Operativo</h4>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Control de 5 estados en tiempo real: <em>Programada $\rightarrow$ En Espera $\rightarrow$ En Atención $\rightarrow$ Atendido $\rightarrow$ Cobrado</em>. Buscador y autocompletado en vivo de pacientes con cero latencia.
+          </p>
+        </div>
+
+        <!-- Módulo Expediente -->
+        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-lg">
+            <i class="fa-solid fa-folder-open"></i>
+          </div>
+          <h4 class="font-bold text-slate-900 text-base">Expediente Oficial & Bioseguridad</h4>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Historial clínico integral bajo norma NOM-004. Banderas rojas automáticas ante alergias a medicamentos (penicilinas), padecimientos crónicos y consentimientos médicos digitales.
+          </p>
+        </div>
+
+        <!-- Módulo Referidos -->
+        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold text-lg">
+            <i class="fa-solid fa-users-viewfinder"></i>
+          </div>
+          <h4 class="font-bold text-slate-900 text-base">CRM Comunitario & Árbol Familiar</h4>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Identificación de pacientes o clientes embajadores. Mapeo de grupos familiares completos para programas de lealtad y cálculo del valor histórico (LTV) del paciente.
+          </p>
+        </div>
+
+        <!-- Módulo BI y Finanzas -->
+        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3">
+          <div class="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold text-lg">
+            <i class="fa-solid fa-chart-pie"></i>
+          </div>
+          <h4 class="font-bold text-slate-900 text-base">Business Intelligence (BI) & Caja</h4>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Arqueo de caja chica diaria y caja general. Reportes analíticos de ingresos por canal de captación (recomendación, redes sociales o campañas) y proyecciones de rentabilidad.
+          </p>
+        </div>
+
+        <!-- Módulo WhatsApp -->
+        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3">
+          <div class="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center font-bold text-lg">
+            <i class="fa-brands fa-whatsapp"></i>
+          </div>
+          <h4 class="font-bold text-slate-900 text-base">Centro de Mensajería (OpenWA)</h4>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Confirmación automatizada de citas por WhatsApp, protocolo nativo para escritorio y bitácora unificada de conversaciones para evitar pérdidas de prospectos.
+          </p>
+        </div>
+
+        <!-- Módulo Oficina de IA -->
+        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-3">
+          <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-lg">
+            <i class="fa-solid fa-brain"></i>
+          </div>
+          <h4 class="font-bold text-slate-900 text-base">Oficina de Empleados IA</h4>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Brigada de 4 agentes especializados: Ejecutivo de Ventas, Soporte Técnico, Analista Clínico/Auditor y Guardaespaldas de Ciberseguridad operando 24 horas al día.
+          </p>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- SECCIÓN 5: ARQUITECTURA DE DOBLE MOTOR DE INTELIGENCIA ARTIFICIAL -->
+    <section class="space-y-6">
+      <div class="border-b border-slate-200 pb-3">
+        <span class="text-brand-600 font-bold text-xs uppercase tracking-widest block mb-1">Capítulo 04</span>
+        <h3 class="text-2xl md:text-3xl font-black text-slate-900 flex items-center gap-3">
+          <i class="fa-solid fa-microchip text-brand-600"></i> Doble Motor de Inteligencia Artificial & Costos de Infraestructura
+        </h3>
+        <p class="text-xs text-slate-500">La solución definitiva al dilema de privacidad médica frente a potencia comercial.</p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        <!-- Motor Local -->
+        <div class="bg-slate-900 text-white p-8 rounded-3xl shadow-xl space-y-4 border border-slate-800">
+          <div class="flex justify-between items-center">
+            <span class="bg-emerald-500/20 text-emerald-300 font-mono text-xs font-bold px-3 py-1 rounded-full border border-emerald-500/30">
+              MOTOR LOCAL: PRIVACIDAD MÉDICA
+            </span>
+            <i class="fa-solid fa-shield-halved text-emerald-400 text-xl"></i>
+          </div>
+          <h4 class="text-2xl font-black">Ollama Engine (Local Dedicated)</h4>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Para cumplir con regulaciones médicas y leyes de protección de datos (HIPAA / NOM-004), los historiales sensibles <strong>nunca deben enviarse a servidores públicos externos</strong>. Audenti ejecuta un motor de IA residente en la computadora de la empresa:
+          </p>
+          <ul class="text-xs text-slate-300 space-y-2">
+            <li class="flex items-center gap-2"><i class="fa-solid fa-check text-emerald-400"></i> Procesamiento 100% privado en memoria local.</li>
+            <li class="flex items-center gap-2"><i class="fa-solid fa-check text-emerald-400"></i> Costo operativo local: <strong>$0 USD en licencias de terceros</strong>.</li>
+            <li class="flex items-center gap-2"><i class="fa-solid fa-check text-emerald-400"></i> Operatividad ininterrumpida aun si falla el internet.</li>
+          </ul>
+        </div>
+
+        <!-- Motor Nube -->
+        <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex justify-between items-center">
+            <span class="bg-brand-50 text-brand-700 font-mono text-xs font-bold px-3 py-1 rounded-full border border-brand-200">
+              MOTOR EN LA NUBE: VELOCIDAD Y BI
+            </span>
+            <i class="fa-solid fa-cloud text-brand-600 text-xl"></i>
+          </div>
+          <h4 class="text-2xl font-black text-slate-900">Google Gemini & Groq Multimodal</h4>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Para tareas que exigen respuesta ultra-rápida en internet, conversión de ventas y analítica masiva, se orquesta una brigada en la nube con modelos de última generación (Llama 3.3 120B y Gemini Flash):
+          </p>
+          <ul class="text-xs text-slate-700 space-y-2">
+            <li class="flex items-center gap-2"><i class="fa-solid fa-check text-brand-600"></i> Triaje de pacientes entrantes en menos de 400 milisegundos.</li>
+            <li class="flex items-center gap-2"><i class="fa-solid fa-check text-brand-600"></i> Cierre de cotizaciones y presupuestos 24/7 sin intervención humana.</li>
+            <li class="flex items-center gap-2"><i class="fa-solid fa-check text-brand-600"></i> Sistema de contingencia automática (Fallback inteligente).</li>
+          </ul>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- SECCIÓN 6: ANÁLISIS DE MERCADO, PRECIOS Y ENLACES DE INVESTIGACIÓN -->
+    <section class="space-y-6">
+      <div class="border-b border-slate-200 pb-3">
+        <span class="text-brand-600 font-bold text-xs uppercase tracking-widest block mb-1">Capítulo 05</span>
+        <h3 class="text-2xl md:text-3xl font-black text-slate-900 flex items-center gap-3">
+          <i class="fa-solid fa-scale-unbalanced text-brand-600"></i> Estudio de Mercado y Enlaces Comparativos
+        </h3>
+        <p class="text-xs text-slate-500">Transparencia absoluta: ¿cuánto cobran las plataformas existentes y qué limitaciones imponen?</p>
+      </div>
+
+      <!-- Cuadro Comparativo Real con Enlaces -->
+      <div class="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-700">
+            <thead class="bg-corporateNavy text-white uppercase text-[11px] tracking-wider">
+              <tr>
+                <th class="p-4">Plataforma / Proveedor</th>
+                <th class="p-4">Precio Oficial de Mercado</th>
+                <th class="p-4">Limitaciones Críticas</th>
+                <th class="p-4">Enlace de Referencia</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr class="hover:bg-slate-50">
+                <td class="p-4 font-bold text-slate-900">
+                  Doctoralia Pro
+                </td>
+                <td class="p-4 font-semibold text-slate-800">
+                  Desde $1,399 hasta $2,899 MXN / mes <br/><span class="text-[10px] text-slate-400 font-normal">por cada médico individual</span>
+                </td>
+                <td class="p-4 text-slate-500">
+                  Es un directorio de citas, no un software integral. No incluye IA clínica, no posee árbol genealógico de referidos y cobra por cada doctor extra.
+                </td>
+                <td class="p-4">
+                  <a href="https://pro.doctoralia.com.mx/precios/medicos-y-especialistas" target="_blank" class="text-brand-600 font-bold hover:underline flex items-center gap-1">
+                    Ver Precios Doctoralia <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                  </a>
+                </td>
+              </tr>
+              <tr class="hover:bg-slate-50">
+                <td class="p-4 font-bold text-slate-900">
+                  Doctocliq
+                </td>
+                <td class="p-4 font-semibold text-slate-800">
+                  $29 a $49 USD / mes <br/><span class="text-[10px] text-slate-400 font-normal">por doctor + cobro extra por WhatsApp</span>
+                </td>
+                <td class="p-4 text-slate-500">
+                  Cobros adicionales por paquetes de mensajes de WhatsApp. No cuenta con motor local de privacidad ni orquestación de agentes IA de ventas.
+                </td>
+                <td class="p-4">
+                  <a href="https://www.doctocliq.com/planes-y-precios" target="_blank" class="text-brand-600 font-bold hover:underline flex items-center gap-1">
+                    Ver Planes Doctocliq <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                  </a>
+                </td>
+              </tr>
+              <tr class="bg-brand-50/60 font-bold">
+                <td class="p-4 text-brand-900">
+                  AUDENTI CLOUD PRO (Ricardo Sánchez)
+                </td>
+                <td class="p-4 text-brand-700">
+                  Licencia Clínica Plena Todo Incluido <br/><span class="text-[10px] text-slate-500 font-normal">Sin límite de doctores ni topes de pacientes</span>
+                </td>
+                <td class="p-4 text-slate-700">
+                  Solución integral: Doble motor de IA, WhatsApp nativo, expediente NOM-004, multi-sucursal y base de datos propia.
+                </td>
+                <td class="p-4">
+                  <span class="bg-brand-600 text-white text-[10px] px-2 py-0.5 rounded font-mono">Solución Máxima</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Valuación de Desarrollo a la Medida -->
+      <div class="bg-gradient-to-r from-slate-900 to-corporateNavy text-white p-8 rounded-3xl shadow-xl flex flex-col md:flex-row justify-between items-center gap-6 border border-slate-800">
+        <div class="space-y-2 max-w-2xl">
+          <span class="text-xs text-brand-400 font-mono uppercase tracking-wider block">Valuación Oficial de Ingeniería de Software</span>
+          <h4 class="text-2xl font-black">¿Cuánto cuesta crear una solución así desde cero?</h4>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Un desarrollo a la medida con esta arquitectura (Next.js 16, PWA, Supabase, doble motor de IA y WhatsApp nativo) tiene un costo de mercado de <strong>$180,000 a $450,000 MXN</strong> en firmas de desarrollo, más 8 a 12 meses de programación. Al adquirir Audenti Cloud Pro, la empresa accede de forma inmediata a esta infraestructura lista para producir ingresos.
+          </p>
+        </div>
+        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700 text-center min-w-[200px]">
+          <span class="text-slate-400 text-xs block">Valor en Mercado</span>
+          <strong class="text-2xl md:text-3xl font-black text-emerald-400">$350,000+</strong>
+          <span class="text-[10px] text-slate-400 block mt-1">Costo de Desarrollo Evitado</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECCIÓN 7: MODELO DE RENTA RECURRENTE Y CONTRATO A 1 AÑO -->
+    <section class="space-y-6">
+      <div class="border-b border-slate-200 pb-3">
+        <span class="text-brand-600 font-bold text-xs uppercase tracking-widest block mb-1">Capítulo 06</span>
+        <h3 class="text-2xl md:text-3xl font-black text-slate-900 flex items-center gap-3">
+          <i class="fa-solid fa-handshake-angle text-brand-600"></i> Modelo de Renta Recurrente y Contrato Forzoso a 1 Año
+        </h3>
+        <p class="text-xs text-slate-500">¿Por qué el servicio se contrata por periodos mínimos de 12 meses?</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-stretch">
+        <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+          <h4 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-shield-halved text-brand-600"></i> Justificación de Estabilidad Operativa (12 Meses)
+          </h4>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            A diferencia de servicios desechables, un sistema operativo empresarial no se implementa para "probar una semana". Los tratamientos médicos, las cuentas por cobrar y el historial de pacientes operan en ciclos de 6 a 24 meses. 
+          </p>
+          <div class="space-y-2.5 text-xs text-slate-700 pt-1">
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <strong class="text-slate-900 block mb-0.5">1. Resguardo de Servidores y Dominio Privado</strong>
+              Aprovisionamiento anticipado de servidores Edge globales y licencias cloud para garantizar 100% de uptime.
+            </div>
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <strong class="text-slate-900 block mb-0.5">2. Bolsa de Tokens de IA Garantizada</strong>
+              Cobertura ilimitada de consultas de triaje y ventas durante todo el año sin suspensiones por cuota.
+            </div>
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-100">
+              <strong class="text-slate-900 block mb-0.5">3. Soporte Técnico Prioritario 24/7</strong>
+              Línea directa con el equipo técnico de ingeniería de Ricardo Sánchez para resolución de contingencias.
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-5 flex flex-col justify-between">
+          <div class="space-y-4">
+            <h4 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <i class="fa-solid fa-receipt text-brand-600"></i> Esquema de Inversión Empresarial
+            </h4>
+            <div class="p-4 bg-brand-50/60 rounded-2xl border border-brand-200 space-y-1">
+              <span class="text-xs font-bold text-brand-900 uppercase">Cuota de Implementación & Setup Inicial</span>
+              <p class="text-[11px] text-slate-600">Configuración de servidor, parametrización de catálogo, instalación de motor Ollama local y capacitación al personal.</p>
+            </div>
+            <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
+              <span class="text-xs font-bold text-slate-900 uppercase">Renta Mensual / Anual Todo Incluido</span>
+              <p class="text-[11px] text-slate-600">Hospedaje de alta velocidad, base de datos redundante, pasarela de WhatsApp, bolsa de IA y actualizaciones de software.</p>
+            </div>
+          </div>
+
+          <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3">
+            <i class="fa-solid fa-circle-check text-emerald-600 text-xl"></i>
+            <span class="text-xs text-emerald-900 font-semibold">
+              Bonificación Especial: 15% de descuento al liquidar la suscripción anual en una sola exhibición.
+            </span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECCIÓN 8: GRÁFICAS VISUALES, MATRIZ PROS/CONTRAS Y CRONOGRAMA -->
+    <section class="space-y-6">
+      <div class="border-b border-slate-200 pb-3">
+        <span class="text-brand-600 font-bold text-xs uppercase tracking-widest block mb-1">Capítulo 07</span>
+        <h3 class="text-2xl md:text-3xl font-black text-slate-900 flex items-center gap-3">
+          <i class="fa-solid fa-chart-column text-brand-600"></i> Retorno de Inversión (ROI), Pros/Contras y Cronograma
+        </h3>
+        <p class="text-xs text-slate-500">Métricas cuantitativas del impacto operativo tras la adopción de Audenti Cloud Pro.</p>
+      </div>
+
+      <!-- Gráficos de Rendimiento y Comparativa Visual -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        <!-- Gráfico de Retorno de Inversión y Ausentismo -->
+        <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-5">
+          <h4 class="font-bold text-slate-900 text-base">Impacto Operativo Comprobado (% de Mejora)</h4>
+          
+          <div class="space-y-4 text-xs">
+            <!-- Barra 1 -->
+            <div class="space-y-1.5">
+              <div class="flex justify-between font-bold text-slate-700">
+                <span>Reducción de Inasistencias (No-Show por WhatsApp)</span>
+                <span class="text-emerald-600">Del 30% al 4%</span>
+              </div>
+              <div class="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                <div class="bg-emerald-500 h-3 rounded-full" style="width: 86%;"></div>
+              </div>
+            </div>
+
+            <!-- Barra 2 -->
+            <div class="space-y-1.5">
+              <div class="flex justify-between font-bold text-slate-700">
+                <span>Ahorro en Tiempos de Recepción y Papeleo</span>
+                <span class="text-brand-600">75% menos tiempo</span>
+              </div>
+              <div class="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                <div class="bg-brand-600 h-3 rounded-full" style="width: 75%;"></div>
+              </div>
+            </div>
+
+            <!-- Barra 3 -->
+            <div class="space-y-1.5">
+              <div class="flex justify-between font-bold text-slate-700">
+                <span>Cierre de Cotizaciones con IA de Ventas 24/7</span>
+                <span class="text-indigo-600">+42% de conversión</span>
+              </div>
+              <div class="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                <div class="bg-indigo-600 h-3 rounded-full" style="width: 65%;"></div>
+              </div>
+            </div>
+
+            <!-- Barra 4 -->
+            <div class="space-y-1.5">
+              <div class="flex justify-between font-bold text-slate-700">
+                <span>Captación Orgánica por Red de Referidos</span>
+                <span class="text-amber-500">+45% de recomendaciones</span>
+              </div>
+              <div class="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                <div class="bg-amber-500 h-3 rounded-full" style="width: 70%;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Matriz de Pros y Contras a Corto, Mediano y Largo Plazo -->
+        <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+          <h4 class="font-bold text-slate-900 text-base">Matriz Estratégica: Inversión en Audenti vs Métodos Tradicionales</h4>
+          <div class="space-y-3 text-xs">
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <strong class="text-slate-900 block mb-1">A Corto Plazo (0 a 30 días):</strong>
+              <span class="text-emerald-700 font-semibold">Con Audenti:</span> Cero pérdidas de expedientes físicos y orden inmediato en citas. <br/>
+              <span class="text-rose-700 font-semibold">Sin Audenti (Libretas/Excel):</span> Confusión en recepciones, cancelaciones de último momento y llamadas manuales agotadoras.
+            </div>
+
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <strong class="text-slate-900 block mb-1">A Mediano Plazo (1 a 6 meses):</strong>
+              <span class="text-emerald-700 font-semibold">Con Audenti:</span> Base de datos patrimonial con árbol de referidos activo y arqueos de caja sin faltantes. <br/>
+              <span class="text-rose-700 font-semibold">Sin Audenti:</span> Desconexión de datos, fugas de efectivo en tratamientos diferidos y pacientes desatendidos.
+            </div>
+
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+              <strong class="text-slate-900 block mb-1">A Largo Plazo (1 año en adelante):</strong>
+              <span class="text-emerald-700 font-semibold">Con Audenti:</span> La clínica se convierte en una franquicia automatizada lista para abrir nuevas sucursales con control total.
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Cronograma de Despliegue y Capacitación -->
+      <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+        <h4 class="text-base font-bold text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-timeline text-brand-600"></i> Cronograma de Despliegue Rápido (Time-to-Value)
+        </h4>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs pt-1">
+          <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
+            <span class="text-brand-600 font-bold font-mono">DÍA 1</span>
+            <strong class="text-slate-900 block text-sm">Aprovisionamiento Cloud</strong>
+            <p class="text-[11px] text-slate-500">Creación de base de datos dedicada en Supabase y generación de accesos seguros.</p>
+          </div>
+          <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
+            <span class="text-brand-600 font-bold font-mono">DÍA 2 - 3</span>
+            <strong class="text-slate-900 block text-sm">Migración & Catálogos</strong>
+            <p class="text-[11px] text-slate-500">Carga del catálogo de servicios, precios y sincronización de pacientes iniciales.</p>
+          </div>
+          <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
+            <span class="text-brand-600 font-bold font-mono">DÍA 4</span>
+            <strong class="text-slate-900 block text-sm">IA Local & WhatsApp</strong>
+            <p class="text-[11px] text-slate-500">Vinculación del motor Ollama privado en la computadora central y emparejamiento WhatsApp.</p>
+          </div>
+          <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-1">
+            <span class="text-emerald-600 font-bold font-mono">DÍA 5</span>
+            <strong class="text-slate-900 block text-sm">Capacitación & Go-Live</strong>
+            <p class="text-[11px] text-slate-500">Entrenamiento práctico de 45 minutos al personal y puesta en marcha oficial al 100%.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- LLAMADO A LA ACCIÓN FINAL -->
+    <section class="gradient-hero bg-corporateNavy text-white rounded-3xl p-8 md:p-12 shadow-2xl border border-slate-800 text-center space-y-6">
+      <div class="max-w-3xl mx-auto space-y-4">
+        <span class="bg-brand-500/20 text-brand-300 text-xs font-bold px-3 py-1 rounded-full border border-brand-500/30 uppercase tracking-widest">
+          Consolidación Estratégica
+        </span>
+        <h3 class="text-3xl md:text-5xl font-black tracking-tight">
+          El Siguiente Nivel Tecnológico para su Organización
+        </h3>
+        <p class="text-slate-300 text-xs md:text-sm leading-relaxed">
+          No permita que su empresa o clínica continúe operando con herramientas desconectadas y obsoletas. <strong>Audenti Cloud Pro</strong>, diseñado por <strong>Ricardo Sánchez</strong>, ofrece la seguridad, velocidad e inteligencia artificial que su equipo necesita para dominar su sector con rentabilidad garantizada.
+        </p>
+      </div>
+
+      <div class="flex flex-col sm:flex-row justify-center items-center gap-4 pt-2 no-print">
+        <a href="https://audenti.vercel.app" target="_blank" class="bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs md:text-sm px-6 py-3.5 rounded-2xl shadow-xl transition-all flex items-center gap-2">
+          <i class="fa-solid fa-play"></i> Probar Demo en Vivo
+        </a>
+        <button onclick="downloadHTML()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold text-xs md:text-sm px-6 py-3.5 rounded-2xl transition-all flex items-center gap-2">
+          <i class="fa-solid fa-download"></i> Descargar este Dossier (.HTML)
+        </button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer Corporativo -->
+  <footer class="border-t border-slate-200 bg-white py-8 text-center text-xs text-slate-500 space-y-2">
+    <p class="font-bold text-slate-800 tracking-wider uppercase">AUDENTI CLOUD PRO — ARQUITECTURA DE SOFTWARE B2B</p>
+    <p>Diseño y Desarrollo Integral por <strong class="text-slate-700">Ricardo Sánchez</strong>. Todos los derechos reservados © 2026.</p>
+  </footer>
+
+  <script>
+    function downloadHTML() {
+      const htmlContent = document.documentElement.outerHTML;
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'audenti_dossier_ejecutivo_b2b_ricardo_sanchez.html';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
