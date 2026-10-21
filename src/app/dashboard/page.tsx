@@ -20,6 +20,7 @@ import {
 import { createClient } from '@/utils/supabase/client'
 import { QuickActions } from '@/components/dashboard/QuickActions'
 import { DoctorLiveTriageAlert } from '@/components/dashboard/DoctorLiveTriageAlert'
+import { AIEmployeeHub } from '@/components/ai/AIEmployeeHub'
 import { useNotificationSound } from '@/hooks/useNotificationSound'
 import { formatDateInMexico } from '@/utils/timezone'
 import Link from 'next/link'
@@ -417,8 +418,15 @@ export default function DashboardPage() {
       {/* Banner de Triaje Clínico y Alertas Médicas en Vivo */}
       <DoctorLiveTriageAlert />
 
-      {/* Quick Actions Bar */}
-      <QuickActions />
+      {/* AI Employee Command Center */}
+      <section className="bg-white rounded-2xl border border-indigo-100 shadow-xl overflow-hidden transition-all hover:shadow-indigo-200/50">
+        <div className="p-4 bg-indigo-50 border-b border-indigo-100 flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-indigo-600 animate-pulse" />
+          <h2 className="text-sm font-bold text-indigo-900 uppercase tracking-wider">Centro de Comando de IAs (Oficina de Empleados)</h2>
+        </div>
+        <AIEmployeeHub />
+      </section>
+
 
       {/* KPI Cards Grid */}
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
