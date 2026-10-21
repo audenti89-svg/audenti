@@ -1,7 +1,32 @@
 import { NextResponse } from 'next/server';
 import { AIDispatcher, AIRole } from '@/lib/ai/ai-dispatcher';
+import { createClient } from '@/lib/supabase/client';
+import { getPersistedAppointments } from '@/lib/supabase/appointments-storage';
 
 export const runtime = 'nodejs';
+
+/**
+ * Obtiene el contexto clínico y de expedientes de los pacientes de la base de datos
+ */
+async function getClinicalContext(searchTerm?: string) {
+  try {
+    const supabase = createClient();
+    const { data: patients } = await supabase
+      .from('patients')
+      .select('id, full_name, phone, birth_date, age, allergies_medication, medical_conditions, emergency_contact_name, emergency_contact_phone, status')
+      .limit(20);
+
+    const appointments = await getPersistedAppointments();
+
+    return {
+      patients: patients || [],
+      appointments: appointments || [],
+    };
+  } catch (e) {
+    console.warn('[Clinical Context Error]:', e);
+    return { patients: [], appointments: [] };
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -12,7 +37,11 @@ export async function POST(request: Request) {
     }
 
     const aiRole: AIRole = (role || 'SUPPORT') as AIRole;
-    const response = await AIDispatcher.dispatch(prompt, aiRole);
+
+    // Cargar contexto clínico en vivo de la base de datos
+    const dbContext = await getClinicalContext();
+
+    const response = await AIDispatcher.dispatch(prompt, aiRole, dbContext);
 
     return NextResponse.json({
       success: true,
