@@ -523,7 +523,7 @@ export default function LandingPage() {
             <img
               src={ASSETS.after}
               alt="Molde dental después del tratamiento de estética dental de alta precisión"
-              className="w-full h-full object-cover object-[center_36%] scale-105 pointer-events-none transition-transform duration-700"
+              className="w-full h-full object-cover object-[center_80%] scale-105 pointer-events-none transition-transform duration-700"
               draggable={false}
             />
             <div className="absolute inset-0 bg-linear-to-t from-slate-950/85 via-slate-950/20 to-slate-950/40 pointer-events-none" />
@@ -541,7 +541,7 @@ export default function LandingPage() {
               <img
                 src={ASSETS.before}
                 alt="Molde dental antes del tratamiento clínico"
-                className="w-full h-full object-cover object-[center_36%] scale-105 pointer-events-none transition-transform duration-700"
+                className="w-full h-full object-cover object-[center_80%] scale-105 pointer-events-none transition-transform duration-700"
                 draggable={false}
               />
               <div className="absolute inset-0 bg-linear-to-t from-slate-950/90 via-slate-950/25 to-slate-950/45 pointer-events-none" />
