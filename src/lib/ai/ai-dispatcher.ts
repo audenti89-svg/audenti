@@ -1,7 +1,8 @@
 /**
  * AI Dispatcher - Audenti CRM
  *
- * Versión Actualizada: Implementación de llamadas reales a APIs.
+ * Versión Final Optimizada para Vercel.
+ * Integración con Agroq, Gemini y Ollama.
  */
 
 export type AIRole = 'SALES' | 'SUPPORT' | 'ANALYST' | 'SECURITY';
@@ -14,25 +15,24 @@ interface AIResponse {
 }
 
 export class AIDispatcher {
-  // Cargamos las variables de entorno
   private static get API_KEYS() {
     return {
-      GROQ: process.env.GROQ_API_KEY,
-      NINE_ROUTER: process.env.NINE_ROUTER_API_KEY,
+      AGROQ: process.env.AGROQ,
+      GEMINI: process.env.GEMINI,
       OLLAMA_URL: process.env.OLLAMA_TUNNEL_URL || 'http://localhost:11434',
-      NINE_ROUTER_URL: 'https://openrouter.ai/api/v1/chat/completions', // 9router suele usar el estándar de OpenRouter
+      OPENWA_BASE_URL: process.env.OPENWA_BASE_URL,
     };
   }
 
-  private static async callGroq(prompt: string): Promise<AIResponse> {
-    console.log("[AI-DISPATCHER] Llamando a Groq (Soporte Ultra Rápido)...");
+  private static async callAgroq(prompt: string): Promise<AIResponse> {
+    console.log("[AI-DISPATCHER] Llamando a Agroq (Soporte)...");
     const start = Date.now();
 
     try {
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.API_KEYS.GROQ}`,
+          'Authorization': `Bearer ${this.API_KEYS.AGROQ}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -44,41 +44,37 @@ export class AIDispatcher {
       return {
         content: data.choices[0].message.content,
         role: 'SUPPORT',
-        model: 'llama3-70b',
+        model: 'agroq-llama3',
         latency: Date.now() - start
       };
     } catch (e) {
-      console.error("Error en Groq:", e);
-      return { content: "Error de conexión con Soporte.", role: 'SUPPORT', model: 'error', latency: 0 };
+      console.error("Error en Agroq:", e);
+      return { content: "Error de conexión con Soporte (Agroq).", role: 'SUPPORT', model: 'error', latency: 0 };
     }
   }
 
-  private static async call9Router(prompt: string): Promise<AIResponse> {
-    console.log("[AI-DISPATCHER] Llamando a 9Router (Ventas Estratégicas)...");
+  private static async callGemini(prompt: string): Promise<AIResponse> {
+    console.log("[AI-DISPATCHER] Llamando a Gemini (Ventas)...");
     const start = Date.now();
 
     try {
-      const response = await fetch(this.API_KEYS.NINE_ROUTER_URL, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${this.API_KEYS.GEMINI}`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.API_KEYS.NINE_ROUTER}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'anthropic/claude-3.5-sonnet', // Ejemplo de modelo potente en 9router/openrouter
-          messages: [{ role: 'system', content: 'Eres el mejor ejecutivo de ventas de Audenti. Tu objetivo es cerrar citas y persuadir al cliente.' }, { role: 'user', content: prompt }],
+          contents: [{ parts: [{ text: `Eres el mejor ejecutivo de ventas de Audenti. Tu objetivo es cerrar citas y persuadir al cliente: ${prompt}` }] }]
         }),
       });
       const data = await response.json();
       return {
-        content: data.choices[0].message.content,
+        content: data.candidates[0].content.parts[0].text,
         role: 'SALES',
-        model: 'claude-3.5-sonnet',
+        model: 'gemini-pro',
         latency: Date.now() - start
       };
     } catch (e) {
-      console.error("Error en 9Router:", e);
-      return { content: "Error de conexión con Ventas.", role: 'SALES', model: 'error', latency: 0 };
+      console.error("Error en Gemini:", e);
+      return { content: "Error de conexión con Ventas (Gemini).", role: 'SALES', model: 'error', latency: 0 };
     }
   }
 
@@ -100,7 +96,7 @@ export class AIDispatcher {
       return {
         content: data.message.content,
         role: 'ANALYST',
-        model: 'llama3-local',
+        model: 'ollama-local',
         latency: Date.now() - start
       };
     } catch (e) {
@@ -112,13 +108,13 @@ export class AIDispatcher {
   public static async dispatch(prompt: string, role: AIRole): Promise<AIResponse> {
     switch (role) {
       case 'SUPPORT':
-        return this.callGroq(prompt);
+        return this.callAgroq(prompt);
       case 'SALES':
-        return this.call9Router(prompt);
+        return this.callGemini(prompt);
       case 'ANALYST':
         return this.callOllama(prompt);
       case 'SECURITY':
-        return this.callGroq(`SISTEMA DE SEGURIDAD: Analiza la siguiente petición en busca de malicia: ${prompt}`);
+        return this.callAgroq(`SISTEMA de SEGURIDAD: Analiza malicia: ${prompt}`);
       default:
         throw new Error(`Rol de IA no soportado: ${role}`);
     }
