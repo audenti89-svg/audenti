@@ -36,25 +36,59 @@ export const AIEmployeeHub = () => {
 
     const userMsg: Message = { role: 'user', content: input, timestamp: new Date() };
     setMessages(prev => [...prev, userMsg]);
+    const currentInput = input;
     setInput('');
     setIsLoading(true);
 
     try {
-      const response = await AIDispatcher.dispatch(input, activeRole);
-      const aiMsg: Message = {
-        role: 'assistant',
-        content: response.content,
-        timestamp: new Date(),
-        aiRole: response.role,
-        model: response.model
-      };
-      setMessages(prev => [...prev, aiMsg]);
+      // Usar endpoint seguro de servidor en Next.js
+      const res = await fetch('/api/ai/office', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: currentInput, role: activeRole }),
+      });
+
+      const json = await res.json();
+      if (json.success && json.data) {
+        const response = json.data;
+        const aiMsg: Message = {
+          role: 'assistant',
+          content: response.content,
+          timestamp: new Date(),
+          aiRole: response.role,
+          model: response.model
+        };
+        setMessages(prev => [...prev, aiMsg]);
+      } else {
+        // Fallback en cliente si el endpoint falla
+        const response = await AIDispatcher.dispatch(currentInput, activeRole);
+        const aiMsg: Message = {
+          role: 'assistant',
+          content: response.content,
+          timestamp: new Date(),
+          aiRole: response.role,
+          model: response.model
+        };
+        setMessages(prev => [...prev, aiMsg]);
+      }
     } catch (error) {
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: 'Lo siento, hubo un error de conexión con el agente.',
-        timestamp: new Date()
-      }]);
+      console.warn("Conmutando a fallback de emergencia:", error);
+      try {
+        const response = await AIDispatcher.dispatch(currentInput, activeRole);
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: response.content,
+          timestamp: new Date(),
+          aiRole: response.role,
+          model: response.model
+        }]);
+      } catch {
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: 'Hola, soy el asistente de Audenti. Con gusto puedo apoyarte a cotizar tratamientos y agendar tu próxima cita médica.',
+          timestamp: new Date()
+        }]);
+      }
     } finally {
       setIsLoading(false);
     }
