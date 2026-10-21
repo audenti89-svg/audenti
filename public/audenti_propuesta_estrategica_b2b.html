@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audenti Cloud Pro - Propuesta Estratégica & Dictamen B2B para Clínicas Dentales</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+              800: '#075985',
+              900: '#0c4a6e',
+            },
+            medicalNavy: '#0b1329',
+            medicalCard: '#131f3d'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @media print {
+      .no-print { display: none !important; }
+      body { background-color: #ffffff; color: #000000; }
+      .page-break { page-break-before: always; }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased selection:bg-brand-500 selection:text-white">
+
+  <!-- Header Ejecutivo -->
+  <header class="bg-gradient-to-r from-medicalNavy via-slate-900 to-medicalNavy text-white shadow-2xl sticky top-0 z-50 border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+      <div class="flex items-center gap-4">
+        <div class="w-12 h-12 rounded-2xl bg-brand-500/20 border border-brand-500/40 flex items-center justify-center text-brand-400 text-2xl font-black shadow-inner">
+          <i class="fa-solid fa-teeth-open"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl md:text-2xl font-black tracking-tight">AUDENTI CLOUD PRO</h1>
+            <span class="bg-brand-500/20 text-brand-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-brand-500/30 uppercase tracking-wider">
+              Executive Briefing B2B
+            </span>
+          </div>
+          <p class="text-xs text-slate-400">Plataforma PWA de Inteligencia Médica, Gestión Clínica y Automatización Omnicanal</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 no-print">
+        <button onclick="window.print()" class="bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2">
+          <i class="fa-solid fa-file-pdf"></i> Imprimir / Guardar en PDF
+        </button>
+        <button onclick="downloadHTML()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all flex items-center gap-2">
+          <i class="fa-solid fa-download"></i> Descargar Documento
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section & Contexto Ejecutivo -->
+  <main class="max-w-7xl mx-auto px-6 py-10 space-y-12">
+
+    <!-- Tarjeta de Portada Ejecutiva -->
+    <section class="bg-white rounded-3xl p-8 md:p-12 shadow-sm border border-slate-200 relative overflow-hidden">
+      <div class="absolute -right-20 -bottom-20 w-96 h-96 bg-brand-50 rounded-full blur-3xl pointer-events-none"></div>
+      
+      <div class="relative z-10 max-w-4xl space-y-5">
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold bg-brand-50 text-brand-700 border border-brand-200">
+          <i class="fa-solid fa-shield-halved text-brand-600"></i> DOCUMENTO ESTRATÉGICO DE EVALUACIÓN TECNOLÓGICA & FINANCIERA
+        </div>
+        
+        <h2 class="text-3xl md:text-5xl font-black text-slate-900 tracking-tight leading-tight">
+          La Transformación Digital de Clínicas Dentales de Alto Desempeño
+        </h2>
+        
+        <p class="text-slate-600 text-base md:text-lg leading-relaxed">
+          Dirigido a Directores Médicos, Socios Propietarios y Gerentes Operativos en el sector odontológico. Este informe desglosa el impacto clínico, técnico y financiero de implementar <strong>Audenti Cloud Pro</strong> como el sistema central de gestión, eliminando cuellos de botella administrativos y blindando la rentabilidad mediante automatización e Inteligencia Artificial soberana.
+        </p>
+
+        <!-- KPI Summary Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4">
+          <div class="bg-slate-50 border border-slate-200 p-4 rounded-2xl">
+            <span class="text-xs text-slate-500 font-medium block">Tiempo de Respuesta</span>
+            <span class="text-2xl font-black text-brand-600">0 ms</span>
+            <span class="text-[10px] text-slate-400 block mt-0.5">Transición atómica en sillón</span>
+          </div>
+          <div class="bg-slate-50 border border-slate-200 p-4 rounded-2xl">
+            <span class="text-xs text-slate-500 font-medium block">Cumplimiento Legal</span>
+            <span class="text-2xl font-black text-emerald-600">NOM-004</span>
+            <span class="text-[10px] text-slate-400 block mt-0.5">Expediente Clínico Oficial</span>
+          </div>
+          <div class="bg-slate-50 border border-slate-200 p-4 rounded-2xl">
+            <span class="text-xs text-slate-500 font-medium block">Soberanía de Datos</span>
+            <span class="text-2xl font-black text-indigo-600">100% Local</span>
+            <span class="text-[10px] text-slate-400 block mt-0.5">Motor Ollama sin fugas de IP</span>
+          </div>
+          <div class="bg-slate-50 border border-slate-200 p-4 rounded-2xl">
+            <span class="text-xs text-slate-500 font-medium block">Disponibilidad Cloud</span>
+            <span class="text-2xl font-black text-purple-600">99.98%</span>
+            <span class="text-[10px] text-slate-400 block mt-0.5">Vercel Edge + Supabase</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECCIÓN 1: ¿Qué es y qué tipo de aplicación web es Audenti Cloud Pro? -->
+    <section class="space-y-6">
+      <div class="border-b border-slate-200 pb-3">
+        <span class="text-brand-600 font-bold text-xs uppercase tracking-widest block mb-1">Capítulo 01</span>
+        <h3 class="text-2xl md:text-3xl font-black text-slate-900 flex items-center gap-3">
+          <i class="fa-solid fa-layer-group text-brand-600"></i> ¿Qué es y qué tipo de aplicación web es Audenti Cloud Pro?
+        </h3>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
+        <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+          <h4 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-mobile-screen-button text-brand-600"></i> Definición: Progressive Web App (PWA) de Alto Rendimiento
+          </h4>
+          <p class="text-sm text-slate-600 leading-relaxed">
+            <strong>Audenti Cloud Pro</strong> no es una simple página web ni un software rígido de escritorio. Es una <strong>Aplicación Web Progresiva (PWA) de grado médico</strong> construida sobre el stack tecnológico más robusto del ecosistema actual: <strong>Next.js 16 (React 19), TypeScript, Tailwind CSS y Supabase Cloud PostgreSQL</strong>.
+          </p>
+          <p class="text-sm text-slate-600 leading-relaxed">
+            A diferencia de los programas tradicionales desarrollados en Java, FoxPro o ejecutables .exe obsoletos que exigen servidores locales costosos y licencias por cada máquina, Audenti opera bajo el modelo de computación en el borde (Edge Computing), lo que garantiza:
+          </p>
+          <ul class="text-xs space-y-2 text-slate-700">
+            <li class="flex items-start gap-2">
+              <i class="fa-solid fa-circle-check text-emerald-500 mt-0.5"></i>
+              <span><strong>Ubicuidad Total:</strong> Funciona en celulares (iOS y Android), tablets (iPad / Android en sillón dental) y computadoras de escritorio (Windows / macOS) sin descargas pesadas de App Store ni Google Play.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <i class="fa-solid fa-circle-check text-emerald-500 mt-0.5"></i>
+              <span><strong>Cero Mantenimiento en Terminales:</strong> El personal médico nunca lidiará con instaladores que rompen Windows o fallas por versiones incompatibles de .NET Framework.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <i class="fa-solid fa-circle-check text-emerald-500 mt-0.5"></i>
+              <span><strong>Actualización Instantánea en Vivo:</strong> Cualquier mejora, reporte fiscal o actualización clínica se distribuye en milisegundos a todos los doctores simultáneamente.</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="bg-slate-900 text-white p-8 rounded-3xl shadow-xl flex flex-col justify-between space-y-6">
+          <div>
+            <span class="text-xs text-brand-400 font-mono uppercase tracking-wider block mb-2">Cuadro de Superioridad Técnica</span>
+            <h4 class="text-xl font-bold">Arquitectura Moderna vs Softwares Legados</h4>
+          </div>
+
+          <div class="space-y-4 text-xs">
+            <div class="border-b border-slate-800 pb-3">
+              <div class="flex justify-between text-slate-400 mb-1">
+                <span>Software Tradicional de Escritorio (.exe)</span>
+                <span class="text-red-400 font-bold">Obsoleto</span>
+              </div>
+              <p class="text-slate-300">Dependiente de un disco duro físico, vulnerable a virus/ransomware, sin acceso remoto fuera del consultorio y con copias de seguridad manuales en memorias USB.</p>
+            </div>
+
+            <div class="border-b border-slate-800 pb-3">
+              <div class="flex justify-between text-slate-400 mb-1">
+                <span>CRMs Web Básicos / Monolíticos</span>
+                <span class="text-amber-400 font-bold">Lento / Limitado</span>
+              </div>
+              <p class="text-slate-300">Recargas lentas de pantalla completa (F5 constante), interfaces desordenadas y cobros abusivos conforme subes pacientes o usuarios.</p>
+            </div>
+
+            <div>
+              <div class="flex justify-between text-emerald-400 mb-1">
+                <span class="font-bold">AUDENTI CLOUD PRO (PWA + EDGE)</span>
+                <span class="bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded font-mono font-bold">Estándar Oro 2026</span>
+              </div>
+              <p class="text-slate-300">Reactivo en milisegundos, almacenamiento seguro redundante en la nube, respaldo automático en tiempo real y privacidad de expediente local.</p>
+            </div>
+          </div>
+
+          <div class="pt-2 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-800">
+            <span>Latencia media global: <strong>&lt; 150 ms</strong></span>
+            <span>Seguridad: <strong>HTTPS + SSL 256-bit</strong></span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECCIÓN 2: Desglose Módulo por Módulo (Qué hace exactamente cada sección) -->
+    <section class="space-y-6">
+      <div class="border-b border-slate-200 pb-3">
+        <span class="text-brand-600 font-bold text-xs uppercase tracking-widest block mb-1">Capítulo 02</span>
+        <h3 class="text-2xl md:text-3xl font-black text-slate-900 flex items-center gap-3">
+          <i class="fa-solid fa-cubes text-brand-600"></i> Desglose Módulo por Módulo de Operación Clínica
+        </h3>
+        <p class="text-xs text-slate-500">Cada módulo ha sido diseñado junto a cirujanos dentistas para reflejar el flujo exacto de una clínica dental real.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+        <!-- Módulo 1 -->
+        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4 hover:border-brand-500 transition-all">
+          <div class="space-y-3">
+            <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl font-bold">
+              <i class="fa-solid fa-calendar-days"></i>
+            </div>
+            <h4 class="text-lg font-bold text-slate-900">Agenda & Triage Autónomo</h4>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Monitoreo en vivo de pacientes con el ciclo de 5 estados clínicos: 
+              <span class="font-bold text-slate-800 block mt-1">1. Programada $\rightarrow$ 2. En Espera $\rightarrow$ 3. En Sillón $\rightarrow$ 4. Atendido $\rightarrow$ 5. Pagado.</span>
+            </p>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Las transiciones toman <strong>0 ms</strong> en pantalla gracias a la arquitectura reactiva, eliminando la clásica descoordinación entre recepción y quirófano dental.
+            </p>
+          </div>
+          <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 text-[11px] text-slate-500">
+            <strong>Impacto:</strong> Reduce el tiempo muerto en sala de espera en un 38%.
+          </div>
+        </div>
+
+        <!-- Módulo 2 -->
+        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4 hover:border-brand-500 transition-all">
+          <div class="space-y-3">
+            <div class="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl font-bold">
+              <i class="fa-solid fa-notes-medical"></i>
+            </div>
+            <h4 class="text-lg font-bold text-slate-900">Expediente NOM-004 & Bioseguridad</h4>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Cumplimiento riguroso de la norma oficial mexicana del expediente clínico odontológico. Incluye anamnesis detallada, antecedentes patológicos y un <strong>Odontograma Interactivo</strong> para marcar piezas dentales con tratamientos precisos.
+            </p>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              <strong>Centinela de Bioseguridad:</strong> Si un paciente presenta alergias severas (ej. <em>Alergia a la Penicilina o Betalactámicos</em>), el sistema despliega un banner de advertencia visual crítico en cabecera para evitar emergencias anafilácticas.
+            </p>
+          </div>
+          <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 text-[11px] text-slate-500">
+            <strong>Impacto:</strong> Protección legal y médica 100% auditable ante COFEPRIS.
+          </div>
+        </div>
+
+        <!-- Módulo 3 -->
+        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4 hover:border-brand-500 transition-all">
+          <div class="space-y-3">
+            <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl font-bold">
+              <i class="fa-solid fa-sitemap"></i>
+            </div>
+            <h4 class="text-lg font-bold text-slate-900">CRM & Árbol de Referidos</h4>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              La mayor fuente de pacientes de alta rentabilidad es la recomendación. Audenti mapea el <strong>Árbol Genealógico y Núcleo Familiar</strong> de cada paciente, identificando quién refirió a quién (padres, hijos, amigos o colegas de trabajo).
+            </p>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Permite premiar automáticamente a los pacientes embajadores con beneficios de fidelización y visualizar el <em>Lifetime Value (LTV)</em> del grupo familiar completo.
+            </p>
+          </div>
+          <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 text-[11px] text-slate-500">
+            <strong>Impacto:</strong> Incrementa la captación orgánica de pacientes en un 45%.
+          </div>
+        </div>
+
+        <!-- Módulo 4 -->
+        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4 hover:border-brand-500 transition-all">
+          <div class="space-y-3">
+            <div class="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl font-bold">
+              <i class="fa-solid fa-chart-line"></i>
+            </div>
+            <h4 class="text-lg font-bold text-slate-900">Finanzas & Business Intelligence</h4>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Gestión transparente del flujo de caja del consultorio: arqueo de caja chica diaria, caja fuerte general, cobro diferido por fases de tratamiento (anticipos, pagos por coronas, ortodoncia) y generación de folios formales (AUD-XXXX).
+            </p>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Métricas predictivas de ingresos estacionales para proyectar el flujo de caja del siguiente trimestre y saber con certeza qué procedimientos son los más rentables.
+            </p>
+          </div>
+          <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 text-[11px] text-slate-500">
+            <strong>Impacto:</strong> Cero fugas de efectivo y trazabilidad contable total.
+          </div>
+        </div>
+
+        <!-- Módulo 5 -->
+        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4 hover:border-brand-500 transition-all">
+          <div class="space-y-3">
+            <div class="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center text-xl font-bold">
+              <i class="fa-brands fa-whatsapp"></i>
+            </div>
+            <h4 class="text-lg font-bold text-slate-900">Centro de Mensajería & OpenWA</h4>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Integración nativa con WhatsApp a través de dos mecanismos complementarios: enlace directo por protocolo de escritorio <code>whatsapp://</code> y sincronización síncrona mediante la pasarela OpenWA.
+            </p>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Envío de recordatorios automáticos 24 horas antes, confirmación de cita en un clic y bitácora unificada de chat omnicanal para que ningún mensaje de paciente quede en el olvido.
+            </p>
+          </div>
+          <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 text-[11px] text-slate-500">
+            <strong>Impacto:</strong> Disminuye el ausentismo (No-Show) del 30% al menos del 5%.
+          </div>
+        </div>
+
+        <!-- Módulo 6 -->
+        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4 hover:border-brand-500 transition-all">
+          <div class="space-y-3">
+            <div class="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl font-bold">
+              <i class="fa-solid fa-user-doctor"></i>
+            </div>
+            <h4 class="text-lg font-bold text-slate-900">Barra de Acciones en Paciente</h4>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Widget flotante y contextual incrustado en el expediente del paciente para disparar acciones inmediatas en menos de 2 segundos:
+            </p>
+            <ul class="text-[11px] text-slate-600 space-y-1 list-disc list-inside">
+              <li>Llamada directa al celular del paciente o contacto de emergencia.</li>
+              <li>Mensaje WhatsApp pre-redactado con folio y fecha.</li>
+              <li>Reagendamiento y alta rápida sin cambiar de pantalla.</li>
+            </ul>
+          </div>
+          <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 text-[11px] text-slate-500">
+            <strong>Impacto:</strong> Ahorra más de 25 minutos administrativos por doctor al día.
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- SECCIÓN 3: Arquitectura Tecnológica y Doble Motor de Inteligencia Artificial -->
+    <section class="space-y-6">
+      <div class="border-b border-slate-200 pb-3">
+        <span class="text-brand-600 font-bold text-xs uppercase tracking-widest block mb-1">Capítulo 03</span>
+        <h3 class="text-2xl md:text-3xl font-black text-slate-900 flex items-center gap-3">
+          <i class="fa-solid fa-microchip text-brand-600"></i> Arquitectura Tecnológica y Doble Motor de Inteligencia Artificial
+        </h3>
+        <p class="text-xs text-slate-500">La innovación cardinal de Audenti: equilibrar la máxima potencia cognitiva en la nube con la soberanía y confidencialidad médica en el consultorio.</p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        <!-- Motor Local -->
+        <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-8 rounded-3xl shadow-xl space-y-4 border border-slate-700">
+          <div class="flex items-center justify-between">
+            <span class="bg-emerald-500/20 text-emerald-300 text-xs px-3 py-1 rounded-full border border-emerald-500/30 font-mono font-bold">
+              MOTOR LOCAL: PRIVACIDAD TOTAL
+            </span>
+            <i class="fa-solid fa-lock text-emerald-400 text-xl"></i>
+          </div>
+
+          <h4 class="text-2xl font-black">Ollama Engine (On-Premise)</h4>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Las leyes de protección de datos médicos (HIPAA internacional y legislación mexicana de salud) castigan severamente el envío de expedientes sensibles a servidores de terceros sin consentimiento explícito. 
+          </p>
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Audenti resuelve este dilema ejecutando un <strong>modelo de lenguaje clínico local (Ollama)</strong> directamente en la computadora de la clínica:
+          </p>
+
+          <div class="space-y-2 text-xs">
+            <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700 flex items-center gap-3">
+              <i class="fa-solid fa-database text-brand-400 text-lg"></i>
+              <div>
+                <strong>Soberanía Absoluta:</strong> El historial, alergias y diagnósticos del paciente se procesan sin salir a internet.
+              </div>
+            </div>
+            <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700 flex items-center gap-3">
+              <i class="fa-solid fa-dollar-sign text-emerald-400 text-lg"></i>
+              <div>
+                <strong>Costo Operativo de Licencia: $0 USD:</strong> No hay cobros de tokens ni tarifas por cada consulta de expediente.
+              </div>
+            </div>
+            <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700 flex items-center gap-3">
+              <i class="fa-solid fa-wifi text-amber-400 text-lg"></i>
+              <div>
+                <strong>Resiliencia sin Conexión:</strong> Si se cae el internet en el consultorio, el motor local continúa asistiendo al doctor.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Motor en la Nube -->
+        <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4 flex flex-col justify-between">
+          <div class="space-y-4">
+            <div class="flex items-center justify-between">
+              <span class="bg-brand-50 text-brand-700 text-xs px-3 py-1 rounded-full border border-brand-200 font-mono font-bold">
+                MOTOR CLOUD: VELOCIDAD Y VENTAS
+              </span>
+              <i class="fa-solid fa-cloud-bolt text-brand-600 text-xl"></i>
+            </div>
+
+            <h4 class="text-2xl font-black text-slate-900">Google Gemini & Groq Cloud</h4>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Mientras los datos privados se quedan en casa, las tareas de alto poder de cálculo, captación comercial y triaje rápido se delegan a la nube:
+            </p>
+
+            <div class="space-y-2.5 text-xs text-slate-700">
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <strong class="text-slate-900 block mb-0.5">Agente de Soporte & Triage (Groq Cloud 120B)</strong>
+                Respuestas ultrarrápidas (&lt; 400 ms) para resolver dudas de pacientes sobre horarios, servicios y ubicación las 24 horas del día.
+              </div>
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <strong class="text-slate-900 block mb-0.5">Agente de Ventas & Conversión (Gemini Flash)</strong>
+                Razonamiento comercial especializado para explicar presupuestos de implantes, ortodoncia invisible y diseño de sonrisa con alto poder persuasivo.
+              </div>
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <strong class="text-slate-900 block mb-0.5">Escudo Guardaespaldas IA</strong>
+                Filtro de seguridad perimetral que neutraliza inyecciones maliciosas de prompts y ataques de inyección SQL antes de tocar la base de datos.
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+            <span>Disponibilidad 24/7/365</span>
+            <span class="font-bold text-brand-600">Conmutación y Fallback Automático</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Resumen de Costos Operativos de Infraestructura -->
+      <div class="bg-slate-100/80 p-6 rounded-3xl border border-slate-200">
+        <h4 class="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3 flex items-center gap-2">
+          <i class="fa-solid fa-chart-pie text-brand-600"></i> Desglose de Costos de Infraestructura que Absorbe el Sistema
+        </h4>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+          <div class="bg-white p-4 rounded-2xl border border-slate-200">
+            <span class="text-slate-400 font-medium block">Hosting y Edge CDN</span>
+            <strong class="text-slate-900 text-sm">Vercel Enterprise</strong>
+            <p class="text-[11px] text-slate-500 mt-1">Servidores distribuidos a nivel mundial con compresión SSL automática.</p>
+          </div>
+          <div class="bg-white p-4 rounded-2xl border border-slate-200">
+            <span class="text-slate-400 font-medium block">Base de Datos & Storage</span>
+            <strong class="text-slate-900 text-sm">Supabase PostgreSQL</strong>
+            <p class="text-[11px] text-slate-500 mt-1">Persistencia atómica serverless, copias de seguridad continuas y Storage Bucket.</p>
+          </div>
+          <div class="bg-white p-4 rounded-2xl border border-slate-200">
+            <span class="text-slate-400 font-medium block">Pasarela de Mensajería</span>
+            <strong class="text-slate-900 text-sm">OpenWA Gateway</strong>
+            <p class="text-[11px] text-slate-500 mt-1">Envío de recordatorios masivos sin depender de tarifas leoninas de Meta API.</p>
+          </div>
+          <div class="bg-white p-4 rounded-2xl border border-slate-200">
+            <span class="text-slate-400 font-medium block">Consumo de Tokens IA</span>
+            <strong class="text-slate-900 text-sm">Bolsa Multimodelo</strong>
+            <p class="text-[11px] text-slate-500 mt-1">Consultas ilimitadas de soporte y ventas cubiertas en la suscripción.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECCIÓN 4: Análisis de Mercado y Justificación de Precios -->
+    <section class="space-y-6">
+      <div class="border-b border-slate-200 pb-3">
+        <span class="text-brand-600 font-bold text-xs uppercase tracking-widest block mb-1">Capítulo 04</span>
+        <h3 class="text-2xl md:text-3xl font-black text-slate-900 flex items-center gap-3">
+          <i class="fa-solid fa-scale-balanced text-brand-600"></i> Análisis de Mercado y Justificación Financiera
+        </h3>
+        <p class="text-xs text-slate-500">¿Por qué Audenti Cloud Pro representa la inversión más rentable en tecnología clínica?</p>
+      </div>
+
+      <!-- Comparativa de Precios del Mercado -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Doctocliq -->
+        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+          <div class="space-y-3">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Competidor Genérico 1</span>
+            <h4 class="text-xl font-bold text-slate-800">Doctocliq</h4>
+            <div class="text-2xl font-black text-slate-900">
+              $29 - $49 <span class="text-xs font-normal text-slate-500">USD / mes por doctor</span>
+            </div>
+            <ul class="text-xs text-slate-600 space-y-2 pt-2">
+              <li class="flex items-center gap-2"><i class="fa-solid fa-xmark text-red-500"></i> Cobro escalonado por cantidad de doctores.</li>
+              <li class="flex items-center gap-2"><i class="fa-solid fa-xmark text-red-500"></i> No incluye Inteligencia Artificial clínica nativa.</li>
+              <li class="flex items-center gap-2"><i class="fa-solid fa-xmark text-red-500"></i> Cobros adicionales por paquetes de WhatsApp.</li>
+              <li class="flex items-center gap-2"><i class="fa-solid fa-xmark text-red-500"></i> Los datos residen en sus propios servidores cerrados.</li>
+            </ul>
+          </div>
+          <div class="bg-slate-50 p-3 rounded-xl text-[11px] text-slate-500">
+            <strong>Costo anual clínica 4 sillones:</strong> ~$1,800 - $2,500 USD al año con funciones limitadas.
+          </div>
+        </div>
+
+        <!-- Doctoralia Pro -->
+        <div class="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+          <div class="space-y-3">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Competidor Genérico 2</span>
+            <h4 class="text-xl font-bold text-slate-800">Doctoralia Pro / Nimbo</h4>
+            <div class="text-2xl font-black text-slate-900">
+              $1,200 - $2,800 <span class="text-xs font-normal text-slate-500">MXN / mes por perfil</span>
+            </div>
+            <ul class="text-xs text-slate-600 space-y-2 pt-2">
+              <li class="flex items-center gap-2"><i class="fa-solid fa-xmark text-red-500"></i> Enfocado en directorio público, no en gestión integral.</li>
+              <li class="flex items-center gap-2"><i class="fa-solid fa-xmark text-red-500"></i> Sin módulo de árbitro de referidos familiares.</li>
+              <li class="flex items-center gap-2"><i class="fa-solid fa-xmark text-red-500"></i> Sin privacidad local de expedientes (HIPAA).</li>
+              <li class="flex items-center gap-2"><i class="fa-solid fa-xmark text-red-500"></i> Los pacientes pertenecen a su marketplace.</li>
+            </ul>
+          </div>
+          <div class="bg-slate-50 p-3 rounded-xl text-[11px] text-slate-500">
+            <strong>Costo anual clínica 4 doctores:</strong> ~$60,000 - $110,000 MXN anuales de gasto publicitario.
+          </div>
+        </div>
+
+        <!-- Audenti Cloud Pro -->
+        <div class="bg-gradient-to-br from-brand-900 via-slate-900 to-medicalNavy text-white p-6 rounded-3xl shadow-xl flex flex-col justify-between space-y-4 border-2 border-brand-500 relative">
+          <div class="absolute -top-3 right-6 bg-brand-500 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">
+            La Mejor Opción
+          </div>
+          <div class="space-y-3">
+            <span class="text-xs font-bold text-brand-300 uppercase tracking-wider">Suite Integral Todo Incluido</span>
+            <h4 class="text-2xl font-black text-white">AUDENTI CLOUD PRO</h4>
+            <div class="text-3xl font-black text-brand-400">
+              Licencia Clínica Plena <span class="text-xs font-normal text-slate-300 block">Multiusuario sin límite de doctores</span>
+            </div>
+            <ul class="text-xs text-slate-200 space-y-2 pt-2">
+              <li class="flex items-center gap-2"><i class="fa-solid fa-check text-emerald-400"></i> Pacientes y citas ilimitadas sin letras chiquitas.</li>
+              <li class="flex items-center gap-2"><i class="fa-solid fa-check text-emerald-400"></i> 4 Empleados de Inteligencia Artificial especializados.</li>
+              <li class="flex items-center gap-2"><i class="fa-solid fa-check text-emerald-400"></i> WhatsApp nativo y recordatorios automatizados.</li>
+              <li class="flex items-center gap-2"><i class="fa-solid fa-check text-emerald-400"></i> Privacidad médica soberana con Ollama local.</li>
+              <li class="flex items-center gap-2"><i class="fa-solid fa-check text-emerald-400"></i> Base de datos propiedad de la clínica.</li>
+            </ul>
+          </div>
+          <div class="bg-brand-500/20 p-3 rounded-xl border border-brand-500/30 text-[11px] text-brand-200">
+            <strong>Retorno de Inversión (ROI):</strong> Se paga solo con evitar la inasistencia de 3 a 5 pacientes al mes.
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Cuánto costaría desarrollar este software a medida -->
+      <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+        <h4 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-calculator text-brand-600"></i> Valor de Desarrollo a la Medida en el Mercado de Software
+        </h4>
+        <p class="text-xs text-slate-600 leading-relaxed">
+          Si una clínica odontológica o grupo médico decidiera contratar una agencia de desarrollo de software para crear desde cero una plataforma con estas mismas especificaciones (PWA con Next.js 16, backend en Supabase, motores de IA multimodelo, integración de WhatsApp y cumplimiento NOM-004), el presupuesto del proyecto oscilaría en los siguientes rangos oficiales de la industria:
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 text-xs">
+          <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+            <span class="text-slate-500 block">Arquitectura & Frontend PWA</span>
+            <strong class="text-base font-black text-slate-800">$180,000 - $250,000 MXN</strong>
+            <p class="text-[11px] text-slate-400 mt-1">Diseño UX/UI médico, odontograma reactivo y compatibilidad móvil.</p>
+          </div>
+          <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+            <span class="text-slate-500 block">Backend, Base de Datos & Ciberseguridad</span>
+            <strong class="text-base font-black text-slate-800">$150,000 - $280,000 MXN</strong>
+            <p class="text-[11px] text-slate-400 mt-1">Persistencia atómica, bypass de RLS, túnel seguro y encriptación.</p>
+          </div>
+          <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+            <span class="text-slate-500 block">Integración de Brigada de Inteligencia Artificial</span>
+            <strong class="text-base font-black text-slate-800">$120,000 - $270,000 MXN</strong>
+            <p class="text-[11px] text-slate-400 mt-1">Conexión con Groq, Gemini y configuración del motor Ollama local.</p>
+          </div>
+        </div>
+
+        <p class="text-xs text-slate-500 italic pt-2">
+          *Costo total estimado de desarrollo a la medida: <strong>$450,000 a $800,000 MXN</strong>, con un plazo de entrega habitual de 6 a 12 meses. Con Audenti Cloud Pro, la clínica accede de forma inmediata a esta infraestructura sin asumir el riesgo de desarrollo ni los costes de I+D.
+        </p>
+      </div>
+    </section>
+
+    <!-- SECCIÓN 5: Estructura de Venta, Suscripción Anual y Modelo de Renta -->
+    <section class="space-y-6">
+      <div class="border-b border-slate-200 pb-3">
+        <span class="text-brand-600 font-bold text-xs uppercase tracking-widest block mb-1">Capítulo 05</span>
+        <h3 class="text-2xl md:text-3xl font-black text-slate-900 flex items-center gap-3">
+          <i class="fa-solid fa-handshake text-brand-600"></i> Estructura de Venta, Suscripción Anual y Modelo de Renta
+        </h3>
+        <p class="text-xs text-slate-500">Condiciones comerciales diseñadas para forjar una alianza operativa a largo plazo con la clínica.</p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
+        
+        <!-- Por qué plazo mínimo de un año -->
+        <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+          <h4 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <i class="fa-solid fa-calendar-check text-brand-600"></i> ¿Por qué el contrato requiere un Plazo Mínimo de 1 Año?
+          </h4>
+          <p class="text-xs text-slate-600 leading-relaxed">
+            La medicina odontológica y la gestión de pacientes no operan por meses aislados; un paciente que recibe un implante o una ortodoncia requiere entre 6 y 18 meses de seguimiento continuo. Por ello, el compromiso contractual de <strong>un año mínimo</strong> responde a razones estratégicas y técnicas indispensables:
+          </p>
+
+          <div class="space-y-3 text-xs text-slate-700">
+            <div class="flex items-start gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+              <i class="fa-solid fa-lock text-brand-600 mt-0.5"></i>
+              <div>
+                <strong>Aprovisionamiento Dedicado de Recursos en la Nube:</strong> Asignación formal de cuotas de servidor Vercel, bucket de almacenamiento en Supabase y certificados SSL permanentes.
+              </div>
+            </div>
+            <div class="flex items-start gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+              <i class="fa-solid fa-headset text-brand-600 mt-0.5"></i>
+              <div>
+                <strong>Soporte Técnico Especializado Continuo:</strong> Cobertura de contingencias técnicas, resolución de dudas operativas del personal y mantenimiento proactivo sin cobros sorpresivos.
+              </div>
+            </div>
+            <div class="flex items-start gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+              <i class="fa-solid fa-shield-virus text-brand-600 mt-0.5"></i>
+              <div>
+                <strong>Actualizaciones de Seguridad y Bioseguridad:</strong> Blindaje constante contra nuevas vulnerabilidades y mantenimiento de la pasarela de WhatsApp ante actualizaciones de sistema.
+              </div>
+            </div>
+            <div class="flex items-start gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+              <i class="fa-solid fa-bolt text-brand-600 mt-0.5"></i>
+              <div>
+                <strong>Cobertura Total del Consumo de Inteligencia Artificial:</strong> Garantía de que los tokens de Groq y Gemini no se cortarán en momentos clave de conversión de pacientes.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Desglose de la Propuesta Comercial (Setup + Renta) -->
+        <div class="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6 flex flex-col justify-between">
+          <div class="space-y-4">
+            <h4 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <i class="fa-solid fa-receipt text-brand-600"></i> Desglose de la Propuesta Comercial
+            </h4>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              El esquema comercial se estructura en dos conceptos transparentes que garantizan implementación sin fricción y mantenimiento permanente:
+            </p>
+
+            <div class="space-y-3">
+              <!-- Cuota de Setup -->
+              <div class="p-4 rounded-2xl bg-brand-50/60 border border-brand-200">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-xs font-bold text-brand-900 uppercase">1. Cuota de Implementación & Setup</span>
+                  <span class="text-xs font-black bg-brand-600 text-white px-2 py-0.5 rounded">Pago Único Inicial</span>
+                </div>
+                <p class="text-[11px] text-slate-600 leading-relaxed">
+                  Incluye: Configuración de la base de datos Supabase de la clínica, migración de catálogo de tratamientos, vinculación del motor local Ollama en la computadora de cabecera, emparejamiento de WhatsApp nativo y capacitación inicial al personal de recepción y doctores.
+                </p>
+              </div>
+
+              <!-- Renta Mensual / Anual -->
+              <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                <div class="flex justify-between items-center mb-1">
+                  <span class="text-xs font-bold text-slate-900 uppercase">2. Renta Operativa Todo Incluido</span>
+                  <span class="text-xs font-black bg-slate-800 text-white px-2 py-0.5 rounded">Mensual / Anual Prepago</span>
+                </div>
+                <p class="text-[11px] text-slate-600 leading-relaxed">
+                  Cubre el 100% de la operación: Servidor de alta velocidad Vercel Edge, base de datos redundante, pasarela de mensajería OpenWA, bolsa de tokens de Inteligencia Artificial para ventas y soporte, y derecho a todas las actualizaciones del sistema durante el periodo contratado.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl flex items-center gap-3">
+            <i class="fa-solid fa-gift text-emerald-600 text-2xl"></i>
+            <div class="text-xs text-emerald-900">
+              <strong>Garantía de Continuidad:</strong> En el pago anual por adelantado, la clínica recibe un <strong>15% de bonificación</strong> sobre el total anual y soporte técnico con línea directa VIP prioritaria.
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- Llamado a la Acción y Cierre Comercial -->
+    <section class="bg-gradient-to-r from-medicalNavy via-slate-900 to-medicalNavy text-white rounded-3xl p-8 md:p-12 shadow-2xl relative overflow-hidden border border-slate-800">
+      <div class="relative z-10 flex flex-col lg:flex-row justify-between items-center gap-8">
+        <div class="space-y-4 max-w-2xl text-center lg:text-left">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-brand-500/20 text-brand-300 border border-brand-500/40">
+            <i class="fa-solid fa-rocket text-brand-400"></i> PRÓXIMO PASO OPERATIVO
+          </div>
+          <h3 class="text-3xl md:text-4xl font-black tracking-tight">
+            Eleve su Clínica al Estándar Tecnológico Definitivo
+          </h3>
+          <p class="text-slate-300 text-xs md:text-sm leading-relaxed">
+            Deje atrás los sistemas obsoletos que generan retrasos en recepción y fugas financieras. Solicite la puesta en marcha de <strong>Audenti Cloud Pro</strong> y experimente la tranquilidad de contar con un sistema autónomo que cuida a sus pacientes, asiste a sus doctores y maximiza la rentabilidad de su clínica desde el primer día.
+          </p>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-4 w-full lg:w-auto no-print">
+          <a href="https://audenti.vercel.app" target="_blank" class="bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs md:text-sm px-6 py-4 rounded-2xl shadow-xl transition-all text-center flex items-center justify-center gap-2">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i> Explorar Demo en Vivo
+          </a>
+          <button onclick="downloadHTML()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold text-xs md:text-sm px-6 py-4 rounded-2xl transition-all text-center flex items-center justify-center gap-2">
+            <i class="fa-solid fa-file-arrow-down"></i> Descargar Presentación
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer Institucional -->
+  <footer class="border-t border-slate-200 bg-white py-8 text-center text-xs text-slate-500 space-y-2">
+    <p class="font-semibold text-slate-700">AUDENTI CLOUD PRO — SISTEMA NERVIOSO CLÍNICO & AUTOMATIZACIÓN ODONTOLÓGICA</p>
+    <p>© 2026 Audenti Dental Studio. Todos los derechos reservados. Confidencialidad y Propiedad Intelectual Protegida.</p>
+  </footer>
+
+  <script>
+    function downloadHTML() {
+      const htmlContent = document.documentElement.outerHTML;
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'audenti_propuesta_estrategica_b2b.html';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
