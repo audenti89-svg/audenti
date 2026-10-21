@@ -465,7 +465,7 @@ export default function LandingPage() {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
-        className="relative w-full min-h-[100svh] select-none touch-pan-y outline-none overflow-hidden bg-slate-950 cursor-crosshair pt-28 pb-20 md:pb-24 md:pt-16 flex flex-col justify-between md:block"
+        className="relative w-full min-h-[110svh] select-none touch-pan-y outline-none overflow-hidden bg-slate-950 cursor-crosshair pt-28 pb-32 md:pb-48 md:pt-24 flex flex-col justify-center md:block"
         aria-label="Comparador interactivo de moldes dentales con seguimiento de cursor y táctil"
       >
         {/* ======================================================== */}
@@ -519,11 +519,11 @@ export default function LandingPage() {
         {/* ======================================================== */}
         <div className="hidden md:block absolute inset-0 w-full h-full">
           {/* AFTER (Clean cast - 1.webp) */}
-          <div className="absolute inset-0 w-full h-full overflow-hidden">
+          <div className="absolute inset-0 w-full h-full overflow-visible">
             <img
               src={ASSETS.after}
               alt="Molde dental después del tratamiento de estética dental de alta precisión"
-              className="w-full h-full object-cover object-[center_36%] scale-105 pointer-events-none transition-transform duration-700"
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[45%] w-auto h-auto max-h-[75vh] scale-105 pointer-events-none transition-transform duration-700 z-20"
               draggable={false}
             />
             <div className="absolute inset-0 bg-linear-to-t from-slate-950/85 via-slate-950/20 to-slate-950/40 pointer-events-none" />
@@ -531,7 +531,7 @@ export default function LandingPage() {
 
           {/* BEFORE (Stained cast - 2.webp) */}
           <div
-            className="absolute inset-y-0 left-0 overflow-hidden transition-[width] duration-75 ease-out"
+            className="absolute inset-y-0 left-0 overflow-visible transition-[width] duration-75 ease-out"
             style={{ width: `${splitPercent}%` }}
           >
             <div
@@ -541,7 +541,7 @@ export default function LandingPage() {
               <img
                 src={ASSETS.before}
                 alt="Molde dental antes del tratamiento clínico"
-                className="w-full h-full object-cover object-[center_36%] scale-105 pointer-events-none transition-transform duration-700"
+                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[45%] w-auto h-auto max-h-[75vh] scale-105 pointer-events-none transition-transform duration-700 z-20"
                 draggable={false}
               />
               <div className="absolute inset-0 bg-linear-to-t from-slate-950/90 via-slate-950/25 to-slate-950/45 pointer-events-none" />
@@ -607,9 +607,9 @@ export default function LandingPage() {
           </div>
 
           {/* 3° Área del Modelo Dental Interactivo con Comida Veo 3 Visible */}
-          <div className="relative w-full h-[340px] rounded-3xl overflow-hidden border border-white/20 shadow-2xl bg-slate-950 my-1">
+          <div className="relative w-full h-[360px] sm:h-[420px] rounded-3xl overflow-hidden border border-white/20 shadow-2xl bg-slate-950 my-4 mb-6">
             {/* FONDO DE COMIDA VEO 3 CLARAMENTE VISIBLE */}
-            <div 
+            <div
               className="absolute inset-0 pointer-events-none z-10 overflow-hidden transition-all duration-300 ease-out"
               style={{
                 opacity: Math.max(0.25, 0.85 - (splitPercent / 100) * 0.65),
@@ -628,7 +628,7 @@ export default function LandingPage() {
               <img
                 src={ASSETS.after}
                 alt="Dientes blancos después"
-                className="w-full h-full object-cover object-center scale-110 pointer-events-none mix-blend-screen"
+                className="w-full h-full object-cover object-[center_35%] scale-105 pointer-events-none mix-blend-screen"
               />
             </div>
 
@@ -644,7 +644,7 @@ export default function LandingPage() {
                 <img
                   src={ASSETS.before}
                   alt="Dientes manchados antes"
-                  className="w-full h-full object-cover object-center scale-110 pointer-events-none mix-blend-screen"
+                  className="w-full h-full object-cover object-[center_35%] scale-105 pointer-events-none mix-blend-screen"
                 />
               </div>
             </div>
@@ -793,17 +793,17 @@ export default function LandingPage() {
       {/* ======================================================== */}
       {/* 4. SECCIÓN ABOUT: MISIÓN & INSTALACIONES CLÍNICAS */}
       {/* ======================================================== */}
-      <section id="about" className="py-20 lg:py-28 px-4 sm:px-8 lg:px-12 max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          <div className="lg:col-span-6 space-y-6">
+      <section id="about" className="py-24 lg:py-32 px-4 sm:px-8 lg:px-12 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-12 duration-1000">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-center">
+          <div className="lg:col-span-6 space-y-8">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/10 text-amber-300 border border-amber-400/30 text-xs font-bold uppercase tracking-wider">
               <Stethoscope className="w-3.5 h-3.5 text-amber-400" />
               Filosofía Clínica &amp; Excelencia
             </div>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-[1.1] font-hanken">
+            <h2 className="text-3xl sm:text-4xl lg:text-6xl font-black text-white tracking-tighter leading-[1.1] font-hanken">
               Donde la ciencia biomédica se encuentra con el arte dental.
             </h2>
-            <p className="text-sm text-slate-300 leading-relaxed">
+            <p className="text-sm text-slate-300 leading-relaxed font-medium">
               En Audenti Studio, bajo el liderazgo de la <strong className="text-white">Dra. Aura Estudillo</strong>, concebimos cada tratamiento como una obra personalizada. No creemos en soluciones estándar: combinamos tomografía Cone Beam de haz cónico, planificación virtual 3D y materiales cerámicos alemanes para devolver función masticatoria y armonía estética con mínima invasión.
             </p>
 
@@ -853,18 +853,18 @@ export default function LandingPage() {
       {/* ======================================================== */}
       {/* 5. SECCIÓN TRATAMIENTOS: CUADRÍCULA EDITORIAL LIMPIA */}
       {/* ======================================================== */}
-      <section id="tratamientos" className="py-20 bg-[#111827] border-y border-slate-800/80 px-4 sm:px-8 lg:px-12">
-        <div className="max-w-7xl mx-auto space-y-12">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div>
+      <section id="tratamientos" className="py-24 bg-slate-900/50 backdrop-blur-sm border-y border-slate-800/40 px-4 sm:px-8 lg:px-12 animate-in fade-in slide-in-from-bottom-12 duration-1000">
+        <div className="max-w-7xl mx-auto space-y-16">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+            <div className="space-y-4">
               <span className="text-xs font-bold uppercase tracking-wider text-amber-300 bg-amber-400/10 px-3 py-1 rounded-full border border-amber-400/20">
                 Catálogo de Especialidades Odontológicas
               </span>
-              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight mt-3 font-hanken">
+              <h2 className="text-3xl sm:text-4xl lg:text-6xl font-black text-white tracking-tighter mt-3 font-hanken leading-tight">
                 Precisión que transforma vidas.
               </h2>
             </div>
-            <p className="text-xs text-slate-400 max-w-md leading-relaxed">
+            <p className="text-xs text-slate-400 max-w-md leading-relaxed font-medium">
               Tratamientos avalados por la Asociación Dental Mexicana (ADM) y diseñados bajo normas oficiales NOM-013-SSA2 para una salud bucodental de clase mundial.
             </p>
           </div>
