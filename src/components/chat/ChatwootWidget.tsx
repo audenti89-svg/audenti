@@ -36,8 +36,14 @@ export function ChatwootWidget() {
       hideMessageBubble: false,
     }
 
+    // Solo inicializar si se ha configurado un WEBSITE_TOKEN real de producción
+    const WEBSITE_TOKEN = process.env.NEXT_PUBLIC_CHATWOOT_WEBSITE_TOKEN
+    if (!WEBSITE_TOKEN) {
+      // Si no hay token configurado en .env, omitir la inyección del script para evitar errores de origen/frame
+      return
+    }
+
     const BASE_URL = process.env.NEXT_PUBLIC_CHATWOOT_BASE_URL || 'https://app.chatwoot.com'
-    const WEBSITE_TOKEN = process.env.NEXT_PUBLIC_CHATWOOT_WEBSITE_TOKEN || 'audenti_chatwoot_token_2026'
 
     // Evitar inyecciones duplicadas
     if (document.getElementById('chatwoot-wjs')) return

@@ -869,7 +869,7 @@ export default function LandingPage() {
               Donde la ciencia biomédica se encuentra con el arte dental.
             </h2>
             <p className="text-sm text-slate-300 leading-relaxed">
-              En Audenti Studio, bajo el liderazgo de la <strong className="text-white">Dra. Aura Estudillo</strong>, concebimos cada tratamiento como una obra personalizada. No creemos en soluciones estándar: combinamos tomografía Cone Beam de haz cónico, planificación virtual 3D y materiales cerámicos alemanes para devolver función masticatoria y armonía estética con mínima invasión.
+              En Audenti Studio, bajo el liderazgo de la <strong className="text-white">Dra. Aura Estudillo</strong>, concebimos cada tratamiento como una obra personalizada. No utilizamos tratamientos genéricos: combinamos tomografía Cone Beam de haz cónico, planificación virtual 3D y materiales cerámicos alemanes para devolver función masticatoria y armonía estética con mínima invasión.
             </p>
 
             <div className="grid grid-cols-2 gap-4 pt-2">

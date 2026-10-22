@@ -196,7 +196,7 @@ export default function PatientPortalPage() {
   const patientName = patient?.full_name || user?.user_metadata?.full_name || 'Paciente';
 
   return (
-    <div className="min-h-screen bg-[#0A0F1D] text-white selection:bg-amber-400 selection:text-slate-950 pb-20">
+    <div className="min-h-screen bg-[#0A0F1D] text-white selection:bg-amber-400 selection:text-slate-950 pb-36">
       {/* 1. Header Institucional del Portal - PatientHeader Oficial Limpio y Separado */}
       <header className="w-full bg-[#0d1322] border-b border-gray-800 px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 sticky top-0 z-40">
         {/* Identidad de la Clínica */}
@@ -262,7 +262,7 @@ export default function PatientPortalPage() {
                   Bioseguridad Validada
                 </span>
                 <p className="text-xs font-bold text-emerald-200">
-                  Sin alergias reportadas (Paciente Apto para Tratamiento Clínico)
+                  Sin alergias reportadas en cuestionario inicial (Sujeto a verificación clínica presencial)
                 </p>
               </div>
             </div>
