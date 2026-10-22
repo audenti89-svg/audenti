@@ -98,20 +98,30 @@ export default function PatientPortalPage() {
 
         setUser(authUser);
 
-        // Consulta filtrada estrictamente al ID o email del usuario en sesión
-        let { data: myProfile } = await supabase
+        // Consulta filtrada estrictamente al user_id del usuario autenticado
+        let { data: myProfile, error: profileError } = await supabase
           .from('patients')
           .select('*')
-          .or(`user_id.eq.${authUser.id},email.eq.${authUser.email}`)
+          .eq('user_id', authUser.id)
           .maybeSingle();
 
-        if (!myProfile && authUser.id) {
-          const { data: fallbackProfile } = await supabase
+        // Enlace de contingencia por email únicamente si el correo está verificado por el proveedor de autenticación
+        const isEmailVerified = !!authUser.email_confirmed_at || !!authUser.confirmed_at;
+        if (!myProfile && authUser.email && isEmailVerified) {
+          const { data: emailProfile } = await supabase
             .from('patients')
             .select('*')
-            .eq('id', authUser.id)
+            .eq('email', authUser.email)
             .maybeSingle();
-          myProfile = fallbackProfile;
+          
+          if (emailProfile) {
+            myProfile = emailProfile;
+            // Auto-enlazar user_id para futuras consultas directas
+            await supabase
+              .from('patients')
+              .update({ user_id: authUser.id })
+              .eq('id', emailProfile.id);
+          }
         }
 
         setPatient(myProfile);
@@ -196,7 +206,7 @@ export default function PatientPortalPage() {
   const patientName = patient?.full_name || user?.user_metadata?.full_name || 'Paciente';
 
   return (
-    <div className="min-h-screen bg-[#0A0F1D] text-white selection:bg-amber-400 selection:text-slate-950 pb-36">
+    <div className="min-h-screen bg-[#0A0F1D] text-white selection:bg-amber-400 selection:text-slate-950 pb-20">
       {/* 1. Header Institucional del Portal - PatientHeader Oficial Limpio y Separado */}
       <header className="w-full bg-[#0d1322] border-b border-gray-800 px-6 py-4 flex flex-col md:flex-row items-center justify-between gap-4 sticky top-0 z-40">
         {/* Identidad de la Clínica */}

@@ -1,20 +1,25 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient } from '@/lib/supabase/server';
 import { sendDoctorWhatsAppAlert, sendPatientWhatsAppMessage } from '@/lib/notifications/whatsapp-doctor';
 
 export const runtime = 'nodejs';
 
-// Endpoint para guardar mensajes del chat omnicanal (con privilegios de service role)
+// Endpoint para guardar mensajes del chat omnicanal (con autenticación y RLS)
 export async function POST(request: Request) {
   try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'No autorizado. Se requiere iniciar sesión.' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { patientId, message } = body;
 
     if (!patientId || !message) {
       return NextResponse.json({ error: 'Faltan parámetros obligatorios' }, { status: 400 });
     }
-
-    const supabase = createAdminClient();
 
     // 1. Descargar chat actual
     let allChats: Record<string, any[]> = {};
@@ -201,10 +206,35 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'No autorizado. Se requiere iniciar sesión.' }, { status: 401 });
+    }
+
     const url = new URL(request.url);
     const patientId = url.searchParams.get('patientId');
 
-    const supabase = createAdminClient();
+    const ADMIN_EMAILS = ['audenti89@gmail.com'];
+    const userEmail = user.email || '';
+    const isStaff = ADMIN_EMAILS.includes(userEmail) ||
+      user.user_metadata?.role === 'owner' ||
+      user.user_metadata?.role === 'admin' ||
+      user.user_metadata?.role === 'doctor';
+
+    // Si es un paciente, verificar que el patientId solicitado le pertenece
+    if (!isStaff && patientId) {
+      const { data: ownPatient } = await supabase
+        .from('patients')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!ownPatient || ownPatient.id !== patientId) {
+        return NextResponse.json({ error: 'Prohibido. No puedes acceder al chat de otro paciente.' }, { status: 403 });
+      }
+    }
 
     let dbMessages: any[] = [];
     if (patientId) {

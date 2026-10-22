@@ -410,34 +410,33 @@ export function UnifiedCommunicationWidget({
   }
 
   return (
-    <div className={`fixed z-50 bottom-6 right-6 ${className}`}>
+    <div className={`fixed z-50 bottom-4 right-4 sm:bottom-6 sm:right-6 ${className}`}>
       {/* =========================================================================
           BOTÓN FLOTANTE UNIFICADO DE ACCESIBILIDAD TOTAL
-          - Dorado Audenti #F59E0B
-          - Texto #000000 Ultra Bold
-          - Tipografía grande de 18px
-          - Iconos de alta visibilidad (Teléfono + Chat)
+          - Desktop: Pill expandida de 18px
+          - Móvil (<640px): Botón flotante circular compacto (FAB de 56x56px) para no tapar contenido
       ========================================================================= */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="group relative flex items-center gap-3.5 px-6 py-4 bg-[#F59E0B] hover:bg-[#D97706] active:scale-95 text-[#000000] font-black rounded-full shadow-2xl hover:shadow-amber-500/50 transition-all duration-300 border-2 border-amber-300 ring-4 ring-black/10 select-none"
+          className="group relative flex items-center justify-center p-3.5 sm:px-6 sm:py-4 bg-[#F59E0B] hover:bg-[#D97706] active:scale-95 text-[#000000] font-black rounded-full shadow-2xl hover:shadow-amber-500/50 transition-all duration-300 border-2 border-amber-300 ring-4 ring-black/10 select-none cursor-pointer"
           title="Abrir Asistencia de Voz y Chat de la Clínica"
+          aria-label="Hablar o escribir a la clínica con Aura IA"
         >
           {/* Ondas pulsantes de alta visibilidad */}
           <span className="absolute -inset-1.5 rounded-full bg-amber-400/40 animate-ping pointer-events-none"></span>
 
-          {/* Iconos de Doble Acción */}
-          <div className="relative w-11 h-11 rounded-full bg-black text-[#F59E0B] flex items-center justify-center shrink-0 shadow-lg">
+          {/* Icono de Doble Acción */}
+          <div className="relative w-8 h-8 sm:w-11 sm:h-11 rounded-full bg-black text-[#F59E0B] flex items-center justify-center shrink-0 shadow-lg">
             {isConnected ? (
-              <Radio className="w-6 h-6 animate-pulse text-emerald-400" />
+              <Radio className="w-4 h-4 sm:w-6 sm:h-6 animate-pulse text-emerald-400" />
             ) : (
-              <Phone className="w-6 h-6 animate-bounce" />
+              <Phone className="w-4 h-4 sm:w-6 sm:h-6 animate-bounce" />
             )}
           </div>
 
-          {/* Texto de Accesibilidad 18px en Negrita */}
-          <div className="text-left">
+          {/* Texto de Accesibilidad (Visible en sm y desktop) */}
+          <div className="hidden sm:block text-left">
             <div className="flex items-center gap-2">
               <span className="text-[18px] sm:text-[19px] leading-tight font-black tracking-tight text-black uppercase">
                 {isConnected ? 'Llamada Activa' : 'Hablar o Escribir'}

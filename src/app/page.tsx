@@ -28,9 +28,15 @@ import {
   Coffee,
   Wine
 } from 'lucide-react'
+import dynamic from 'next/dynamic'
 import { SpotlightCard } from '@/components/ui/spotlight-card'
 import { ShimmerButton } from '@/components/ui/shimmer-button'
-import { Velaris } from '@/components/ui/velaris'
+
+// Carga diferida del shader WebGL Velaris para no bloquear el First Contentful Paint ni el hilo principal
+const Velaris = dynamic(
+  () => import('@/components/ui/velaris').then((mod) => mod.Velaris),
+  { ssr: false }
+)
 import { AudentiLogo } from '@/components/ui/AudentiLogo'
 import { AuthModal } from '@/components/auth/AuthModal'
 import { QRCodeSVG } from 'qrcode.react'
@@ -38,12 +44,12 @@ import { SmileAuditTool } from '@/components/landing/SmileAuditTool'
 import { SeniorAccessibilityBanner } from '@/components/ui/SeniorAccessibilityBanner'
 import { UnifiedCommunicationWidget } from '@/components/chat/UnifiedCommunicationWidget'
 
-// ASSETS OFICIALES OBLIGATORIOS
+// ASSETS OFICIALES OBLIGATORIOS (Optimizados localmente)
 const ASSETS = {
-  after: 'https://media.kolpusites.com/dental_ad/1.webp',     // Clean cast
-  before: 'https://media.kolpusites.com/dental_ad/2.webp',    // Stained cast
+  after: '/images/dental-after.webp',                         // Clean cast optimizado local
+  before: '/images/dental-before.webp',                       // Stained cast optimizado local
   interior: 'https://media.kolpusites.com/dental_ad/3.webp',  // Clinic interior
-  floatingFood: '/images/floating-food-veo.png',              // Comida flotante Veo 3 (cazuela de guisado, plato gourmet, café y vino)
+  floatingFood: '/images/floating-food-veo.png',              // Comida flotante Veo 3
   draAuraQuirifano: '/images/dra-aura-estudillo.jpg',         // Cirujana en quirófano con luz azul, cofia, filipina y gafas
   portraits: [
     'https://media.kolpusites.com/dental_ad/4.webp',
@@ -572,18 +578,21 @@ export default function LandingPage() {
         {/* CAPA DE FONDOS DENTALES EN DESKTOP (Full-Screen) */}
         {/* ======================================================== */}
         <div className="hidden md:block absolute inset-0 w-full h-full">
-          {/* AFTER (Clean cast - 1.webp) */}
+          {/* AFTER (Clean cast - dental-after.webp optimizado con prioridad LCP) */}
           <div className="absolute inset-0 w-full h-full overflow-hidden">
-            <img
+            <Image
               src={ASSETS.after}
               alt="Molde dental después del tratamiento de estética dental de alta precisión"
-              className="w-full h-full object-cover object-[center_80%] scale-105 pointer-events-none transition-transform duration-700"
+              fill
+              priority
+              sizes="100vw"
+              className="object-cover object-[center_80%] scale-105 pointer-events-none transition-transform duration-700"
               draggable={false}
             />
             <div className="absolute inset-0 bg-linear-to-t from-slate-950/85 via-slate-950/20 to-slate-950/40 pointer-events-none" />
           </div>
 
-          {/* BEFORE (Stained cast - 2.webp) */}
+          {/* BEFORE (Stained cast - dental-before.webp) */}
           <div
             className="absolute inset-y-0 left-0 overflow-hidden transition-[width] duration-75 ease-out"
             style={{ width: `${splitPercent}%` }}
@@ -592,10 +601,13 @@ export default function LandingPage() {
               className="relative h-full"
               style={{ width: heroRef.current ? `${heroRef.current.clientWidth}px` : '100vw' }}
             >
-              <img
+              <Image
                 src={ASSETS.before}
                 alt="Molde dental antes del tratamiento clínico"
-                className="w-full h-full object-cover object-[center_80%] scale-105 pointer-events-none transition-transform duration-700"
+                fill
+                priority
+                sizes="100vw"
+                className="object-cover object-[center_80%] scale-105 pointer-events-none transition-transform duration-700"
                 draggable={false}
               />
               <div className="absolute inset-0 bg-linear-to-t from-slate-950/90 via-slate-950/25 to-slate-950/45 pointer-events-none" />
@@ -676,12 +688,15 @@ export default function LandingPage() {
               <div className="absolute inset-0 bg-slate-950/20" />
             </div>
 
-            {/* Capa After (Dientes Blancos) */}
+            {/* Capa After (Dientes Blancos) con Image y prioridad */}
             <div className="absolute inset-0 w-full h-full overflow-hidden z-20">
-              <img
+              <Image
                 src={ASSETS.after}
                 alt="Dientes blancos después"
-                className="w-full h-full object-cover object-center scale-110 pointer-events-none mix-blend-screen"
+                fill
+                priority
+                sizes="(max-width: 768px) 100vw, 400px"
+                className="object-cover object-center scale-110 pointer-events-none mix-blend-screen"
               />
             </div>
 
@@ -694,10 +709,13 @@ export default function LandingPage() {
                 className="relative h-full"
                 style={{ width: heroRef.current ? `${heroRef.current.clientWidth - 32}px` : '92vw' }}
               >
-                <img
+                <Image
                   src={ASSETS.before}
                   alt="Dientes manchados antes"
-                  className="w-full h-full object-cover object-center scale-110 pointer-events-none mix-blend-screen"
+                  fill
+                  priority
+                  sizes="(max-width: 768px) 100vw, 400px"
+                  className="object-cover object-center scale-110 pointer-events-none mix-blend-screen"
                 />
               </div>
             </div>
@@ -1030,12 +1048,15 @@ export default function LandingPage() {
                     : 'border-slate-800 hover:border-amber-400/50'
                 }`}
               >
-                {/* Imagen Fija del Especialista */}
+                {/* Imagen Optimizada del Especialista */}
                 <div className="relative aspect-3/4 overflow-hidden bg-slate-900">
-                  <img
+                  <Image
                     src={doc.image}
                     alt={doc.name}
-                    className="w-full h-full object-cover object-top transition-transform duration-500 ease-out group-hover:scale-105"
+                    fill
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                    className="object-cover object-top transition-transform duration-500 ease-out group-hover:scale-105"
+                    loading="lazy"
                   />
                   
                   {/* Badge de Dirección Médica para Dra. Aura */}

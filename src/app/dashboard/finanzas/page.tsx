@@ -128,15 +128,42 @@ export default function FinanzasPage() {
     setIsModalOpen(true)
   }
 
+  // Función de sanitización y parseo robusto de montos financieros
+  const parseFinancialAmount = (raw: string): { value: number; error: string | null } => {
+    if (!raw || !raw.trim()) {
+      return { value: 0, error: 'Ingresa un monto para la transacción.' }
+    }
+    // Remover espacios, signos de pesos y comas de miles
+    const cleaned = raw.replace(/\s+/g, '').replace(/\$/g, '').replace(/,/g, '')
+    // Validar que solo contenga dígitos y opcionalmente un único punto decimal
+    if (!/^\d+(\.\d{1,2})?$/.test(cleaned)) {
+      return { value: 0, error: 'Monto inválido. Ingresa una cifra numérica válida (ej. 1500 o 1,500.50).' }
+    }
+    const parsed = parseFloat(cleaned)
+    if (isNaN(parsed) || parsed <= 0) {
+      return { value: 0, error: 'El monto debe ser una cantidad mayor a cero.' }
+    }
+    return { value: parsed, error: null }
+  }
+
   const handleSaveTransaction = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Validación estricta del monto
+    const targetRawAmount = modalType === 'trueque' ? (formData.barterCommercialValue || formData.amount) : formData.amount
+    const { value: parsedAmount, error: amountError } = parseFinancialAmount(targetRawAmount)
+    if (amountError) {
+      alert(amountError)
+      return
+    }
+
     setSavingTransaction(true)
 
     try {
       const { data: defaultTenant } = await supabase.from('tenants').select('id').limit(1).maybeSingle()
 
       if (modalType === 'trueque') {
-        const val = parseFloat(formData.barterCommercialValue || formData.amount) || 0
+        const val = parsedAmount
         const counterpart = formData.barterCounterpartName.trim() || formData.patientName.trim() || 'Profesional Aliado'
         const service = formData.barterServiceReceived.trim() || 'Servicios Profesionales Externos'
 
@@ -164,7 +191,7 @@ export default function FinanzasPage() {
 
         await supabase.from('payments').insert([incomeEntry, expenseEntry])
       } else {
-        const val = parseFloat(formData.amount) || 0
+        const val = parsedAmount
         const entry: any = {
           amount: val,
           type: modalType === 'egreso' ? 'expense' : 'income',

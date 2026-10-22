@@ -55,9 +55,23 @@ export default function PacientesPage() {
     })
   }
 
+  const validatePhone = (raw: string): boolean => {
+    // Saneamiento de espacios y guiones
+    const cleaned = raw.replace(/\D/g, '')
+    // Debe contener entre 10 y 13 dígitos numéricos (formato nacional o con clave país)
+    return cleaned.length >= 10 && cleaned.length <= 13
+  }
+
   const handleSavePatientEdit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingPatient) return
+
+    // Validación de teléfono en cliente
+    if (!validatePhone(editForm.phone)) {
+      alert('Número telefónico inválido. Ingresa un teléfono de 10 dígitos (ej. 55 1234 5678).')
+      return
+    }
+
     setSavingEdit(true)
     try {
       const allergyList = editForm.allergies
@@ -70,26 +84,29 @@ export default function PacientesPage() {
       const { error } = await supabase
         .from('patients')
         .update({
-          full_name: editForm.fullName,
-          phone: editForm.phone,
-          email: editForm.email || null,
-          emergency_contact_name: editForm.emergencyContact || null,
+          full_name: editForm.fullName.trim(),
+          phone: editForm.phone.trim(),
+          email: editForm.email ? editForm.email.trim() : null,
+          emergency_contact_name: editForm.emergencyContact ? editForm.emergencyContact.trim() : null,
           allergies_medication: allergyList,
           age: parsedAge,
           onboarding_completed: true
         })
         .eq('id', editingPatient.id)
 
-      if (error) throw error
+      if (error) {
+        // Mensaje clínico amigable al usuario (sin exponer err.message crudo de Supabase)
+        throw new Error('No fue posible actualizar el expediente del paciente en este momento. Verifica los datos e intenta nuevamente.')
+      }
 
       setPatients(prev => prev.map(item => {
         if (item.id === editingPatient.id) {
           return {
             ...item,
-            full_name: editForm.fullName,
-            phone: editForm.phone,
-            email: editForm.email,
-            emergency_contact_name: editForm.emergencyContact,
+            full_name: editForm.fullName.trim(),
+            phone: editForm.phone.trim(),
+            email: editForm.email ? editForm.email.trim() : null,
+            emergency_contact_name: editForm.emergencyContact ? editForm.emergencyContact.trim() : null,
             allergies_medication: allergyList,
             age: parsedAge,
             onboarding_completed: true
@@ -100,7 +117,7 @@ export default function PacientesPage() {
 
       setEditingPatient(null)
     } catch (err: any) {
-      alert('Error guardando paciente: ' + (err?.message || 'Error desconocido'))
+      alert(err?.message || 'Ocurrió un problema al guardar los cambios del paciente.')
     } finally {
       setSavingEdit(false)
     }

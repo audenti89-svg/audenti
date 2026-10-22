@@ -1,14 +1,55 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
 import { getPersistedAppointments, savePersistedAppointments } from '@/lib/supabase/appointments-storage';
-import { createAdminClient } from '@/lib/supabase/admin';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    // Verificación de sesión activa
+    if (authError || !user) {
+      return NextResponse.json({ success: false, error: 'No autorizado. Se requiere iniciar sesión.' }, { status: 401 });
+    }
+
+    const ADMIN_EMAILS = ['audenti89@gmail.com'];
+    const userEmail = user.email || '';
+    const isStaff = ADMIN_EMAILS.includes(userEmail) ||
+      user.user_metadata?.role === 'owner' ||
+      user.user_metadata?.role === 'admin' ||
+      user.user_metadata?.role === 'doctor' ||
+      user.app_metadata?.role === 'owner' ||
+      user.app_metadata?.role === 'admin' ||
+      user.app_metadata?.role === 'doctor';
+
+    // Si es personal clínico (Doctora / Administrador)
+    if (isStaff) {
+      const list = await getPersistedAppointments();
+      return NextResponse.json({ success: true, appointments: list });
+    }
+
+    // Si es paciente, filtrar estrictamente a sus citas aplicando RLS
+    const { data: patientProfile } = await supabase
+      .from('patients')
+      .select('id, full_name, phone')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (!patientProfile) {
+      return NextResponse.json({ success: true, appointments: [] });
+    }
+
     const list = await getPersistedAppointments();
-    return NextResponse.json({ success: true, appointments: list });
+    const patientFiltered = list.filter((a: any) => 
+      a.patient_id === patientProfile.id ||
+      (a.patient_phone && patientProfile.phone && a.patient_phone.includes(patientProfile.phone)) ||
+      (a.patient_name && patientProfile.full_name && a.patient_name.toLowerCase() === patientProfile.full_name.toLowerCase())
+    );
+
+    return NextResponse.json({ success: true, appointments: patientFiltered });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
@@ -16,6 +57,13 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ success: false, error: 'No autorizado. Se requiere iniciar sesión para agendar citas.' }, { status: 401 });
+    }
+
     const body = await request.json();
     const {
       patient_name,
