@@ -98,12 +98,22 @@ export default function LandingPage() {
     // Si es evento de puntero tipo mouse/pen o arrastre libre
     if (e.pointerType !== 'touch') {
       updateSplit(e.clientX)
+      if (heroRef.current) {
+        const rect = heroRef.current.getBoundingClientRect()
+        heroRef.current.style.setProperty('--spotlight-x', `${e.clientX - rect.left}px`)
+        heroRef.current.style.setProperty('--spotlight-y', `${e.clientY - rect.top}px`)
+      }
     }
   }
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (e.pointerType !== 'touch') {
       updateSplit(e.clientX)
+      if (heroRef.current) {
+        const rect = heroRef.current.getBoundingClientRect()
+        heroRef.current.style.setProperty('--spotlight-x', `${e.clientX - rect.left}px`)
+        heroRef.current.style.setProperty('--spotlight-y', `${e.clientY - rect.top}px`)
+      }
     }
   }
 
@@ -385,7 +395,24 @@ export default function LandingPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-[#0B0F19] text-slate-100 font-sans antialiased overflow-x-hidden selection:bg-amber-400 selection:text-slate-950">
+    <div 
+      onPointerMove={(e) => {
+        const root = document.documentElement
+        root.style.setProperty('--global-spotlight-x', `${e.clientX}px`)
+        root.style.setProperty('--global-spotlight-y', `${e.clientY}px`)
+      }}
+      className="relative min-h-screen bg-[#0B0F19] text-slate-100 font-sans antialiased overflow-x-hidden selection:bg-amber-400 selection:text-slate-950"
+    >
+      {/* ======================================================== */}
+      {/* EFECTO DE LUZ GLOBAL AMBIENTAL DE FONDO (Spotlight que sigue al puntero siempre atrás) */}
+      {/* ======================================================== */}
+      <div 
+        className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-300"
+        style={{
+          background: `radial-gradient(900px circle at var(--global-spotlight-x, 50vw) var(--global-spotlight-y, 50vh), rgba(245, 158, 11, 0.12), transparent 70%)`
+        }}
+        aria-hidden="true"
+      />
       
       {/* ======================================================== */}
       {/* 1. NAVBAR MINIMALISTA FLOTANTE */}
@@ -471,6 +498,16 @@ export default function LandingPage() {
         className="relative w-full min-h-screen min-h-[100svh] select-none touch-pan-y outline-none overflow-hidden bg-slate-950 cursor-crosshair pt-28 pb-20 md:pb-24 md:pt-16 flex flex-col justify-between md:block"
         aria-label="Comparador interactivo de moldes dentales con seguimiento de cursor y táctil"
       >
+        {/* ======================================================== */}
+        {/* EFECTO SPOTLIGHT AMBIENTAL DENTRO DEL HERO (Detrás de todo a z-0) */}
+        {/* ======================================================== */}
+        <div 
+          className="pointer-events-none absolute inset-0 z-0 transition-opacity duration-200"
+          style={{
+            background: `radial-gradient(800px circle at var(--spotlight-x, 50%) var(--spotlight-y, 50%), rgba(245, 158, 11, 0.22), transparent 70%)`
+          }}
+          aria-hidden="true"
+        />
         {/* ======================================================== */}
         {/* FONDO DESKTOP & MÓVIL: COMIDA FLOTANTE VEO 3 CON CONSUMO DINÁMICO */}
         {/* ======================================================== */}
