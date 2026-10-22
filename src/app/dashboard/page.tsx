@@ -24,6 +24,7 @@ import { AIEmployeeHub } from '@/components/ai/AIEmployeeHub'
 import { useNotificationSound } from '@/hooks/useNotificationSound'
 import { formatDateInMexico } from '@/utils/timezone'
 import Link from 'next/link'
+import { SpotlightCard } from '@/components/ui/spotlight-card'
 
 interface ToastAlert {
   id: string
@@ -376,22 +377,22 @@ export default function DashboardPage() {
       )}
 
       {/* Welcome Banner */}
-      <section className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6 transition-all">
-        <div className="space-y-2">
+      <section className="bg-white/70 backdrop-blur-md rounded-3xl border border-white/40 p-8 shadow-xl shadow-slate-200/50 flex flex-col lg:flex-row lg:items-center justify-between gap-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl">
+        <div className="space-y-3">
           <div className="flex items-center gap-3 flex-wrap">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold capitalize border border-slate-200/60">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-200/50 text-slate-700 text-xs font-semibold capitalize border border-slate-300/50 backdrop-blur-sm">
               <CalendarDays className="w-3.5 h-3.5 text-amber-600" />
               {today}
             </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 text-xs font-bold">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               Sistema en Producción Real (BD Limpia)
             </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+          <h1 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tighter leading-tight">
             Buen día, <span className="text-amber-600">Dra. Aura Estudillo</span>
           </h1>
-          <p className="text-sm text-slate-600 max-w-2xl leading-relaxed">
+          <p className="text-sm text-slate-600 max-w-2xl leading-relaxed font-medium">
             Dirección General &amp; Clínica DentalCloud Pro • Céd. Prof. 8492019. Panel conectado reactivamente a Supabase PostgreSQL.
           </p>
         </div>
@@ -429,63 +430,83 @@ export default function DashboardPage() {
 
 
       {/* KPI Cards Grid */}
-      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         {/* Tarjeta Citas */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Citas de Hoy</p>
+        <SpotlightCard
+          hue={43}
+          size={300}
+          spotlightOpacity={0.18}
+          className="bg-white/75 backdrop-blur-md p-6 rounded-3xl border border-white/40 shadow-lg shadow-slate-200/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Citas de Hoy</p>
             <CalendarDays className="w-4 h-4 text-amber-500" />
           </div>
-          <h3 className="text-3xl font-extrabold text-[#202D4C]">{kpis.todayAppointments}</h3>
-          <p className="text-xs text-slate-500 mt-2">Programadas para la jornada</p>
-        </div>
+          <h3 className="text-4xl font-black text-slate-900 tracking-tighter">{kpis.todayAppointments}</h3>
+          <p className="text-xs text-slate-500 mt-2 font-medium">Programadas para la jornada</p>
+        </SpotlightCard>
 
         {/* Tarjeta Sillón */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">En Sillón Ahora</p>
+        <SpotlightCard
+          hue={155}
+          size={300}
+          spotlightOpacity={0.18}
+          className="bg-white/75 backdrop-blur-md p-6 rounded-3xl border border-white/40 shadow-lg shadow-slate-200/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">En Sillón Ahora</p>
             <Activity className="w-4 h-4 text-emerald-500" />
           </div>
-          <h3 className="text-base font-bold text-slate-900 truncate">{kpis.activeInChair}</h3>
-          <p className="text-xs text-amber-700 mt-2 truncate font-semibold">{kpis.inChairProcedure}</p>
-        </div>
+          <h3 className="text-lg font-bold text-slate-900 truncate tracking-tight">{kpis.activeInChair}</h3>
+          <p className="text-xs text-amber-700 mt-2 truncate font-bold">{kpis.inChairProcedure}</p>
+        </SpotlightCard>
 
         {/* Tarjeta Caja */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Caja del Turno</p>
+        <SpotlightCard
+          hue={215}
+          size={300}
+          spotlightOpacity={0.18}
+          className="bg-white/75 backdrop-blur-md p-6 rounded-3xl border border-white/40 shadow-lg shadow-slate-200/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Caja del Turno</p>
             <CreditCard className="w-4 h-4 text-blue-500" />
           </div>
-          <h3 className="text-3xl font-extrabold text-emerald-600">
-            ${kpis.dailyRevenue.toLocaleString('es-MX', { minimumFractionDigits: 2 })}{' '}
-            <span className="text-xs font-normal text-slate-400">MXN</span>
+          <h3 className="text-4xl font-black text-emerald-600 tracking-tighter">
+            ${kpis.dailyRevenue.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+            <span className="text-xs font-normal text-slate-400 ml-1">MXN</span>
           </h3>
-          <p className="text-xs text-slate-500 mt-2">Ingresos registrados hoy</p>
-        </div>
+          <p className="text-xs text-slate-500 mt-2 font-medium">Ingresos registrados hoy</p>
+        </SpotlightCard>
 
         {/* Tarjeta Notas SOAP */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Notas por Firmar</p>
+        <SpotlightCard
+          hue={275}
+          size={300}
+          spotlightOpacity={0.18}
+          className="bg-white/75 backdrop-blur-md p-6 rounded-3xl border border-white/40 shadow-lg shadow-slate-200/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Notas por Firmar</p>
             <FileSignature className="w-4 h-4 text-purple-500" />
           </div>
-          <h3 className="text-3xl font-extrabold text-[#202D4C]">{kpis.pendingNotes}</h3>
-          <p className="text-xs text-slate-500 mt-2">Expedientes clínicos pendientes</p>
-        </div>
+          <h3 className="text-4xl font-black text-slate-900 tracking-tighter">{kpis.pendingNotes}</h3>
+          <p className="text-xs text-slate-500 mt-2 font-medium">Expedientes clínicos pendientes</p>
+        </SpotlightCard>
       </section>
 
       {/* Main Layout: Flujo de Pacientes y Resumen Limpio */}
-      <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-in fade-in slide-in-from-bottom-8 duration-700">
         {/* Left: Citas de Hoy en Vivo (7 cols) */}
-        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900 tracking-tight">Flujo de Pacientes de Hoy</h2>
-              <p className="text-xs text-slate-500 mt-0.5">Sincronización en vivo desde Supabase PostgreSQL</p>
+        <div className="lg:col-span-7 bg-white/60 backdrop-blur-md rounded-3xl border border-white/40 p-8 shadow-xl shadow-slate-200/40 space-y-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl">
+          <div className="flex items-center justify-between pb-5 border-b border-slate-200/40">
+            <div className="space-y-1">
+              <h2 className="text-xl font-black text-slate-900 tracking-tighter">Flujo de Pacientes de Hoy</h2>
+              <p className="text-xs text-slate-500 font-medium">Sincronización en vivo desde Supabase PostgreSQL</p>
             </div>
             <Link
               href="/dashboard/agenda"
-              className="text-xs font-bold text-amber-700 hover:text-amber-800 transition-colors"
+              className="text-xs font-bold text-amber-700 hover:text-amber-800 transition-colors px-3 py-1 rounded-full bg-amber-50 border border-amber-100"
             >
               Ver agenda completa →
             </Link>
@@ -527,15 +548,15 @@ export default function DashboardPage() {
         </div>
 
         {/* Right: Resumen de Caja Real (5 cols) */}
-        <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-4">
-          <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-bold text-slate-900 tracking-tight">Arqueo de Caja del Turno</h2>
-              <p className="text-xs text-slate-500 mt-0.5">Control de ingresos por sede</p>
+        <div className="lg:col-span-5 bg-white/60 backdrop-blur-md rounded-3xl border border-white/40 p-8 shadow-xl shadow-slate-200/40 space-y-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl">
+          <div className="pb-5 border-b border-slate-200/40 flex items-center justify-between">
+            <div className="space-y-1">
+              <h2 className="text-xl font-black text-slate-900 tracking-tighter">Arqueo de Caja del Turno</h2>
+              <p className="text-xs text-slate-500 font-medium">Control de ingresos por sede</p>
             </div>
             <Link
               href="/dashboard/finanzas"
-              className="text-xs font-bold text-amber-700 hover:text-amber-800 transition-colors"
+              className="text-xs font-bold text-amber-700 hover:text-amber-800 transition-colors px-3 py-1 rounded-full bg-amber-50 border border-amber-100"
             >
               Ver finanzas →
             </Link>

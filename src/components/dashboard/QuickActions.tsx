@@ -29,8 +29,8 @@ export function QuickActions() {
 
   return (
     <>
-      <section className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-center">
+      <section className="bg-white/60 backdrop-blur-md rounded-3xl border border-white/40 p-6 shadow-xl shadow-slate-200/50 transition-all duration-300 hover:-translate-y-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-center">
 
           {/* Acción 1: Ver Agenda */}
           <Link

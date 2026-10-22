@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import Image from 'next/image'
 import {
@@ -27,6 +28,9 @@ import {
   Coffee,
   Wine
 } from 'lucide-react'
+import { SpotlightCard } from '@/components/ui/spotlight-card'
+import { ShimmerButton } from '@/components/ui/shimmer-button'
+import { Velaris } from '@/components/ui/velaris'
 import { AudentiLogo } from '@/components/ui/AudentiLogo'
 import { AuthModal } from '@/components/auth/AuthModal'
 import { QRCodeSVG } from 'qrcode.react'
@@ -412,12 +416,11 @@ export default function LandingPage() {
             </button>
 
             {/* Botón Principal Agendar Cita */}
-            <a
-              href="#reservar"
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full bg-amber-400 hover:bg-amber-300 text-xs font-bold text-slate-950 transition-all shadow-xs whitespace-nowrap font-hanken"
-            >
-              <Calendar className="w-3.5 h-3.5 text-slate-950" />
-              <span>Agendar</span>
+            <a href="#reservar">
+              <ShimmerButton variant="primary" className="py-1.5 px-4 text-xs font-black font-hanken">
+                <Calendar className="w-3.5 h-3.5 text-slate-950" />
+                <span>Agendar</span>
+              </ShimmerButton>
             </a>
 
             {/* Botón Menú Móvil */}
@@ -465,7 +468,7 @@ export default function LandingPage() {
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
-        className="relative w-full min-h-[100svh] select-none touch-pan-y outline-none overflow-hidden bg-slate-950 cursor-crosshair pt-28 pb-20 md:pb-24 md:pt-16 flex flex-col justify-between md:block"
+        className="relative w-full min-h-screen min-h-[100svh] select-none touch-pan-y outline-none overflow-hidden bg-slate-950 cursor-crosshair pt-28 pb-20 md:pb-24 md:pt-16 flex flex-col justify-between md:block"
         aria-label="Comparador interactivo de moldes dentales con seguimiento de cursor y táctil"
       >
         {/* ======================================================== */}
@@ -474,16 +477,16 @@ export default function LandingPage() {
         <div 
           className="absolute inset-0 pointer-events-none z-10 overflow-hidden transition-all duration-300 ease-out"
           style={{
-            opacity: Math.max(0.04, 0.65 - (splitPercent / 100) * 0.58),
-            filter: `blur(${(splitPercent / 100) * 2}px)`,
-            transform: `scale(${1 - (splitPercent / 100) * 0.05})`,
+            opacity: Math.max(0.35, 0.95 - (splitPercent / 100) * 0.45),
+            filter: `blur(${(splitPercent / 100) * 1.5}px)`,
+            transform: `scale(${1 - (splitPercent / 100) * 0.03})`,
           }}
         >
           {/* Imagen cinematográfica Veo 3 de alimentos gourmet flotantes */}
           <img
             src={ASSETS.floatingFood}
             alt="Alimentos pigmentantes flotantes: cazuela de guisado, plato gourmet, café y vino tinto"
-            className="w-full h-full object-cover md:object-cover object-center mix-blend-screen select-none"
+            className="w-full h-full object-cover md:object-cover object-center select-none"
             draggable={false}
           />
 
@@ -591,12 +594,11 @@ export default function LandingPage() {
 
           {/* 2° Botones de Acción */}
           <div className="flex items-center justify-center gap-2">
-            <a
-              href="#reservar"
-              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shadow-lg transition-all active:scale-95"
-            >
-              Reservar Cita
-              <ArrowRight className="w-3.5 h-3.5" />
+            <a href="#reservar">
+              <ShimmerButton variant="primary" className="py-2 px-4 text-xs font-black">
+                Reservar Cita
+                <ArrowRight className="w-3.5 h-3.5" />
+              </ShimmerButton>
             </a>
             <a
               href="#about"
@@ -612,7 +614,7 @@ export default function LandingPage() {
             <div 
               className="absolute inset-0 pointer-events-none z-10 overflow-hidden transition-all duration-300 ease-out"
               style={{
-                opacity: Math.max(0.25, 0.85 - (splitPercent / 100) * 0.65),
+                opacity: 0.85,
               }}
             >
               <img
@@ -620,7 +622,7 @@ export default function LandingPage() {
                 alt="Alimentos pigmentantes flotantes"
                 className="w-full h-full object-cover object-center select-none"
               />
-              <div className="absolute inset-0 bg-slate-950/30" />
+              <div className="absolute inset-0 bg-slate-950/20" />
             </div>
 
             {/* Capa After (Dientes Blancos) */}
@@ -664,23 +666,23 @@ export default function LandingPage() {
 
           {/* 4° Píldoras de Estadísticas Debajo de la Dentadura */}
           <div className="grid grid-cols-2 gap-2.5 w-full">
-            <div className="p-3 rounded-2xl bg-slate-950/75 backdrop-blur-md border border-white/15 text-white shadow-xl">
+            <SpotlightCard className="p-3 rounded-2xl bg-slate-950/85 backdrop-blur-md border border-white/15 text-white shadow-xl">
               <div className="flex items-baseline gap-1.5">
                 <span className="text-xl font-black text-amber-400 font-hanken">07 tonos</span>
               </div>
               <p className="text-[10px] text-slate-300 mt-0.5 leading-tight">
                 Más blancos con tecnología LED.
               </p>
-            </div>
+            </SpotlightCard>
 
-            <div className="p-3 rounded-2xl bg-slate-950/75 backdrop-blur-md border border-white/15 text-white shadow-xl">
+            <SpotlightCard className="p-3 rounded-2xl bg-slate-950/85 backdrop-blur-md border border-white/15 text-white shadow-xl">
               <div className="flex items-baseline gap-1.5">
                 <span className="text-xl font-black text-amber-400 font-hanken">4,200+</span>
               </div>
               <p className="text-[10px] text-slate-300 mt-0.5 leading-tight">
                 Sonrisas perfeccionadas.
               </p>
-            </div>
+            </SpotlightCard>
           </div>
 
           {/* 5° Hint de Interacción Táctil */}
@@ -695,13 +697,18 @@ export default function LandingPage() {
         {/* DESKTOP: PÍLDORAS Y HERO CALL TO ACTION (md:block) */}
         {/* ======================================================== */}
         <div
-          className={`hidden md:block absolute bottom-32 sm:bottom-28 left-6 sm:left-12 z-20 space-y-2 pointer-events-auto transition-opacity duration-300 ${
+          className={`hidden md:block absolute bottom-32 sm:bottom-28 left-6 sm:left-12 z-20 space-y-3 pointer-events-auto transition-opacity duration-300 ${
             isOverText ? 'opacity-20' : 'opacity-100'
           }`}
           onMouseEnter={() => setIsOverText(true)}
           onMouseLeave={() => setIsOverText(false)}
         >
-          <div className="p-3 sm:p-4 rounded-2xl bg-slate-950/75 backdrop-blur-md border border-white/15 text-white max-w-xs shadow-2xl">
+          <SpotlightCard
+            hue={43}
+            size={300}
+            spotlightOpacity={0.5}
+            className="p-3 sm:p-4 rounded-2xl bg-slate-950/85 backdrop-blur-md border border-white/15 text-white max-w-xs shadow-2xl"
+          >
             <div className="flex items-baseline gap-2">
               <span className="text-2xl sm:text-3xl font-black text-amber-400 font-hanken">07 tonos</span>
               <span className="text-[11px] uppercase tracking-wider text-slate-300 font-semibold">más blancos</span>
@@ -709,9 +716,14 @@ export default function LandingPage() {
             <p className="text-[11px] text-slate-400 mt-1 leading-snug">
               Tecnología de fotoactivación dental LED que preserva íntegramente la microestructura del esmalte.
             </p>
-          </div>
+          </SpotlightCard>
 
-          <div className="p-3 sm:p-4 rounded-2xl bg-slate-950/75 backdrop-blur-md border border-white/15 text-white max-w-xs shadow-2xl">
+          <SpotlightCard
+            hue={43}
+            size={300}
+            spotlightOpacity={0.5}
+            className="p-3 sm:p-4 rounded-2xl bg-slate-950/85 backdrop-blur-md border border-white/15 text-white max-w-xs shadow-2xl"
+          >
             <div className="flex items-baseline gap-2">
               <span className="text-2xl sm:text-3xl font-black text-amber-400 font-hanken">4,200+</span>
               <span className="text-[11px] uppercase tracking-wider text-slate-300 font-semibold">sonrisas</span>
@@ -719,7 +731,7 @@ export default function LandingPage() {
             <p className="text-[11px] text-slate-400 mt-1 leading-snug">
               Casos rehabilitados exitosamente en la sede matriz Balbuena y franquicias de la Dra. Aura Estudillo.
             </p>
-          </div>
+          </SpotlightCard>
         </div>
 
         {/* HERO TITLE & CALL TO ACTION (Desktop) */}
@@ -742,12 +754,11 @@ export default function LandingPage() {
           </p>
 
           <div className="flex items-center justify-end gap-3 mt-4">
-            <a
-              href="#reservar"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shadow-lg transition-all active:scale-95 cursor-pointer"
-            >
-              Reservar Valoración
-              <ArrowRight className="w-4 h-4" />
+            <a href="#reservar">
+              <ShimmerButton variant="primary" className="py-2.5 px-5 text-xs font-black">
+                Reservar Valoración
+                <ArrowRight className="w-4 h-4" />
+              </ShimmerButton>
             </a>
             <a
               href="#about"
@@ -793,7 +804,10 @@ export default function LandingPage() {
       {/* ======================================================== */}
       {/* 4. SECCIÓN ABOUT: MISIÓN & INSTALACIONES CLÍNICAS */}
       {/* ======================================================== */}
-      <section id="about" className="py-20 lg:py-28 px-4 sm:px-8 lg:px-12 max-w-7xl mx-auto">
+      <section
+        id="about"
+        className="py-20 lg:py-28 px-4 sm:px-8 lg:px-12 max-w-7xl mx-auto"
+      >
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           <div className="lg:col-span-6 space-y-6">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/10 text-amber-300 border border-amber-400/30 text-xs font-bold uppercase tracking-wider">
@@ -853,7 +867,10 @@ export default function LandingPage() {
       {/* ======================================================== */}
       {/* 5. SECCIÓN TRATAMIENTOS: CUADRÍCULA EDITORIAL LIMPIA */}
       {/* ======================================================== */}
-      <section id="tratamientos" className="py-20 bg-[#111827] border-y border-slate-800/80 px-4 sm:px-8 lg:px-12">
+      <section
+        id="tratamientos"
+        className="py-20 bg-[#111827] border-y border-slate-800/80 px-4 sm:px-8 lg:px-12"
+      >
         <div className="max-w-7xl mx-auto space-y-12">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div>
@@ -873,8 +890,11 @@ export default function LandingPage() {
             {treatments.map((t, idx) => {
               const Icon = t.icon
               return (
-                <div
+                <SpotlightCard
                   key={idx}
+                  hue={43}
+                  size={320}
+                  spotlightOpacity={0.4}
                   className="bg-[#0B0F19] hover:bg-slate-900/90 p-6 rounded-3xl border border-slate-800 hover:border-amber-400/80 shadow-2xs hover:shadow-2xl transition-all duration-300 flex flex-col justify-between group"
                 >
                   <div className="space-y-3">
@@ -902,7 +922,7 @@ export default function LandingPage() {
                       <strong className="text-slate-200">{t.guarantee}</strong>
                     </div>
                   </div>
-                </div>
+                </SpotlightCard>
               )
             })}
           </div>
@@ -948,8 +968,11 @@ export default function LandingPage() {
           {specialists.map((doc, idx) => {
             const isDirector = idx === 0;
             return (
-              <div
+              <SpotlightCard
                 key={idx}
+                hue={43}
+                size={320}
+                spotlightOpacity={0.4}
                 className={`w-full bg-[#111827] rounded-3xl border overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 flex flex-col justify-between group ${
                   isDirector
                     ? 'border-amber-400/80 ring-2 ring-amber-400/20 shadow-amber-400/10'
@@ -991,7 +1014,7 @@ export default function LandingPage() {
                     <span>{doc.experience}</span>
                   </div>
                 </div>
-              </div>
+              </SpotlightCard>
             );
           })}
         </div>
@@ -1116,13 +1139,14 @@ export default function LandingPage() {
                   />
                 </div>
 
-                <button
+                <ShimmerButton
                   type="submit"
-                  className="w-full py-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+                  variant="primary"
+                  className="w-full py-3.5 rounded-xl text-xs uppercase tracking-wider"
                 >
                   Confirmar Solicitud de Cita
                   <ArrowRight className="w-4 h-4" />
-                </button>
+                </ShimmerButton>
               </form>
             )}
           </div>
@@ -1250,43 +1274,51 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Tarjeta QR con Psicología Inversa para PWA / Mobile Instant Access */}
-        <div className="max-w-xl mx-auto my-6 p-6 sm:p-8 rounded-3xl bg-slate-900/90 border-2 border-amber-400/80 shadow-2xl text-center space-y-4 relative overflow-hidden backdrop-blur-xl">
-          <div className="absolute -top-12 -right-12 w-32 h-32 bg-amber-400/10 rounded-full blur-2xl pointer-events-none" />
-          <div className="absolute -bottom-12 -left-12 w-32 h-32 bg-rose-500/10 rounded-full blur-2xl pointer-events-none" />
+        {/* Tarjeta QR con Psicología Inversa para PWA / Mobile Instant Access montada sobre Velaris WebGL */}
+        <div className="max-w-xl mx-auto my-6 rounded-3xl overflow-hidden border-2 border-amber-400/80 shadow-2xl relative">
+          <Velaris
+            bg="#020617"
+            colors={["#d97706", "#f59e0b", "#fbbf24", "#0f172a"]}
+            speed={1.2}
+            grain={0.15}
+            height="auto"
+            className="w-full"
+          >
+            <div className="p-6 sm:p-8 text-center space-y-4 backdrop-blur-xs bg-slate-950/60">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 text-[10px] font-black uppercase tracking-widest">
+                Acceso Inmediato PWA
+              </div>
 
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 text-[10px] font-black uppercase tracking-widest">
-            Acceso Inmediato PWA
-          </div>
+              <h3 className="text-xl sm:text-2xl font-black text-white font-hanken tracking-tight">
+                NO ESCANEES ESTE CÓDIGO QR ⛔
+              </h3>
 
-          <h3 className="text-xl sm:text-2xl font-black text-white font-hanken tracking-tight">
-            NO ESCANEES ESTE CÓDIGO QR ⛔
-          </h3>
+              <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
+                A menos que quieras agendar citas en 3 segundos, recibir recordatorios de control clínico en tu celular y acceder a beneficios exclusivos en tu tratamiento.
+              </p>
 
-          <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
-            A menos que quieras agendar citas en 3 segundos, recibir recordatorios de control clínico en tu celular y acceder a beneficios exclusivos en tu tratamiento.
-          </p>
+              <div className="p-3.5 bg-white rounded-2xl inline-block border-2 border-amber-400 shadow-xl transition-transform hover:scale-105 duration-300">
+                <QRCodeSVG
+                  value="https://audenti.vercel.app"
+                  size={160}
+                  level="H"
+                  includeMargin={true}
+                  imageSettings={{
+                    src: "https://media.kolpusites.com/dental_ad/1.webp",
+                    x: undefined,
+                    y: undefined,
+                    height: 32,
+                    width: 32,
+                    excavate: true,
+                  }}
+                />
+              </div>
 
-          <div className="p-3.5 bg-white rounded-2xl inline-block border-2 border-amber-400 shadow-xl transition-transform hover:scale-105 duration-300">
-            <QRCodeSVG
-              value="https://audenti.vercel.app"
-              size={160}
-              level="H"
-              includeMargin={true}
-              imageSettings={{
-                src: "https://media.kolpusites.com/dental_ad/1.webp",
-                x: undefined,
-                y: undefined,
-                height: 32,
-                width: 32,
-                excavate: true,
-              }}
-            />
-          </div>
-
-          <p className="text-[11px] sm:text-xs text-amber-300/90 font-bold tracking-wide">
-            App Web Cero Instalación — Escanea para agregar a tu Pantalla de Inicio.
-          </p>
+              <p className="text-[11px] sm:text-xs text-amber-300/90 font-bold tracking-wide">
+                App Web Cero Instalación — Escanea para agregar a tu Pantalla de Inicio.
+              </p>
+            </div>
+          </Velaris>
         </div>
 
         {/* Monumental Wordmark adaptado */}

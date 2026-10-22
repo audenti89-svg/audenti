@@ -170,7 +170,7 @@ export function DoctorLiveTriageAlert() {
   if (cases.length === 0) return null
 
   return (
-    <div className="w-full space-y-3">
+    <div className="w-full space-y-4 animate-in fade-in slide-in-from-top-4 duration-700">
       {cases.map((c) => {
         const elapsed = elapsedSecondsMap[c.id] || 0
         const isOver60s = elapsed >= 60
@@ -179,7 +179,7 @@ export function DoctorLiveTriageAlert() {
         return (
           <div
             key={c.id}
-            className={`rounded-2xl p-4 sm:p-5 border shadow-md transition-all animate-in fade-in slide-in-from-top-2 duration-300 ${
+            className={`rounded-3xl p-5 border shadow-xl transition-all duration-300 hover:-translate-y-1 backdrop-blur-md ${
               isRed
                 ? 'bg-rose-950/10 border-rose-500/40 text-slate-900 dark:text-rose-100'
                 : 'bg-amber-950/10 border-amber-500/40 text-slate-900 dark:text-amber-100'

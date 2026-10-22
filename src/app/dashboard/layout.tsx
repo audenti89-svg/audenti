@@ -64,11 +64,11 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-[100dvh] bg-[#fdf9f1]">
+    <div className="min-h-[100dvh] bg-[radial-gradient(circle_at_top_center,_var(--tw-gradient-stops))] from-slate-50 via-slate-100 to-slate-200">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="lg:pl-72 flex flex-col min-h-[100dvh]">
         <Header onMenuToggle={() => setSidebarOpen(true)} />
-        <main className="relative pt-20 px-4 sm:px-6 lg:px-8 py-6 w-full max-w-7xl mx-auto flex-1">
+        <main className="relative pt-20 px-4 sm:px-6 lg:px-12 py-8 w-full max-w-7xl mx-auto flex-1">
           {children}
         </main>
       </div>
