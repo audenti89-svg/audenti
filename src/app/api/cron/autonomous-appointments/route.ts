@@ -16,6 +16,14 @@ export async function POST(request: Request) {
 
 async function handleAutonomousCheck(request: Request) {
   try {
+    const authHeader = request.headers.get('authorization');
+    const cronSecret = process.env.CRON_SECRET;
+
+    // Validación de seguridad para tareas programadas (Vercel Cron)
+    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 });
+    }
+
     const supabase = createAdminClient();
     const now = new Date();
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);

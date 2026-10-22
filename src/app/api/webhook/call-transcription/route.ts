@@ -26,6 +26,17 @@ interface CallTranscriptionPayload {
 
 export async function POST(request: Request) {
   try {
+    const authHeader = request.headers.get('authorization') || request.headers.get('x-webhook-secret');
+    const expectedSecret = process.env.CALL_TRANSCRIPTION_WEBHOOK_SECRET || process.env.WEBHOOK_SECRET;
+
+    // Validación de firma o secreto de webhook de telefonía
+    if (expectedSecret) {
+      const token = authHeader?.replace(/^Bearer\s+/i, '');
+      if (token !== expectedSecret) {
+        return NextResponse.json({ success: false, error: 'Firma de webhook inválida' }, { status: 401 });
+      }
+    }
+
     const body: CallTranscriptionPayload = await request.json();
     const {
       patientId: rawPatientId,

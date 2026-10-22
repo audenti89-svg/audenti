@@ -56,10 +56,10 @@ export default function PacientesPage() {
   }
 
   const validatePhone = (raw: string): boolean => {
-    // Saneamiento de espacios y guiones
-    const cleaned = raw.replace(/\D/g, '')
-    // Debe contener entre 10 y 13 dígitos numéricos (formato nacional o con clave país)
-    return cleaned.length >= 10 && cleaned.length <= 13
+    // Saneamiento extrayendo únicamente los dígitos numéricos
+    const digitsOnly = raw.replace(/\D/g, '')
+    // Validación estricta: contar únicamente entre 10 y 13 dígitos
+    return digitsOnly.length >= 10 && digitsOnly.length <= 13
   }
 
   const handleSavePatientEdit = async (e: React.FormEvent) => {

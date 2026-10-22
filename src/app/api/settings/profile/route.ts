@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient } from '@/lib/supabase/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -27,6 +28,13 @@ const DEFAULT_PROFILE = {
 
 export async function GET() {
   try {
+    const authSupabase = await createClient();
+    const { data: { user } } = await authSupabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 });
+    }
+
     const supabase = createAdminClient();
     try {
       const { data: file } = await supabase.storage.from('audenti_database').download(PROFILE_FILE);
@@ -47,6 +55,13 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const authSupabase = await createClient();
+    const { data: { user } } = await authSupabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 });
+    }
+
     const body = await request.json();
     const supabase = createAdminClient();
 

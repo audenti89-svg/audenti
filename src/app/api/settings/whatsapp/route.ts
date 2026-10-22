@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient } from '@/lib/supabase/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -8,6 +9,13 @@ const SETTINGS_FILE = 'whatsapp_settings.json';
 
 export async function GET() {
   try {
+    const authSupabase = await createClient();
+    const { data: { user } } = await authSupabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 });
+    }
+
     const supabase = createAdminClient();
 
     // 1. Intentar descargar de Supabase Storage
@@ -65,6 +73,13 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const authSupabase = await createClient();
+    const { data: { user } } = await authSupabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'No autorizado' }, { status: 401 });
+    }
+
     const body = await request.json();
     const {
       messaging_provider = 'zernio',

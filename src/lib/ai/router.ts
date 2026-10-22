@@ -41,6 +41,52 @@ const googleAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 export type AITaskDomain = 'clinical' | 'patient_chat' | 'finance' | 'bi' | 'scheduling';
 export type AITaskType = AITaskDomain;
 
+// Helper para invocar 9router Local Gateway (http://127.0.0.1:20128/v1)
+async function call9Router(params: {
+  model?: string;
+  prompt: string;
+  systemPrompt?: string;
+  history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  temperature?: number;
+}): Promise<string | null> {
+  const AI_ROUTER_BASE_URL = process.env.AI_ROUTER_BASE_URL || 'http://127.0.0.1:20128/v1';
+  const AUDENTI_AI_API_KEY = process.env.AUDENTI_AI_API_KEY || 'sk-623d95255f395c93-6seidp-2a0b79ba';
+  const model = params.model || process.env.AI_MODEL_CLINICAL || 'kr/claude-sonnet-4.5';
+
+  try {
+    const messages = [];
+    if (params.systemPrompt) {
+      messages.push({ role: 'system', content: params.systemPrompt });
+    }
+    if (params.history && params.history.length > 0) {
+      messages.push(...params.history);
+    }
+    messages.push({ role: 'user', content: params.prompt });
+
+    const res = await fetch(`${AI_ROUTER_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${AUDENTI_AI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: params.temperature ?? 0.2,
+      }),
+      signal: AbortSignal.timeout(20000),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return data.choices?.[0]?.message?.content || null;
+    }
+  } catch (err: any) {
+    console.warn(`[9Router Engine] No disponible en ${AI_ROUTER_BASE_URL}:`, err.message);
+  }
+  return null;
+}
+
 // Helper para invocar el nodo local de Ollama (http://localhost:11434)
 async function callOllamaLocal(params: {
   model?: string;
@@ -134,13 +180,35 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
 
   try {
     // ==========================================
-    // 1. DOMINIO CLINICO & TRIAJE SENSIBLE (OLLAMA LOCAL -> FALLBACK CLAUDE / GROQ)
+    // 1. DOMINIO CLINICO & TRIAJE SENSIBLE (9ROUTER DEV -> OLLAMA LOCAL -> NUBE PRODUCCION)
     // ==========================================
     if (domain === 'clinical') {
-      // 1. Intentar delegar tareas clínicas y de triaje sensible al servidor local de Ollama (http://localhost:11434)
+      // Nivel 1 (Desarrollo): Si 9Router esta activo en la maquina del programador
+      if (process.env.NODE_ENV !== 'production' || process.env.AI_ROUTER_BASE_URL) {
+        try {
+          const routerResult = await call9Router({
+            prompt: effectivePrompt,
+            systemPrompt: systemPrompt || 'Eres un asistente clinico experto apoyando a personal medico odontologico de la Dra. Aura Estudillo bajo norma NOM-004-SSA3.',
+            history,
+            temperature: 0.2
+          });
+
+          if (routerResult) {
+            return {
+              success: true,
+              domain,
+              result: routerResult,
+              provider: '9router-gateway/claude-sonnet-4.5',
+              executionTimeMs: Date.now() - startTime
+            };
+          }
+        } catch {}
+      }
+
+      // Nivel 2: Servidor local de Ollama (si la clinica tiene servidor dedicado on-premise)
       const localResult = await callOllamaLocal({
         prompt: effectivePrompt,
-        systemPrompt: systemPrompt || 'Eres un asistente clínico experto apoyando a personal médico odontológico de la Dra. Aura Estudillo bajo norma NOM-004-SSA3.',
+        systemPrompt: systemPrompt || 'Eres un asistente clinico experto apoyando a personal medico odontologico de la Dra. Aura Estudillo bajo norma NOM-004-SSA3.',
         history,
         temperature: 0.2
       });
@@ -155,34 +223,41 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
         };
       }
 
-      // Si Ollama local está apagado, conmutación fluida a Claude / Groq Cloud
-      try {
-        const response = await anthropic.messages.create({
-          model: 'claude-3-5-sonnet-20241022',
-          max_tokens: 1500,
-          system: systemPrompt || 'Eres un asistente clínico experto apoyando a personal médico odontológico de la Dra. Aura Estudillo.',
-          messages: [
-            ...history.map(h => ({ role: h.role, content: h.content })),
-            { role: 'user', content: effectivePrompt }
-          ]
-        });
+      // Nivel 3 (Entrega al Cliente / Produccion Autonoma en Nube):
+      // Intento con Anthropic Cloud oficial si existe API Key
+      if (process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY.trim() !== '') {
+        try {
+          const response = await anthropic.messages.create({
+            model: 'claude-3-5-sonnet-20241022',
+            max_tokens: 1500,
+            system: systemPrompt || 'Eres un asistente clinico experto apoyando a personal medico odontologico de la Dra. Aura Estudillo.',
+            messages: [
+              ...history.map(h => ({ role: h.role, content: h.content })),
+              { role: 'user', content: effectivePrompt }
+            ]
+          });
 
-        const textContent = response.content.find(c => c.type === 'text');
-        return {
-          success: true,
-          domain,
-          result: textContent ? textContent.text : '',
-          provider: 'anthropic/claude-3.5-sonnet',
-          executionTimeMs: Date.now() - startTime
-        };
-      } catch (anthropicError: any) {
-        console.warn('[AI Router] Claude falló o sin saldo. Conmutando a fallback Groq...', anthropicError.message);
-        
-        // Fallback inmediato a Groq
+          const textContent = response.content.find(c => c.type === 'text');
+          if (textContent && textContent.text) {
+            return {
+              success: true,
+              domain,
+              result: textContent.text,
+              provider: 'anthropic/claude-3.5-sonnet',
+              executionTimeMs: Date.now() - startTime
+            };
+          }
+        } catch (anthropicError: any) {
+          console.warn('[AI Router] Anthropic fallo. Conmutando a fallback de alta velocidad...', anthropicError.message);
+        }
+      }
+
+      // Nivel 4 (Nube Produccion Resiliente): Groq Cloud LLM
+      try {
         const fallbackRes = await groq.chat.completions.create({
           model: 'openai/gpt-oss-120b',
           messages: [
-            { role: 'system', content: systemPrompt || 'Fallback clínico de emergencia para Audenti.' },
+            { role: 'system', content: systemPrompt || 'Eres un asistente clinico experto odontologico de Audenti Dental Studio bajo norma NOM-004-SSA3.' },
             ...history,
             { role: 'user', content: effectivePrompt }
           ],
@@ -193,7 +268,36 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
           success: true,
           domain,
           result: fallbackRes.choices[0]?.message?.content || '',
-          provider: 'groq/fallback-clinical',
+          provider: 'groq/clinical-cloud-production',
+          executionTimeMs: Date.now() - startTime
+        };
+      } catch (groqErr: any) {
+        console.warn('[AI Router] Groq clinico no disponible. Conmutando a Gemini Cloud...', groqErr.message);
+      }
+
+      // Nivel 5 (Respaldo Maximo Nube): Google Gemini Cloud
+      try {
+        const geminiModel = googleAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const geminiRes = await geminiModel.generateContent([
+          systemPrompt || 'Eres un asistente clinico odontologico de Audenti Dental Studio.',
+          effectivePrompt
+        ]);
+
+        return {
+          success: true,
+          domain,
+          result: geminiRes.response.text(),
+          provider: 'google/gemini-clinical-cloud',
+          executionTimeMs: Date.now() - startTime
+        };
+      } catch (finalErr: any) {
+        console.error('[AI Router Error Fatal] Ningun proveedor clinico respondio:', finalErr.message);
+        return {
+          success: false,
+          domain,
+          result: '',
+          error: 'Servicio clinico temporalmente saturado. Reintente en un momento.',
+          provider: 'none',
           executionTimeMs: Date.now() - startTime
         };
       }

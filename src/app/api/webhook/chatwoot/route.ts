@@ -37,6 +37,16 @@ interface ChatwootWebhookPayload {
 
 export async function POST(request: Request) {
   try {
+    const authHeader = request.headers.get('x-chatwoot-signature') || request.headers.get('authorization') || request.headers.get('x-webhook-secret');
+    const expectedSecret = process.env.CHATWOOT_WEBHOOK_SECRET || process.env.WEBHOOK_SECRET;
+
+    if (expectedSecret) {
+      const token = authHeader?.replace(/^Bearer\s+/i, '');
+      if (token !== expectedSecret) {
+        return NextResponse.json({ success: false, error: 'Firma de Chatwoot inválida' }, { status: 401 });
+      }
+    }
+
     const payload: ChatwootWebhookPayload = await request.json();
     const event = payload.event;
 
