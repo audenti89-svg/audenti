@@ -401,15 +401,29 @@ export default function LandingPage() {
         root.style.setProperty('--global-spotlight-x', `${e.clientX}px`)
         root.style.setProperty('--global-spotlight-y', `${e.clientY}px`)
       }}
-      className="relative min-h-screen bg-[#0B0F19] text-slate-100 font-sans antialiased overflow-x-hidden selection:bg-amber-400 selection:text-slate-950"
+      className="relative min-h-screen bg-[#070b14] text-slate-100 font-sans antialiased overflow-x-hidden selection:bg-amber-400 selection:text-slate-950"
     >
+      {/* ======================================================== */}
+      {/* FONDO ANIMADO GLOBAL (Velaris WebGL Shader: Azul Profundo Dental & Ámbar Contrastante) */}
+      {/* ======================================================== */}
+      <div className="fixed inset-0 pointer-events-none z-0 opacity-40">
+        <Velaris
+          bg="#050a18"
+          colors={["#1e3a8a", "#0284c7", "#f59e0b", "#0f172a"]}
+          speed={0.8}
+          grain={0.12}
+          height="100vh"
+          className="w-full h-full"
+        />
+      </div>
+
       {/* ======================================================== */}
       {/* EFECTO DE LUZ GLOBAL AMBIENTAL DE FONDO (Spotlight que sigue al puntero siempre atrás) */}
       {/* ======================================================== */}
       <div 
         className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-300"
         style={{
-          background: `radial-gradient(900px circle at var(--global-spotlight-x, 50vw) var(--global-spotlight-y, 50vh), rgba(245, 158, 11, 0.12), transparent 70%)`
+          background: `radial-gradient(900px circle at var(--global-spotlight-x, 50vw) var(--global-spotlight-y, 50vh), rgba(56, 189, 248, 0.12), transparent 70%)`
         }}
         aria-hidden="true"
       />
@@ -1311,51 +1325,42 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Tarjeta QR con Psicología Inversa para PWA / Mobile Instant Access montada sobre Velaris WebGL */}
-        <div className="max-w-xl mx-auto my-6 rounded-3xl overflow-hidden border-2 border-amber-400/80 shadow-2xl relative">
-          <Velaris
-            bg="#020617"
-            colors={["#d97706", "#f59e0b", "#fbbf24", "#0f172a"]}
-            speed={1.2}
-            grain={0.15}
-            height="auto"
-            className="w-full"
-          >
-            <div className="p-6 sm:p-8 text-center space-y-4 backdrop-blur-xs bg-slate-950/60">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 text-[10px] font-black uppercase tracking-widest">
-                Acceso Inmediato PWA
-              </div>
-
-              <h3 className="text-xl sm:text-2xl font-black text-white font-hanken tracking-tight">
-                NO ESCANEES ESTE CÓDIGO QR ⛔
-              </h3>
-
-              <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
-                A menos que quieras agendar citas en 3 segundos, recibir recordatorios de control clínico en tu celular y acceder a beneficios exclusivos en tu tratamiento.
-              </p>
-
-              <div className="p-3.5 bg-white rounded-2xl inline-block border-2 border-amber-400 shadow-xl transition-transform hover:scale-105 duration-300">
-                <QRCodeSVG
-                  value="https://audenti.vercel.app"
-                  size={160}
-                  level="H"
-                  includeMargin={true}
-                  imageSettings={{
-                    src: "https://media.kolpusites.com/dental_ad/1.webp",
-                    x: undefined,
-                    y: undefined,
-                    height: 32,
-                    width: 32,
-                    excavate: true,
-                  }}
-                />
-              </div>
-
-              <p className="text-[11px] sm:text-xs text-amber-300/90 font-bold tracking-wide">
-                App Web Cero Instalación — Escanea para agregar a tu Pantalla de Inicio.
-              </p>
+        {/* Tarjeta QR con Psicología Inversa para PWA / Mobile Instant Access */}
+        <div className="max-w-xl mx-auto my-6 rounded-3xl overflow-hidden border-2 border-amber-400/80 shadow-2xl relative bg-slate-900/90 backdrop-blur-md">
+          <div className="p-6 sm:p-8 text-center space-y-4">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 text-[10px] font-black uppercase tracking-widest">
+              Acceso Inmediato PWA
             </div>
-          </Velaris>
+
+            <h3 className="text-xl sm:text-2xl font-black text-white font-hanken tracking-tight">
+              NO ESCANEES ESTE CÓDIGO QR ⛔
+            </h3>
+
+            <p className="text-xs sm:text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
+              A menos que quieras agendar citas en 3 segundos, recibir recordatorios de control clínico en tu celular y acceder a beneficios exclusivos en tu tratamiento.
+            </p>
+
+            <div className="p-3.5 bg-white rounded-2xl inline-block border-2 border-amber-400 shadow-xl transition-transform hover:scale-105 duration-300">
+              <QRCodeSVG
+                value="https://audenti.vercel.app"
+                size={160}
+                level="H"
+                includeMargin={true}
+                imageSettings={{
+                  src: "https://media.kolpusites.com/dental_ad/1.webp",
+                  x: undefined,
+                  y: undefined,
+                  height: 32,
+                  width: 32,
+                  excavate: true,
+                }}
+              />
+            </div>
+
+            <p className="text-[11px] sm:text-xs text-amber-300/90 font-bold tracking-wide">
+              App Web Cero Instalación — Escanea para agregar a tu Pantalla de Inicio.
+            </p>
+          </div>
         </div>
 
         {/* Monumental Wordmark adaptado */}
