@@ -102,7 +102,6 @@ export async function POST(request: Request) {
 
     // Intentar emitir broadcast en Realtime
     try {
-      const supabase = createAdminClient();
       await supabase.channel('chat_omnichannel_sync').send({
         type: 'broadcast',
         event: 'appointment_created',
@@ -124,6 +123,13 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ success: false, error: 'No autorizado. Se requiere iniciar sesión.' }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
@@ -137,7 +143,6 @@ export async function DELETE(request: Request) {
 
     // También intentar borrar de la tabla SQL de appointments si existe
     try {
-      const supabase = createAdminClient();
       await supabase.from('appointments').delete().eq('id', id);
       await supabase.channel('calendar_page_realtime').send({
         type: 'broadcast',
