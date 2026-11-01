@@ -36,7 +36,7 @@ export default function DoctorProfilePage() {
     secondaryEmail: 'audenti89@gmail.com',
     address: 'Sucursal Balbuena (Matriz) & Sucursal Chalma de Guadalupe',
     bio: 'Especialista en rehabilitación oral, estética dental y cirugía menor con más de 12 años de trayectoria clínica bajo estrictas normas de bioseguridad NOM-004-SSA3.',
-    workingHours: 'Lunes a Sábado de 09:00 a 19:30 hrs',
+    workingHours: 'Lunes a Sábado de 16:00 a 21:00 hrs (Turno Vespertino) y Domingos según disponibilidad',
     avatarUrl: '/images/dra-aura-estudillo.png',
     letterheadEnabled: true,
     printerDefault: 'letter'

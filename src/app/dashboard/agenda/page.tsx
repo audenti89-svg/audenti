@@ -75,7 +75,7 @@ export default function CalendarPage() {
   const [newPatientId, setNewPatientId] = useState('')
   const [newTreatment, setNewTreatment] = useState('Consulta Odontológica General')
   const [newDate, setNewDate] = useState(() => new Date().toISOString().split('T')[0])
-  const [newTime, setNewTime] = useState('10:00')
+  const [newTime, setNewTime] = useState('16:00')
   const [newDuration, setNewDuration] = useState('45')
   const [newNotes, setNewNotes] = useState('')
   const [savingAppointment, setSavingAppointment] = useState(false)
@@ -279,6 +279,15 @@ export default function CalendarPage() {
       const selectedPatientObj = patientsList.find(p => p.id === newPatientId)
       const patientFullName = selectedPatientObj?.full_name || 'Paciente'
       const patientPhone = selectedPatientObj?.phone || '5522427769'
+
+      // Validación de Turno Vespertino 2027 (16:00 a 21:00 hrs)
+      const [hStr, mStr] = newTime.split(':')
+      const totalMin = parseInt(hStr || '0', 10) * 60 + parseInt(mStr || '0', 10)
+      if (totalMin < 16 * 60 || totalMin > 21 * 60) {
+        alert('Horario no permitido: A partir de enero de 2027, el turno matutino está estrictamente bloqueado. Las citas deben ser de 16:00 a 21:00 hrs (Lunes a Sábado) o en domingo según agenda.')
+        setSavingAppointment(false)
+        return
+      }
 
       // Guardar vía API de persistencia permanente (/api/appointments)
       const res = await fetch('/api/appointments', {
@@ -812,14 +821,17 @@ export default function CalendarPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Hora</label>
+                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Hora (16:00 - 21:00)</label>
                   <input
                     type="time"
+                    min="16:00"
+                    max="21:00"
                     required
                     value={newTime}
                     onChange={(e) => setNewTime(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900"
                   />
+                  <span className="text-[10px] text-amber-700 font-bold block mt-1">🌙 Turno Vespertino Oficial</span>
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Duración</label>

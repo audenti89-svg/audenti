@@ -80,6 +80,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'El nombre del paciente es obligatorio.' }, { status: 400 });
     }
 
+    // Validación de Horarios 2027: Turno Vespertino exclusivo (16:00 a 21:00 hrs). Turno matutino bloqueado.
+    const selectedTime = (appointment_time || '16:00').trim();
+    const [hStr, mStr] = selectedTime.split(':');
+    const totalMinutes = parseInt(hStr || '0', 10) * 60 + parseInt(mStr || '0', 10);
+
+    if (totalMinutes < 16 * 60) {
+      return NextResponse.json({
+        success: false,
+        error: 'Turno matutino bloqueado. A partir de enero de 2027, el horario de atención clínica es exclusivamente de Lunes a Sábado de 16:00 a 21:00 hrs (Turno Vespertino) y Domingos según disponibilidad de agenda.'
+      }, { status: 400 });
+    }
+
+    if (totalMinutes > 21 * 60) {
+      return NextResponse.json({
+        success: false,
+        error: 'Horario no permitido. Las citas del turno vespertino concluyen a las 21:00 hrs (9:00 PM).'
+      }, { status: 400 });
+    }
+
     const folio = body.folio || body.id || `AUD-${Math.floor(1000 + Math.random() * 9000)}`;
     const newAppt = {
       id: folio,
@@ -87,7 +106,7 @@ export async function POST(request: Request) {
       patient_name,
       patient_phone: patient_phone || '5522427769',
       appointment_date: appointment_date || new Date().toISOString().split('T')[0],
-      appointment_time: appointment_time || '10:00',
+      appointment_time: selectedTime,
       treatment,
       treatment_type: treatment,
       branch,

@@ -37,14 +37,14 @@ const BRANCH_DETAILS: Record<string, { name: string; address: string; mapUrl: st
     name: 'Sucursal Valbuena (Matriz)',
     address: 'Calle Cecilio Robelo 475, Aeronáutica Militar, Venustiano Carranza, CDMX',
     mapUrl: 'https://maps.google.com/?q=Aeronautica+Militar+Venustiano+Carranza+CDMX',
-    hours: 'Lunes a Viernes: 09:00 - 20:00 | Sábado: 09:00 - 15:00',
+    hours: 'Lunes a Sábado: 16:00 - 21:00 hrs (Turno Vespertino) | Domingos según agenda',
     phone: '55 2242 7769'
   },
   '00000000-0000-0000-0000-000000000002': {
     name: 'Sucursal Chalma de Guadalupe',
     address: 'Av. Chalma de Guadalupe, Gustavo A. Madero, CDMX',
     mapUrl: 'https://maps.google.com/?q=Chalma+de+Guadalupe+Gustavo+A+Madero+CDMX',
-    hours: 'Lunes a Viernes: 10:00 - 19:00 | Sábado: 09:00 - 14:00',
+    hours: 'Lunes a Sábado: 16:00 - 21:00 hrs (Turno Vespertino) | Domingos según agenda',
     phone: '55 2242 7769'
   }
 };

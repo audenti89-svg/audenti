@@ -68,9 +68,25 @@ export async function createAppointmentAction(input: CreateAppointmentInput) {
     tomorrowMx.setDate(tomorrowMx.getDate() + 1)
 
     const appDate = appointment_date || formatDateInMexico(tomorrowMx)
-    const appTime = appointment_time || '11:00:00'
+    const appTime = appointment_time || '16:00:00'
     const appBranch = branch || 'Sede Balbuena (Matriz)'
     const appTreatment = treatment || 'Consulta / Valoración Estética Oral'
+
+    // Validación de Horarios 2027: Turno Vespertino exclusivo (16:00 a 21:00 hrs)
+    const [hStr, mStr] = appTime.split(':')
+    const totalMin = parseInt(hStr || '0', 10) * 60 + parseInt(mStr || '0', 10)
+    if (totalMin < 16 * 60) {
+      return {
+        success: false,
+        error: 'Turno matutino bloqueado. A partir de 2027, el horario de atención es exclusivamente de Lunes a Sábado de 16:00 a 21:00 hrs (Turno Vespertino) y Domingos según agenda.'
+      }
+    }
+    if (totalMin > 21 * 60) {
+      return {
+        success: false,
+        error: 'Horario fuera de rango. Las citas de turno vespertino concluyen a las 21:00 hrs (9:00 PM).'
+      }
+    }
 
     const newAppointment: PersistentAppointment = {
       id: `APT-${Date.now()}-${Math.floor(Math.random() * 1000)}`,

@@ -49,8 +49,7 @@ const DOCTORS = [
 const CHAIRS = ['Gabinete 1 (Principal)', 'Gabinete 2', 'Quirófano Quirúrgico']
 
 const HOURS = [
-  '08:00', '09:00', '10:00', '11:00', '12:00', '13:00',
-  '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'
+  '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'
 ]
 
 const INITIAL_APPOINTMENTS: CalendarAppointment[] = []
@@ -75,7 +74,7 @@ export default function CalendarPage() {
 
   // Modal de Creación Rápida Estilo Google Calendar
   const [showQuickCreateModal, setShowQuickCreateModal] = useState(false)
-  const [modalSlot, setModalSlot] = useState({ date: getTodayStr(), time: '12:00' })
+  const [modalSlot, setModalSlot] = useState({ date: getTodayStr(), time: '16:00' })
   const [newTitle, setNewTitle] = useState('')
   const [newPatient, setNewPatient] = useState('')
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null)
@@ -293,6 +292,14 @@ export default function CalendarPage() {
   const handleCreateAppointment = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newTitle || !newPatient) return
+
+    // Validación de horario vespertino 2027 (16:00 a 21:00 hrs)
+    const [hStr, mStr] = modalSlot.time.split(':')
+    const totalMin = parseInt(hStr || '0', 10) * 60 + parseInt(mStr || '0', 10)
+    if (totalMin < 16 * 60 || totalMin > 21 * 60) {
+      alert('Horario no permitido: A partir de enero de 2027, el turno matutino está estrictamente bloqueado. Las citas deben agendarse en Turno Vespertino (16:00 a 21:00 hrs) o en domingo según disponibilidad.')
+      return
+    }
 
     playTone('message')
 
@@ -875,13 +882,16 @@ export default function CalendarPage() {
                   )}
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Hora Inicio</label>
+                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Hora Inicio (16:00 - 21:00)</label>
                   <input
                     type="time"
+                    min="16:00"
+                    max="21:00"
                     value={modalSlot.time}
                     onChange={e => setModalSlot({ ...modalSlot, time: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none"
                   />
+                  <span className="text-[10px] text-amber-700 font-bold block mt-1">🌙 Turno Vespertino Oficial</span>
                 </div>
               </div>
 

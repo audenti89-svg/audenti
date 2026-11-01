@@ -288,7 +288,7 @@ export default function LandingPage() {
     phone: '',
     email: '',
     service: 'Blanqueamiento Dental LED',
-    preferredTime: 'Matutino (09:00 - 14:00)',
+    preferredTime: 'Vespertino Temprano (16:00 - 18:30)',
     notes: '',
   })
   const [bookingSent, setBookingSent] = useState(false)
@@ -303,7 +303,7 @@ export default function LandingPage() {
         phone: '',
         email: '',
         service: 'Blanqueamiento Dental LED',
-        preferredTime: 'Matutino (09:00 - 14:00)',
+        preferredTime: 'Vespertino Temprano (16:00 - 18:30)',
         notes: '',
       })
     }, 4500)
@@ -1191,9 +1191,9 @@ export default function LandingPage() {
                       onChange={(e) => setBookingForm({ ...bookingForm, preferredTime: e.target.value })}
                       className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer"
                     >
-                      <option value="Matutino (09:00 - 14:00)">Matutino (09:00 - 14:00)</option>
-                      <option value="Vespertino (14:00 - 19:30)">Vespertino (14:00 - 19:30)</option>
-                      <option value="Sábado (09:00 - 15:00)">Sábado (09:00 - 15:00)</option>
+                      <option value="Vespertino Temprano (16:00 - 18:30)">Vespertino Temprano (16:00 - 18:30)</option>
+                      <option value="Vespertino Nocturno (18:30 - 21:00)">Vespertino Nocturno (18:30 - 21:00)</option>
+                      <option value="Domingo (Con Cita Previa)">Domingo (Con Cita Previa según agenda)</option>
                     </select>
                   </div>
                 </div>

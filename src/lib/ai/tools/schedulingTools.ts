@@ -20,11 +20,11 @@ export const conciergeChatTools = [
     type: 'function' as const,
     function: {
       name: 'getAvailableSlots',
-      description: 'Consulta los horarios y disponibilidad de la agenda de la Dra. Aura Estudillo para una fecha y sede específica.',
+      description: 'Consulta los horarios y disponibilidad de la agenda de la Dra. Aura Estudillo para una fecha y sede específica. A partir de enero 2027, el servicio es exclusivamente vespertino de Lunes a Sábado de 16:00 a 21:00 hrs y Domingos según agenda. El turno matutino está estrictamente bloqueado.',
       parameters: {
         type: 'object',
         properties: {
-          date: { type: 'string', description: 'Fecha a consultar en formato YYYY-MM-DD (ej. 2026-10-18)' },
+          date: { type: 'string', description: 'Fecha a consultar en formato YYYY-MM-DD (ej. 2027-01-15)' },
           branch: { type: 'string', description: 'Sede requerida: Balbuena, Roma o Chalma de Guadalupe' }
         },
         required: ['date']
@@ -35,16 +35,16 @@ export const conciergeChatTools = [
     type: 'function' as const,
     function: {
       name: 'createAppointment',
-      description: 'Crea y agenda atómicamente una cita en la base de datos de Supabase cuando el paciente ha definido fecha, hora y tratamiento, reflejándose de inmediato en la agenda y KPIs de la Dra. Aura.',
+      description: 'Crea y agenda atómicamente una cita en la base de datos de Supabase cuando el paciente ha definido fecha, hora y tratamiento, reflejándose de inmediato en la agenda y KPIs de la Dra. Aura. A partir de 2027, el turno matutino está estrictamente bloqueado; únicamente se admiten citas en Turno Vespertino (16:00 a 21:00 hrs) de lunes a sábado o domingos según agenda.',
       parameters: {
         type: 'object',
         properties: {
           patientName: { type: 'string', description: 'Nombre completo del paciente' },
           phone: { type: 'string', description: 'Número de teléfono de 10 dígitos' },
-          date: { type: 'string', description: 'Fecha de la cita en formato YYYY-MM-DD (ej. 2026-10-18)' },
-          time: { type: 'string', description: 'Hora de inicio de la cita en formato HH:mm (ej. 10:00, 16:30)' },
+          date: { type: 'string', description: 'Fecha de la cita en formato YYYY-MM-DD (ej. 2027-01-18)' },
+          time: { type: 'string', description: 'Hora de inicio de la cita en formato HH:mm (Turno Vespertino obligatorio: 16:00 a 21:00 hrs de lunes a sábado, o disponibilidad dominical)' },
           treatmentType: { type: 'string', description: 'Tratamiento o motivo (ej. Valoración inicial, Limpieza dental, Resina, Ortodoncia)' },
-          branch: { type: 'string', description: 'Sede de la cita (Sede Balbuena o Sede Chalma de Guadalupe)' }
+          branch: { type: 'string', description: 'Sede de la cita (Sede Balbuena, Sede Roma o Sede Chalma de Guadalupe)' }
         },
         required: ['date', 'time']
       }
@@ -165,13 +165,15 @@ export async function executeConciergeTool(name: string, args: Record<string, an
         })
       );
 
-      const standardSlots = ['10:00', '11:30', '13:00', '15:30', '17:00', '18:30'];
+      // Franjas oficiales Turno Vespertino (16:00 a 21:00 hrs) - Turno matutino bloqueado
+      const standardSlots = ['16:00', '16:45', '17:30', '18:15', '19:00', '19:45', '20:15'];
       const availableSlots = standardSlots.filter(s => !bookedHours.has(s));
 
       return {
         fechaConsultada: targetDate,
         sede: branch,
-        horariosDisponibles: availableSlots.length > 0 ? availableSlots : ['11:00 (Sobre-cupo confirmado con Dra. Aura)'],
+        horariosDisponibles: availableSlots.length > 0 ? availableSlots : ['19:00 (Sobre-cupo vespertino a autorizar por Dra. Aura)'],
+        politicaHorario: 'Lunes a Sábado exclusivamente Turno Vespertino (16:00 a 21:00 hrs) y Domingos según agenda. Turno matutino estrictamente bloqueado.',
         sedeInfo: branch.toLowerCase().includes('balbuena')
           ? 'Sede Balbuena activa (con próxima mudanza a Colonia Roma)'
           : 'Sede Chalma de Guadalupe activa con normalidad'
@@ -200,6 +202,33 @@ export async function executeConciergeTool(name: string, args: Record<string, an
           confirmed: false,
           error: 'POLITICA_URGENCIA_ACTIVA',
           mensajeError: 'Las urgencias no pueden autoconfirmarse como citas ordinarias. Por favor escala el caso con escalateEmergencyTriage para someterlo a la decisión médica de la Dra. Aura Estudillo.'
+        };
+      }
+
+      // 0.1 Validación de Política de Horarios 2027 (Turno Vespertino 16:00 a 21:00 hrs)
+      const parsedTime = (time || '').trim();
+      const [hoursStr, minutesStr] = parsedTime.split(':');
+      const appointmentHour = parseInt(hoursStr || '0', 10);
+      const appointmentMinute = parseInt(minutesStr || '0', 10);
+      const totalAppMinutes = appointmentHour * 60 + appointmentMinute;
+
+      // Bloqueo estricto del Turno Matutino (cualquier horario antes de las 16:00 hrs)
+      if (totalAppMinutes < 16 * 60) {
+        return {
+          status: 400,
+          confirmed: false,
+          error: 'TURNO_MATUTINO_BLOQUEADO',
+          mensajeError: 'A partir de 2027, el turno matutino se encuentra estrictamente bloqueado y deshabilitado para consultas. El horario de atención oficial es de Lunes a Sábado exclusivamente de 4:00 PM a 9:00 PM (16:00 a 21:00 hrs) y Domingos según disponibilidad de agenda. Por favor elige un horario en turno vespertino.'
+        };
+      }
+
+      // Bloqueo de horarios posteriores a las 21:00 hrs
+      if (totalAppMinutes > 21 * 60) {
+        return {
+          status: 400,
+          confirmed: false,
+          error: 'HORARIO_EXCEDE_CIERRE',
+          mensajeError: 'El horario seleccionado supera las 21:00 hrs. El turno vespertino concluye a las 9:00 PM. Por favor selecciona un bloque entre las 16:00 y las 20:15 hrs.'
         };
       }
 

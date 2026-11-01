@@ -528,7 +528,7 @@ export async function executeAIAgent(options: AIRequestOptions): Promise<AIRespo
           return {
             success: true,
             domain,
-            result: '¡Hola! Con mucho gusto te atendemos en la clínica dental Audenti de la Dra. Aura Estudillo. Nuestro horario es de Lunes a Sábado de 09:00 a 19:30 hrs en nuestras sedes Balbuena y Chalma de Guadalupe. ¿Qué día o procedimiento tienes en mente?',
+            result: '¡Hola! Con mucho gusto te atendemos en la clínica dental Audenti de la Dra. Aura Estudillo. Nuestro horario oficial es de Lunes a Sábado de 16:00 a 21:00 hrs (Turno Vespertino) y Domingos según agenda en nuestras sedes Balbuena, Chalma de Guadalupe y Roma. ¿Qué día o procedimiento tienes en mente?',
             provider: 'audenti/concierge-resilience-fallback',
             executionTimeMs: Date.now() - startTime
           };

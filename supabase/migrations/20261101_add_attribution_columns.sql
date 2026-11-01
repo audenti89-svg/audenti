@@ -69,9 +69,13 @@ ALTER TABLE users
 -- 1.2 COLUMNAS EN TABLA transactions (para BI por sucursal)
 -- -------------------------------------------------------
 
-ALTER TABLE transactions
-  ADD COLUMN IF NOT EXISTS branch_id TEXT,
-  ADD COLUMN IF NOT EXISTS branch_name TEXT DEFAULT 'Sucursal Balbuena (Matriz)';
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'transactions') THEN
+    ALTER TABLE transactions
+      ADD COLUMN IF NOT EXISTS branch_id TEXT,
+      ADD COLUMN IF NOT EXISTS branch_name TEXT DEFAULT 'Sucursal Balbuena (Matriz)';
+  END IF;
+END $$;
 
 -- -------------------------------------------------------
 -- 2. TABLA DE RELACIONES FAMILIARES
@@ -82,7 +86,7 @@ CREATE TABLE IF NOT EXISTS family_relationships (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Asegurar que existan todas las columnas requeridas (incluso si la tabla ya existía)
+-- Asegurar que existan todas las columnas requeridas (incluso si la tabla ya existía previamente)
 ALTER TABLE family_relationships
   ADD COLUMN IF NOT EXISTS patient_id UUID,
   ADD COLUMN IF NOT EXISTS related_patient_id UUID,
@@ -99,6 +103,7 @@ DO $$ BEGIN
   END IF;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN others THEN null;
 END $$;
 
 -- Constraint de no autoreferencia
@@ -108,6 +113,21 @@ DO $$ BEGIN
   END IF;
 EXCEPTION
   WHEN duplicate_object THEN null;
+  WHEN others THEN null;
+END $$;
+
+-- Foreign Keys seguras
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_family_patient') THEN
+    ALTER TABLE family_relationships ADD CONSTRAINT fk_family_patient FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_family_related') THEN
+    ALTER TABLE family_relationships ADD CONSTRAINT fk_family_related FOREIGN KEY (related_patient_id) REFERENCES patients(id) ON DELETE CASCADE;
+  END IF;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+  WHEN undefined_object THEN null;
+  WHEN others THEN null;
 END $$;
 
 -- Índices de relaciones familiares
