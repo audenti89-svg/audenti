@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
     // Top referidores
     const { data: topReferrers, error: referrerError } = await supabase
       .from('patients')
-      .select('id, first_name, last_name, total_referrals, acquisition_channel, referral_code')
+      .select('id, full_name, total_referrals, acquisition_channel, referral_code')
       .gt('total_referrals', 0)
       .order('total_referrals', { ascending: false })
       .limit(10)

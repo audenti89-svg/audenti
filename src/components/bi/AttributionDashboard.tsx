@@ -29,8 +29,7 @@ interface ChannelStat {
 
 interface TopReferrer {
   id: string
-  first_name: string
-  last_name: string
+  full_name: string
   total_referrals: number
   acquisition_channel: string
   referral_code: string
@@ -38,10 +37,8 @@ interface TopReferrer {
 
 interface FamilyNode {
   id: string
-  first_name: string
-  last_name: string
-  related_first_name: string
-  related_last_name: string
+  full_name: string
+  related_full_name: string
   relationship_type: string
 }
 
@@ -83,7 +80,7 @@ export function AttributionDashboard() {
       // ② Top referidores
       const { data: referrers } = await supabase
         .from('patients')
-        .select('id, first_name, last_name, total_referrals, acquisition_channel, referral_code')
+        .select('id, full_name, total_referrals, acquisition_channel, referral_code')
         .gt('total_referrals', 0)
         .order('total_referrals', { ascending: false })
         .limit(10)
@@ -95,18 +92,16 @@ export function AttributionDashboard() {
         .select(`
           id,
           relationship_type,
-          patient:patient_id(first_name, last_name),
-          related:related_patient_id(first_name, last_name)
+          patient:patient_id(full_name),
+          related:related_patient_id(full_name)
         `)
         .limit(50)
       // Aplanar la estructura anidada
       const flat: FamilyNode[] = (families || []).map((r: any) => ({
         id: r.id,
         relationship_type: r.relationship_type,
-        first_name: r.patient?.first_name ?? '',
-        last_name: r.patient?.last_name ?? '',
-        related_first_name: r.related?.first_name ?? '',
-        related_last_name: r.related?.last_name ?? '',
+        full_name: r.patient?.full_name ?? '',
+        related_full_name: r.related?.full_name ?? '',
       }))
       setFamilyLinks(flat)
     } catch (err) {
@@ -283,9 +278,9 @@ export function AttributionDashboard() {
                             <td className="px-5 py-4 font-bold text-slate-900">
                               <div className="flex items-center gap-2">
                                 <div className="w-7 h-7 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center text-xs font-black">
-                                  {(r.first_name?.[0] ?? '?')}
+                                  {(r.full_name?.[0] ?? '?')}
                                 </div>
-                                {r.first_name} {r.last_name}
+                                {r.full_name}
                               </div>
                             </td>
                             <td className="px-5 py-4">
@@ -340,7 +335,7 @@ export function AttributionDashboard() {
                       {familyLinks.map(f => (
                         <tr key={f.id} className="hover:bg-slate-50/70 transition-colors">
                           <td className="px-5 py-4 font-bold text-slate-900">
-                            {f.first_name} {f.last_name}
+                            {f.full_name}
                           </td>
                           <td className="px-5 py-4">
                             <div className="flex items-center gap-2 text-slate-500">
@@ -350,7 +345,7 @@ export function AttributionDashboard() {
                             </div>
                           </td>
                           <td className="px-5 py-4 font-bold text-slate-900">
-                            {f.related_first_name} {f.related_last_name}
+                            {f.related_full_name}
                           </td>
                         </tr>
                       ))}

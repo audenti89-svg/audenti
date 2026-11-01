@@ -20,8 +20,7 @@ import { createClient } from '@/utils/supabase/client'
 // ────────────────────────────────────────────────────────────
 interface PatientAttribution {
   id: string
-  first_name: string
-  last_name: string
+  full_name: string
   referral_code: string | null
   total_referrals: number
   acquisition_channel: string | null
@@ -45,7 +44,7 @@ export function PatientReferralCard({ patientId }: PatientReferralCardProps) {
       try {
         let query = supabase
           .from('patients')
-          .select('id, first_name, last_name, referral_code, total_referrals, acquisition_channel')
+          .select('id, full_name, referral_code, total_referrals, acquisition_channel')
 
         if (patientId) {
           query = query.eq('id', patientId)
@@ -116,7 +115,7 @@ export function PatientReferralCard({ patientId }: PatientReferralCardProps) {
           <div className="flex items-start justify-between mb-4">
             <div>
               <span className="text-[10px] font-bold uppercase tracking-widest text-amber-400">Código de Referido</span>
-              <h3 className="text-lg font-bold mt-0.5">{patient.first_name} {patient.last_name}</h3>
+              <h3 className="text-lg font-bold mt-0.5">{patient.full_name}</h3>
             </div>
             <span className={`px-3 py-1 rounded-full text-[11px] font-black ${levelColors[level]}`}>
               {level}
