@@ -110,6 +110,7 @@ function OnboardingContent() {
         referrer_name: formData.referral_source === 'Recomendación de familiar o amigo' ? formData.referred_by.trim() : null,
         branch_id: BRANCHES.find(b => b.id === formData.tenant_id)?.code || 'balbuena',
         branch_name: BRANCHES.find(b => b.id === formData.tenant_id)?.name || 'Sucursal Balbuena (Matriz)',
+        attribution_status: (formData.referred_by?.trim() || formData.qr_code_id?.trim() || (normalizedChannel && normalizedChannel !== 'otro')) ? 'completed' : 'pending_review',
         onboarding_completed: true,
       };
 

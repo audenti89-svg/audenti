@@ -118,6 +118,7 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
       patientData.referrer_name = formData.referredBy?.trim() || null
       patientData.qr_code_id = formData.qrCodeId?.trim() || null
       patientData.referral_code = `AUD-${Math.random().toString(36).substring(2, 10).toUpperCase()}`
+      patientData.attribution_status = (formData.referredBy?.trim() || formData.qrCodeId?.trim() || (channelMap[formData.referralSource] && channelMap[formData.referralSource] !== 'otro')) ? 'completed' : 'pending_review'
 
       // Búsqueda de referidor por código AUD o nombre para enlazar el árbol
       if (formData.referredBy?.trim()) {

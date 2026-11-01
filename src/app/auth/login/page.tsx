@@ -12,6 +12,22 @@ function LoginForm() {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
+    // Captura silenciosa y persistente de parámetros de campaña en login
+    const utmKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'ref', 'canal', 'qr']
+    const attribution: Record<string, string> = {}
+    utmKeys.forEach(key => {
+      const val = searchParams.get(key)
+      if (val) {
+        sessionStorage.setItem(`audenti_${key}`, val)
+        attribution[key] = val
+      }
+    })
+    if (Object.keys(attribution).length > 0) {
+      try {
+        document.cookie = `audenti_attr=${encodeURIComponent(JSON.stringify(attribution))}; path=/; max-age=2592000; SameSite=Lax`
+      } catch {}
+    }
+
     const errorParam = searchParams.get('error');
     if (errorParam) {
       if (errorParam === 'auth_failed') {
@@ -28,10 +44,25 @@ function LoginForm() {
     setLoading(true);
     setErrorMsg('');
     try {
+      // Preservar atribución si existía en cookie o sessionStorage
+      let state: string | undefined = undefined
+      try {
+        const storedAttr: Record<string, string> = {}
+        const keys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'ref', 'canal', 'qr']
+        keys.forEach(k => {
+          const v = sessionStorage.getItem(`audenti_${k}`)
+          if (v) storedAttr[k] = v
+        })
+        if (Object.keys(storedAttr).length > 0) {
+          state = btoa(JSON.stringify(storedAttr))
+        }
+      } catch {}
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: state ? { state } : undefined,
         },
       });
       if (error) throw error;
@@ -66,6 +97,13 @@ function LoginForm() {
         </svg>
         {loading ? 'Conectando...' : 'Continuar con Google'}
       </button>
+
+      <div className="mt-4 text-xs text-slate-500">
+        ¿Aún no tienes expediente clínico?{' '}
+        <Link href="/auth/register" className="font-bold text-amber-700 hover:text-amber-600 transition-colors underline">
+          Crear expediente con sucursal
+        </Link>
+      </div>
 
       <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
         <Link href="/" className="hover:text-amber-600 transition-colors">

@@ -16,6 +16,8 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 
+import { AttributionDashboard } from '@/components/bi/AttributionDashboard'
+
 interface BIData {
   totalPatients: number
   totalRevenue: number
@@ -186,6 +188,11 @@ export default function BIDashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Módulo Avanzado de Atribución Comercial, Sucursales y Red Familiar */}
+      <div className="mt-8">
+        <AttributionDashboard />
+      </div>
     </div>
   )
 }

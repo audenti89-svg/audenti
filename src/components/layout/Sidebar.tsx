@@ -36,6 +36,7 @@ const clinicalNav: NavItem[] = [
 
 const businessNav: NavItem[] = [
   { label: 'Finanzas',          path: '/dashboard/finanzas',     icon: CircleDollarSign },
+  { label: 'Inteligencia BI',   path: '/admin/bi',               icon: BarChart3 },
   { label: 'Reportes',          path: '/dashboard/reportes',     icon: BarChart3 },
   { label: 'CRM & Seguimiento', path: '/dashboard/crm',          icon: Contact2 },
   { label: 'Comunicación',      path: '/dashboard/comunicacion', icon: MessageSquare },
