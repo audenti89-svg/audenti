@@ -6,8 +6,9 @@ import { createClient } from '@/utils/supabase/client';
 import { ShieldCheck, UserCheck, HeartPulse, PhoneCall, AlertTriangle, QrCode, Sparkles } from 'lucide-react';
 
 const BRANCHES = [
-  { id: '00000000-0000-0000-0000-000000000001', name: 'Sucursal Valbuena (Matriz)' },
-  { id: '00000000-0000-0000-0000-000000000002', name: 'Sucursal Chalma de Guadalupe' }
+  { id: '00000000-0000-0000-0000-000000000001', code: 'balbuena', name: 'Sucursal Balbuena (Matriz)' },
+  { id: '00000000-0000-0000-0000-000000000002', code: 'guadalupe-chalma', name: 'Sucursal Guadalupe Chalma' },
+  { id: '00000000-0000-0000-0000-000000000003', code: 'colonia-roma', name: 'Sucursal Colonia Roma' },
 ];
 
 function OnboardingContent() {
@@ -107,7 +108,8 @@ function OnboardingContent() {
         qr_code_id: formData.qr_code_id?.trim() || null,
         referred_by: formData.referral_source === 'Recomendación de familiar o amigo' ? formData.referred_by.trim() : null,
         referrer_name: formData.referral_source === 'Recomendación de familiar o amigo' ? formData.referred_by.trim() : null,
-        branch_name: formData.tenant_id === '00000000-0000-0000-0000-000000000002' ? 'Sucursal Chalma de Guadalupe' : 'Sucursal Valbuena (Matriz)',
+        branch_id: BRANCHES.find(b => b.id === formData.tenant_id)?.code || 'balbuena',
+        branch_name: BRANCHES.find(b => b.id === formData.tenant_id)?.name || 'Sucursal Balbuena (Matriz)',
         onboarding_completed: true,
       };
 

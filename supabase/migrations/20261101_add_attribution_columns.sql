@@ -1,14 +1,14 @@
 -- ============================================================
--- MIGRACIÓN RESILIENTE: Módulo de Registro Inteligente y Atribución Comercial
+-- MIGRACIÓN RESILIENTE: Atribución Comercial, Sucursales y BI
 -- Proyecto: Audenti Cloud Pro
 -- Arquitecto: Ricardo Sánchez
 -- Fecha: 2026-11-01
 -- Instrucción: Ejecutar en Supabase SQL Editor (Dashboard)
--- Es 100% IDEMPOTENTE (se puede ejecutar múltiples veces sin error).
+-- 100% IDEMPOTENTE (se puede ejecutar completo o por secciones)
 -- ============================================================
 
 -- -------------------------------------------------------
--- 1. COLUMNAS DE ATRIBUCIÓN EN LA TABLA patients
+-- 1. COLUMNAS DE ATRIBUCIÓN Y SUCURSALES EN TABLA patients
 -- -------------------------------------------------------
 
 ALTER TABLE patients
@@ -21,11 +21,12 @@ ALTER TABLE patients
   ADD COLUMN IF NOT EXISTS utm_campaign TEXT,
   ADD COLUMN IF NOT EXISTS utm_content TEXT,
   ADD COLUMN IF NOT EXISTS referral_code TEXT,
-  ADD COLUMN IF NOT EXISTS total_referrals INTEGER DEFAULT 0;
+  ADD COLUMN IF NOT EXISTS total_referrals INTEGER DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS branch_id TEXT,
+  ADD COLUMN IF NOT EXISTS branch_name TEXT DEFAULT 'Sucursal Balbuena (Matriz)';
 
--- Establecer defaults y constraints de manera segura
+-- Constraint de canal de adquisición seguro
 DO $$ BEGIN
-  -- Constraint de canal de adquisición
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_patients_acquisition_channel') THEN
     ALTER TABLE patients ADD CONSTRAINT chk_patients_acquisition_channel
       CHECK (acquisition_channel IN ('tiktok','instagram','youtube','facebook','referral','qr','directo','otro') OR acquisition_channel IS NULL);
@@ -39,10 +40,16 @@ UPDATE patients
 SET referral_code = CONCAT('AUD-', UPPER(SUBSTRING(gen_random_uuid()::text, 1, 8)))
 WHERE referral_code IS NULL;
 
+-- Asignar sucursal matriz a pacientes que no tengan sucursal especificada
+UPDATE patients
+SET branch_name = 'Sucursal Balbuena (Matriz)'
+WHERE branch_name IS NULL;
+
 -- Índices en patients
 CREATE INDEX IF NOT EXISTS idx_patients_acquisition_channel ON patients(acquisition_channel);
 CREATE INDEX IF NOT EXISTS idx_patients_referrer_id ON patients(referrer_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_patients_referral_code ON patients(referral_code);
+CREATE INDEX IF NOT EXISTS idx_patients_branch_name ON patients(branch_name);
 
 -- -------------------------------------------------------
 -- 1.1 COLUMNAS EN TABLA users (perfiles y sincronización OAuth)
@@ -54,10 +61,20 @@ ALTER TABLE users
   ADD COLUMN IF NOT EXISTS acquisition_channel TEXT,
   ADD COLUMN IF NOT EXISTS referrer_name TEXT,
   ADD COLUMN IF NOT EXISTS qr_code_id TEXT,
-  ADD COLUMN IF NOT EXISTS referral_code TEXT;
+  ADD COLUMN IF NOT EXISTS referral_code TEXT,
+  ADD COLUMN IF NOT EXISTS branch_id TEXT,
+  ADD COLUMN IF NOT EXISTS branch_name TEXT DEFAULT 'Sucursal Balbuena (Matriz)';
 
 -- -------------------------------------------------------
--- 2. TABLA DE RELACIONES FAMILIARES (Con soporte si ya existía)
+-- 1.2 COLUMNAS EN TABLA transactions (para BI por sucursal)
+-- -------------------------------------------------------
+
+ALTER TABLE transactions
+  ADD COLUMN IF NOT EXISTS branch_id TEXT,
+  ADD COLUMN IF NOT EXISTS branch_name TEXT DEFAULT 'Sucursal Balbuena (Matriz)';
+
+-- -------------------------------------------------------
+-- 2. TABLA DE RELACIONES FAMILIARES
 -- -------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS family_relationships (
@@ -65,7 +82,7 @@ CREATE TABLE IF NOT EXISTS family_relationships (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Asegurar que existan todas las columnas requeridas
+-- Asegurar que existan todas las columnas requeridas (incluso si la tabla ya existía)
 ALTER TABLE family_relationships
   ADD COLUMN IF NOT EXISTS patient_id UUID,
   ADD COLUMN IF NOT EXISTS related_patient_id UUID,
@@ -112,7 +129,7 @@ CREATE TABLE IF NOT EXISTS campaign_qr_codes (
 );
 
 -- -------------------------------------------------------
--- 4. RLS (Row Level Security) - Políticas con DROP previo para idempotencia
+-- 4. POLÍTICAS RLS (Con DROP previo para evitar error 42710)
 -- -------------------------------------------------------
 
 ALTER TABLE family_relationships ENABLE ROW LEVEL SECURITY;
@@ -158,6 +175,7 @@ CREATE POLICY "staff_write_qr_codes"
 -- -------------------------------------------------------
 -- 5. FUNCIÓN: Incrementar contador de referidos
 -- -------------------------------------------------------
+
 CREATE OR REPLACE FUNCTION increment_referral_count(referrer UUID)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
@@ -167,8 +185,8 @@ $$;
 
 -- -------------------------------------------------------
 -- 6. VISTA BI: Desglose e Ingresos por Canal
--- (Casting a ::text para soportar tanto 'income' como cualquier valor del enum transaction_type sin error 22P02)
 -- -------------------------------------------------------
+
 CREATE OR REPLACE VIEW attribution_by_channel AS
 SELECT
   COALESCE(p.acquisition_channel, 'sin_dato') AS canal,
@@ -184,8 +202,28 @@ ORDER BY total_pacientes DESC;
 GRANT SELECT ON attribution_by_channel TO authenticated;
 
 -- -------------------------------------------------------
+-- 6.1 VISTA BI: Historial Financiero por Sucursal
+-- -------------------------------------------------------
+
+CREATE OR REPLACE VIEW financial_by_branch AS
+SELECT
+  COALESCE(p.branch_name, 'Sucursal Balbuena (Matriz)') AS sucursal,
+  COUNT(DISTINCT p.id) AS total_pacientes,
+  COUNT(t.id) AS total_transacciones,
+  COALESCE(SUM(CASE WHEN t.type::text IN ('income', 'cobro') THEN t.amount ELSE 0 END), 0) AS ingresos_totales,
+  COALESCE(SUM(CASE WHEN t.type::text IN ('expense', 'egreso') THEN t.amount ELSE 0 END), 0) AS egresos_totales,
+  COALESCE(SUM(CASE WHEN t.type::text IN ('income', 'cobro') THEN t.amount ELSE -t.amount END), 0) AS flujo_neto
+FROM patients p
+LEFT JOIN transactions t ON t.patient_id = p.id
+GROUP BY COALESCE(p.branch_name, 'Sucursal Balbuena (Matriz)')
+ORDER BY ingresos_totales DESC;
+
+GRANT SELECT ON financial_by_branch TO authenticated;
+
+-- -------------------------------------------------------
 -- 7. DATOS DE EJEMPLO: Códigos QR de campaña
 -- -------------------------------------------------------
+
 INSERT INTO campaign_qr_codes (id, name, description, canal) VALUES
   ('qr_balbuena_01', 'QR Clínica Balbuena – Recepción', 'QR físico en la entrada de recepción', 'qr'),
   ('qr_tarjeta_presentacion', 'QR Tarjeta de Presentación Dra. Aura', 'QR impreso en tarjetas de presentación', 'qr'),

@@ -48,10 +48,22 @@ export async function GET(req: NextRequest) {
       .from('family_relationships')
       .select('*', { count: 'exact', head: true })
 
+    // Historial financiero por sucursal (BI)
+    let branchStats: any[] = []
+    try {
+      const { data: bData } = await supabase
+        .from('financial_by_branch')
+        .select('*')
+      if (bData && bData.length > 0) {
+        branchStats = bData
+      }
+    } catch {}
+
     return NextResponse.json({
       channel_stats: channelStats ?? [],
       top_referrers: topReferrers ?? [],
       family_relationships_count: familyCount ?? 0,
+      branch_stats: branchStats,
       generated_at: new Date().toISOString(),
     })
   } catch (err: any) {

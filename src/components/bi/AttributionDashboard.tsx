@@ -12,7 +12,11 @@ import {
   Sparkles,
   BarChart3,
   Award,
-  GitBranch
+  GitBranch,
+  Building2,
+  Wallet,
+  Receipt,
+  DollarSign
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 
@@ -42,8 +46,17 @@ interface FamilyNode {
   relationship_type: string
 }
 
+interface BranchStat {
+  sucursal: string
+  total_pacientes: number
+  total_transacciones: number
+  ingresos_totales: number
+  egresos_totales: number
+  flujo_neto: number
+}
+
 // ────────────────────────────────────────────────────────────
-// Iconos de canal
+// Iconos y colores de canal
 // ────────────────────────────────────────────────────────────
 const CHANNEL_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   tiktok:    { label: 'TikTok',       color: 'bg-slate-900 text-white',          icon: <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.75a8.2 8.2 0 004.79 1.53V6.84a4.85 4.85 0 01-1.02-.15z"/></svg> },
@@ -65,8 +78,9 @@ export function AttributionDashboard() {
   const [channelStats, setChannelStats] = useState<ChannelStat[]>([])
   const [topReferrers, setTopReferrers] = useState<TopReferrer[]>([])
   const [familyLinks, setFamilyLinks] = useState<FamilyNode[]>([])
+  const [branchStats, setBranchStats] = useState<BranchStat[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'canales' | 'referidores' | 'familias'>('canales')
+  const [activeTab, setActiveTab] = useState<'canales' | 'referidores' | 'familias' | 'sucursales'>('canales')
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -96,7 +110,6 @@ export function AttributionDashboard() {
           related:related_patient_id(full_name)
         `)
         .limit(50)
-      // Aplanar la estructura anidada
       const flat: FamilyNode[] = (families || []).map((r: any) => ({
         id: r.id,
         relationship_type: r.relationship_type,
@@ -104,6 +117,55 @@ export function AttributionDashboard() {
         related_full_name: r.related?.full_name ?? '',
       }))
       setFamilyLinks(flat)
+
+      // ④ Historial financiero por sucursal
+      const { data: bStats } = await supabase
+        .from('financial_by_branch')
+        .select('*')
+
+      if (bStats && bStats.length > 0) {
+        setBranchStats(bStats)
+      } else {
+        // Fallback en tiempo real directamente de patients y transactions
+        const { data: pList } = await supabase.from('patients').select('id, branch_name')
+        const { data: tList } = await supabase.from('transactions').select('patient_id, amount, type')
+
+        const map: Record<string, { pacientes: Set<string>; transacciones: number; ingresos: number; egresos: number }> = {
+          'Sucursal Balbuena (Matriz)': { pacientes: new Set(), transacciones: 0, ingresos: 0, egresos: 0 },
+          'Sucursal Guadalupe Chalma': { pacientes: new Set(), transacciones: 0, ingresos: 0, egresos: 0 },
+          'Sucursal Colonia Roma': { pacientes: new Set(), transacciones: 0, ingresos: 0, egresos: 0 },
+        }
+
+        const patientMap: Record<string, string> = {}
+        ;(pList || []).forEach(p => {
+          const b = p.branch_name || 'Sucursal Balbuena (Matriz)'
+          patientMap[p.id] = b
+          if (!map[b]) map[b] = { pacientes: new Set(), transacciones: 0, ingresos: 0, egresos: 0 }
+          map[b].pacientes.add(p.id)
+        })
+
+        ;(tList || []).forEach(t => {
+          const b = patientMap[t.patient_id] || 'Sucursal Balbuena (Matriz)'
+          if (!map[b]) map[b] = { pacientes: new Set(), transacciones: 0, ingresos: 0, egresos: 0 }
+          map[b].transacciones++
+          const amt = Number(t.amount) || 0
+          if (['income', 'cobro'].includes(String(t.type))) {
+            map[b].ingresos += amt
+          } else if (['expense', 'egreso'].includes(String(t.type))) {
+            map[b].egresos += amt
+          }
+        })
+
+        const calculated: BranchStat[] = Object.entries(map).map(([sucursal, d]) => ({
+          sucursal,
+          total_pacientes: d.pacientes.size,
+          total_transacciones: d.transacciones,
+          ingresos_totales: d.ingresos,
+          egresos_totales: d.egresos,
+          flujo_neto: d.ingresos - d.egresos,
+        }))
+        setBranchStats(calculated)
+      }
     } catch (err) {
       console.warn('[AttributionDashboard] Error cargando datos:', err)
     } finally {
@@ -122,44 +184,48 @@ export function AttributionDashboard() {
   return (
     <div className="space-y-6">
       {/* Header BI */}
-      <div className="bg-gradient-to-br from-[#202D4C] to-slate-700 rounded-2xl p-6 text-white">
-        <div className="flex items-center gap-2 mb-1">
+      <div className="bg-gradient-to-br from-[#202D4C] to-slate-800 rounded-3xl p-6 sm:p-8 text-white shadow-xl">
+        <div className="flex items-center gap-2 mb-2">
           <BarChart3 className="w-5 h-5 text-amber-400" />
-          <span className="text-xs font-bold uppercase tracking-widest text-amber-400">Business Intelligence</span>
+          <span className="text-[11px] font-bold uppercase tracking-widest text-amber-400">Business Intelligence &amp; Analítica Comercial</span>
         </div>
-        <h2 className="text-xl font-bold tracking-tight">Atribución Comercial & Canales de Adquisición</h2>
-        <p className="text-xs text-slate-300 mt-1">Panel de dirección — Dra. Aura Estudillo</p>
+        <h2 className="text-2xl font-bold tracking-tight">Atribución de Pacientes, Redes y Sucursales</h2>
+        <p className="text-xs text-slate-300 mt-1">Dirección General — Dra. Aura Estudillo • Céd. Prof. 8492019</p>
 
-        <div className="grid grid-cols-3 gap-4 mt-5">
-          <div className="bg-white/10 rounded-xl p-4 backdrop-blur-sm">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">Pacientes Totales</span>
-            <p className="text-3xl font-bold mt-1">{totalPatients.toLocaleString('es-MX')}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
+          <div className="bg-white/10 rounded-2xl p-4 backdrop-blur-md border border-white/10">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">Pacientes Atribuidos</span>
+            <p className="text-3xl font-black mt-1">{totalPatients.toLocaleString('es-MX')}</p>
+            <p className="text-[10px] text-slate-300 mt-0.5">Base clínica activa</p>
           </div>
-          <div className="bg-white/10 rounded-xl p-4 backdrop-blur-sm">
+          <div className="bg-white/10 rounded-2xl p-4 backdrop-blur-md border border-white/10">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">Referidos Generados</span>
-            <p className="text-3xl font-bold mt-1 text-amber-400">{totalReferrals.toLocaleString('es-MX')}</p>
+            <p className="text-3xl font-black mt-1 text-amber-400">{totalReferrals.toLocaleString('es-MX')}</p>
+            <p className="text-[10px] text-amber-300 mt-0.5">Red de embajadores</p>
           </div>
-          <div className="bg-white/10 rounded-xl p-4 backdrop-blur-sm">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">Ingresos Atribuidos</span>
-            <p className="text-3xl font-bold mt-1 text-emerald-400">
+          <div className="bg-white/10 rounded-2xl p-4 backdrop-blur-md border border-white/10">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">Ingresos Identificados</span>
+            <p className="text-3xl font-black mt-1 text-emerald-400">
               ${totalRevenue.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
             </p>
+            <p className="text-[10px] text-emerald-300 mt-0.5">Trazabilidad por canal</p>
           </div>
         </div>
       </div>
 
       {/* Tabs de navegación */}
-      <div className="flex gap-2 p-1.5 bg-slate-100 rounded-2xl w-fit border border-slate-200/70">
+      <div className="flex flex-wrap gap-2 p-1.5 bg-slate-100 rounded-2xl w-fit border border-slate-200/70">
         {([
-          { key: 'canales', label: 'Canales', icon: <BarChart3 className="w-4 h-4 text-amber-600" /> },
-          { key: 'referidores', label: 'Top Referidores', icon: <Award className="w-4 h-4 text-amber-600" /> },
+          { key: 'canales', label: 'Canales de Origen', icon: <BarChart3 className="w-4 h-4 text-amber-600" /> },
+          { key: 'sucursales', label: 'Finanzas por Sede', icon: <Building2 className="w-4 h-4 text-amber-600" /> },
+          { key: 'referidores', label: 'Red de Embajadores', icon: <Award className="w-4 h-4 text-amber-600" /> },
           { key: 'familias', label: 'Árbol Familiar', icon: <GitBranch className="w-4 h-4 text-amber-600" /> },
         ] as const).map(tab => (
           <button
             key={tab.key}
             type="button"
             onClick={() => setActiveTab(tab.key)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               activeTab === tab.key
                 ? 'bg-white text-slate-900 shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
@@ -172,25 +238,29 @@ export function AttributionDashboard() {
       </div>
 
       {loading ? (
-        <div className="bg-white rounded-2xl p-12 text-center border border-slate-200">
+        <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 shadow-sm">
           <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-xs text-slate-400">Cargando inteligencia comercial...</p>
+          <p className="text-xs text-slate-400 font-medium">Cargando inteligencia comercial y financiera...</p>
         </div>
       ) : (
         <>
-          {/* ── TAB: CANALES ── */}
+          {/* ── TAB: CANALES DE ORIGEN ── */}
           {activeTab === 'canales' && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-5 border-b border-slate-100">
-                <h3 className="text-base font-bold text-slate-900">Desglose por Canal de Adquisición</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Distribución de pacientes, referidos e ingresos por canal de origen</p>
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Desglose de Conversión por Canal</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Pacientes, ingresos y volumen originados por TikTok, Instagram, QR y recomendaciones</p>
+                </div>
               </div>
 
               {channelStats.length === 0 ? (
                 <div className="p-12 text-center space-y-2">
-                  <BarChart3 className="w-10 h-10 text-slate-200 mx-auto" />
-                  <p className="text-sm font-bold text-slate-400">Sin datos de atribución aún</p>
-                  <p className="text-xs text-slate-400">Los datos aparecerán conforme los pacientes se registren con su canal de origen.</p>
+                  <BarChart3 className="w-10 h-10 text-slate-300 mx-auto" />
+                  <p className="text-sm font-bold text-slate-700">Sin datos de atribución aún</p>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                    Los registros nuevos y altas en recepción comenzarán a poblar este gráfico automáticamente.
+                  </p>
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100">
@@ -198,10 +268,10 @@ export function AttributionDashboard() {
                     const cfg = CHANNEL_CONFIG[stat.canal] ?? CHANNEL_CONFIG['otro']
                     const pct = Math.round((stat.total_pacientes / maxPatients) * 100)
                     return (
-                      <div key={stat.canal} className="p-5 hover:bg-slate-50/50 transition-colors">
-                        <div className="flex items-center justify-between mb-3">
+                      <div key={stat.canal} className="p-5 sm:p-6 hover:bg-slate-50/50 transition-colors">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
                           <div className="flex items-center gap-3">
-                            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold ${cfg.color}`}>
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold ${cfg.color}`}>
                               {cfg.icon}
                               {cfg.label}
                             </span>
@@ -209,28 +279,31 @@ export function AttributionDashboard() {
                           <div className="flex items-center gap-6 text-right">
                             <div>
                               <p className="text-[10px] font-bold text-slate-400 uppercase">Pacientes</p>
-                              <p className="text-lg font-bold text-slate-900">{stat.total_pacientes}</p>
+                              <p className="text-lg font-black text-slate-900">{stat.total_pacientes}</p>
                             </div>
                             <div>
                               <p className="text-[10px] font-bold text-slate-400 uppercase">Referidos</p>
-                              <p className="text-lg font-bold text-amber-700">{stat.referidos_generados}</p>
+                              <p className="text-lg font-black text-amber-700">{stat.referidos_generados}</p>
                             </div>
                             <div>
                               <p className="text-[10px] font-bold text-slate-400 uppercase">Ingresos</p>
-                              <p className="text-lg font-bold text-emerald-700">
+                              <p className="text-lg font-black text-emerald-700">
                                 ${Number(stat.ingresos_totales).toLocaleString('es-MX', { minimumFractionDigits: 0 })}
                               </p>
                             </div>
                           </div>
                         </div>
                         {/* Barra de progreso */}
-                        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-amber-400 rounded-full transition-all duration-700"
+                            className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-700"
                             style={{ width: `${pct}%` }}
                           />
                         </div>
-                        <p className="text-[10px] text-slate-400 mt-1">{pct}% del canal líder</p>
+                        <div className="flex justify-between items-center text-[10px] text-slate-400 mt-1">
+                          <span>{pct}% del canal líder</span>
+                          <span>Ticket Promedio: ${Number(stat.ticket_promedio).toLocaleString('es-MX', { minimumFractionDigits: 0 })}</span>
+                        </div>
                       </div>
                     )
                   })}
@@ -239,28 +312,123 @@ export function AttributionDashboard() {
             </div>
           )}
 
+          {/* ── TAB: FINANZAS POR SUCURSAL (SEDES) ── */}
+          {activeTab === 'sucursales' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {branchStats.map(bs => (
+                  <div key={bs.sucursal} className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                          Sede Dental
+                        </span>
+                        <h4 className="text-base font-bold text-slate-900 mt-1">{bs.sucursal}</h4>
+                      </div>
+                      <div className="w-9 h-9 rounded-xl bg-[#202D4C] text-white flex items-center justify-center">
+                        <Building2 className="w-5 h-5 text-amber-400" />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                      <div>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase">Pacientes Dados de Alta</p>
+                        <p className="text-2xl font-black text-slate-900 mt-0.5">{bs.total_pacientes}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase">Flujo Neto</p>
+                        <p className="text-2xl font-black text-emerald-700 mt-0.5">
+                          ${Number(bs.flujo_neto).toLocaleString('es-MX', { minimumFractionDigits: 0 })}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-slate-50 rounded-2xl space-y-1.5 text-xs">
+                      <div className="flex justify-between text-slate-600">
+                        <span>Ingresos cobrados:</span>
+                        <strong className="text-emerald-700">${Number(bs.ingresos_totales).toLocaleString('es-MX')}</strong>
+                      </div>
+                      <div className="flex justify-between text-slate-600">
+                        <span>Egresos asentados:</span>
+                        <strong className="text-rose-600">${Number(bs.egresos_totales).toLocaleString('es-MX')}</strong>
+                      </div>
+                      <div className="flex justify-between text-slate-500 text-[11px] pt-1 border-t border-slate-200/60">
+                        <span>Transacciones totales:</span>
+                        <span>{bs.total_transacciones} operaciones</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Tabla consolidada de sucursales */}
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-slate-100">
+                  <h3 className="text-base font-bold text-slate-900">Historial Financiero y Altas por Sede</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Monitoreo consolidado de ventas y balance de cada unidad dental</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      <tr>
+                        <th className="px-6 py-4">Sucursal</th>
+                        <th className="px-6 py-4 text-center">Pacientes</th>
+                        <th className="px-6 py-4 text-center">Transacciones</th>
+                        <th className="px-6 py-4 text-right">Ingresos</th>
+                        <th className="px-6 py-4 text-right">Egresos</th>
+                        <th className="px-6 py-4 text-right">Flujo Neto</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {branchStats.map(bs => (
+                        <tr key={bs.sucursal} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="px-6 py-4 font-bold text-slate-900 flex items-center gap-2">
+                            <Building2 className="w-4 h-4 text-amber-600 shrink-0" />
+                            {bs.sucursal}
+                          </td>
+                          <td className="px-6 py-4 text-center font-bold text-slate-700">{bs.total_pacientes}</td>
+                          <td className="px-6 py-4 text-center font-medium text-slate-500">{bs.total_transacciones}</td>
+                          <td className="px-6 py-4 text-right font-bold text-emerald-700">
+                            ${Number(bs.ingresos_totales).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="px-6 py-4 text-right font-semibold text-rose-600">
+                            ${Number(bs.egresos_totales).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="px-6 py-4 text-right font-black text-slate-900">
+                            ${Number(bs.flujo_neto).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* ── TAB: TOP REFERIDORES ── */}
           {activeTab === 'referidores' && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-5 border-b border-slate-100">
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-slate-100">
                 <h3 className="text-base font-bold text-slate-900">Pacientes Embajadores — Ranking de Referidos</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Pacientes que han traído más personas nuevas a la clínica</p>
+                <p className="text-xs text-slate-500 mt-0.5">Pacientes que han compartido su código de lealtad e invitado amigos o familiares</p>
               </div>
               {topReferrers.length === 0 ? (
                 <div className="p-12 text-center space-y-2">
-                  <Award className="w-10 h-10 text-slate-200 mx-auto" />
-                  <p className="text-sm font-bold text-slate-400">Ningún embajador con referidos aún</p>
+                  <Award className="w-10 h-10 text-slate-300 mx-auto" />
+                  <p className="text-sm font-bold text-slate-700">Ningún embajador con referidos aún</p>
+                  <p className="text-xs text-slate-400">Los embajadores aparecerán conforme se usen los códigos AUD- en registros.</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                       <tr>
-                        <th className="px-5 py-3.5">#</th>
-                        <th className="px-5 py-3.5">Embajador</th>
-                        <th className="px-5 py-3.5">Código único</th>
-                        <th className="px-5 py-3.5">Canal origen</th>
-                        <th className="px-5 py-3.5 text-right">Referidos</th>
+                        <th className="px-6 py-4">#</th>
+                        <th className="px-6 py-4">Embajador</th>
+                        <th className="px-6 py-4">Código único</th>
+                        <th className="px-6 py-4">Canal origen</th>
+                        <th className="px-6 py-4 text-right">Referidos</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -268,14 +436,14 @@ export function AttributionDashboard() {
                         const cfg = CHANNEL_CONFIG[r.acquisition_channel] ?? CHANNEL_CONFIG['otro']
                         return (
                           <tr key={r.id} className="hover:bg-slate-50/70 transition-colors">
-                            <td className="px-5 py-4">
+                            <td className="px-6 py-4">
                               <span className={`w-7 h-7 rounded-full inline-flex items-center justify-center text-xs font-bold ${
                                 idx === 0 ? 'bg-amber-400 text-slate-950' : idx === 1 ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-500'
                               }`}>
                                 {idx + 1}
                               </span>
                             </td>
-                            <td className="px-5 py-4 font-bold text-slate-900">
+                            <td className="px-6 py-4 font-bold text-slate-900">
                               <div className="flex items-center gap-2">
                                 <div className="w-7 h-7 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center text-xs font-black">
                                   {(r.full_name?.[0] ?? '?')}
@@ -283,18 +451,18 @@ export function AttributionDashboard() {
                                 {r.full_name}
                               </div>
                             </td>
-                            <td className="px-5 py-4">
+                            <td className="px-6 py-4">
                               <code className="bg-amber-50 text-amber-800 px-2 py-0.5 rounded font-mono text-[11px] font-bold border border-amber-200">
                                 {r.referral_code}
                               </code>
                             </td>
-                            <td className="px-5 py-4">
+                            <td className="px-6 py-4">
                               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${cfg.color}`}>
                                 {cfg.icon}
                                 {cfg.label}
                               </span>
                             </td>
-                            <td className="px-5 py-4 text-right">
+                            <td className="px-6 py-4 text-right">
                               <span className="text-lg font-black text-amber-700">{r.total_referrals}</span>
                               <span className="text-slate-400 ml-1">personas</span>
                             </td>
@@ -310,41 +478,41 @@ export function AttributionDashboard() {
 
           {/* ── TAB: ÁRBOL FAMILIAR ── */}
           {activeTab === 'familias' && (
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="p-5 border-b border-slate-100">
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-slate-100">
                 <h3 className="text-base font-bold text-slate-900">Árbol de Familias Registradas</h3>
                 <p className="text-xs text-slate-500 mt-0.5">Relaciones familiares entre pacientes para planes preventivos y facturación familiar</p>
               </div>
               {familyLinks.length === 0 ? (
                 <div className="p-12 text-center space-y-2">
-                  <GitBranch className="w-10 h-10 text-slate-200 mx-auto" />
-                  <p className="text-sm font-bold text-slate-400">No hay relaciones familiares registradas</p>
-                  <p className="text-xs text-slate-400">Registra las relaciones desde el expediente de cada paciente.</p>
+                  <GitBranch className="w-10 h-10 text-slate-300 mx-auto" />
+                  <p className="text-sm font-bold text-slate-700">No hay relaciones familiares registradas</p>
+                  <p className="text-xs text-slate-400">Registra las relaciones desde el expediente de cada paciente en recepción.</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                       <tr>
-                        <th className="px-5 py-3.5">Paciente</th>
-                        <th className="px-5 py-3.5">Relación</th>
-                        <th className="px-5 py-3.5">Familiar</th>
+                        <th className="px-6 py-4">Paciente</th>
+                        <th className="px-6 py-4">Relación</th>
+                        <th className="px-6 py-4">Familiar</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {familyLinks.map(f => (
                         <tr key={f.id} className="hover:bg-slate-50/70 transition-colors">
-                          <td className="px-5 py-4 font-bold text-slate-900">
+                          <td className="px-6 py-4 font-bold text-slate-900">
                             {f.full_name}
                           </td>
-                          <td className="px-5 py-4">
+                          <td className="px-6 py-4">
                             <div className="flex items-center gap-2 text-slate-500">
                               <ArrowRight className="w-3 h-3" />
                               <span className="capitalize font-semibold text-slate-700">{f.relationship_type}</span>
                               <ArrowRight className="w-3 h-3" />
                             </div>
                           </td>
-                          <td className="px-5 py-4 font-bold text-slate-900">
+                          <td className="px-6 py-4 font-bold text-slate-900">
                             {f.related_full_name}
                           </td>
                         </tr>

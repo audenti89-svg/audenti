@@ -4,7 +4,6 @@ import Script from 'next/script'
 import './globals.css'
 import { SmartPwaFloatingBanner } from '@/components/ui/SmartPwaFloatingBanner'
 import { AccessibilityProvider } from '@/context/AccessibilityContext'
-import { LocationPermissionBanner } from '@/components/ui/LocationPermissionBanner'
 import { ChatwootWidget } from '@/components/chat/ChatwootWidget'
 import { CampaignTracker } from '@/components/analytics/CampaignTracker'
 
@@ -119,7 +118,6 @@ export default function RootLayout({
           <CampaignTracker />
           {children}
           <SmartPwaFloatingBanner />
-          <LocationPermissionBanner />
           <ChatwootWidget />
         </AccessibilityProvider>
       </body>

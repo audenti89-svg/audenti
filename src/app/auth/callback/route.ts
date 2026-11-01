@@ -100,6 +100,10 @@ export async function GET(request: Request) {
         if (attr.utm_campaign)  updatePayload.utm_campaign   = attr.utm_campaign;
         if (attr.utm_content)   updatePayload.utm_content    = attr.utm_content;
 
+        if (attr.branch_name)   updatePayload.branch_name    = attr.branch_name;
+        if (attr.branch_id)     updatePayload.branch_id      = attr.branch_id;
+        if (attr.tenant_id)     updatePayload.tenant_id      = attr.tenant_id;
+
         // Resolver referidor por código AUD-XXXXX o ref param
         const refCandidate = attr.referrer_code || attr.ref;
         if (refCandidate) {
@@ -139,6 +143,8 @@ export async function GET(request: Request) {
             acquisition_channel: channel,
             referrer_name: updatePayload.referrer_name,
             qr_code_id: updatePayload.qr_code_id,
+            branch_id: updatePayload.branch_id,
+            branch_name: updatePayload.branch_name,
           }).eq('id', user.id);
         } catch {
           // Soporte opcional si tabla users no tiene todas las columnas
