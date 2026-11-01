@@ -16,7 +16,11 @@ import {
   Building2,
   Wallet,
   Receipt,
-  DollarSign
+  DollarSign,
+  Clock,
+  Check,
+  X,
+  AlertCircle
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 
@@ -55,6 +59,17 @@ interface BranchStat {
   flujo_neto: number
 }
 
+interface PendingPatient {
+  id: string
+  full_name: string
+  phone: string
+  email: string
+  branch_name: string
+  created_at: string
+  referral_code: string
+  attribution_status: string
+}
+
 // ────────────────────────────────────────────────────────────
 // Iconos y colores de canal
 // ────────────────────────────────────────────────────────────
@@ -79,8 +94,15 @@ export function AttributionDashboard() {
   const [topReferrers, setTopReferrers] = useState<TopReferrer[]>([])
   const [familyLinks, setFamilyLinks] = useState<FamilyNode[]>([])
   const [branchStats, setBranchStats] = useState<BranchStat[]>([])
+  const [pendingPatients, setPendingPatients] = useState<PendingPatient[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'canales' | 'referidores' | 'familias' | 'sucursales'>('canales')
+  const [activeTab, setActiveTab] = useState<'canales' | 'referidores' | 'familias' | 'sucursales' | 'pendientes'>('canales')
+
+  // Estado para modal de asignación rápida en recepción
+  const [assigningPatient, setAssigningPatient] = useState<PendingPatient | null>(null)
+  const [selectedChannel, setSelectedChannel] = useState('tiktok')
+  const [assignReferrerCode, setAssignReferrerCode] = useState('')
+  const [savingAttribution, setSavingAttribution] = useState(false)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -166,6 +188,15 @@ export function AttributionDashboard() {
         }))
         setBranchStats(calculated)
       }
+
+      // ⑤ Pacientes con atribución pendiente (para recepción durante turno vespertino)
+      const { data: pending } = await supabase
+        .from('patients')
+        .select('id, full_name, phone, email, branch_name, created_at, referral_code, attribution_status')
+        .or('attribution_status.eq.pending_review,acquisition_channel.is.null')
+        .order('created_at', { ascending: false })
+        .limit(30)
+      setPendingPatients((pending as any) || [])
     } catch (err) {
       console.warn('[AttributionDashboard] Error cargando datos:', err)
     } finally {
@@ -174,6 +205,32 @@ export function AttributionDashboard() {
   }, [supabase])
 
   useEffect(() => { loadData() }, [loadData])
+
+  const handleSaveAttribution = async () => {
+    if (!assigningPatient) return
+    setSavingAttribution(true)
+    try {
+      const res = await fetch('/api/attribution', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patient_id: assigningPatient.id,
+          acquisition_channel: selectedChannel,
+          referrer_code: assignReferrerCode.trim() || undefined,
+          attribution_status: 'completed'
+        })
+      })
+      if (res.ok) {
+        setAssigningPatient(null)
+        setAssignReferrerCode('')
+        await loadData()
+      }
+    } catch (err) {
+      console.warn('Error al resolver atribución:', err)
+    } finally {
+      setSavingAttribution(false)
+    }
+  }
 
   // KPIs totales
   const totalPatients = channelStats.reduce((s, c) => s + c.total_pacientes, 0)
@@ -220,6 +277,7 @@ export function AttributionDashboard() {
           { key: 'sucursales', label: 'Finanzas por Sede', icon: <Building2 className="w-4 h-4 text-amber-600" /> },
           { key: 'referidores', label: 'Red de Embajadores', icon: <Award className="w-4 h-4 text-amber-600" /> },
           { key: 'familias', label: 'Árbol Familiar', icon: <GitBranch className="w-4 h-4 text-amber-600" /> },
+          { key: 'pendientes', label: 'Atribución Pendiente', icon: <Clock className="w-4 h-4 text-amber-600" />, badge: pendingPatients.length },
         ] as const).map(tab => (
           <button
             key={tab.key}
@@ -233,6 +291,11 @@ export function AttributionDashboard() {
           >
             {tab.icon}
             <span>{tab.label}</span>
+            {'badge' in tab && tab.badge > 0 && (
+              <span className="px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black">
+                {tab.badge}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -521,6 +584,161 @@ export function AttributionDashboard() {
                   </table>
                 </div>
               )}
+            </div>
+          )}
+          {/* ── TAB: ATRIBUCIÓN PENDIENTE (Recepción Vespertina) ── */}
+          {activeTab === 'pendientes' && (
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-900">Pacientes con Atribución Pendiente</h3>
+                    <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-xs">
+                      {pendingPatients.length} en espera
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Pacientes registrados sin canal o referidor identificado. El personal de recepción puede validar y asignar su origen al asistir a su cita vespertina (16:00 a 21:00 hrs o domingos).
+                  </p>
+                </div>
+              </div>
+
+              {pendingPatients.length === 0 ? (
+                <div className="p-12 text-center space-y-2">
+                  <Check className="w-10 h-10 text-emerald-500 mx-auto" />
+                  <p className="text-sm font-bold text-slate-700">¡Todo al día!</p>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                    Todos los pacientes registrados tienen su origen comercial, QR o referidor embajador debidamente atribuido.
+                  </p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200/60">
+                      <tr>
+                        <th className="px-6 py-3.5">Paciente</th>
+                        <th className="px-6 py-3.5">Contacto</th>
+                        <th className="px-6 py-3.5">Sucursal</th>
+                        <th className="px-6 py-3.5">Código Único</th>
+                        <th className="px-6 py-3.5 text-right">Acción en Recepción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {pendingPatients.map(p => (
+                        <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="px-6 py-4">
+                            <span className="font-bold text-slate-900 block">{p.full_name}</span>
+                            <span className="text-[10px] text-amber-700 font-semibold bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200 inline-block mt-0.5">
+                              Atribución Pendiente
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-slate-600 block">{p.phone || 'Sin cel'}</span>
+                            <span className="text-[10px] text-slate-400">{p.email || 'Sin correo'}</span>
+                          </td>
+                          <td className="px-6 py-4 text-slate-700 font-medium">
+                            {p.branch_name || 'Sucursal Balbuena'}
+                          </td>
+                          <td className="px-6 py-4 font-mono font-bold text-slate-900">
+                            {p.referral_code || 'AUD-REG'}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAssigningPatient(p)
+                                setSelectedChannel('tiktok')
+                                setAssignReferrerCode('')
+                              }}
+                              className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs transition shadow-2xs cursor-pointer inline-flex items-center gap-1.5"
+                            >
+                              <Sparkles className="w-3.5 h-3.5" />
+                              Asignar Origen
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Modal de Asignación Rápida para Recepción */}
+          {assigningPatient && (
+            <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-900">Validar Atribución en Recepción</h4>
+                    <p className="text-[11px] text-slate-500">Paciente: <strong className="text-slate-800">{assigningPatient.full_name}</strong></p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAssigningPatient(null)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-700"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-3 text-xs">
+                  <div>
+                    <label className="block font-bold text-slate-700 uppercase tracking-wide text-[10px] mb-1">
+                      Canal de Adquisición / Origen
+                    </label>
+                    <select
+                      value={selectedChannel}
+                      onChange={e => setSelectedChannel(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 font-semibold"
+                    >
+                      <option value="tiktok">TikTok</option>
+                      <option value="instagram">Instagram</option>
+                      <option value="youtube">YouTube</option>
+                      <option value="facebook">Facebook</option>
+                      <option value="qr">Código QR Físico / Digital</option>
+                      <option value="referral">Recomendación Personal</option>
+                      <option value="directo">Directo (Paso por la clínica)</option>
+                      <option value="otro">Otro medio</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 uppercase tracking-wide text-[10px] mb-1">
+                      Código del Referidor o Nombre (Opcional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="AUD-XXXX o Nombre del embajador"
+                      value={assignReferrerCode}
+                      onChange={e => setAssignReferrerCode(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-400 font-mono"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Si el paciente menciona quién lo recomendó, ingrésalo aquí para vincular los beneficios en el panel financiero.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setAssigningPatient(null)}
+                    className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs hover:bg-slate-200"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveAttribution}
+                    disabled={savingAttribution}
+                    className="px-4 py-2 rounded-xl bg-amber-400 text-slate-950 font-bold text-xs hover:bg-amber-300 shadow-sm flex items-center gap-1.5"
+                  >
+                    {savingAttribution ? 'Guardando...' : 'Confirmar y Atribuir'}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </>

@@ -104,9 +104,11 @@ export async function GET(request: Request) {
         if (attr.branch_id)     updatePayload.branch_id      = attr.branch_id;
         if (attr.tenant_id)     updatePayload.tenant_id      = attr.tenant_id;
 
-        // Resolver referidor por código AUD-XXXXX o ref param
+        // Resolver referidor directo por ID o por código AUD-XXXXX / ref param
+        let finalReferrerId = attr.referrer_id || null;
         const refCandidate = attr.referrer_code || attr.ref;
-        if (refCandidate) {
+
+        if (!finalReferrerId && refCandidate) {
           const { data: referrer } = await supabase
             .from('patients')
             .select('id')
@@ -114,14 +116,43 @@ export async function GET(request: Request) {
             .maybeSingle();
 
           if (referrer?.id) {
-            updatePayload.referrer_id = referrer.id;
-            // Incrementar contador del referidor
-            await supabase.rpc('increment_referral_count', { referrer: referrer.id });
+            finalReferrerId = referrer.id;
           }
         }
+
+        if (finalReferrerId) {
+          updatePayload.referrer_id = finalReferrerId;
+          try {
+            await supabase.rpc('increment_referral_count', { referrer: finalReferrerId });
+          } catch {}
+
+          // Si viene parentesco o red familiar, insertar relación
+          if (attr.relationship_type) {
+            try {
+              await supabase.from('family_relationships').insert({
+                patient_id: finalReferrerId,
+                related_patient_id: user.id,
+                relationship_type: attr.relationship_type,
+                notes: `Vinculado en Google OAuth (${attr.relationship_type})`
+              });
+            } catch {}
+          }
+        }
+
         if (attr.referrer_name && !updatePayload.referrer_id) {
           updatePayload.referrer_name = attr.referrer_name;
         }
+
+        // Determinar estado de atribución ('completed' vs 'pending_review')
+        const isAttributed = Boolean(
+          channel ||
+          attr.qr_code_id ||
+          attr.qr ||
+          updatePayload.referrer_id ||
+          attr.referrer_name
+        );
+        const attributionStatus = attr.attribution_status || (isAttributed ? 'completed' : 'pending_review');
+        updatePayload.attribution_status = attributionStatus;
 
         // Upsert en patients (usando auth user id como referencia de email)
         const { error: upsertError } = await supabase
@@ -145,6 +176,7 @@ export async function GET(request: Request) {
             qr_code_id: updatePayload.qr_code_id,
             branch_id: updatePayload.branch_id,
             branch_name: updatePayload.branch_name,
+            attribution_status: attributionStatus,
           }).eq('id', user.id);
         } catch {
           // Soporte opcional si tabla users no tiene todas las columnas

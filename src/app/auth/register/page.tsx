@@ -88,6 +88,8 @@ function RegisterForm() {
   const [channel, setChannel] = useState('')
   const [referrerCode, setReferrerCode] = useState('')
   const [referrerName, setReferrerName] = useState('')
+  const [referrerId, setReferrerId] = useState('')
+  const [relationshipType, setRelationshipType] = useState('otro')
   const [detectedQR, setDetectedQR] = useState('')
   const [detectedCanal, setDetectedCanal] = useState('')
 
@@ -113,20 +115,37 @@ function RegisterForm() {
   // Construir el payload de atribución y sucursal
   const buildAttributionPayload = () => {
     const utm = getStoredUTM()
+    const effChannel = channel || utm.canal || utm.utm_source || ''
+    const effRefCode = referrerCode || utm.ref || ''
+    const effQR = detectedQR || utm.qr || ''
+
+    // Determinar si la atribución está completa o pendiente de revisión en recepción
+    const isAttributed = Boolean(
+      (effChannel && effChannel !== 'sin_dato') ||
+      effRefCode ||
+      referrerId ||
+      referrerName.trim() ||
+      effQR
+    )
+    const attributionStatus = isAttributed ? 'completed' : 'pending_review'
+
     return {
-      channel:       channel || utm.canal || utm.utm_source || 'directo',
-      referrer_code: referrerCode || utm.ref || '',
-      referrer_name: referrerName,
-      qr_code_id:    detectedQR || utm.qr || '',
-      utm_source:    utm.utm_source,
-      utm_medium:    utm.utm_medium,
-      utm_campaign:  utm.utm_campaign,
-      utm_content:   utm.utm_content,
-      full_name:     fullName.trim(),
-      phone:         phone.trim(),
-      branch_id:     currentBranch.id,
-      branch_name:   currentBranch.name,
-      tenant_id:     currentBranch.tenantId,
+      channel:            effChannel || 'directo',
+      referrer_code:      effRefCode,
+      referrer_name:      referrerName.trim(),
+      referrer_id:        referrerId || null,
+      relationship_type:  relationshipType,
+      qr_code_id:         effQR,
+      attribution_status: attributionStatus,
+      utm_source:         utm.utm_source,
+      utm_medium:         utm.utm_medium,
+      utm_campaign:       utm.utm_campaign,
+      utm_content:        utm.utm_content,
+      full_name:          fullName.trim(),
+      phone:              phone.trim(),
+      branch_id:          currentBranch.id,
+      branch_name:        currentBranch.name,
+      tenant_id:          currentBranch.tenantId,
     }
   }
 
@@ -184,6 +203,19 @@ function RegisterForm() {
 
       const userId = authData.user?.id
       if (userId) {
+        // Resolver referidor ID definitivo si viene código o id
+        let finalReferrerId = payload.referrer_id
+        if (!finalReferrerId && payload.referrer_code) {
+          const { data: refPatient } = await supabase
+            .from('patients')
+            .select('id')
+            .eq('referral_code', payload.referrer_code.toUpperCase())
+            .maybeSingle()
+          if (refPatient?.id) {
+            finalReferrerId = refPatient.id
+          }
+        }
+
         // Guardar paciente con atribución y sucursal
         const patientData: any = {
           id: userId,
@@ -197,27 +229,34 @@ function RegisterForm() {
           branch_name: payload.branch_name,
           tenant_id: payload.tenant_id,
           referrer_name: payload.referrer_name || null,
+          referrer_id: finalReferrerId || null,
           qr_code_id: payload.qr_code_id || null,
+          attribution_status: payload.attribution_status,
           referral_code: `AUD-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
           onboarding_completed: true,
         }
 
-        // Resolver referidor si viene código
-        if (payload.referrer_code) {
-          const { data: refPatient } = await supabase
-            .from('patients')
-            .select('id')
-            .eq('referral_code', payload.referrer_code.toUpperCase())
-            .maybeSingle()
-          if (refPatient?.id) {
-            patientData.referrer_id = refPatient.id
+        await supabase.from('patients').upsert(patientData, { onConflict: 'id' })
+
+        // Si se vinculó referidor, sumar al embajador y conectar árbol familiar
+        if (finalReferrerId) {
+          try {
+            await supabase.rpc('increment_referral_count', { referrer: finalReferrerId })
+          } catch {}
+
+          if (payload.relationship_type) {
             try {
-              await supabase.rpc('increment_referral_count', { referrer: refPatient.id })
-            } catch {}
+              await supabase.from('family_relationships').insert({
+                patient_id: finalReferrerId,
+                related_patient_id: userId,
+                relationship_type: payload.relationship_type,
+                notes: `Vinculado en registro web (${payload.relationship_type})`
+              })
+            } catch (famErr) {
+              console.warn('Nota registro en family_relationships:', famErr)
+            }
           }
         }
-
-        await supabase.from('patients').upsert(patientData, { onConflict: 'id' })
 
         // Sincronizar en users si existe tabla de perfil
         try {
@@ -230,6 +269,9 @@ function RegisterForm() {
             branch_id: payload.branch_id,
             branch_name: payload.branch_name,
             acquisition_channel: payload.channel,
+            referrer_name: payload.referrer_name,
+            qr_code_id: payload.qr_code_id,
+            attribution_status: payload.attribution_status,
             onboarding_completed: true,
           }, { onConflict: 'id' })
         } catch {}
@@ -413,12 +455,16 @@ function RegisterForm() {
               onChange={setChannel}
             />
 
-            {/* Referidor */}
+            {/* Referidor con Autocompletado y Red Familiar */}
             <ReferrerInput
               referrerCode={referrerCode}
               referrerName={referrerName}
+              referrerId={referrerId}
+              relationshipType={relationshipType}
               onCodeChange={setReferrerCode}
               onNameChange={setReferrerName}
+              onIdChange={setReferrerId}
+              onRelationshipChange={setRelationshipType}
             />
 
             {/* Métodos de Registro: Google OAuth vs Directo */}

@@ -23,13 +23,24 @@ ALTER TABLE patients
   ADD COLUMN IF NOT EXISTS referral_code TEXT,
   ADD COLUMN IF NOT EXISTS total_referrals INTEGER DEFAULT 0,
   ADD COLUMN IF NOT EXISTS branch_id TEXT,
-  ADD COLUMN IF NOT EXISTS branch_name TEXT DEFAULT 'Sucursal Balbuena (Matriz)';
+  ADD COLUMN IF NOT EXISTS branch_name TEXT DEFAULT 'Sucursal Balbuena (Matriz)',
+  ADD COLUMN IF NOT EXISTS attribution_status TEXT DEFAULT 'pending_review';
 
 -- Constraint de canal de adquisición seguro
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_patients_acquisition_channel') THEN
     ALTER TABLE patients ADD CONSTRAINT chk_patients_acquisition_channel
       CHECK (acquisition_channel IN ('tiktok','instagram','youtube','facebook','referral','qr','directo','otro') OR acquisition_channel IS NULL);
+  END IF;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+
+-- Constraint de estado de atribución ('completed', 'pending_review', 'verified')
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_patients_attribution_status') THEN
+    ALTER TABLE patients ADD CONSTRAINT chk_patients_attribution_status
+      CHECK (attribution_status IN ('completed','pending_review','verified') OR attribution_status IS NULL);
   END IF;
 EXCEPTION
   WHEN duplicate_object THEN null;
@@ -45,11 +56,22 @@ UPDATE patients
 SET branch_name = 'Sucursal Balbuena (Matriz)'
 WHERE branch_name IS NULL;
 
+-- Asignar estado de atribución a pacientes existentes
+UPDATE patients
+SET attribution_status = CASE
+  WHEN acquisition_channel IS NOT NULL AND acquisition_channel <> 'sin_dato' THEN 'completed'
+  WHEN referrer_id IS NOT NULL OR referrer_name IS NOT NULL THEN 'completed'
+  WHEN qr_code_id IS NOT NULL THEN 'completed'
+  ELSE 'pending_review'
+END
+WHERE attribution_status IS NULL;
+
 -- Índices en patients
 CREATE INDEX IF NOT EXISTS idx_patients_acquisition_channel ON patients(acquisition_channel);
 CREATE INDEX IF NOT EXISTS idx_patients_referrer_id ON patients(referrer_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_patients_referral_code ON patients(referral_code);
 CREATE INDEX IF NOT EXISTS idx_patients_branch_name ON patients(branch_name);
+CREATE INDEX IF NOT EXISTS idx_patients_attribution_status ON patients(attribution_status);
 
 -- -------------------------------------------------------
 -- 1.1 COLUMNAS EN TABLA users (perfiles y sincronización OAuth)
@@ -63,7 +85,8 @@ ALTER TABLE users
   ADD COLUMN IF NOT EXISTS qr_code_id TEXT,
   ADD COLUMN IF NOT EXISTS referral_code TEXT,
   ADD COLUMN IF NOT EXISTS branch_id TEXT,
-  ADD COLUMN IF NOT EXISTS branch_name TEXT DEFAULT 'Sucursal Balbuena (Matriz)';
+  ADD COLUMN IF NOT EXISTS branch_name TEXT DEFAULT 'Sucursal Balbuena (Matriz)',
+  ADD COLUMN IF NOT EXISTS attribution_status TEXT DEFAULT 'pending_review';
 
 -- -------------------------------------------------------
 -- 1.2 COLUMNAS EN TABLA transactions (para BI por sucursal)
@@ -239,6 +262,28 @@ GROUP BY COALESCE(p.branch_name, 'Sucursal Balbuena (Matriz)')
 ORDER BY ingresos_totales DESC;
 
 GRANT SELECT ON financial_by_branch TO authenticated;
+
+-- -------------------------------------------------------
+-- 6.2 VISTA BI / RECEPCIÓN: Pacientes con Atribución Pendiente
+-- Para resolución rápida en recepción durante turno vespertino
+-- -------------------------------------------------------
+
+CREATE OR REPLACE VIEW pending_attributions_view AS
+SELECT
+  p.id,
+  p.full_name,
+  p.phone,
+  p.email,
+  COALESCE(p.branch_name, 'Sucursal Balbuena (Matriz)') AS branch_name,
+  p.created_at,
+  COALESCE(p.attribution_status, 'pending_review') AS attribution_status,
+  p.referral_code
+FROM patients p
+WHERE p.attribution_status = 'pending_review'
+   OR (p.acquisition_channel IS NULL AND p.referrer_id IS NULL AND p.qr_code_id IS NULL)
+ORDER BY p.created_at DESC;
+
+GRANT SELECT ON pending_attributions_view TO authenticated;
 
 -- -------------------------------------------------------
 -- 7. DATOS DE EJEMPLO: Códigos QR de campaña

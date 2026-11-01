@@ -59,11 +59,24 @@ export async function GET(req: NextRequest) {
       }
     } catch {}
 
+    // Pacientes con atribución pendiente (para recepción durante turno vespertino)
+    let pendingAttributions: any[] = []
+    try {
+      const { data: pList } = await supabase
+        .from('patients')
+        .select('id, full_name, phone, email, branch_name, created_at, referral_code, attribution_status')
+        .or('attribution_status.eq.pending_review,acquisition_channel.is.null')
+        .order('created_at', { ascending: false })
+        .limit(20)
+      if (pList) pendingAttributions = pList
+    } catch {}
+
     return NextResponse.json({
       channel_stats: channelStats ?? [],
       top_referrers: topReferrers ?? [],
       family_relationships_count: familyCount ?? 0,
       branch_stats: branchStats,
+      pending_attributions: pendingAttributions,
       generated_at: new Date().toISOString(),
     })
   } catch (err: any) {
@@ -92,6 +105,9 @@ export async function POST(req: NextRequest) {
     acquisition_channel,
     referrer_code,
     referrer_name,
+    referrer_id,
+    relationship_type,
+    attribution_status,
     qr_code_id,
     utm_source,
     utm_medium,
@@ -107,7 +123,9 @@ export async function POST(req: NextRequest) {
   const channel = typeof acquisition_channel === 'string' && VALID_CHANNELS.includes(acquisition_channel)
     ? acquisition_channel : null
 
-  const updatePayload: Record<string, unknown> = {}
+  const updatePayload: Record<string, unknown> = {
+    attribution_status: attribution_status || 'completed'
+  }
   if (channel)        updatePayload.acquisition_channel = channel
   if (qr_code_id)     updatePayload.qr_code_id          = String(qr_code_id)
   if (utm_source)     updatePayload.utm_source           = String(utm_source)
@@ -115,16 +133,34 @@ export async function POST(req: NextRequest) {
   if (utm_campaign)   updatePayload.utm_campaign         = String(utm_campaign)
   if (utm_content)    updatePayload.utm_content          = String(utm_content)
 
-  // Resolver referidor por código
-  if (referrer_code && typeof referrer_code === 'string') {
+  // Resolver o asignar referidor
+  let resolvedReferrerId = referrer_id ? String(referrer_id) : null
+  if (!resolvedReferrerId && referrer_code && typeof referrer_code === 'string') {
     const { data: referrer } = await supabase
       .from('patients')
       .select('id')
       .eq('referral_code', String(referrer_code).toUpperCase())
       .maybeSingle()
     if (referrer?.id) {
-      updatePayload.referrer_id = referrer.id
-      await supabase.rpc('increment_referral_count', { referrer: referrer.id })
+      resolvedReferrerId = referrer.id
+    }
+  }
+
+  if (resolvedReferrerId) {
+    updatePayload.referrer_id = resolvedReferrerId
+    try {
+      await supabase.rpc('increment_referral_count', { referrer: resolvedReferrerId })
+    } catch {}
+
+    if (relationship_type) {
+      try {
+        await supabase.from('family_relationships').insert({
+          patient_id: resolvedReferrerId,
+          related_patient_id: patient_id,
+          relationship_type: String(relationship_type),
+          notes: `Vinculado en actualización de atribución (${relationship_type})`
+        })
+      } catch {}
     }
   } else if (referrer_name && typeof referrer_name === 'string') {
     updatePayload.referrer_name = String(referrer_name)
