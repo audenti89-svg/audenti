@@ -27,9 +27,10 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { FinancialAnalyticsDashboard } from '@/components/FinancialAnalyticsDashboard'
+import { AttributionDashboard } from '@/components/bi/AttributionDashboard'
 
 export default function FinanzasPage() {
-  const [activeTab, setActiveTab] = useState<'arqueo' | 'auditoria'>('arqueo')
+  const [activeTab, setActiveTab] = useState<'arqueo' | 'auditoria' | 'atribucion'>('arqueo')
   const [transactions, setTransactions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -329,9 +330,24 @@ export default function FinanzasPage() {
           <BarChart3 className="w-4 h-4 text-purple-600" />
           <span>Auditoría Financiera &amp; Canales Trueque</span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('atribucion')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'atribucion'
+              ? 'bg-white text-slate-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <PieChart className="w-4 h-4 text-amber-600" />
+          <span>Atribución Comercial BI</span>
+        </button>
       </div>
 
-      {activeTab === 'auditoria' ? (
+      {activeTab === 'atribucion' ? (
+        <AttributionDashboard />
+      ) : activeTab === 'auditoria' ? (
         <FinancialAnalyticsDashboard />
       ) : (
         <>

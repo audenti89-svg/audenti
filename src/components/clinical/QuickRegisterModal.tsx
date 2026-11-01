@@ -46,8 +46,9 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
     medicalConditions: '',
     birthYear: '',
     email: '',
-    referralSource: 'Recomendación de familiar o amigo',
+    referralSource: 'Boca en Boca / Familiar',
     referredBy: '',
+    qrCodeId: '',
     selectedBranchId: currentBranchId,
   })
 
@@ -96,6 +97,39 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
         onboarding_completed: true,
       }
 
+      // Mapeo normalizado para Atribución Comercial y BI
+      const channelMap: Record<string, string> = {
+        'TikTok': 'tiktok',
+        'Instagram': 'instagram',
+        'YouTube': 'youtube',
+        'Facebook': 'facebook',
+        'Boca en Boca / Familiar': 'referral',
+        'Recomendación de familiar o amigo': 'referral',
+        'Código QR': 'qr',
+        'WhatsApp Directo': 'directo',
+        'Google Ads': 'otro',
+        'Otro': 'otro',
+      }
+      patientData.acquisition_channel = channelMap[formData.referralSource] || 'otro'
+      patientData.referrer_name = formData.referredBy?.trim() || null
+      patientData.qr_code_id = formData.qrCodeId?.trim() || null
+      patientData.referral_code = `AUD-${Math.random().toString(36).substring(2, 10).toUpperCase()}`
+
+      // Búsqueda de referidor por código AUD o nombre para enlazar el árbol
+      if (formData.referredBy?.trim()) {
+        const refSearch = formData.referredBy.trim().toUpperCase()
+        const { data: refPatient } = await supabase
+          .from('patients')
+          .select('id')
+          .or(`referral_code.eq.${refSearch},full_name.ilike.%${formData.referredBy.trim()}%`)
+          .limit(1)
+          .maybeSingle()
+
+        if (refPatient?.id) {
+          patientData.referrer_id = refPatient.id
+        }
+      }
+
       if (formData.email.trim()) {
         patientData.email = formData.email.trim()
       }
@@ -106,6 +140,12 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
         .insert([patientData])
         .select()
         .single()
+
+      if (!error && patientData.referrer_id) {
+        try {
+          await supabase.rpc('increment_referral_count', { referrer: patientData.referrer_id })
+        } catch {}
+      }
 
       // Si falla por restricción de clave foránea en tenant_id inexistente, obtener el tenant existente de la BD
       if (error && (error.code === '23503' || error.message?.includes('foreign key'))) {
@@ -351,26 +391,48 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
                 className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#202D4C] focus:bg-white transition-all cursor-pointer"
                 required
               >
-                <option value="Boca en Boca / Familiar">Boca en Boca / Familiar</option>
-                <option value="WhatsApp Directo">WhatsApp Directo</option>
-                <option value="YouTube">YouTube</option>
+                <option value="Boca en Boca / Familiar">Boca en Boca / Familiar (Referido)</option>
                 <option value="TikTok">TikTok</option>
                 <option value="Instagram">Instagram</option>
+                <option value="YouTube">YouTube</option>
                 <option value="Facebook">Facebook</option>
+                <option value="Código QR">Código QR (Material Físico / Digital)</option>
+                <option value="WhatsApp Directo">WhatsApp Directo</option>
                 <option value="Google Ads">Google Ads</option>
                 <option value="Otro">Otro</option>
               </select>
             </div>
 
-            {formData.referralSource === 'Boca en Boca / Familiar' && (
+            {formData.referralSource === 'Código QR' && (
+              <div className="animate-in fade-in duration-200">
+                <label className="block text-[11px] font-bold uppercase text-emerald-700 mb-1">
+                  Identificador o Material del Código QR *
+                </label>
+                <select
+                  value={formData.qrCodeId}
+                  onChange={e => setFormData({ ...formData, qrCodeId: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-emerald-50/50 border border-emerald-300 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all cursor-pointer"
+                  required
+                >
+                  <option value="">Selecciona o ingresa código...</option>
+                  <option value="qr_balbuena_01">qr_balbuena_01 — Recepción Clínica Balbuena</option>
+                  <option value="qr_tarjeta_presentacion">qr_tarjeta_presentacion — Tarjetas Dra. Aura</option>
+                  <option value="qr_redes_tiktok">qr_redes_tiktok — Campaña TikTok</option>
+                  <option value="qr_instagram_bio">qr_instagram_bio — Enlace Instagram Bio</option>
+                  <option value="qr_otro">qr_otro — Otro Folleto / Volante Impreso</option>
+                </select>
+              </div>
+            )}
+
+            {(formData.referralSource === 'Boca en Boca / Familiar' || formData.referralSource === 'Boca en Boca / Familiar (Referido)') && (
               <div className="animate-in fade-in duration-200">
                 <label className="block text-[11px] font-bold uppercase text-amber-700 mb-1">
-                  ¿Quién te recomendó? (Nombre del paciente o referente) *
+                  ¿Quién te recomendó? (Nombre o Código AUD- del paciente referente) *
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="Ej. María de los Ángeles Sánchez Rivera"
+                  placeholder="Ej. AUD-8492 o María de los Ángeles Sánchez"
                   value={formData.referredBy}
                   onChange={e => setFormData({ ...formData, referredBy: e.target.value })}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-amber-50/50 border border-amber-300 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white transition-all"

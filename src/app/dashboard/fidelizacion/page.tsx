@@ -18,9 +18,10 @@ import {
 import { createClient } from '@/utils/supabase/client'
 import { QuickRegisterModal } from '@/components/clinical/QuickRegisterModal'
 import { ReviewRedirectEngine } from '@/components/ReviewRedirectEngine'
+import { PatientReferralCard } from '@/components/clinical/PatientReferralCard'
 
 export default function FidelizacionPage() {
-  const [activeTab, setActiveTab] = useState<'referrals' | 'reviews'>('referrals')
+  const [activeTab, setActiveTab] = useState<'referrals' | 'reviews' | 'mi-codigo'>('referrals')
   const [copied, setCopied] = useState(false)
   const [patients, setPatients] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -99,10 +100,25 @@ export default function FidelizacionPage() {
           <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
           <span>Motor de Reseñas 5★ &amp; Redes Sociales</span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('mi-codigo')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'mi-codigo'
+              ? 'bg-white text-slate-900 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <QrCode className="w-4 h-4 text-emerald-600" />
+          <span>Mi Código de Referido</span>
+        </button>
       </div>
 
       {activeTab === 'reviews' ? (
         <ReviewRedirectEngine />
+      ) : activeTab === 'mi-codigo' ? (
+        <PatientReferralCard />
       ) : (
         <>
           {/* Tarjetas KPI de Fidelización */}

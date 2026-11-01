@@ -6,6 +6,7 @@ import { SmartPwaFloatingBanner } from '@/components/ui/SmartPwaFloatingBanner'
 import { AccessibilityProvider } from '@/context/AccessibilityContext'
 import { LocationPermissionBanner } from '@/components/ui/LocationPermissionBanner'
 import { ChatwootWidget } from '@/components/chat/ChatwootWidget'
+import { CampaignTracker } from '@/components/analytics/CampaignTracker'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -115,6 +116,7 @@ export default function RootLayout({
       </head>
       <body className="bg-[#f8fafc] font-sans text-[#0f172a] antialiased">
         <AccessibilityProvider>
+          <CampaignTracker />
           {children}
           <SmartPwaFloatingBanner />
           <LocationPermissionBanner />
