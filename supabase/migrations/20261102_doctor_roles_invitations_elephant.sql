@@ -4,24 +4,13 @@
 -- y Soporte de Concurrencia Elephant-Goldfish
 -- Arquitecto: Ricardo Sánchez
 -- Fecha: 2026-11-02
--- 100% IDEMPOTENTE Y RESILIENTE
+-- 100% IDEMPOTENTE Y RESILIENTE (Sin conflictos 55P04)
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
--- 1. SOPORTE DE ROLES MÉDICOS: socio y trabajador
+-- 1. TIPOS MÉDICOS Y PERMISOS: doctor_type ('socio' vs 'trabajador')
+-- Se utiliza columna TEXT con CHECK para total compatibilidad transaccional
 -- ---------------------------------------------------------------------
-DO $$ BEGIN
-  IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN
-    BEGIN
-      ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'socio';
-    EXCEPTION WHEN duplicate_object THEN null; WHEN others THEN null; END;
-    BEGIN
-      ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'trabajador';
-    EXCEPTION WHEN duplicate_object THEN null; WHEN others THEN null; END;
-  END IF;
-END $$;
-
--- Columnas de soporte en users para tipificación médica
 ALTER TABLE public.users
   ADD COLUMN IF NOT EXISTS doctor_type TEXT DEFAULT 'trabajador',
   ADD COLUMN IF NOT EXISTS medical_license TEXT,
@@ -70,12 +59,12 @@ CREATE POLICY "staff_manage_doctor_invitations"
   ON public.doctor_invitations FOR ALL
   TO authenticated
   USING (
-    (SELECT role FROM public.users WHERE id = auth.uid()) IN ('superadmin', 'owner', 'director', 'socio')
+    (SELECT role FROM public.users WHERE id = auth.uid())::text IN ('superadmin', 'owner', 'director', 'socio')
     OR (SELECT doctor_type FROM public.users WHERE id = auth.uid()) = 'socio'
     OR (SELECT email FROM auth.users WHERE id = auth.uid()) = 'audenti89@gmail.com'
   )
   WITH CHECK (
-    (SELECT role FROM public.users WHERE id = auth.uid()) IN ('superadmin', 'owner', 'director', 'socio')
+    (SELECT role FROM public.users WHERE id = auth.uid())::text IN ('superadmin', 'owner', 'director', 'socio')
     OR (SELECT doctor_type FROM public.users WHERE id = auth.uid()) = 'socio'
     OR (SELECT email FROM auth.users WHERE id = auth.uid()) = 'audenti89@gmail.com'
   );
@@ -100,7 +89,7 @@ DO $$ BEGIN
     CREATE POLICY "tenant_transactions_read" ON public.transactions
       FOR SELECT TO authenticated
       USING (
-        (SELECT role FROM public.users WHERE id = auth.uid()) IN ('superadmin', 'owner', 'director', 'socio')
+        (SELECT role FROM public.users WHERE id = auth.uid())::text IN ('superadmin', 'owner', 'director', 'socio')
         OR (SELECT doctor_type FROM public.users WHERE id = auth.uid()) = 'socio'
         OR (SELECT email FROM auth.users WHERE id = auth.uid()) = 'audenti89@gmail.com'
       );
@@ -146,80 +135,45 @@ BEGIN
 
   v_role := v_invitation.role;
 
-  -- Actualizar invitación
+  -- Actualizar invitación a aceptada
   UPDATE public.doctor_invitations
   SET status = 'accepted',
       accepted_by = p_user_id,
       accepted_at = now()
   WHERE id = v_invitation.id;
 
-  -- Actualizar o insertar en users con fallback seguro de enum
-  BEGIN
-    INSERT INTO public.users (
-      id,
-      email,
-      full_name,
-      role,
-      doctor_type,
-      branch_id,
-      branch_name,
-      invited_by,
-      onboarding_completed,
-      is_active
-    ) VALUES (
-      p_user_id,
-      v_invitation.email,
-      COALESCE(p_full_name, v_invitation.full_name, 'Odontólogo Especialista'),
-      v_role::user_role,
-      v_role,
-      v_invitation.branch_id,
-      v_invitation.branch_name,
-      v_invitation.created_by,
-      true,
-      true
-    )
-    ON CONFLICT (id) DO UPDATE SET
-      role = EXCLUDED.role,
-      doctor_type = EXCLUDED.doctor_type,
-      branch_id = EXCLUDED.branch_id,
-      branch_name = EXCLUDED.branch_name,
-      invited_by = EXCLUDED.invited_by,
-      onboarding_completed = true,
-      is_active = true;
-  EXCEPTION WHEN others THEN
-    -- Fallback si el tipo user_role estricto no contiene el valor: usa 'doctor' con doctor_type
-    INSERT INTO public.users (
-      id,
-      email,
-      full_name,
-      role,
-      doctor_type,
-      branch_id,
-      branch_name,
-      invited_by,
-      onboarding_completed,
-      is_active
-    ) VALUES (
-      p_user_id,
-      v_invitation.email,
-      COALESCE(p_full_name, v_invitation.full_name, 'Odontólogo Especialista'),
-      'doctor'::user_role,
-      v_role,
-      v_invitation.branch_id,
-      v_invitation.branch_name,
-      v_invitation.created_by,
-      true,
-      true
-    )
-    ON CONFLICT (id) DO UPDATE SET
-      role = 'doctor'::user_role,
-      doctor_type = v_role,
-      branch_id = EXCLUDED.branch_id,
-      branch_name = EXCLUDED.branch_name,
-      invited_by = EXCLUDED.invited_by,
-      onboarding_completed = true,
-      is_active = true;
-  END;
+  -- Insertar o actualizar en users: role base 'doctor' y doctor_type ('socio' | 'trabajador')
+  INSERT INTO public.users (
+    id,
+    email,
+    full_name,
+    role,
+    doctor_type,
+    branch_id,
+    branch_name,
+    invited_by,
+    onboarding_completed,
+    is_active
+  ) VALUES (
+    p_user_id,
+    v_invitation.email,
+    COALESCE(p_full_name, v_invitation.full_name, 'Odontólogo Especialista'),
+    'doctor',
+    v_role,
+    v_invitation.branch_id,
+    v_invitation.branch_name,
+    v_invitation.created_by,
+    true,
+    true
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    role = 'doctor',
+    doctor_type = v_role,
+    branch_id = EXCLUDED.branch_id,
+    branch_name = EXCLUDED.branch_name,
+    invited_by = EXCLUDED.invited_by,
+    onboarding_completed = true,
+    is_active = true;
 
   RETURN jsonb_build_object(
     'success', true,
