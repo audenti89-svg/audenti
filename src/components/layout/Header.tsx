@@ -274,7 +274,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
             className="bg-transparent text-xs font-bold text-slate-900 pr-6 appearance-none focus:outline-none cursor-pointer truncate"
           >
             <option value="balbuena">Sucursal Balbuena (Matriz) — Dra. Aura Estudillo</option>
-            <option value="guadalupe-chalma">Sucursal Guadalupe Chalma — Dr. Ramírez López</option>
+            <option value="guadalupe-chalma">Sucursal Guadalupe Chalma — Dra. Aura Estudillo</option>
             <option value="colonia-roma">Próximamente: Sucursal Colonia Roma</option>
           </select>
           <ChevronDown className="w-3.5 h-3.5 absolute right-2 pointer-events-none text-slate-400" />

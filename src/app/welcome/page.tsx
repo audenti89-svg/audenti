@@ -128,7 +128,7 @@ export default function LandingPresentationPage() {
     },
     guadalupe: {
       name: 'Sucursal Guadalupe Chalma',
-      doctor: 'Dr. Ramírez López — Especialista en Turno',
+      doctor: 'Dra. Aura Estudillo — Dirección Médica General',
       address: 'Av. Morelos 144, Guadalupe Chalma, Gustavo A. Madero, CDMX',
       phone: '+52 55 5306 9920',
       hours: 'Lunes a Sábado: 16:00 - 21:00 hrs (Turno Vespertino) | Domingos según agenda',

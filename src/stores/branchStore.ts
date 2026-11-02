@@ -28,9 +28,9 @@ export const BRANCHES_DATA: Record<BranchId, BranchInfo> = {
     name: 'Sucursal Guadalupe Chalma',
     code: 'DCL-GDC-02',
     address: 'Av. Guadalupe Victoria 45, Gustavo A. Madero, CDMX',
-    doctorInCharge: 'Dr. Ramírez López & Equipo Asociado',
+    doctorInCharge: 'Dra. Aura Estudillo (Céd. Prof. 8492019)',
     phone: '+52 55 5389 1204',
-    statusBadge: 'Operativa • Franquicia Autorizada',
+    statusBadge: 'Operativa • Dirección Médica General',
   },
   'colonia-roma': {
     id: 'colonia-roma',
