@@ -16,46 +16,25 @@ import {
   ShieldCheck,
   Hash,
   Database,
-  Sliders
+  Plus,
+  CheckCircle2,
+  DollarSign
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   TOOTH_BY_FDI,
-  TOOTH_BY_UNIVERSAL,
   INTERPROXIMAL_CONTACTS,
   ORGANUI_MESH_TO_NUMBERS,
   ToothTaxonomy
 } from '@/lib/dental-anatomy'
-
-export type SurfaceCondition =
-  | 'sano'
-  | 'caries'
-  | 'resina'
-  | 'amalgama'
-  | 'sellador'
-  | 'fractura'
-  | 'incrustacion'
-
-export type ToothWholeCondition =
-  | 'sano'
-  | 'caries'
-  | 'obturado'
-  | 'corona'
-  | 'endodoncia'
-  | 'implante'
-  | 'ausente'
-  | 'extraccion_indicada'
-  | 'protesis'
-  | 'sellador'
-  | 'fractura'
-
-export interface ToothSurfaces {
-  vestibular: SurfaceCondition
-  lingual: SurfaceCondition
-  mesial: SurfaceCondition
-  distal: SurfaceCondition
-  oclusal: SurfaceCondition
-}
+import {
+  TREATMENT_CATALOG,
+  SURFACE_COLORS,
+  DentalSpecialty,
+  SurfaceCondition,
+  ToothWholeCondition,
+  ToothSurfaces
+} from '@/components/clinical/Odontogram'
 
 export interface Dental3DViewerProps {
   selectedToothNum?: number // Representado en FDI (11-48)
@@ -138,6 +117,8 @@ export function Dental3DViewer({
 
   // ESTADO DE LA VENTANA FLOTANTE MODO CRISTAL (GLASSMORPHISM)
   const [modalOpen, setModalOpen] = useState(false)
+  const [modalSpecialty, setModalSpecialty] = useState<DentalSpecialty>('operatoria')
+  const [modalActiveTool, setModalActiveTool] = useState<SurfaceCondition>('caries')
   const [modalData, setModalData] = useState<{
     toothFdi: number
     toothUniversal: number
@@ -155,7 +136,7 @@ export function Dental3DViewer({
   const [isPersistingSupabase, setIsPersistingSupabase] = useState(false)
   const [saveSuccessNotification, setSaveSuccessNotification] = useState(false)
 
-  // 1. Abrir Modal Cristal para diente o contacto interproximal
+  // 1. Abrir Modal Cristal para diente o contacto interproximal con enfoque y atenuación de fondo
   const handleOpenCrystalModal = useCallback(
     (toothFdi: number, isInterproximal = false, pairFdi?: [number, number]) => {
       const taxonomy = TOOTH_BY_FDI[toothFdi]
@@ -178,6 +159,18 @@ export function Dental3DViewer({
         ]
       }
 
+      // Enfoque visual de cámara hacia la pieza seleccionada
+      const mesh = teethMeshesRef.current.get(toothFdi)
+      if (mesh && controlsRef.current && cameraRef.current) {
+        const box = new THREE.Box3().setFromObject(mesh)
+        const center = new THREE.Vector3()
+        box.getCenter(center)
+
+        controlsRef.current.target.set(center.x, center.y, center.z)
+        cameraRef.current.position.set(center.x, center.y + 0.35, center.z + 1.25)
+        controlsRef.current.update()
+      }
+
       setModalData({
         toothFdi,
         toothUniversal,
@@ -188,18 +181,28 @@ export function Dental3DViewer({
         activeSurfaces: { ...surfaces },
         selectedCondition: (toothInfo?.wholeCondition as ToothWholeCondition) || 'caries',
         notes: isInterproximal && pairFdi
-          ? `Tratamiento interproximal de punto de contacto entre piezas #${pairFdi[0]} (UNS #${pairUniversal?.[0]}) y #${pairFdi[1]} (UNS #${pairUniversal?.[1]}).`
-          : `Tratamiento clínico en pieza FDI #${toothFdi} (Universal #${toothUniversal}) — ${taxonomy?.name}.`,
-        estimatedCost: 950,
+          ? `Punto de contacto entre piezas FDI #${pairFdi[0]} (UNS #${pairUniversal?.[0]}) y FDI #${pairFdi[1]} (UNS #${pairUniversal?.[1]}).`
+          : `Tratamiento en pieza FDI #${toothFdi} (Universal #${toothUniversal}) — ${taxonomy?.name}.`,
+        estimatedCost: 850,
         specialty: 'operatoria',
         procedure: isInterproximal
-          ? 'Restauración Resina Interproximal Clase II (Matriz & Cuña)'
-          : 'Restauración Estética de Resina Nanohíbrida'
+          ? 'Resina Estética 2 Caras (MO / DO)'
+          : 'Resina Estética 1 Cara (Oclusal/Vestibular)'
       })
       setModalOpen(true)
     },
     [teethState]
   )
+
+  // Cerrar modal y restablecer cámara general
+  const handleCloseModal = () => {
+    setModalOpen(false)
+    if (controlsRef.current && cameraRef.current) {
+      controlsRef.current.target.set(0, -0.55, 0.55)
+      cameraRef.current.position.set(0, 0.35, 3.2)
+      controlsRef.current.update()
+    }
+  }
 
   // 2. Inicialización de la Escena Three.js con OrganUI teeth.glb
   useEffect(() => {
@@ -207,11 +210,11 @@ export function Dental3DViewer({
     if (!container) return
 
     const width = container.clientWidth || 700
-    const height = container.clientHeight || 560
+    const height = container.clientHeight || 580
 
     // Escena con Fondo Holográfico Quirúrgico Profundo
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color(0x040711) // Fondo médico futurista oscuro
+    scene.background = new THREE.Color(0x040711)
     sceneRef.current = scene
 
     // Cámara con ángulo frontal-oclusal
@@ -239,8 +242,8 @@ export function Dental3DViewer({
     controls.enableDamping = true
     controls.dampingFactor = 0.05
     controls.maxDistance = 6.5
-    controls.minDistance = 1.2
-    controls.target.set(0, -0.55, 0.55) // Centro dental anatómico
+    controls.minDistance = 1.1
+    controls.target.set(0, -0.55, 0.55)
     controls.update()
     controlsRef.current = controls
 
@@ -248,7 +251,7 @@ export function Dental3DViewer({
     const ambientLight = new THREE.AmbientLight(0xf1f5f9, 0.95)
     scene.add(ambientLight)
 
-    // Luz Principal Frontal de Estudio
+    // Luz Principal Quirúrgica
     const mainLight = new THREE.DirectionalLight(0xffffff, 1.7)
     mainLight.position.set(3, 5, 5)
     scene.add(mainLight)
@@ -258,7 +261,7 @@ export function Dental3DViewer({
     fillLight.position.set(-4, -2, 4)
     scene.add(fillLight)
 
-    // Luz Rim Holográfica Cian Neón (Borde de Silueta Dental)
+    // Luz Rim Holográfica Cian Neón
     const cyanRim = new THREE.DirectionalLight(0x38bdf8, 1.6)
     cyanRim.position.set(0, 4, -4)
     scene.add(cyanRim)
@@ -268,7 +271,7 @@ export function Dental3DViewer({
     goldRim.position.set(0, -5, 2)
     scene.add(goldRim)
 
-    // Luz Intraoral para iluminar caras linguales y palatinas
+    // Luz Intraoral
     const intraoralLight = new THREE.PointLight(0xffffff, 1.8, 4.0)
     intraoralLight.position.set(0, -0.45, 0.35)
     scene.add(intraoralLight)
@@ -301,7 +304,6 @@ export function Dental3DViewer({
                 name: TOOTH_BY_FDI[fdi]?.name || `Pieza #${fdi}`
               }
 
-              // Material esmalte de alta fidelidad
               child.material = new THREE.MeshStandardMaterial({
                 color: 0xfcfbfa,
                 roughness: 0.18,
@@ -334,7 +336,7 @@ export function Dental3DViewer({
           }
         })
 
-        // Generar terceros molares cordales (18, 28, 38, 48) para completar 32 piezas permanentes
+        // Terceros molares cordales (18, 28, 38, 48)
         const wisdomPairs: [number, number, number, number][] = [
           [17, 18, 1, 1],   // Upper Right Cordal (FDI 18, UNS 1)
           [27, 28, 16, 1],  // Upper Left Cordal (FDI 28, UNS 16)
@@ -363,7 +365,7 @@ export function Dental3DViewer({
           }
         })
 
-        // CREAR NODOS INTERPROXIMALES GLOWING CON NUMERACIÓN DUAL
+        // NODOS INTERPROXIMALES GLOWING
         const interMap = new Map<string, THREE.Mesh>()
         const sphereGeo = new THREE.SphereGeometry(0.042, 16, 16)
         const contactMat = new THREE.MeshStandardMaterial({
@@ -479,7 +481,6 @@ export function Dental3DViewer({
       animationFrameRef.current = requestAnimationFrame(animate)
       const elapsedTime = clock.getElapsedTime()
 
-      // Efecto pulsante holográfico para contactos interproximales
       interproximalMeshesRef.current.forEach((mesh) => {
         const scale = 1 + 0.18 * Math.sin(elapsedTime * 3.6)
         mesh.scale.set(scale, scale, scale)
@@ -510,10 +511,15 @@ export function Dental3DViewer({
     }
   }, [onSelectTooth, handleOpenCrystalModal])
 
-  // 3. Resaltado 3D según Patología y Selección
+  // 3. ENFOQUE Y ATENUACIÓN DINÁMICA DEL MODELO 3D (REQUERIMIENTO DIRECTIVA 1)
   useEffect(() => {
+    const activeTargetFdi = modalData?.toothFdi || selectedToothNum
+    const activePairFdi = modalData?.pairFdi
+
     teethMeshesRef.current.forEach((mesh, fdi) => {
-      const isSelected = selectedToothNum === fdi
+      const isSelected =
+        activeTargetFdi === fdi ||
+        (activePairFdi && (activePairFdi[0] === fdi || activePairFdi[1] === fdi))
       const toothState = teethState?.[fdi]
       const condition = toothState?.wholeCondition || 'sano'
       const isAbsent = condition === 'ausente'
@@ -523,35 +529,44 @@ export function Dental3DViewer({
 
       if (renderMode === 'xray') {
         mat.transparent = true
-        mat.opacity = isSelected ? 0.95 : 0.38
-        mat.color.setHex(isSelected ? 0xf59e0b : 0x38bdf8)
         mat.wireframe = true
-      } else if (renderMode === 'clinical') {
-        mat.transparent = isAbsent
-        mat.opacity = isAbsent ? 0.22 : 1.0
+        if (activeTargetFdi) {
+          mat.opacity = isSelected ? 0.95 : 0.18 // Atenuado en Rayos X
+          mat.color.setHex(isSelected ? 0xf59e0b : 0x1e293b)
+        } else {
+          mat.opacity = 0.4
+          mat.color.setHex(0x38bdf8)
+        }
+      } else {
         mat.wireframe = false
 
-        if (isSelected) {
-          mat.color.setHex(0xf59e0b) // Dorado Audenti para selección activa
-          mat.roughness = 0.15
-          mesh.scale.set(1.12, 1.12, 1.12)
+        // ATENUACIÓN DINÁMICA: Si hay una pieza seleccionada, atenuar el resto del modelo 3D
+        if (activeTargetFdi) {
+          if (isSelected) {
+            mat.transparent = false
+            mat.opacity = 1.0
+            mat.color.setHex(0xf59e0b) // Resalte dorado Audenti
+            mat.roughness = 0.12
+            mesh.scale.set(1.18, 1.18, 1.18)
+          } else {
+            mat.transparent = true
+            mat.opacity = 0.22 // Atenuado de fondo
+            mat.color.setHex(0x334155) // Tono neutro apagado
+            mat.roughness = 0.65
+            mesh.scale.set(1.0, 1.0, 1.0)
+          }
         } else {
+          // Vista general sin atenuación
+          mat.transparent = isAbsent
+          mat.opacity = isAbsent ? 0.22 : 1.0
           const hex = CONDITION_COLORS[condition] || 0xfcfbfa
           mat.color.setHex(hex)
           mat.roughness = condition === 'sano' ? 0.2 : 0.4
-          mesh.scale.set(1, 1, 1)
+          mesh.scale.set(1.0, 1.0, 1.0)
         }
-      } else {
-        // Modo realista
-        mat.transparent = isAbsent
-        mat.opacity = isAbsent ? 0.2 : 1.0
-        mat.wireframe = false
-        mat.color.setHex(isSelected ? 0xfef08a : 0xfcfbfa)
-        mat.roughness = 0.18
-        mesh.scale.set(isSelected ? 1.08 : 1, isSelected ? 1.08 : 1, isSelected ? 1.08 : 1)
       }
     })
-  }, [selectedToothNum, teethState, renderMode])
+  }, [selectedToothNum, modalData, teethState, renderMode])
 
   // 4. Filtrar Visibilidad por Arcada
   useEffect(() => {
@@ -617,60 +632,26 @@ export function Dental3DViewer({
     controlsRef.current.update()
   }
 
-  // Guardar Cambios con Persistencia en Supabase
-  const handleSaveModalData = async () => {
+  // APLICAR CONDICIÓN A UNA CARA Y AUTO-SINCRONIZAR CON SUPABASE
+  const handleApplyFaceCondition = async (face: keyof ToothSurfaces, conditionToApply?: SurfaceCondition) => {
     if (!modalData) return
 
-    const {
-      toothFdi,
-      toothUniversal,
-      isInterproximal,
-      pairFdi,
-      pairUniversal,
-      activeSurfaces,
-      selectedCondition,
-      notes,
-      estimatedCost,
-      specialty,
-      procedure
-    } = modalData
+    const cond = conditionToApply || modalActiveTool
+    const updatedSurfaces: ToothSurfaces = {
+      ...modalData.activeSurfaces,
+      [face]: cond
+    }
 
-    setIsPersistingSupabase(true)
+    setModalData({
+      ...modalData,
+      activeSurfaces: updatedSurfaces
+    })
 
-    // Extraer caras tratadas
-    const treatedFaces = Object.entries(activeSurfaces)
-      .filter(([_, cond]) => cond !== 'sano')
-      .map(([face]) => face)
-
-    // 1. Notificar actualización de caras a Odontogram local
     if (onUpdateToothSurfaces) {
-      onUpdateToothSurfaces(toothFdi, activeSurfaces, selectedCondition)
-
-      if (isInterproximal && pairFdi) {
-        const otherTooth = pairFdi[0] === toothFdi ? pairFdi[1] : pairFdi[0]
-        const complementarySurfaces: Partial<ToothSurfaces> = {
-          mesial: activeSurfaces.distal !== 'sano' ? activeSurfaces.distal : 'sano',
-          distal: activeSurfaces.mesial !== 'sano' ? activeSurfaces.mesial : 'sano'
-        }
-        onUpdateToothSurfaces(otherTooth, complementarySurfaces, selectedCondition)
-      }
+      onUpdateToothSurfaces(modalData.toothFdi, updatedSurfaces, modalData.selectedCondition)
     }
 
-    // 2. Notificar nuevo tratamiento clínico vinculado
-    if (onAddTreatment) {
-      onAddTreatment({
-        toothNumber: toothFdi,
-        toothUniversal,
-        specialty,
-        procedure: isInterproximal && pairFdi ? `${procedure} (#${pairFdi[0]} ↔ #${pairFdi[1]})` : procedure,
-        surfaces: treatedFaces.length > 0 ? treatedFaces : ['corona_completa'],
-        notes,
-        estimatedCost,
-        condition: selectedCondition
-      })
-    }
-
-    // 3. PERSISTENCIA DIRECTA EN SUPABASE VÍA API
+    // Auto-sincronización con Supabase en segundo plano
     if (patientId) {
       try {
         await fetch('/api/clinical/odontogram', {
@@ -679,24 +660,159 @@ export function Dental3DViewer({
           body: JSON.stringify({
             patientId,
             patientName,
-            toothFdi,
-            toothUniversal,
-            surfaces: activeSurfaces,
-            condition: selectedCondition,
-            procedure,
-            specialty,
-            notes,
-            estimatedCost,
-            isInterproximal,
-            pairFdi,
-            pairUniversal,
+            toothFdi: modalData.toothFdi,
+            toothUniversal: modalData.toothUniversal,
+            surfaces: updatedSurfaces,
+            condition: modalData.selectedCondition,
+            procedure: `Ajuste clínico en cara ${face.toUpperCase()} (${cond})`,
+            specialty: modalSpecialty,
+            notes: modalData.notes,
+            estimatedCost: modalData.estimatedCost,
+            doctorRole,
+            branch
+          })
+        })
+      } catch (err) {
+        console.warn('Auto-sync Supabase aviso:', err)
+      }
+    }
+  }
+
+  // VINCULAR TRATAMIENTO DEL CATÁLOGO DIRECTO A LA PIEZA (IDÉNTICO A IMAGEN 3)
+  const handleLinkProcedure = async (procedureItem: { name: string; cost: number; condition: ToothWholeCondition }) => {
+    if (!modalData) return
+
+    setIsPersistingSupabase(true)
+
+    // Ajustar caras según el procedimiento
+    const updatedSurfaces = { ...modalData.activeSurfaces }
+    if (procedureItem.condition === 'sano' && procedureItem.name.includes('Resina')) {
+      if (procedureItem.name.includes('1 Cara')) {
+        updatedSurfaces.oclusal = 'resina'
+      } else if (procedureItem.name.includes('2 Caras')) {
+        updatedSurfaces.oclusal = 'resina'
+        updatedSurfaces.mesial = 'resina'
+      } else if (procedureItem.name.includes('3+ Caras')) {
+        updatedSurfaces.oclusal = 'resina'
+        updatedSurfaces.mesial = 'resina'
+        updatedSurfaces.distal = 'resina'
+      }
+    }
+
+    const updatedCondition = procedureItem.condition !== 'sano' ? procedureItem.condition : modalData.selectedCondition
+
+    setModalData({
+      ...modalData,
+      selectedCondition: updatedCondition,
+      activeSurfaces: updatedSurfaces,
+      procedure: procedureItem.name,
+      estimatedCost: procedureItem.cost,
+      specialty: modalSpecialty
+    })
+
+    // 1. Notificar a Odontogram
+    if (onUpdateToothSurfaces) {
+      onUpdateToothSurfaces(modalData.toothFdi, updatedSurfaces, updatedCondition)
+    }
+
+    if (onAddTreatment) {
+      const treatedFaces = Object.entries(updatedSurfaces)
+        .filter(([_, c]) => c !== 'sano')
+        .map(([f]) => f)
+
+      onAddTreatment({
+        toothNumber: modalData.toothFdi,
+        toothUniversal: modalData.toothUniversal,
+        specialty: modalSpecialty,
+        procedure: procedureItem.name,
+        surfaces: treatedFaces.length > 0 ? treatedFaces : ['oclusal'],
+        notes: `Vinculado desde Ventana Cristal: ${procedureItem.name}`,
+        estimatedCost: procedureItem.cost,
+        condition: updatedCondition
+      })
+    }
+
+    // 2. Persistir directamente en Supabase
+    if (patientId) {
+      try {
+        await fetch('/api/clinical/odontogram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientId,
+            patientName,
+            toothFdi: modalData.toothFdi,
+            toothUniversal: modalData.toothUniversal,
+            surfaces: updatedSurfaces,
+            condition: updatedCondition,
+            procedure: procedureItem.name,
+            specialty: modalSpecialty,
+            notes: modalData.notes,
+            estimatedCost: procedureItem.cost,
+            doctorRole,
+            branch
+          })
+        })
+      } catch (err) {
+        console.warn('Error al vincular en Supabase:', err)
+      }
+    }
+
+    setIsPersistingSupabase(false)
+    setSaveSuccessNotification(true)
+    setTimeout(() => setSaveSuccessNotification(false), 1800)
+  }
+
+  // Guardar Cambios Finales
+  const handleSaveModalData = async () => {
+    if (!modalData) return
+
+    setIsPersistingSupabase(true)
+
+    const treatedFaces = Object.entries(modalData.activeSurfaces)
+      .filter(([_, cond]) => cond !== 'sano')
+      .map(([face]) => face)
+
+    if (onUpdateToothSurfaces) {
+      onUpdateToothSurfaces(modalData.toothFdi, modalData.activeSurfaces, modalData.selectedCondition)
+    }
+
+    if (onAddTreatment) {
+      onAddTreatment({
+        toothNumber: modalData.toothFdi,
+        toothUniversal: modalData.toothUniversal,
+        specialty: modalData.specialty,
+        procedure: modalData.procedure,
+        surfaces: treatedFaces.length > 0 ? treatedFaces : ['corona_completa'],
+        notes: modalData.notes,
+        estimatedCost: modalData.estimatedCost,
+        condition: modalData.selectedCondition
+      })
+    }
+
+    if (patientId) {
+      try {
+        await fetch('/api/clinical/odontogram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientId,
+            patientName,
+            toothFdi: modalData.toothFdi,
+            toothUniversal: modalData.toothUniversal,
+            surfaces: modalData.activeSurfaces,
+            condition: modalData.selectedCondition,
+            procedure: modalData.procedure,
+            specialty: modalData.specialty,
+            notes: modalData.notes,
+            estimatedCost: modalData.estimatedCost,
             doctorRole,
             branch,
             fullTeethState: teethState
           })
         })
       } catch (err) {
-        console.warn('Error al persistir en Supabase desde Ventana Cristal:', err)
+        console.warn('Error al guardar en Supabase:', err)
       }
     }
 
@@ -704,27 +820,12 @@ export function Dental3DViewer({
     setSaveSuccessNotification(true)
     setTimeout(() => {
       setSaveSuccessNotification(false)
-      setModalOpen(false)
+      handleCloseModal()
     }, 1200)
   }
 
-  const toggleModalSurface = (face: keyof ToothSurfaces) => {
-    if (!modalData) return
-    const current = modalData.activeSurfaces[face]
-    const nextCondition: SurfaceCondition =
-      current === 'sano' ? 'caries' : current === 'caries' ? 'resina' : 'sano'
-
-    setModalData({
-      ...modalData,
-      activeSurfaces: {
-        ...modalData.activeSurfaces,
-        [face]: nextCondition
-      }
-    })
-  }
-
   return (
-    <div className={cn('relative w-full h-[600px] rounded-3xl bg-[#040711] border border-slate-800 shadow-2xl overflow-hidden flex flex-col', className)}>
+    <div className={cn('relative w-full h-[620px] rounded-3xl bg-[#040711] border border-slate-800 shadow-2xl overflow-hidden flex flex-col', className)}>
       {/* BARRA SUPERIOR DE HERRAMIENTAS HOLOGRÁFICAS */}
       <div className="absolute top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
         {/* Selector de Arcadas */}
@@ -762,9 +863,8 @@ export function Dental3DViewer({
           </button>
         </div>
 
-        {/* Modos de Renderizado, Nomenclatura y Shading */}
+        {/* Nomenclatura, Shading y Vistas */}
         <div className="flex items-center gap-2 pointer-events-auto flex-wrap">
-          {/* Conmutador Nomenclatura (Universal vs FDI vs Dual) */}
           <div className="flex items-center gap-1 p-1 bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-slate-700/80 shadow-xl">
             <button
               type="button"
@@ -785,9 +885,8 @@ export function Dental3DViewer({
                 'px-2 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer',
                 numberingSystem === 'universal' ? 'bg-cyan-500 text-slate-950 font-black' : 'text-slate-300 hover:text-white'
               )}
-              title="Sistema Universal Americano (1 a 32)"
             >
-              UNS (1-32)
+              UNS
             </button>
             <button
               type="button"
@@ -796,13 +895,11 @@ export function Dental3DViewer({
                 'px-2 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer',
                 numberingSystem === 'fdi' ? 'bg-amber-500 text-slate-950 font-black' : 'text-slate-300 hover:text-white'
               )}
-              title="Federación Dental Internacional (11 a 48)"
             >
-              FDI (11-48)
+              FDI
             </button>
           </div>
 
-          {/* Toggles Encías / Hueso */}
           <div className="flex items-center gap-1 p-1 bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-slate-700/80 shadow-xl">
             <button
               type="button"
@@ -826,7 +923,6 @@ export function Dental3DViewer({
             </button>
           </div>
 
-          {/* Shading Clínico / Realista / Rayos X */}
           <div className="flex items-center gap-1 p-1 bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-slate-700/80 shadow-xl">
             <button
               type="button"
@@ -860,7 +956,6 @@ export function Dental3DViewer({
             </button>
           </div>
 
-          {/* Vistas Rápidas de Cámara */}
           <div className="flex items-center gap-1 p-1 bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-slate-700/80 shadow-xl">
             <button
               type="button"
@@ -900,11 +995,11 @@ export function Dental3DViewer({
           <p className="text-sm font-bold tracking-wide text-amber-300">
             Cargando arcada dental 3D anatómica (OrganUI BodyParts3D)...
           </p>
-          <span className="text-xs text-slate-400">Indexando mallas Universal 1–32 y FDI 11–48</span>
+          <span className="text-xs text-slate-400">Optimizando mallas y coordenadas FDI 11–48 y UNS 1–32</span>
         </div>
       )}
 
-      {/* BADGE INFORMATIVO EN VIVO (CON NUMERACIÓN UNIVERSAL Y FDI) */}
+      {/* BADGE INFORMATIVO EN VIVO */}
       <div className="absolute bottom-4 left-4 z-20 pointer-events-none">
         {hoveredInfo ? (
           <div className="px-4 py-2.5 rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-amber-400/60 text-white shadow-2xl flex items-center gap-3 animate-in fade-in duration-150">
@@ -929,7 +1024,7 @@ export function Dental3DViewer({
               <span className="text-[10px] text-amber-300 font-semibold block">
                 {hoveredInfo.isInterproximal
                   ? 'Clic para abrir la Ventana Cristal y registrar patología de contacto compartida'
-                  : 'Clic para abrir la Ventana Cristal en Modo Glassmorphism'}
+                  : 'Clic para enfocar pieza, atenuar fondo y abrir la Ventana Cristal'}
               </span>
             </div>
           </div>
@@ -937,7 +1032,7 @@ export function Dental3DViewer({
           <div className="px-3.5 py-2 rounded-2xl bg-slate-950/85 backdrop-blur-md border border-slate-800 text-[11px] text-slate-300 flex items-center gap-2 shadow-lg">
             <Info className="w-4 h-4 text-amber-400 shrink-0" />
             <span>
-              Rotación 360° • Zoom • Clic en cualquier pieza o esfera interproximal para abrir la <strong>Ventana Cristal</strong>
+              Rotación 360° • Zoom • Clic en cualquier pieza o esfera interproximal para enfocar y abrir la <strong>Ventana Cristal</strong>
             </span>
           </div>
         )}
@@ -950,25 +1045,20 @@ export function Dental3DViewer({
       </div>
 
       {/* =========================================================================
-          VENTANA FLOTANTE EN MODO CRISTAL (GLASSMORPHISM)
+          MODAL FLOTANTE EN MODO CRISTAL (GLASSMORPHISM) - REQUERIMIENTOS 2 Y 3
           ========================================================================= */}
       {modalOpen && modalData && (
-        <div className="absolute inset-0 z-40 bg-slate-950/80 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="relative w-full max-w-xl max-h-[92%] overflow-y-auto bg-slate-900/90 backdrop-blur-2xl border-2 border-amber-400/60 shadow-[0_0_60px_rgba(245,158,11,0.25)] rounded-3xl p-6 text-white space-y-5">
-            {/* Overlay de Notificación de Guardado */}
+        <div className="absolute inset-0 z-40 bg-slate-950/75 backdrop-blur-xl flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200">
+          <div className="relative w-full max-w-4xl max-h-[94%] overflow-y-auto bg-slate-900/90 backdrop-blur-2xl border-2 border-amber-400/60 shadow-[0_0_60px_rgba(245,158,11,0.25)] rounded-3xl p-5 sm:p-6 text-white space-y-5">
+            {/* Notificación de Guardado / Sincronización en Supabase */}
             {saveSuccessNotification && (
-              <div className="absolute inset-0 z-50 bg-slate-950/95 backdrop-blur-md rounded-3xl flex flex-col items-center justify-center gap-3 animate-in zoom-in-95 duration-200">
-                <div className="w-16 h-16 rounded-full bg-emerald-500/20 border-2 border-emerald-400 flex items-center justify-center text-emerald-400">
-                  <Check className="w-8 h-8" />
-                </div>
-                <h4 className="text-lg font-black text-white">¡Historial Clínico Actualizado!</h4>
-                <p className="text-xs text-slate-300 text-center max-w-xs">
-                  Diagnóstico, desglose de caras y evolución persistidos en Supabase y expediente del paciente.
-                </p>
+              <div className="absolute top-4 right-16 z-50 px-4 py-2 rounded-xl bg-emerald-500/90 text-white text-xs font-black shadow-lg flex items-center gap-2 animate-in slide-in-from-top-2 duration-200">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>✓ Sincronizado en Supabase y Expediente</span>
               </div>
             )}
 
-            {/* Encabezado del Modal Cristal */}
+            {/* ENCABEZADO CON IDENTIFICACIÓN DUAL UNS / FDI */}
             <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-700/80">
               <div className="flex items-center gap-3">
                 {modalData.isInterproximal ? (
@@ -977,29 +1067,35 @@ export function Dental3DViewer({
                   </div>
                 ) : (
                   <div className="flex flex-col gap-1 items-center">
-                    <span className="px-2.5 py-1 rounded-xl bg-cyan-400 text-slate-950 font-black text-xs shadow-xs">
+                    <span className="px-2.5 py-0.5 rounded-xl bg-cyan-400 text-slate-950 font-black text-xs shadow-xs">
                       UNS #{modalData.toothUniversal}
                     </span>
-                    <span className="px-2.5 py-1 rounded-xl bg-amber-400 text-slate-950 font-black text-xs shadow-xs">
+                    <span className="px-2.5 py-0.5 rounded-xl bg-amber-400 text-slate-950 font-black text-xs shadow-xs">
                       FDI #{modalData.toothFdi}
                     </span>
                   </div>
                 )}
+
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
                       {modalData.isInterproximal ? 'Contacto Interproximal' : 'Ventana Cristal 3D'}
                     </span>
                     <span className="text-[11px] text-slate-400">
-                      {modalData.taxonomy?.arch === 'upper' ? 'Maxilar Superior' : 'Mandíbula Inferior'} • Cuad. {modalData.taxonomy?.quadrant || 1}
+                      {modalData.taxonomy?.arch === 'upper' ? 'Maxilar Superior' : 'Mandíbula Inferior'} • Cuadrante {modalData.taxonomy?.quadrant || 1} FDI
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                      {modalData.selectedCondition.toUpperCase()}
                     </span>
                   </div>
-                  <h3 className="text-base font-bold text-white mt-0.5">
+
+                  <h3 className="text-lg font-black text-white mt-0.5">
                     {modalData.isInterproximal && modalData.pairFdi
                       ? `Punto de Contacto: FDI #${modalData.pairFdi[0]} ↔ #${modalData.pairFdi[1]} (UNS #${modalData.pairUniversal?.[0]} ↔ #${modalData.pairUniversal?.[1]})`
                       : modalData.taxonomy?.name || `Pieza Dental #${modalData.toothFdi}`}
                   </h3>
-                  <p className="text-[11px] text-slate-400">
+
+                  <p className="text-xs text-slate-400">
                     Expediente: <strong className="text-slate-200">{patientName}</strong> • Sucursal: <strong className="text-amber-300">{branch}</strong>
                   </p>
                 </div>
@@ -1007,192 +1103,199 @@ export function Dental3DViewer({
 
               <button
                 type="button"
-                onClick={() => setModalOpen(false)}
+                onClick={handleCloseModal}
                 className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-                title="Cerrar ventana cristal"
+                title="Cerrar y restablecer arcada"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* SECCIÓN 1: DESGLOSE ANATÓMICO POR 5 CARAS DENTALES */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <Activity className="w-3.5 h-3.5" />
-                  <span>Desglose Anatómico de 5 Caras Dentales</span>
-                </label>
-                <span className="text-[10px] text-slate-400">Clic en cada cara para alternar patología</span>
-              </div>
-
-              {/* Matriz Visual de las 5 Caras (Cruz Anatómica) */}
-              <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 flex flex-col items-center justify-center gap-1.5">
-                {/* Bucal / Vestibular (Superior) */}
-                <button
-                  type="button"
-                  onClick={() => toggleModalSurface('vestibular')}
-                  className={cn(
-                    'w-40 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer flex items-center justify-center gap-1.5',
-                    modalData.activeSurfaces.vestibular === 'caries'
-                      ? 'bg-rose-500/30 text-rose-300 border-rose-500/80 shadow-xs shadow-rose-500/30 font-black'
-                      : modalData.activeSurfaces.vestibular === 'resina'
-                      ? 'bg-blue-500/30 text-blue-300 border-blue-500/80 shadow-xs shadow-blue-500/30 font-black'
-                      : 'bg-slate-900/80 text-slate-300 border-slate-700 hover:bg-slate-800'
-                  )}
-                >
-                  <span>Bucal / Vestibular</span>
-                  <span className="text-[10px] uppercase opacity-75">[{modalData.activeSurfaces.vestibular}]</span>
-                </button>
-
-                {/* Mesial - Oclusal/Incisal - Distal */}
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => toggleModalSurface('mesial')}
-                    className={cn(
-                      'w-28 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer flex flex-col items-center justify-center',
-                      modalData.activeSurfaces.mesial === 'caries'
-                        ? 'bg-rose-500/30 text-rose-300 border-rose-500/80 shadow-xs shadow-rose-500/30 font-black'
-                        : modalData.activeSurfaces.mesial === 'resina'
-                        ? 'bg-blue-500/30 text-blue-300 border-blue-500/80 shadow-xs shadow-blue-500/30 font-black'
-                        : 'bg-slate-900/80 text-slate-300 border-slate-700 hover:bg-slate-800'
-                    )}
-                  >
-                    <span>Mesial</span>
-                    <span className="text-[10px] uppercase opacity-75">[{modalData.activeSurfaces.mesial}]</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => toggleModalSurface('oclusal')}
-                    className={cn(
-                      'w-36 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer flex flex-col items-center justify-center',
-                      modalData.activeSurfaces.oclusal === 'caries'
-                        ? 'bg-rose-500/40 text-rose-200 border-rose-400 shadow-md shadow-rose-500/40 font-black'
-                        : modalData.activeSurfaces.oclusal === 'resina'
-                        ? 'bg-blue-500/40 text-blue-200 border-blue-400 shadow-md shadow-blue-500/40 font-black'
-                        : 'bg-amber-400/20 text-amber-200 border-amber-400/50 hover:bg-amber-400/30'
-                    )}
-                  >
-                    <span className="text-amber-300 font-black">
-                      {modalData.taxonomy?.isAnterior ? 'Incisal' : 'Oclusal'}
-                    </span>
-                    <span className="text-[10px] uppercase opacity-80">[{modalData.activeSurfaces.oclusal}]</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => toggleModalSurface('distal')}
-                    className={cn(
-                      'w-28 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer flex flex-col items-center justify-center',
-                      modalData.activeSurfaces.distal === 'caries'
-                        ? 'bg-rose-500/30 text-rose-300 border-rose-500/80 shadow-xs shadow-rose-500/30 font-black'
-                        : modalData.activeSurfaces.distal === 'resina'
-                        ? 'bg-blue-500/30 text-blue-300 border-blue-500/80 shadow-xs shadow-blue-500/30 font-black'
-                        : 'bg-slate-900/80 text-slate-300 border-slate-700 hover:bg-slate-800'
-                    )}
-                  >
-                    <span>Distal</span>
-                    <span className="text-[10px] uppercase opacity-75">[{modalData.activeSurfaces.distal}]</span>
-                  </button>
+            {/* CONTENIDO PRINCIPAL: 2 COLUMNAS (DESGLOSE 5 CARAS + ESPECIALIDADES / PROCEDIMIENTOS) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+              {/* COLUMNA IZQUIERDA: ZOOM ANATÓMICO DE 5 CARAS (IDÉNTICO A CONCEPTO IMAGEN 2) */}
+              <div className="lg:col-span-6 space-y-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Activity className="w-4 h-4 text-amber-400" />
+                    <h4 className="text-xs font-black uppercase tracking-wider text-amber-300">
+                      Desglose Anatómico de 5 Caras
+                    </h4>
+                  </div>
+                  <span className="text-[10px] text-slate-400">Clic en cara para aplicar</span>
                 </div>
 
-                {/* Lingual o Palatino (Inferior) */}
-                <button
-                  type="button"
-                  onClick={() => toggleModalSurface('lingual')}
-                  className={cn(
-                    'w-40 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer flex items-center justify-center gap-1.5',
-                    modalData.activeSurfaces.lingual === 'caries'
-                      ? 'bg-rose-500/30 text-rose-300 border-rose-500/80 shadow-xs shadow-rose-500/30 font-black'
-                      : modalData.activeSurfaces.lingual === 'resina'
-                      ? 'bg-blue-500/30 text-blue-300 border-blue-500/80 shadow-xs shadow-blue-500/30 font-black'
-                      : 'bg-slate-900/80 text-slate-300 border-slate-700 hover:bg-slate-800'
-                  )}
-                >
-                  <span>{modalData.toothFdi <= 28 ? 'Palatino' : 'Lingual'}</span>
-                  <span className="text-[10px] uppercase opacity-75">[{modalData.activeSurfaces.lingual}]</span>
-                </button>
+                {/* Paleta rápida de condiciones activas */}
+                <div className="flex flex-wrap items-center gap-1.5 pb-2 border-b border-slate-800">
+                  {(['caries', 'resina', 'amalgama', 'sellador', 'fractura', 'incrustacion', 'sano'] as SurfaceCondition[]).map(cond => {
+                    const info = SURFACE_COLORS[cond]
+                    const isActive = modalActiveTool === cond
+                    return (
+                      <button
+                        key={cond}
+                        type="button"
+                        onClick={() => setModalActiveTool(cond)}
+                        className={cn(
+                          'px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer flex items-center gap-1',
+                          isActive
+                            ? 'bg-amber-400 text-slate-950 border-amber-300 font-black shadow-xs'
+                            : 'bg-slate-900/80 text-slate-300 border-slate-700 hover:bg-slate-800'
+                        )}
+                      >
+                        <span className="w-2.5 h-2.5 rounded-full border" style={{ backgroundColor: info.fill, borderColor: info.stroke }} />
+                        <span>{info.label.split(' ')[0]}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* LAS 5 CARAS ANATÓMICAS CON TARJETAS DETALLADAS (ESTILO IMAGEN 2) */}
+                <div className="space-y-2">
+                  {[
+                    { key: 'vestibular' as const, label: 'Vestibular / Buccal', sub: modalData.toothFdi >= 31 && modalData.toothFdi <= 48 ? 'Inferior (Labial)' : 'Superior (Labial)' },
+                    { key: 'oclusal' as const, label: modalData.taxonomy?.isAnterior ? 'Incisal' : 'Oclusal', sub: modalData.taxonomy?.isAnterior ? 'Borde de corte' : 'Superficie masticatoria' },
+                    { key: 'mesial' as const, label: 'Mesial', sub: 'Hacia línea media' },
+                    { key: 'distal' as const, label: 'Distal', sub: 'Hacia posterior' },
+                    { key: 'lingual' as const, label: modalData.toothFdi >= 31 && modalData.toothFdi <= 48 ? 'Lingual' : 'Palatino', sub: modalData.toothFdi >= 31 && modalData.toothFdi <= 48 ? 'Hacia lengua' : 'Hacia paladar' }
+                  ].map(face => {
+                    const currentCond = modalData.activeSurfaces[face.key]
+                    const info = SURFACE_COLORS[currentCond]
+                    return (
+                      <div
+                        key={face.key}
+                        onClick={() => handleApplyFaceCondition(face.key)}
+                        className={cn(
+                          'p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 select-none',
+                          currentCond !== 'sano'
+                            ? 'bg-slate-900 border-amber-400/80 shadow-xs shadow-amber-500/10'
+                            : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                        )}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span
+                            className="w-3.5 h-3.5 rounded-full border shadow-2xs shrink-0"
+                            style={{ backgroundColor: info.fill, borderColor: info.stroke }}
+                          />
+                          <div>
+                            <span className="text-xs font-bold text-white block">{face.label}</span>
+                            <span className="text-[10px] text-slate-400 block">{face.sub}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <span className={cn(
+                            'text-[10px] font-black uppercase px-2 py-0.5 rounded-md',
+                            currentCond === 'sano' ? 'bg-slate-800 text-slate-400' : 'bg-amber-400 text-slate-950 font-black'
+                          )}>
+                            {info.label}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* COLUMNA DERECHA: CATÁLOGO POR ESPECIALIDAD & VINCULACIÓN (IDÉNTICO A IMAGEN 2 Y 3) */}
+              <div className="lg:col-span-6 space-y-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-black uppercase tracking-wider text-amber-300">
+                      Especialidades &amp; Procedimientos
+                    </span>
+                    <span className="text-[10px] text-emerald-400 font-bold">Autoguardado en Supabase</span>
+                  </div>
+
+                  {/* Tabs de Especialidades Odontológicas */}
+                  <div className="grid grid-cols-3 gap-1 p-1 bg-slate-900 rounded-xl border border-slate-800 mb-3">
+                    {(['operatoria', 'endodoncia', 'periodoncia', 'implantes', 'ortodoncia', 'cirugia'] as DentalSpecialty[]).map(spec => (
+                      <button
+                        key={spec}
+                        type="button"
+                        onClick={() => setModalSpecialty(spec)}
+                        className={cn(
+                          'py-1.5 px-2 rounded-lg text-xs font-bold capitalize transition-all cursor-pointer text-center',
+                          modalSpecialty === spec
+                            ? 'bg-amber-400 text-slate-950 font-black shadow-xs'
+                            : 'text-slate-400 hover:text-white'
+                        )}
+                      >
+                        {spec}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Listado de Procedimientos Vinculables (Estilo Tarjetas Imagen 3) */}
+                  <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                    {TREATMENT_CATALOG[modalSpecialty].map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 hover:border-amber-400/60 transition-colors flex items-center justify-between gap-2 shadow-xs"
+                      >
+                        <div>
+                          <span className="text-xs font-bold text-white block leading-tight">
+                            {item.name}
+                          </span>
+                          <span className="text-xs font-black text-emerald-400 font-mono block mt-0.5">
+                            ${item.cost.toLocaleString('es-MX')} MXN
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleLinkProcedure(item)}
+                          className="px-2.5 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-colors flex items-center gap-1 cursor-pointer shrink-0 shadow-xs"
+                          title="Vincular a esta pieza y sincronizar con Supabase"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Vincular</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* NOTAS Y PRESUPUESTO */}
+                <div className="pt-2 border-t border-slate-800 space-y-2">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="col-span-2">
+                      <label className="text-[10px] font-bold text-slate-400 block mb-0.5">Notas Clínicas</label>
+                      <input
+                        type="text"
+                        value={modalData.notes}
+                        onChange={(e) => setModalData({ ...modalData, notes: e.target.value })}
+                        placeholder="Observación clínica..."
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-hidden focus:border-amber-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 block mb-0.5">Costo ($MXN)</label>
+                      <input
+                        type="number"
+                        value={modalData.estimatedCost}
+                        onChange={(e) => setModalData({ ...modalData, estimatedCost: parseInt(e.target.value, 10) || 0 })}
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-amber-300 font-bold focus:outline-hidden focus:border-amber-400"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* SECCIÓN 2: DIAGNÓSTICO / TRATAMIENTO */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-amber-300 uppercase tracking-wider block">
-                Diagnóstico Principal / Tratamiento
-              </label>
-
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { id: 'caries', label: 'Caries Dental', color: 'bg-rose-500/20 text-rose-300 border-rose-500/60' },
-                  { id: 'obturado', label: 'Resina / Obturación', color: 'bg-blue-500/20 text-blue-300 border-blue-500/60' },
-                  { id: 'endodoncia', label: 'Endodoncia', color: 'bg-orange-500/20 text-orange-300 border-orange-500/60' },
-                  { id: 'corona', label: 'Corona Zirconia', color: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/60' },
-                  { id: 'implante', label: 'Implante Titanio', color: 'bg-purple-500/20 text-purple-300 border-purple-500/60' },
-                  { id: 'sellador', label: 'Sellador Fosetas', color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/60' },
-                  { id: 'fractura', label: 'Fractura Dental', color: 'bg-pink-500/20 text-pink-300 border-pink-500/60' },
-                  { id: 'ausente', label: 'Pieza Ausente', color: 'bg-slate-700/40 text-slate-300 border-slate-600' },
-                  { id: 'sano', label: 'Diente Sano', color: 'bg-white/10 text-white border-white/30' }
-                ].map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setModalData({ ...modalData, selectedCondition: item.id as ToothWholeCondition })}
-                    className={cn(
-                      'px-2.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer text-center',
-                      modalData.selectedCondition === item.id
-                        ? `${item.color} ring-2 ring-amber-400 font-black scale-102 shadow-md`
-                        : 'bg-slate-900/60 text-slate-400 border-slate-800 hover:text-white hover:bg-slate-800'
-                    )}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* SECCIÓN 3: NOTAS CLÍNICAS Y PRESUPUESTO */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="sm:col-span-2 space-y-1">
-                <label className="text-[11px] font-bold text-slate-300 block">
-                  Notas de Evolución Clínica
-                </label>
-                <input
-                  type="text"
-                  value={modalData.notes}
-                  onChange={(e) => setModalData({ ...modalData, notes: e.target.value })}
-                  placeholder="Detalles del procedimiento clínico..."
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-amber-400"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-300 block">
-                  Costo Estimado ($MXN)
-                </label>
-                <input
-                  type="number"
-                  value={modalData.estimatedCost}
-                  onChange={(e) => setModalData({ ...modalData, estimatedCost: parseInt(e.target.value, 10) || 0 })}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-slate-700 text-xs text-amber-300 font-bold focus:outline-hidden focus:border-amber-400"
-                />
-              </div>
-            </div>
-
-            {/* BOTONES DE ACCIÓN Y PERSISTENCIA */}
+            {/* BOTONES DE PIE DE MODAL */}
             <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-800">
-              <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+              <div className="flex items-center gap-1.5 text-xs text-slate-400">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>Rol: <strong>{doctorRole.toUpperCase()}</strong></span>
+                <span>Rol: <strong>{doctorRole.toUpperCase()}</strong> • Supabase Live Sync</span>
               </div>
 
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setModalOpen(false)}
+                  onClick={handleCloseModal}
                   className="px-4 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
                 >
-                  Cancelar
+                  Cerrar
                 </button>
 
                 <button
@@ -1202,7 +1305,7 @@ export function Dental3DViewer({
                   className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-xs font-black hover:from-amber-300 hover:to-amber-400 transition-all shadow-lg shadow-amber-500/25 flex items-center gap-2 cursor-pointer disabled:opacity-50"
                 >
                   <Save className="w-4 h-4" />
-                  <span>{isPersistingSupabase ? 'Guardando en Supabase...' : 'Aplicar & Guardar en Supabase'}</span>
+                  <span>{isPersistingSupabase ? 'Guardando en Supabase...' : 'Guardar en Expediente & Supabase'}</span>
                 </button>
               </div>
             </div>

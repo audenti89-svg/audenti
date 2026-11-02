@@ -117,7 +117,7 @@ export const TREATMENT_CATALOG: Record<DentalSpecialty, Array<{ name: string; co
 }
 
 // Colores de condiciones de superficie
-const SURFACE_COLORS: Record<SurfaceCondition, { fill: string; stroke: string; label: string }> = {
+export const SURFACE_COLORS: Record<SurfaceCondition, { fill: string; stroke: string; label: string }> = {
   sano:         { fill: '#ffffff', stroke: '#cbd5e1', label: 'Sano' },
   caries:       { fill: '#ef4444', stroke: '#b91c1c', label: 'Caries (Rojo)' },
   resina:       { fill: '#3b82f6', stroke: '#1d4ed8', label: 'Resina (Azul)' },
