@@ -115,7 +115,7 @@ DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'patients') THEN
     ALTER TABLE public.patients ENABLE ROW LEVEL SECURITY;
 
-    -- Política de lectura para estudiantes activos
+    -- Política de lectura para estudiantes activos con cast seguro text = text
     DROP POLICY IF EXISTS "student_read_branch_patients" ON public.patients;
     CREATE POLICY "student_read_branch_patients"
       ON public.patients FOR SELECT
@@ -125,7 +125,7 @@ DO $$ BEGIN
         AND (SELECT student_expires_at FROM public.users WHERE id = auth.uid()) > now()
         AND (
           branch_name = (SELECT branch_name FROM public.users WHERE id = auth.uid())
-          OR branch_id = (SELECT branch_id FROM public.users WHERE id = auth.uid())
+          OR branch_id::text = (SELECT branch_id::text FROM public.users WHERE id = auth.uid())
           OR branch_name IS NULL
         )
       );
