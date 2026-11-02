@@ -14,9 +14,11 @@ import {
   FileText,
   DollarSign,
   AlertCircle,
-  Box
+  Box,
+  X
 } from 'lucide-react'
 import { Dental3DViewer } from '@/components/clinical/Dental3DViewer'
+import { TOOTH_BY_FDI } from '@/lib/dental-anatomy'
 
 export type DentalSpecialty = 'operatoria' | 'endodoncia' | 'ortodoncia' | 'implantes' | 'periodoncia' | 'cirugia'
 
@@ -366,15 +368,19 @@ function AnatomicalToothSVG({
 export interface OdontogramProps {
   patientId?: string
   patientName?: string
+  doctorName?: string
   doctorRole?: string
   branch?: string
+  onHistoryUpdated?: () => void
 }
 
 export function Odontogram({
   patientId,
   patientName = 'Paciente General',
+  doctorName = 'Dra. Aura Estudillo',
   doctorRole = 'socio',
-  branch = 'Sucursal Balbuena (Matriz)'
+  branch = 'Sucursal Balbuena (Matriz)',
+  onHistoryUpdated
 }: OdontogramProps = {}) {
   const [teeth, setTeeth] = useState<Record<number, ToothState>>(initTeethRecord)
   const [selectedToothNum, setSelectedToothNum] = useState<number>(16)
@@ -406,6 +412,209 @@ export function Odontogram({
     }
   ])
   const [savedSuccess, setSavedSuccess] = useState(false)
+
+  // Modal Flotante Modo Cristal para Vista 2D (Glassmorphism)
+  const [modal2DOpen, setModal2DOpen] = useState(false)
+  const [modal2DTool, setModal2DTool] = useState<SurfaceCondition>('caries')
+  const [modal2DSpecialty, setModal2DSpecialty] = useState<DentalSpecialty>('operatoria')
+  const [modal2DNotes, setModal2DNotes] = useState('')
+  const [modal2DCost, setModal2DCost] = useState(850)
+  const [isPersisting2D, setIsPersisting2D] = useState(false)
+  const [save2DSuccess, setSave2DSuccess] = useState(false)
+
+  const handleOpen2DModalForTooth = (num: number) => {
+    setSelectedToothNum(num)
+    const t = teeth[num]
+    const tax = TOOTH_BY_FDI[num]
+    setModal2DNotes(t?.notes || `Tratamiento en pieza FDI #${num} (Universal #${tax?.universal || '?'}) — ${tax?.name || 'Órgano Dentario'}`)
+    setModal2DCost(850)
+    setModal2DOpen(true)
+  }
+
+  const handleClose2DModal = () => {
+    setModal2DOpen(false)
+  }
+
+  const handleApplyFaceCondition2D = async (face: keyof ToothSurfaces, conditionToApply?: SurfaceCondition) => {
+    const cond = conditionToApply || modal2DTool
+    const curr = teeth[selectedToothNum] || {
+      number: selectedToothNum,
+      wholeCondition: 'sano',
+      surfaces: { vestibular: 'sano', lingual: 'sano', mesial: 'sano', distal: 'sano', oclusal: 'sano' },
+      notes: ''
+    }
+    const updatedSurfaces: ToothSurfaces = {
+      ...curr.surfaces,
+      [face]: cond
+    }
+
+    setTeeth(prev => ({
+      ...prev,
+      [selectedToothNum]: {
+        ...curr,
+        surfaces: updatedSurfaces
+      }
+    }))
+
+    if (patientId) {
+      try {
+        await fetch('/api/clinical/odontogram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientId,
+            patientName,
+            toothFdi: selectedToothNum,
+            toothUniversal: TOOTH_BY_FDI[selectedToothNum]?.universal || 0,
+            surfaces: updatedSurfaces,
+            condition: curr.wholeCondition,
+            procedure: `Ajuste en cara ${face.toUpperCase()} (${cond})`,
+            specialty: modal2DSpecialty,
+            notes: modal2DNotes,
+            estimatedCost: modal2DCost,
+            doctorName,
+            doctorRole,
+            branch
+          })
+        })
+        if (onHistoryUpdated) {
+          onHistoryUpdated()
+        }
+      } catch (err) {
+        console.warn('Error al persistir ajuste de cara:', err)
+      }
+    }
+  }
+
+  const handleLinkProcedure2D = async (proc: { name: string; cost: number; condition: ToothWholeCondition }) => {
+    setIsPersisting2D(true)
+    const curr = teeth[selectedToothNum] || {
+      number: selectedToothNum,
+      wholeCondition: 'sano',
+      surfaces: { vestibular: 'sano', lingual: 'sano', mesial: 'sano', distal: 'sano', oclusal: 'sano' },
+      notes: ''
+    }
+    const updatedSurfaces = { ...curr.surfaces }
+    if (proc.condition === 'sano' && proc.name.includes('Resina')) {
+      if (proc.name.includes('1 Cara')) updatedSurfaces.oclusal = 'resina'
+      else if (proc.name.includes('2 Caras')) { updatedSurfaces.oclusal = 'resina'; updatedSurfaces.mesial = 'resina' }
+      else if (proc.name.includes('3+ Caras')) { updatedSurfaces.oclusal = 'resina'; updatedSurfaces.mesial = 'resina'; updatedSurfaces.distal = 'resina' }
+    }
+
+    const updatedCondition = proc.condition !== 'sano' ? proc.condition : curr.wholeCondition
+
+    setTeeth(prev => ({
+      ...prev,
+      [selectedToothNum]: {
+        ...curr,
+        surfaces: updatedSurfaces,
+        wholeCondition: updatedCondition
+      }
+    }))
+
+    const treatedFaces = Object.entries(updatedSurfaces).filter(([_, c]) => c !== 'sano').map(([f]) => f)
+
+    const newTreatment: LinkedTreatment = {
+      id: `treat-${Date.now()}-${Math.random()}`,
+      toothNumber: selectedToothNum,
+      specialty: modal2DSpecialty,
+      procedure: proc.name,
+      surfaces: treatedFaces.join(', ') || 'General',
+      notes: modal2DNotes || `Procedimiento vinculado: ${proc.name}`,
+      estimatedCost: proc.cost
+    }
+    setLinkedTreatments(prev => [...prev, newTreatment])
+
+    const nowStr = new Intl.DateTimeFormat('es-MX', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit'
+    }).format(new Date())
+
+    const newEvo: ClinicalEvolutionEntry = {
+      id: `evo-${Date.now()}`,
+      toothNumber: selectedToothNum,
+      date: nowStr,
+      doctor: doctorName,
+      procedure: proc.name,
+      surfaces: treatedFaces.join(', ') || 'General',
+      status: 'En Proceso',
+      notes: modal2DNotes || `Procedimiento registrado para pieza #${selectedToothNum}`
+    }
+    setEvolutionHistory(prev => [newEvo, ...prev])
+
+    if (patientId) {
+      try {
+        await fetch('/api/clinical/odontogram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientId,
+            patientName,
+            toothFdi: selectedToothNum,
+            toothUniversal: TOOTH_BY_FDI[selectedToothNum]?.universal || 0,
+            surfaces: updatedSurfaces,
+            condition: updatedCondition,
+            procedure: proc.name,
+            specialty: modal2DSpecialty,
+            notes: modal2DNotes || `Tratamiento registrado en pieza #${selectedToothNum}`,
+            estimatedCost: proc.cost,
+            doctorName,
+            doctorRole,
+            branch
+          })
+        })
+        if (onHistoryUpdated) {
+          onHistoryUpdated()
+        }
+      } catch (err) {
+        console.warn('Error al persistir procedimiento en Supabase:', err)
+      }
+    }
+
+    setIsPersisting2D(false)
+    setSave2DSuccess(true)
+    setTimeout(() => setSave2DSuccess(false), 1800)
+  }
+
+  const handleSaveModal2DData = async () => {
+    setIsPersisting2D(true)
+    const curr = teeth[selectedToothNum]
+    if (patientId) {
+      try {
+        await fetch('/api/clinical/odontogram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientId,
+            patientName,
+            toothFdi: selectedToothNum,
+            toothUniversal: TOOTH_BY_FDI[selectedToothNum]?.universal || 0,
+            surfaces: curr.surfaces,
+            condition: curr.wholeCondition,
+            procedure: `Actualización clínica de pieza #${selectedToothNum}`,
+            specialty: modal2DSpecialty,
+            notes: modal2DNotes,
+            estimatedCost: modal2DCost,
+            doctorName,
+            doctorRole,
+            branch,
+            fullTeethState: teeth
+          })
+        })
+        if (onHistoryUpdated) {
+          onHistoryUpdated()
+        }
+      } catch (err) {
+        console.warn('Error al guardar en Supabase:', err)
+      }
+    }
+    setIsPersisting2D(false)
+    setSave2DSuccess(true)
+    setTimeout(() => {
+      setSave2DSuccess(false)
+      setModal2DOpen(false)
+    }, 1200)
+  }
 
   // Cargar estado inicial persistido si existe
   useEffect(() => {
@@ -760,10 +969,12 @@ export function Odontogram({
             teethState={teeth}
             patientId={patientId}
             patientName={patientName}
+            doctorName={doctorName}
             doctorRole={doctorRole}
             branch={branch}
             onUpdateToothSurfaces={handleUpdateToothSurfacesFrom3D}
             onAddTreatment={handleAddTreatmentFrom3D}
+            onHistoryUpdated={onHistoryUpdated}
           />
         </div>
       ) : (
@@ -787,7 +998,7 @@ export function Odontogram({
                     state={teeth[num]}
                     isSelected={selectedToothNum === num}
                     activeSurfaceCondition={activeSurfaceCondition}
-                    onSelectTooth={setSelectedToothNum}
+                    onSelectTooth={handleOpen2DModalForTooth}
                     onSurfaceClick={handleSurfaceClick}
                   />
                 ))}
@@ -799,7 +1010,7 @@ export function Odontogram({
                     state={teeth[num]}
                     isSelected={selectedToothNum === num}
                     activeSurfaceCondition={activeSurfaceCondition}
-                    onSelectTooth={setSelectedToothNum}
+                    onSelectTooth={handleOpen2DModalForTooth}
                     onSurfaceClick={handleSurfaceClick}
                   />
                 ))}
@@ -813,7 +1024,7 @@ export function Odontogram({
                     state={teeth[num]}
                     isSelected={selectedToothNum === num}
                     activeSurfaceCondition={activeSurfaceCondition}
-                    onSelectTooth={setSelectedToothNum}
+                    onSelectTooth={handleOpen2DModalForTooth}
                     onSurfaceClick={handleSurfaceClick}
                   />
                 ))}
@@ -825,7 +1036,7 @@ export function Odontogram({
                     state={teeth[num]}
                     isSelected={selectedToothNum === num}
                     activeSurfaceCondition={activeSurfaceCondition}
-                    onSelectTooth={setSelectedToothNum}
+                    onSelectTooth={handleOpen2DModalForTooth}
                     onSurfaceClick={handleSurfaceClick}
                   />
                 ))}
@@ -855,7 +1066,7 @@ export function Odontogram({
                     state={teeth[num]}
                     isSelected={selectedToothNum === num}
                     activeSurfaceCondition={activeSurfaceCondition}
-                    onSelectTooth={setSelectedToothNum}
+                    onSelectTooth={handleOpen2DModalForTooth}
                     onSurfaceClick={handleSurfaceClick}
                   />
                 ))}
@@ -867,7 +1078,7 @@ export function Odontogram({
                     state={teeth[num]}
                     isSelected={selectedToothNum === num}
                     activeSurfaceCondition={activeSurfaceCondition}
-                    onSelectTooth={setSelectedToothNum}
+                    onSelectTooth={handleOpen2DModalForTooth}
                     onSurfaceClick={handleSurfaceClick}
                   />
                 ))}
@@ -881,7 +1092,7 @@ export function Odontogram({
                     state={teeth[num]}
                     isSelected={selectedToothNum === num}
                     activeSurfaceCondition={activeSurfaceCondition}
-                    onSelectTooth={setSelectedToothNum}
+                    onSelectTooth={handleOpen2DModalForTooth}
                     onSurfaceClick={handleSurfaceClick}
                   />
                 ))}
@@ -893,7 +1104,7 @@ export function Odontogram({
                     state={teeth[num]}
                     isSelected={selectedToothNum === num}
                     activeSurfaceCondition={activeSurfaceCondition}
-                    onSelectTooth={setSelectedToothNum}
+                    onSelectTooth={handleOpen2DModalForTooth}
                     onSurfaceClick={handleSurfaceClick}
                   />
                 ))}
@@ -1075,6 +1286,278 @@ export function Odontogram({
           </div>
         )}
       </div>
+
+      {/* =========================================================================
+          VENTANA FLOTANTE MODO CRISTAL (GLASSMORPHISM) PARA SELECCIÓN EN 2D
+      ========================================================================= */}
+      {modal2DOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-xl flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200">
+          <div className="relative w-full max-w-4xl max-h-[94%] overflow-y-auto bg-slate-900/90 backdrop-blur-2xl border-2 border-amber-400/60 shadow-[0_0_60px_rgba(245,158,11,0.25)] rounded-3xl p-5 sm:p-6 text-white space-y-5">
+            {/* Notificación de Sincronización en Supabase */}
+            {save2DSuccess && (
+              <div className="absolute top-4 right-16 z-50 px-4 py-2 rounded-xl bg-emerald-500/95 text-white text-xs font-black shadow-lg flex items-center gap-2 animate-in slide-in-from-top-2 duration-200">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>✓ Sincronizado en Supabase y Expediente</span>
+              </div>
+            )}
+
+            {/* ENCABEZADO CON IDENTIFICACIÓN DUAL */}
+            {(() => {
+              const tax = TOOTH_BY_FDI[selectedToothNum]
+              const curr = teeth[selectedToothNum] || { wholeCondition: 'sano', surfaces: { vestibular: 'sano', lingual: 'sano', mesial: 'sano', distal: 'sano', oclusal: 'sano' } }
+              const isLower = selectedToothNum >= 31 && selectedToothNum <= 48
+              return (
+                <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-700/80">
+                  <div className="flex items-center gap-3">
+                    <div className="flex flex-col gap-1 items-center">
+                      <span className="px-2.5 py-0.5 rounded-xl bg-cyan-400 text-slate-950 font-black text-xs shadow-xs">
+                        UNS #{tax?.universal || '?'}
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-xl bg-amber-400 text-slate-950 font-black text-xs shadow-xs">
+                        FDI #{selectedToothNum}
+                      </span>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                          Ventana Cristal Anatómica
+                        </span>
+                        <span className="text-[11px] text-slate-400">
+                          {isLower ? 'Mandíbula Inferior' : 'Maxilar Superior'} • Cuadrante {tax?.quadrant || 1} FDI
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                          {curr.wholeCondition.toUpperCase()}
+                        </span>
+                      </div>
+
+                      <h3 className="text-lg font-black text-white mt-0.5">
+                        {tax?.name || `Pieza Dental #${selectedToothNum}`}
+                      </h3>
+
+                      <p className="text-xs text-slate-400">
+                        Expediente: <strong className="text-slate-200">{patientName}</strong> • Sucursal: <strong className="text-amber-300">{branch}</strong>
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleClose2DModal}
+                    className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                    title="Cerrar ventana cristal"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              )
+            })()}
+
+            {/* CUERPO PRINCIPAL: 2 COLUMNAS (5 CARAS ANATÓMICAS + ESPECIALIDADES) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+              {/* COLUMNA IZQUIERDA: ZOOM ANATÓMICO DE 5 CARAS */}
+              <div className="lg:col-span-6 space-y-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Activity className="w-4 h-4 text-amber-400" />
+                    <h4 className="text-xs font-black uppercase tracking-wider text-amber-300">
+                      Desglose Anatómico de 5 Caras
+                    </h4>
+                  </div>
+                  <span className="text-[10px] text-slate-400">Clic en cara para aplicar</span>
+                </div>
+
+                {/* Paleta rápida de condiciones activas */}
+                <div className="flex flex-wrap items-center gap-1.5 pb-2 border-b border-slate-800">
+                  {(['caries', 'resina', 'amalgama', 'sellador', 'fractura', 'incrustacion', 'sano'] as SurfaceCondition[]).map(cond => {
+                    const info = SURFACE_COLORS[cond]
+                    const isActive = modal2DTool === cond
+                    return (
+                      <button
+                        key={cond}
+                        type="button"
+                        onClick={() => setModal2DTool(cond)}
+                        className={cn(
+                          'px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer flex items-center gap-1',
+                          isActive
+                            ? 'bg-amber-400 text-slate-950 border-amber-300 font-black shadow-xs'
+                            : 'bg-slate-900/80 text-slate-300 border-slate-700 hover:bg-slate-800'
+                        )}
+                      >
+                        <span className="w-2.5 h-2.5 rounded-full border" style={{ backgroundColor: info.fill, borderColor: info.stroke }} />
+                        <span>{info.label.split(' ')[0]}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Las 5 Caras Anatómicas con Tarjetas Detalladas */}
+                <div className="space-y-2">
+                  {(() => {
+                    const tax = TOOTH_BY_FDI[selectedToothNum]
+                    const curr = teeth[selectedToothNum] || { surfaces: { vestibular: 'sano', lingual: 'sano', mesial: 'sano', distal: 'sano', oclusal: 'sano' } }
+                    return [
+                      { key: 'vestibular' as const, label: 'Vestibular / Bucal', sub: selectedToothNum >= 31 && selectedToothNum <= 48 ? 'Inferior (Labial)' : 'Superior (Labial)' },
+                      { key: 'oclusal' as const, label: tax?.isAnterior ? 'Incisal' : 'Oclusal', sub: tax?.isAnterior ? 'Borde de corte incisal' : 'Superficie masticatoria' },
+                      { key: 'mesial' as const, label: 'Mesial', sub: 'Hacia línea media dental' },
+                      { key: 'distal' as const, label: 'Distal', sub: 'Hacia zona posterior' },
+                      { key: 'lingual' as const, label: selectedToothNum >= 31 && selectedToothNum <= 48 ? 'Lingual' : 'Palatino', sub: selectedToothNum >= 31 && selectedToothNum <= 48 ? 'Hacia lengua' : 'Hacia paladar' }
+                    ].map(face => {
+                      const currentCond = curr.surfaces[face.key]
+                      const info = SURFACE_COLORS[currentCond]
+                      return (
+                        <div
+                          key={face.key}
+                          onClick={() => handleApplyFaceCondition2D(face.key)}
+                          className={cn(
+                            'p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 select-none',
+                            currentCond !== 'sano'
+                              ? 'bg-slate-900 border-amber-400/80 shadow-xs shadow-amber-500/10'
+                              : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                          )}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <span
+                              className="w-3.5 h-3.5 rounded-full border shadow-2xs shrink-0"
+                              style={{ backgroundColor: info.fill, borderColor: info.stroke }}
+                            />
+                            <div>
+                              <span className="text-xs font-bold text-white block">{face.label}</span>
+                              <span className="text-[10px] text-slate-400 block">{face.sub}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <span className={cn(
+                              'text-[10px] font-black uppercase px-2 py-0.5 rounded-md',
+                              currentCond === 'sano' ? 'bg-slate-800 text-slate-400' : 'bg-amber-400 text-slate-950 font-black'
+                            )}>
+                              {info.label}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })
+                  })()}
+                </div>
+              </div>
+
+              {/* COLUMNA DERECHA: ESPECIALIDADES & CATÁLOGO */}
+              <div className="lg:col-span-6 space-y-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-black uppercase tracking-wider text-amber-300">
+                      Especialidades &amp; Procedimientos
+                    </span>
+                    <span className="text-[10px] text-emerald-400 font-bold">Autoguardado en Supabase</span>
+                  </div>
+
+                  {/* Tabs de Especialidades */}
+                  <div className="grid grid-cols-3 gap-1 p-1 bg-slate-900 rounded-xl border border-slate-800 mb-3">
+                    {(['operatoria', 'endodoncia', 'periodoncia', 'implantes', 'ortodoncia', 'cirugia'] as DentalSpecialty[]).map(spec => (
+                      <button
+                        key={spec}
+                        type="button"
+                        onClick={() => setModal2DSpecialty(spec)}
+                        className={cn(
+                          'py-1.5 px-2 rounded-lg text-xs font-bold capitalize transition-all cursor-pointer text-center',
+                          modal2DSpecialty === spec
+                            ? 'bg-amber-400 text-slate-950 font-black shadow-xs'
+                            : 'text-slate-400 hover:text-white'
+                        )}
+                      >
+                        {spec}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Procedimientos vinculables */}
+                  <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                    {TREATMENT_CATALOG[modal2DSpecialty].map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 hover:border-amber-400/60 transition-colors flex items-center justify-between gap-2 shadow-xs"
+                      >
+                        <div>
+                          <span className="text-xs font-bold text-white block leading-tight">
+                            {item.name}
+                          </span>
+                          <span className="text-xs font-black text-emerald-400 font-mono block mt-0.5">
+                            ${item.cost.toLocaleString('es-MX')} MXN
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleLinkProcedure2D(item)}
+                          className="px-2.5 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-colors flex items-center gap-1 cursor-pointer shrink-0 shadow-xs"
+                          title="Vincular a esta pieza y sincronizar con Supabase"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Vincular</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* NOTAS Y PRESUPUESTO */}
+                <div className="pt-2 border-t border-slate-800 space-y-2">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="col-span-2">
+                      <label className="text-[10px] font-bold text-slate-400 block mb-0.5">Notas Clínicas</label>
+                      <input
+                        type="text"
+                        value={modal2DNotes}
+                        onChange={(e) => setModal2DNotes(e.target.value)}
+                        placeholder="Observación clínica..."
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white focus:outline-hidden focus:border-amber-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-400 block mb-0.5">Costo ($MXN)</label>
+                      <input
+                        type="number"
+                        value={modal2DCost}
+                        onChange={(e) => setModal2DCost(parseInt(e.target.value, 10) || 0)}
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-amber-300 font-bold focus:outline-hidden focus:border-amber-400"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* BOTONES DE PIE DE MODAL */}
+            <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-800">
+              <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <span>Profesional: <strong>{doctorName}</strong> ({doctorRole.toUpperCase()}) • Supabase Live Sync</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleClose2DModal}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  Cerrar
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSaveModal2DData}
+                  disabled={isPersisting2D}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-xs font-black hover:from-amber-300 hover:to-amber-400 transition-all shadow-lg shadow-amber-500/25 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{isPersisting2D ? 'Guardando en Supabase...' : 'Guardar en Expediente & Supabase'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

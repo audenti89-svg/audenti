@@ -26,6 +26,7 @@ import {
   Lock,
   PhoneCall,
   Activity,
+  ShieldCheck,
   ShieldAlert,
   ClipboardList,
   Sparkles
@@ -64,6 +65,46 @@ export default function ExpedientePage() {
     medicalConditions: '',
   })
   const [savingEdit, setSavingEdit] = useState(false)
+
+  // Perfil del profesional en sesión (Socio, Trabajador o Pasante)
+  const [doctorProfile, setDoctorProfile] = useState<{
+    name: string
+    role: 'socio' | 'trabajador' | 'pasante'
+    branch: string
+  }>({
+    name: 'Dra. Aura Estudillo',
+    role: 'socio',
+    branch: 'Sucursal Balbuena (Matriz)'
+  })
+
+  useEffect(() => {
+    async function loadDoctorSession() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        const email = user.email || ''
+        const rawRole = (user.user_metadata?.role || user.app_metadata?.role || '').toLowerCase()
+        let resolvedRole: 'socio' | 'trabajador' | 'pasante' = 'socio'
+        if (rawRole === 'pasante' || rawRole === 'estudiante' || user.user_metadata?.is_intern) {
+          resolvedRole = 'pasante'
+        } else if (rawRole === 'trabajador' || rawRole === 'doctor' || rawRole === 'asistente') {
+          resolvedRole = 'trabajador'
+        } else if (email === 'audenti89@gmail.com' || rawRole === 'owner' || rawRole === 'admin' || rawRole === 'socio') {
+          resolvedRole = 'socio'
+        }
+
+        const name = user.user_metadata?.full_name || user.user_metadata?.name || (resolvedRole === 'socio' ? 'Dra. Aura Estudillo' : 'Dr. Clínico Audenti')
+        setDoctorProfile({
+          name,
+          role: resolvedRole,
+          branch: user.user_metadata?.branch || 'Sucursal Balbuena (Matriz)'
+        })
+      } catch (err) {
+        console.warn('Error loading doctor session:', err)
+      }
+    }
+    loadDoctorSession()
+  }, [supabase])
 
   const fetchPatientHistory = async (patient: any) => {
     if (!patient) return
@@ -658,8 +699,10 @@ export default function ExpedientePage() {
             <Odontogram
               patientId={selectedPatient?.id}
               patientName={selectedPatient?.full_name || selectedPatient?.name}
-              doctorRole="socio"
-              branch="Sucursal Balbuena (Matriz)"
+              doctorName={doctorProfile.name}
+              doctorRole={doctorProfile.role}
+              branch={doctorProfile.branch}
+              onHistoryUpdated={() => fetchPatientHistory(selectedPatient)}
             />
           </div>
         </div>
@@ -730,9 +773,63 @@ export default function ExpedientePage() {
           ) : (
             <div className="space-y-3">
               {messages.map((m, idx) => {
+                const isOdontogram = m.channel_type === 'odontogram_clinical_entry' || m.content?.includes('[ODONTOGRAMA 3D') || m.content?.includes('[ODONTOGRAMA')
                 const isVoice = m.channel_type === 'voice_call' || m.content?.includes('Llamada de Voz')
                 const isNote = m.isPrivateNote || m.channel_type === 'internal_note' || m.content?.includes('[NOTA PRIVADA')
                 const isDoctor = m.senderRole === 'doctor' || m.senderName?.includes('Aura Estudillo')
+
+                if (isOdontogram) {
+                  const meta = m.metadata || {}
+                  const isDraft = meta.status?.includes('Borrador') || meta.doctorRole === 'pasante' || meta.doctorRole === 'estudiante'
+                  return (
+                    <div
+                      key={m.id || idx}
+                      className="p-4 sm:p-5 rounded-2xl border-2 border-amber-400/80 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white shadow-lg space-y-3"
+                    >
+                      <div className="flex items-center justify-between gap-2 flex-wrap pb-2 border-b border-slate-800">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-xl text-xs font-black bg-amber-400 text-slate-950 shadow-xs">
+                            🦷 Pieza FDI #{meta.toothFdi || 'Dental'}
+                          </span>
+                          {meta.toothUniversal && (
+                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-cyan-400/20 text-cyan-300 border border-cyan-400/30">
+                              UNS #{meta.toothUniversal}
+                            </span>
+                          )}
+                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                            isDraft
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                              : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                          }`}>
+                            {isDraft ? 'Borrador (Revisión Pendiente)' : 'Confirmado'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-xs text-slate-400">
+                          <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                          <span>Profesional: <strong className="text-white">{m.senderName}</strong> ({String(meta.doctorRole || 'socio').toUpperCase()})</span>
+                          <span>•</span>
+                          <span className="font-mono text-[11px] text-slate-400">{m.timestamp}</span>
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-slate-900/90 rounded-xl border border-slate-800/80">
+                        <p className="whitespace-pre-wrap leading-relaxed text-slate-200 text-xs font-sans">
+                          {m.content}
+                        </p>
+                      </div>
+
+                      {meta.estimatedCost > 0 && (
+                        <div className="flex items-center justify-between pt-1 text-xs text-slate-300">
+                          <span className="text-[11px] text-slate-400">Presupuesto Registrado en Ficha:</span>
+                          <span className="font-mono font-black text-emerald-400 text-sm">
+                            ${Number(meta.estimatedCost).toLocaleString('es-MX')} MXN
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )
+                }
 
                 return (
                   <div

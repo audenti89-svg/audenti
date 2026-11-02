@@ -42,6 +42,7 @@ export interface Dental3DViewerProps {
   teethState?: Record<number, any>
   patientId?: string
   patientName?: string
+  doctorName?: string
   doctorRole?: string
   branch?: string
   onUpdateToothSurfaces?: (toothNum: number, surfaces: Partial<ToothSurfaces>, wholeCondition?: ToothWholeCondition) => void
@@ -55,6 +56,7 @@ export interface Dental3DViewerProps {
     estimatedCost: number
     condition?: ToothWholeCondition
   }) => void
+  onHistoryUpdated?: () => void
   className?: string
 }
 
@@ -82,10 +84,12 @@ export function Dental3DViewer({
   teethState,
   patientId,
   patientName = 'Paciente General',
+  doctorName = 'Dra. Aura Estudillo',
   doctorRole = 'socio',
   branch = 'Sucursal Balbuena (Matriz)',
   onUpdateToothSurfaces,
   onAddTreatment,
+  onHistoryUpdated,
   className
 }: Dental3DViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -749,10 +753,14 @@ export function Dental3DViewer({
             specialty: modalSpecialty,
             notes: modalData.notes,
             estimatedCost: procedureItem.cost,
+            doctorName,
             doctorRole,
             branch
           })
         })
+        if (onHistoryUpdated) {
+          onHistoryUpdated()
+        }
       } catch (err) {
         console.warn('Error al vincular en Supabase:', err)
       }
@@ -806,11 +814,15 @@ export function Dental3DViewer({
             specialty: modalData.specialty,
             notes: modalData.notes,
             estimatedCost: modalData.estimatedCost,
+            doctorName,
             doctorRole,
             branch,
             fullTeethState: teethState
           })
         })
+        if (onHistoryUpdated) {
+          onHistoryUpdated()
+        }
       } catch (err) {
         console.warn('Error al guardar en Supabase:', err)
       }
