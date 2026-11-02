@@ -175,6 +175,50 @@ CREATE TABLE IF NOT EXISTS campaign_qr_codes (
 -- 4. POLÍTICAS RLS (Con DROP previo para evitar error 42710)
 -- -------------------------------------------------------
 
+-- 4.1 CORRECCIÓN DE SEGURIDAD EN patients (Resuelve advertencia Advisor: 'RLS references user metadata')
+ALTER TABLE patients ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' AND table_name = 'patients' AND column_name = 'user_id'
+  ) THEN
+    EXECUTE '
+      DROP POLICY IF EXISTS "Permitir acceso a doctores y administradores" ON public.patients;
+      CREATE POLICY "Permitir acceso a doctores y administradores"
+        ON public.patients
+        FOR ALL
+        TO authenticated
+        USING (
+          (SELECT role FROM public.users WHERE id = auth.uid()) IN (''superadmin'', ''owner'', ''director'', ''doctor'', ''receptionist'')
+          OR auth.uid() = id
+          OR user_id = auth.uid()
+        )
+        WITH CHECK (
+          (SELECT role FROM public.users WHERE id = auth.uid()) IN (''superadmin'', ''owner'', ''director'', ''doctor'', ''receptionist'')
+          OR auth.uid() = id
+          OR user_id = auth.uid()
+        );
+    ';
+  ELSE
+    EXECUTE '
+      DROP POLICY IF EXISTS "Permitir acceso a doctores y administradores" ON public.patients;
+      CREATE POLICY "Permitir acceso a doctores y administradores"
+        ON public.patients
+        FOR ALL
+        TO authenticated
+        USING (
+          (SELECT role FROM public.users WHERE id = auth.uid()) IN (''superadmin'', ''owner'', ''director'', ''doctor'', ''receptionist'')
+          OR auth.uid() = id
+        )
+        WITH CHECK (
+          (SELECT role FROM public.users WHERE id = auth.uid()) IN (''superadmin'', ''owner'', ''director'', ''doctor'', ''receptionist'')
+          OR auth.uid() = id
+        );
+    ';
+  END IF;
+END $$;
+
 ALTER TABLE family_relationships ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "staff_read_family_relationships" ON family_relationships;
@@ -227,10 +271,12 @@ END;
 $$;
 
 -- -------------------------------------------------------
--- 6. VISTA BI: Desglose e Ingresos por Canal
+-- 6. VISTAS BI CON SECURITY INVOKER (Resuelve advertencia Advisor: 'Security Definer View')
 -- -------------------------------------------------------
 
-CREATE OR REPLACE VIEW attribution_by_channel AS
+-- 6.1 VISTA BI: Desglose e Ingresos por Canal
+CREATE OR REPLACE VIEW attribution_by_channel
+WITH (security_invoker = true) AS
 SELECT
   COALESCE(p.acquisition_channel, 'sin_dato') AS canal,
   COUNT(p.id) AS total_pacientes,
@@ -242,13 +288,12 @@ LEFT JOIN transactions t ON t.patient_id = p.id AND t.type::text IN ('income', '
 GROUP BY COALESCE(p.acquisition_channel, 'sin_dato')
 ORDER BY total_pacientes DESC;
 
+ALTER VIEW attribution_by_channel SET (security_invoker = true);
 GRANT SELECT ON attribution_by_channel TO authenticated;
 
--- -------------------------------------------------------
--- 6.1 VISTA BI: Historial Financiero por Sucursal
--- -------------------------------------------------------
-
-CREATE OR REPLACE VIEW financial_by_branch AS
+-- 6.2 VISTA BI: Historial Financiero por Sucursal
+CREATE OR REPLACE VIEW financial_by_branch
+WITH (security_invoker = true) AS
 SELECT
   COALESCE(p.branch_name, 'Sucursal Balbuena (Matriz)') AS sucursal,
   COUNT(DISTINCT p.id) AS total_pacientes,
@@ -261,14 +306,13 @@ LEFT JOIN transactions t ON t.patient_id = p.id
 GROUP BY COALESCE(p.branch_name, 'Sucursal Balbuena (Matriz)')
 ORDER BY ingresos_totales DESC;
 
+ALTER VIEW financial_by_branch SET (security_invoker = true);
 GRANT SELECT ON financial_by_branch TO authenticated;
 
--- -------------------------------------------------------
--- 6.2 VISTA BI / RECEPCIÓN: Pacientes con Atribución Pendiente
+-- 6.3 VISTA BI / RECEPCIÓN: Pacientes con Atribución Pendiente
 -- Para resolución rápida en recepción durante turno vespertino
--- -------------------------------------------------------
-
-CREATE OR REPLACE VIEW pending_attributions_view AS
+CREATE OR REPLACE VIEW pending_attributions_view
+WITH (security_invoker = true) AS
 SELECT
   p.id,
   p.full_name,
@@ -283,6 +327,7 @@ WHERE p.attribution_status = 'pending_review'
    OR (p.acquisition_channel IS NULL AND p.referrer_id IS NULL AND p.qr_code_id IS NULL)
 ORDER BY p.created_at DESC;
 
+ALTER VIEW pending_attributions_view SET (security_invoker = true);
 GRANT SELECT ON pending_attributions_view TO authenticated;
 
 -- -------------------------------------------------------
