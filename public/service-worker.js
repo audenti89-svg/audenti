@@ -1,5 +1,5 @@
 // Service Worker para Audenti — DentalCloud Pro (Windows, macOS, Linux, iOS, Android)
-const CACHE_NAME = 'audenti-pro-pwa-v2'
+const CACHE_NAME = 'audenti-pro-pwa-v3'
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
