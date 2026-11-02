@@ -13,8 +13,10 @@ import {
   Activity,
   FileText,
   DollarSign,
-  AlertCircle
+  AlertCircle,
+  Box
 } from 'lucide-react'
+import { Dental3DViewer } from '@/components/clinical/Dental3DViewer'
 
 export type DentalSpecialty = 'operatoria' | 'endodoncia' | 'ortodoncia' | 'implantes' | 'periodoncia' | 'cirugia'
 
@@ -365,6 +367,7 @@ export function Odontogram() {
   const [teeth, setTeeth] = useState<Record<number, ToothState>>(initTeethRecord)
   const [selectedToothNum, setSelectedToothNum] = useState<number>(16)
   const [dentition, setDentition] = useState<'adult' | 'pediatric'>('adult')
+  const [viewMode, setViewMode] = useState<'2d' | '3d'>('2d')
   const [activeSpecialty, setActiveSpecialty] = useState<DentalSpecialty>('operatoria')
   const [activeSurfaceCondition, setActiveSurfaceCondition] = useState<SurfaceCondition>('caries')
   const [linkedTreatments, setLinkedTreatments] = useState<LinkedTreatment[]>([])
@@ -521,6 +524,32 @@ export function Odontogram() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Conmutador 2D / 3D */}
+          <div className="flex p-1 bg-slate-200/80 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setViewMode('2d')}
+              className={cn(
+                'px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer',
+                viewMode === '2d' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              )}
+            >
+              Diagrama 2D
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('3d')}
+              className={cn(
+                'px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5',
+                viewMode === '3d' ? 'bg-slate-950 text-amber-400 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              )}
+              title="Explorador 3D de Arcada Dental GLTF/GLB"
+            >
+              <Box className="w-3.5 h-3.5 text-amber-400" />
+              <span>Modelo 3D (GLB)</span>
+            </button>
+          </div>
+
           <div className="flex p-1 bg-slate-200/70 rounded-xl">
             <button
               type="button"
@@ -589,7 +618,17 @@ export function Odontogram() {
         </div>
       </div>
 
-      {/* Diagrama Odontológico Completo (Superior e Inferior) */}
+      {/* Visualizador 3D Dental o Diagrama 2D */}
+      {viewMode === '3d' ? (
+        <div className="px-6 py-2">
+          <Dental3DViewer
+            selectedToothNum={selectedToothNum}
+            onSelectTooth={setSelectedToothNum}
+            teethState={teeth}
+          />
+        </div>
+      ) : (
+      /* Diagrama Odontológico Completo (Superior e Inferior) */
       <div className="p-6 space-y-6 overflow-x-auto">
         {/* Arcada Superior */}
         <div className="space-y-1">
@@ -730,6 +769,8 @@ export function Odontogram() {
           </div>
         </div>
       </div>
+
+      )}
 
       {/* PANEL DE VINCULACIÓN DE TRATAMIENTOS POR ESPECIALIDAD */}
       <div className="p-6 border-t border-slate-200 bg-slate-50/70 space-y-5">
