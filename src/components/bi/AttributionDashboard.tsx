@@ -20,9 +20,11 @@ import {
   Clock,
   Check,
   X,
-  AlertCircle
+  AlertCircle,
+  UserPlus
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
+import { InviteDoctorModal } from '@/components/admin/InviteDoctorModal'
 
 // ────────────────────────────────────────────────────────────
 // Tipos
@@ -103,6 +105,7 @@ export function AttributionDashboard() {
   const [selectedChannel, setSelectedChannel] = useState('tiktok')
   const [assignReferrerCode, setAssignReferrerCode] = useState('')
   const [savingAttribution, setSavingAttribution] = useState(false)
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -242,12 +245,24 @@ export function AttributionDashboard() {
     <div className="space-y-6">
       {/* Header BI */}
       <div className="bg-gradient-to-br from-[#202D4C] to-slate-800 rounded-3xl p-6 sm:p-8 text-white shadow-xl">
-        <div className="flex items-center gap-2 mb-2">
-          <BarChart3 className="w-5 h-5 text-amber-400" />
-          <span className="text-[11px] font-bold uppercase tracking-widest text-amber-400">Business Intelligence &amp; Analítica Comercial</span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <BarChart3 className="w-5 h-5 text-amber-400" />
+              <span className="text-[11px] font-bold uppercase tracking-widest text-amber-400">Business Intelligence &amp; Analítica Comercial</span>
+            </div>
+            <h2 className="text-2xl font-bold tracking-tight">Atribución de Pacientes, Redes y Sucursales</h2>
+            <p className="text-xs text-slate-300 mt-1">Dirección General — Dra. Aura Estudillo • Céd. Prof. 8492019</p>
+          </div>
+
+          <button
+            onClick={() => setIsInviteModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs shadow-lg transition-all active:scale-95 cursor-pointer self-start sm:self-auto shrink-0"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Invitar a Odontólogo</span>
+          </button>
         </div>
-        <h2 className="text-2xl font-bold tracking-tight">Atribución de Pacientes, Redes y Sucursales</h2>
-        <p className="text-xs text-slate-300 mt-1">Dirección General — Dra. Aura Estudillo • Céd. Prof. 8492019</p>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
           <div className="bg-white/10 rounded-2xl p-4 backdrop-blur-md border border-white/10">
@@ -743,6 +758,13 @@ export function AttributionDashboard() {
           )}
         </>
       )}
+
+      {/* Modal de Invitación a Odontólogos */}
+      <InviteDoctorModal
+        isOpen={isInviteModalOpen}
+        onClose={() => setIsInviteModalOpen(false)}
+        onSuccess={() => loadData()}
+      />
     </div>
   )
 }

@@ -60,35 +60,48 @@ export async function updateSession(request: NextRequest) {
     // Lista de correos administradores / dueños del sistema (Dra. Aura Estudillo)
     const isSuperAdmin = user.email === 'audenti89@gmail.com';
 
-    // 1. Leer rol prioritariamente desde los Claims del JWT (Custom Access Token Hook de Supabase)
+    // 1. Leer rol prioritariamente desde los Claims del JWT
     const jwtRole = user.app_metadata?.user_role || user.app_metadata?.role || user.user_metadata?.role;
 
     let isStaffOrOwner =
       isSuperAdmin ||
       jwtRole === 'owner' ||
       jwtRole === 'admin' ||
-      jwtRole === 'doctor';
+      jwtRole === 'director' ||
+      jwtRole === 'doctor' ||
+      jwtRole === 'socio' ||
+      jwtRole === 'trabajador';
+
+    let userRole = jwtRole;
+    let doctorType: string | undefined = undefined;
 
     // 2. Si no viene en los claims del token, consultar la tabla `users` como fallback
-    if (!isStaffOrOwner) {
+    if (!isStaffOrOwner || !userRole) {
       const { data: userProfile } = await supabase
         .from('users')
-        .select('role, onboarding_completed')
+        .select('role, doctor_type, onboarding_completed')
         .eq('id', user.id)
         .maybeSingle();
 
+      userRole = userProfile?.role || userRole;
+      doctorType = userProfile?.doctor_type;
+
       isStaffOrOwner =
+        isSuperAdmin ||
         userProfile?.role === 'owner' ||
         userProfile?.role === 'admin' ||
-        userProfile?.role === 'doctor';
+        userProfile?.role === 'director' ||
+        userProfile?.role === 'doctor' ||
+        userProfile?.role === 'socio' ||
+        userProfile?.role === 'trabajador';
     }
 
-    // REGLA CLAVE: Validación estricta de acceso por correo de la Dra. Aura Estudillo
+    // REGLA CLAVE: Validación estricta de personal clínico vs pacientes
     const ADMIN_EMAILS = ['audenti89@gmail.com'];
     const userEmail = user.email || '';
     const isAdmin = ADMIN_EMAILS.includes(userEmail) || isStaffOrOwner;
 
-    // REGLA CLAVE: Si NO es la doctora/administrador y está intentando ver el dashboard administrativo:
+    // Si NO es personal clínico (es paciente) y está intentando entrar al dashboard o admin:
     if (!isAdmin) {
       if (isDashboardRoute || isAdminRoute || isPatientsRoute) {
         redirectUrl.pathname = '/portal';
@@ -97,7 +110,27 @@ export async function updateSession(request: NextRequest) {
     }
 
     if (isAdmin) {
-      // Dueña / Doctora / Administrador tiene acceso total directo al dashboard
+      // ─────────────────────────────────────────────────────────────
+      // REGLA 2027: RESTRICCIÓN GRANULAR DE ODONTÓLOGOS (Socio vs Trabajador)
+      // ─────────────────────────────────────────────────────────────
+      const isTrabajador =
+        !isSuperAdmin &&
+        (userRole === 'trabajador' || doctorType === 'trabajador');
+
+      const isFinancialOrAdminRestricted =
+        redirectUrl.pathname.startsWith('/admin') ||
+        redirectUrl.pathname.startsWith('/dashboard/finanzas') ||
+        redirectUrl.pathname.startsWith('/dashboard/reportes') ||
+        redirectUrl.pathname.startsWith('/dashboard/configuracion');
+
+      if (isTrabajador && isFinancialOrAdminRestricted) {
+        // Redirigir al trabajador a su agenda clínica permitida
+        redirectUrl.pathname = '/dashboard/calendar';
+        redirectUrl.searchParams.set('restricted', 'financial_views_locked');
+        return NextResponse.redirect(redirectUrl);
+      }
+
+      // Si está en auth o onboarding, enviar al dashboard
       if (isAuthRoute || isOnboardingRoute) {
         redirectUrl.pathname = '/dashboard';
         return NextResponse.redirect(redirectUrl);

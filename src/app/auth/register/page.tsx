@@ -559,6 +559,16 @@ function RegisterForm() {
             </div>
           </div>
         )}
+        {/* Separación de Registro: Nota Institucional para Odontólogos */}
+        <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-left">
+          <div className="flex items-center gap-2 text-slate-800 font-bold text-xs mb-1">
+            <Lock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+            <span>¿Eres Odontólogo o Colega Especialista?</span>
+          </div>
+          <p className="text-[11px] text-slate-500 leading-relaxed">
+            El acceso para especialistas médicos (Socios o Colaboradores) es estrictamente mediante invitación privada generada por la dirección de la Dra. Aura Estudillo. Si cuentas con un enlace de invitación institucional, ábrelo directamente en tu navegador para activar tus credenciales.
+          </p>
+        </div>
       </div>
 
       <div className="px-6 pb-5 flex items-center justify-between text-xs text-slate-400 border-t border-slate-100 pt-3">

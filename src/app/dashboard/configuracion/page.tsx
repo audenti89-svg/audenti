@@ -13,14 +13,17 @@ import {
   Cpu,
   Lock,
   ShieldAlert,
-  Key
+  Key,
+  UserPlus
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { StaffDepartment, resolveAutomaticRolePermissions } from '@/lib/auth/roleProvisioning'
+import { InviteDoctorModal } from '@/components/admin/InviteDoctorModal'
 
 export default function ConfiguracionPage() {
   const supabase = createClient()
   const [saved, setSaved] = useState(false)
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
   const [clinicName, setClinicName] = useState('DentalCloud Pro — Dirección General Dra. Aura Estudillo')
   const [licenseKey, setLicenseKey] = useState('DCL-PRO-2026-AE01')
   const [autoInactivation, setAutoInactivation] = useState(true)
@@ -91,14 +94,25 @@ export default function ConfiguracionPage() {
           </p>
         </div>
 
-        <button
-          onClick={handleSave}
-          type="button"
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors shadow-xs"
-        >
-          <Save className="w-4 h-4 text-amber-400" />
-          {saved ? '¡Configuración Guardada!' : 'Guardar Cambios'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsInviteModalOpen(true)}
+            type="button"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-400 text-slate-950 text-xs font-bold hover:bg-amber-300 transition-colors shadow-xs cursor-pointer"
+          >
+            <UserPlus className="w-4 h-4" />
+            Invitar Odontólogo
+          </button>
+
+          <button
+            onClick={handleSave}
+            type="button"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors shadow-xs cursor-pointer"
+          >
+            <Save className="w-4 h-4 text-amber-400" />
+            {saved ? '¡Configuración Guardada!' : 'Guardar Cambios'}
+          </button>
+        </div>
       </div>
 
       <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -335,6 +349,11 @@ export default function ConfiguracionPage() {
           )}
         </div>
       </form>
+
+      <InviteDoctorModal
+        isOpen={isInviteModalOpen}
+        onClose={() => setIsInviteModalOpen(false)}
+      />
     </div>
   )
 }

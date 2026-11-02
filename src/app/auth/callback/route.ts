@@ -84,7 +84,48 @@ export async function GET(request: Request) {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (user) {
-        // Preparar objeto de atribución
+        // ── Si viene token de invitación médica a odontólogo (Socio vs Trabajador) ──
+        if (attr.invite_token) {
+          try {
+            const { data: inv } = await supabase
+              .from('doctor_invitations')
+              .select('*')
+              .eq('token', attr.invite_token)
+              .eq('status', 'pending')
+              .gt('expires_at', new Date().toISOString())
+              .maybeSingle();
+
+            if (inv) {
+              const docRole = inv.role === 'socio' ? 'socio' : 'trabajador';
+              const docName = user.user_metadata?.full_name || user.user_metadata?.name || inv.full_name || 'Odontólogo Especialista';
+
+              await supabase.from('doctor_invitations').update({
+                status: 'accepted',
+                accepted_by: user.id,
+                accepted_at: new Date().toISOString()
+              }).eq('id', inv.id);
+
+              await supabase.from('users').upsert({
+                id: user.id,
+                email: user.email,
+                full_name: docName,
+                role: docRole,
+                doctor_type: docRole,
+                branch_id: inv.branch_id,
+                branch_name: inv.branch_name,
+                invited_by: inv.created_by,
+                onboarding_completed: true,
+                is_active: true
+              }, { onConflict: 'id' });
+
+              return NextResponse.redirect(`${origin}/dashboard`);
+            }
+          } catch (invErr) {
+            console.warn('[auth/callback] Error procesando invitación de odontólogo:', invErr);
+          }
+        }
+
+        // Preparar objeto de atribución para pacientes
         const rawChannel = attr.channel || attr.canal || attr.utm_source || '';
         const channel = normalizeChannel(rawChannel);
         const updatePayload: Record<string, unknown> = {

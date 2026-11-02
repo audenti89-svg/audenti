@@ -94,7 +94,9 @@ function NavGroup({ title, items, unconfirmedCount }: { title: string; items: Na
 }
 
 import { AudentiLogo } from '@/components/ui/AudentiLogo'
-import { X } from 'lucide-react'
+import { X, UserPlus } from 'lucide-react'
+import { createClient } from '@/utils/supabase/client'
+import { InviteDoctorModal } from '@/components/admin/InviteDoctorModal'
 
 export interface SidebarProps {
   isOpen?: boolean
@@ -103,8 +105,43 @@ export interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [unconfirmedCount, setUnconfirmedCount] = useState(0)
+  const [currentUser, setCurrentUser] = useState<any>(null)
+  const [userRole, setUserRole] = useState<string>('')
+  const [doctorType, setDoctorType] = useState<string>('')
+  const [userName, setUserName] = useState<string>('Dra. Aura Estudillo')
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
+
+  const supabase = createClient()
 
   useEffect(() => {
+    async function loadUserProfile() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          setCurrentUser(user)
+          const isSuper = user.email === 'audenti89@gmail.com'
+
+          const { data: profile } = await supabase
+            .from('users')
+            .select('role, doctor_type, full_name')
+            .eq('id', user.id)
+            .maybeSingle()
+
+          const role = profile?.role || (isSuper ? 'superadmin' : 'doctor')
+          setUserRole(role)
+          setDoctorType(profile?.doctor_type || (role === 'socio' ? 'socio' : 'trabajador'))
+
+          if (profile?.full_name) {
+            setUserName(profile.full_name)
+          } else if (isSuper) {
+            setUserName('Dra. Aura Estudillo')
+          }
+        }
+      } catch {}
+    }
+
+    loadUserProfile()
+
     try {
       const saved = localStorage.getItem('audenti_frozen_omnipresent_toasts')
       if (saved) {
@@ -123,6 +160,26 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       window.removeEventListener('audenti_unconfirmed_notifications_change', handleUnconfirmedChange)
     }
   }, [])
+
+  const isSuperAdmin = currentUser?.email === 'audenti89@gmail.com'
+  const isTrabajador = !isSuperAdmin && (userRole === 'trabajador' || doctorType === 'trabajador')
+  const isSocio = !isTrabajador && (userRole === 'socio' || doctorType === 'socio')
+  const canInvite = isSuperAdmin || isSocio || userRole === 'owner' || userRole === 'director' || userRole === 'superadmin'
+
+  const initials = userName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((n) => n[0].toUpperCase())
+    .join('') || 'DR'
+
+  const roleBadgeLabel = isSuperAdmin
+    ? 'Dirección General & Clínica'
+    : isSocio
+    ? 'Odontólogo Socio'
+    : isTrabajador
+    ? 'Odontólogo Colaborador'
+    : 'Equipo Médico'
 
   return (
     <>
@@ -154,31 +211,61 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           )}
         </div>
 
+        {/* Botón de Invitar Odontólogo (Solo Dra. Aura o Socios) */}
+        {canInvite && (
+          <div className="px-4 pt-4">
+            <button
+              onClick={() => setIsInviteModalOpen(true)}
+              className="w-full py-2.5 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-95 cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4 shrink-0" />
+              <span>Invitar a Odontólogo</span>
+            </button>
+          </div>
+        )}
+
         {/* Navigation */}
         <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
-          <NavGroup title="Gestión Clínica"     items={clinicalNav} unconfirmedCount={unconfirmedCount} />
-          <NavGroup title="Operación & Negocio" items={businessNav} unconfirmedCount={unconfirmedCount} />
-          <NavGroup title="Sistema"             items={systemNav}   unconfirmedCount={unconfirmedCount} />
+          <NavGroup title="Gestión Clínica" items={clinicalNav} unconfirmedCount={unconfirmedCount} />
+
+          {/* REGLA 2027: Ocultar Operación & Negocio para Odontólogos Trabajadores */}
+          {!isTrabajador && (
+            <NavGroup title="Operación & Negocio" items={businessNav} unconfirmedCount={unconfirmedCount} />
+          )}
+
+          {!isTrabajador && (
+            <NavGroup title="Sistema" items={systemNav} unconfirmedCount={unconfirmedCount} />
+          )}
         </div>
 
         {/* User Footer */}
         <Link
           href="/dashboard/perfil"
           className="p-4 border-t border-white/10 bg-black/20 hover:bg-white/5 transition flex items-center justify-between cursor-pointer"
-          title="Editar Perfil de la Doctora"
+          title="Editar Perfil"
         >
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
-              AE
+            <div className={`w-9 h-9 rounded-full flex items-center justify-center font-black text-xs shrink-0 shadow-xs ${
+              isSocio ? 'bg-amber-400 text-slate-950' : isTrabajador ? 'bg-blue-500 text-white' : 'bg-amber-400 text-slate-950'
+            }`}>
+              {initials}
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="text-xs font-bold text-white truncate">Dra. Aura Estudillo</span>
-              <span className="text-[10px] text-amber-300 truncate">Dirección General &amp; Clínica</span>
+              <span className="text-xs font-bold text-white truncate">{userName}</span>
+              <span className={`text-[10px] truncate ${isSocio ? 'text-amber-300' : isTrabajador ? 'text-blue-300' : 'text-amber-300'}`}>
+                {roleBadgeLabel}
+              </span>
             </div>
           </div>
           <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
         </Link>
       </aside>
+
+      {/* Modal de Invitación a Odontólogos */}
+      <InviteDoctorModal
+        isOpen={isInviteModalOpen}
+        onClose={() => setIsInviteModalOpen(false)}
+      />
     </>
   )
 }
