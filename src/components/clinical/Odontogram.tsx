@@ -487,6 +487,78 @@ export function Odontogram() {
     setLinkedTreatments(prev => prev.filter(t => t.id !== id))
   }
 
+  // Sincronización desde la Ventana Cristal 3D
+  const handleUpdateToothSurfacesFrom3D = (
+    toothNum: number,
+    surfaces: Partial<ToothSurfaces>,
+    wholeCondition?: ToothWholeCondition | string
+  ) => {
+    setTeeth(prev => {
+      const current = prev[toothNum] || {
+        number: toothNum,
+        wholeCondition: 'sano',
+        surfaces: { vestibular: 'sano', lingual: 'sano', mesial: 'sano', distal: 'sano', oclusal: 'sano' },
+        notes: ''
+      }
+      return {
+        ...prev,
+        [toothNum]: {
+          ...current,
+          surfaces: { ...current.surfaces, ...surfaces },
+          wholeCondition: (wholeCondition as ToothWholeCondition) || current.wholeCondition
+        }
+      }
+    })
+  }
+
+  const handleAddTreatmentFrom3D = (treatment: {
+    toothNumber: number
+    specialty: string
+    procedure: string
+    surfaces: string[]
+    notes: string
+    estimatedCost: number
+    condition?: any
+  }) => {
+    const newTreatment: LinkedTreatment = {
+      id: `treat-${Date.now()}-${Math.random()}`,
+      toothNumber: treatment.toothNumber,
+      specialty: (treatment.specialty as any) || 'operatoria',
+      procedure: treatment.procedure,
+      surfaces: treatment.surfaces.join(', '),
+      notes: treatment.notes,
+      estimatedCost: treatment.estimatedCost
+    }
+    setLinkedTreatments(prev => [...prev, newTreatment])
+
+    const nowStr = new Intl.DateTimeFormat('es-MX', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit'
+    }).format(new Date())
+
+    const newEvo: ClinicalEvolutionEntry = {
+      id: `evo-${Date.now()}`,
+      toothNumber: treatment.toothNumber,
+      date: nowStr,
+      doctor: 'Dra. Aura Estudillo',
+      procedure: treatment.procedure,
+      surfaces: treatment.surfaces.join(', '),
+      status: 'En Proceso',
+      notes: treatment.notes || `Procedimiento registrado desde visor 3D para pieza #${treatment.toothNumber}`
+    }
+    setEvolutionHistory(prev => [newEvo, ...prev])
+
+    if (treatment.condition && treatment.condition !== 'sano') {
+      setTeeth(prev => ({
+        ...prev,
+        [treatment.toothNumber]: {
+          ...prev[treatment.toothNumber],
+          wholeCondition: treatment.condition as any
+        }
+      }))
+    }
+  }
+
   // Guardar Odontograma de forma persistente
   const handleSaveOdontogram = () => {
     try {
@@ -625,6 +697,8 @@ export function Odontogram() {
             selectedToothNum={selectedToothNum}
             onSelectTooth={setSelectedToothNum}
             teethState={teeth}
+            onUpdateToothSurfaces={handleUpdateToothSurfacesFrom3D}
+            onAddTreatment={handleAddTreatmentFrom3D}
           />
         </div>
       ) : (
