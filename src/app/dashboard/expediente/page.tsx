@@ -375,7 +375,7 @@ export default function ExpedientePage() {
           ? ['Penicilina']
           : ['Sin alergias medicamentosas conocidas reportadas (Revalidar antes de prescribir)']
 
-        const hasRealAllergies = finalAllergies.some(a => !a.toLowerCase().includes('sin alergias'))
+        const hasRealAllergies = finalAllergies.some(a => !a.toLowerCase().includes('sin alergias') && !a.toLowerCase().includes('niega') && !a.toLowerCase().includes('nkda'))
 
         return (
           <div className={`border-2 rounded-2xl p-4 sm:p-5 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all ${
@@ -421,16 +421,16 @@ export default function ExpedientePage() {
                   ))}
                 </div>
 
-                {selectedPatient.medical_conditions && (
-                  <p className="text-xs font-bold text-rose-950 mt-1.5 flex items-center gap-1.5">
-                    <span className="font-extrabold uppercase text-slate-700">Condiciones Sistémicas:</span>
-                    <span>
-                      {Array.isArray(selectedPatient.medical_conditions)
-                        ? selectedPatient.medical_conditions.join(', ')
-                        : selectedPatient.medical_conditions}
-                    </span>
-                  </p>
-                )}
+                <p className="text-xs font-bold text-slate-800 mt-1.5 flex items-center gap-1.5 flex-wrap">
+                  <span className="font-extrabold uppercase text-slate-700">Condiciones Sistémicas:</span>
+                  <span className="text-slate-600">
+                    {Array.isArray(selectedPatient.medical_conditions) && selectedPatient.medical_conditions.length > 0
+                      ? selectedPatient.medical_conditions.join(', ')
+                      : (typeof selectedPatient.medical_conditions === 'string' && selectedPatient.medical_conditions.trim()
+                          ? selectedPatient.medical_conditions
+                          : 'Sin antecedentes patológicos crónicos de importancia')}
+                  </span>
+                </p>
               </div>
             </div>
 

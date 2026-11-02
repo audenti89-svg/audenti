@@ -507,7 +507,7 @@ export default function PacientesPage() {
                                       : 'bg-slate-100 text-slate-700 border-slate-200'
                                   }`}
                                 >
-                                  {p.onboarding_completed ? '✓ Sin Alergias Reportadas' : 'Onboarding Pendiente'}
+                                  {p.onboarding_completed ? '✓ Niega Alergias Medicamentosas (NKDA)' : 'Onboarding Pendiente'}
                                 </span>
                               )
                             })()}

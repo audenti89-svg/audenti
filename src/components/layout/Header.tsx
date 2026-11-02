@@ -18,11 +18,13 @@ import {
   Clock,
   X,
   ArrowRight,
-  ShieldAlert
+  ShieldAlert,
+  GraduationCap
 } from 'lucide-react'
 import { useBranchStore, BranchId, BRANCHES_DATA } from '@/stores/branchStore'
 import { useNotificationSound } from '@/hooks/useNotificationSound'
 import { FastTrackEmergencyModal } from '@/components/FastTrackEmergencyModal'
+import { QuickStudentPassModal } from '@/components/admin/QuickStudentPassModal'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
 
@@ -45,6 +47,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
   const { playTone } = useNotificationSound()
   const [showNotifications, setShowNotifications] = useState(false)
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false)
+  const [isStudentModalOpen, setIsStudentModalOpen] = useState(false)
   const [hasActiveEmergency, setHasActiveEmergency] = useState(false)
   const [activeEmergencyFolio, setActiveEmergencyFolio] = useState<string | null>(null)
   const [emergencyCount, setEmergencyCount] = useState(0)
@@ -308,6 +311,17 @@ export function Header({ onMenuToggle }: HeaderProps) {
           </select>
           <ChevronDown className="w-3 h-3 absolute right-1 pointer-events-none text-slate-400" />
         </div>
+
+                {/* Botón Pase Estudiante Express (Dra. Aura) */}
+        <button
+          type="button"
+          onClick={() => setIsStudentModalOpen(true)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-xs cursor-pointer whitespace-nowrap"
+          title="Generar Pase Temporal de Estudiante / Servicio Social (Dra. Aura Estudillo)"
+        >
+          <GraduationCap className="w-3.5 h-3.5 text-amber-300" />
+          <span className="hidden md:inline">Pase Estudiante</span>
+        </button>
 
         {/* Botón Triage Urgencias Inmediatas */}
         <button

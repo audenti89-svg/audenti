@@ -389,9 +389,9 @@ export function OmnipresentDoctorLiveAlerts() {
       }
     }
 
-    // Escuchar en el canal omnicanal
+    // Escuchar en canal exclusivo de alertas omnipresentes (evita colisiones con ChatInterface)
     const omniChannel = supabase
-      .channel('chat_omnichannel_sync')
+      .channel('doctor_live_alerts_omnipresent')
       .on('broadcast', { event: 'incoming_patient_message' }, ({ payload }) => handleIncomingMessage(payload))
       .on('broadcast', { event: 'voice_call_event' }, ({ payload }) => handleVoiceEvent(payload))
       .subscribe()

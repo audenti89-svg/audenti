@@ -46,6 +46,17 @@ export interface ToothSurfaces {
   oclusal: SurfaceCondition
 }
 
+export interface ClinicalEvolutionEntry {
+  id: string
+  toothNumber: number
+  date: string
+  doctor: string
+  procedure: string
+  surfaces: string
+  status: 'Diagnóstico' | 'En Proceso' | 'Finalizado' | 'En Observación'
+  notes: string
+}
+
 export interface LinkedTreatment {
   id: string
   toothNumber: number
@@ -357,6 +368,28 @@ export function Odontogram() {
   const [activeSpecialty, setActiveSpecialty] = useState<DentalSpecialty>('operatoria')
   const [activeSurfaceCondition, setActiveSurfaceCondition] = useState<SurfaceCondition>('caries')
   const [linkedTreatments, setLinkedTreatments] = useState<LinkedTreatment[]>([])
+  const [evolutionHistory, setEvolutionHistory] = useState<ClinicalEvolutionEntry[]>([
+    {
+      id: 'evo-1',
+      toothNumber: 16,
+      date: '2026-10-20 17:30',
+      doctor: 'Dra. Aura Estudillo',
+      procedure: 'Diagnóstico Clínico Inicial y Mapeo 5 Caras',
+      surfaces: 'Oclusal, Mesial',
+      status: 'Diagnóstico',
+      notes: 'Presencia de lesión cariosa oclusal profunda con compromiso hacia cresta mesial.'
+    },
+    {
+      id: 'evo-2',
+      toothNumber: 21,
+      date: '2026-10-22 18:15',
+      doctor: 'Dra. Aura Estudillo',
+      procedure: 'Resina Estética Fotocurable 1 Cara',
+      surfaces: 'Vestibular',
+      status: 'Finalizado',
+      notes: 'Restauración estética directa con aislamiento absoluto satisfactorio.'
+    }
+  ])
   const [savedSuccess, setSavedSuccess] = useState(false)
 
   // Cargar estado inicial persistido si existe
@@ -367,6 +400,7 @@ export function Odontogram() {
         const parsed = JSON.parse(stored)
         if (parsed.teeth) setTeeth(parsed.teeth)
         if (parsed.treatments) setLinkedTreatments(parsed.treatments)
+        if (parsed.evolution) setEvolutionHistory(parsed.evolution)
       }
     } catch {}
   }, [])
@@ -424,6 +458,23 @@ export function Odontogram() {
     }
 
     setLinkedTreatments(prev => [...prev, newTreatment])
+
+    const nowStr = new Intl.DateTimeFormat('es-MX', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit'
+    }).format(new Date())
+
+    const newEvo: ClinicalEvolutionEntry = {
+      id: `evo-${Date.now()}`,
+      toothNumber: selectedToothNum,
+      date: nowStr,
+      doctor: 'Dra. Aura Estudillo',
+      procedure: proc.name,
+      surfaces: affectedSurfaces || 'General',
+      status: 'En Proceso',
+      notes: selectedTooth.notes || `Procedimiento indicado para pieza #${selectedToothNum}`
+    }
+    setEvolutionHistory(prev => [newEvo, ...prev])
     if (proc.condition !== 'sano') {
       handleSetWholeCondition(proc.condition)
     }
@@ -695,9 +746,63 @@ export function Odontogram() {
             </p>
           </div>
 
-          {/* Selector de Especialidad Odontológica */}
+          
+        {/* DESGLOSE DETALLADO DE LAS 5 CARAS DE LA PIEZA SELECCIONADA */}
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Layers className="w-4 h-4 text-amber-500" />
+              <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                Desglose Anatómico de 5 Caras — Pieza #{selectedToothNum}
+              </h4>
+            </div>
+            <span className="text-[11px] text-slate-500 font-medium">
+              Haz clic en cualquier cara para aplicar la herramienta activa: <strong className="text-slate-900 font-bold capitalize">{SURFACE_COLORS[activeSurfaceCondition].label}</strong>
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+            {[
+              { key: 'vestibular' as const, label: 'Vestibular', sub: selectedToothNum >= 31 && selectedToothNum <= 48 ? 'Inferior (Labial)' : 'Superior (Labial)' },
+              { key: 'oclusal' as const, label: 'Oclusal / Incisal', sub: 'Masticatoria / Borde' },
+              { key: 'mesial' as const, label: 'Mesial', sub: 'Línea media' },
+              { key: 'distal' as const, label: 'Distal', sub: 'Hacia posterior' },
+              { key: 'lingual' as const, label: selectedToothNum >= 31 && selectedToothNum <= 48 ? 'Lingual' : 'Palatino', sub: selectedToothNum >= 31 && selectedToothNum <= 48 ? 'Hacia lengua' : 'Hacia paladar' },
+            ].map(face => {
+              const currentCond = selectedTooth.surfaces[face.key]
+              const condInfo = SURFACE_COLORS[currentCond]
+              return (
+                <div
+                  key={face.key}
+                  onClick={() => handleSurfaceClick(face.key)}
+                  className={cn(
+                    'p-3 rounded-xl border transition-all cursor-pointer flex flex-col justify-between hover:shadow-xs select-none',
+                    currentCond !== 'sano' ? 'bg-slate-50 border-slate-300 ring-1 ring-slate-400' : 'bg-white border-slate-200 hover:border-slate-300'
+                  )}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold text-slate-900">{face.label}</span>
+                    <span
+                      className="w-3.5 h-3.5 rounded-full border shadow-2xs shrink-0"
+                      style={{ backgroundColor: condInfo.fill, borderColor: condInfo.stroke }}
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-400 block mb-2">{face.sub}</span>
+                  <span className={cn(
+                    'text-[10px] font-black uppercase px-2 py-0.5 rounded-md inline-block text-center',
+                    currentCond === 'sano' ? 'bg-slate-100 text-slate-600' : 'bg-amber-100 text-amber-950 font-black'
+                  )}>
+                    {condInfo.label}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Selector de Especialidad Odontológica */}
           <div className="flex flex-wrap gap-1.5 p-1 bg-white rounded-2xl border border-slate-200 shadow-2xs">
-            {(['operatoria', 'endodoncia', 'ortodoncia', 'implantes', 'cirugia'] as DentalSpecialty[]).map(spec => (
+            {(['operatoria', 'endodoncia', 'periodoncia', 'implantes', 'ortodoncia', 'cirugia'] as DentalSpecialty[]).map(spec => (
               <button
                 key={spec}
                 type="button"

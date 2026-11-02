@@ -103,6 +103,11 @@ export function ChatInterface() {
   const [hasPendingAppointment, setHasPendingAppointment] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const selectedPatientIdRef = useRef<string>(selectedPatientId)
+
+  useEffect(() => {
+    selectedPatientIdRef.current = selectedPatientId
+  }, [selectedPatientId])
 
   // 1. Cargar pacientes directamente de Supabase (public.patients) y mensajes cruzados
   const loadOmnichannelHistory = async () => {
@@ -456,9 +461,106 @@ export function ChatInterface() {
     }
   }, [messages, selectedPatientId])
 
-  // 2. Suscripción a Realtime de mensajes entrantes y llamadas de voz
+  // 2. Suscripción a Realtime de mensajes entrantes y llamadas de voz (Separación de Canales)
   useEffect(() => {
-    const channel = supabase
+    // A. Canal dedicado exclusivamente a cambios de base de datos PostgreSQL (con ID único para evitar colisiones)
+    const dbChannelName = `chat_db_sync_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
+    const dbChannel = supabase
+      .channel(dbChannelName)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'chat_messages' },
+        (payload) => {
+          const r = payload.new as any
+          if (!r) return
+          const targetId = r.patient_id || r.metadata?.patientId || (r.metadata?.phone ? `prospect_${r.metadata.phone.replace(/\D/g, '')}` : 'prospect_general')
+          const nowTime = r.created_at ? new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date(r.created_at)) : 'Ahora'
+
+          const incomingMsg: ChatMessageItem = {
+            id: r.id,
+            senderName: r.sender_name || (r.sender_role === 'doctor' ? 'Dra. Aura Estudillo' : 'Paciente'),
+            senderRole: r.sender_role || 'patient',
+            channel_type: r.channel_type || 'web_chat',
+            content: r.content || '',
+            time: nowTime,
+            isOwn: r.sender_role === 'doctor',
+            metadata: r.metadata
+          }
+
+          setMessages(prev => {
+            const current = prev[targetId] || []
+            if (current.some(m => m.id === incomingMsg.id)) return prev
+            return {
+              ...prev,
+              [targetId]: [...current, incomingMsg]
+            }
+          })
+
+          setPatients(prev => {
+            const idx = prev.findIndex(p => p.id === targetId)
+            const isUrgent = /(?:dolor|duele|muela|urgente|emergencia|sangr|inflamad)/i.test(r.content || '')
+            if (idx >= 0) {
+              const updated = [...prev]
+              updated[idx] = {
+                ...updated[idx],
+                lastMessage: r.content || updated[idx].lastMessage,
+                lastTime: nowTime,
+                isUrgent: updated[idx].isUrgent || isUrgent,
+                channel_type: r.channel_type || updated[idx].channel_type
+              }
+              return updated
+            } else {
+              const newPat: PatientDirectoryItem = {
+                id: targetId,
+                name: r.sender_name || 'Nuevo Contacto',
+                phone: r.metadata?.phone || 'Sin teléfono',
+                folio: targetId.startsWith('prospect_') ? `PROS-${targetId.slice(-6).toUpperCase()}` : `EXP-${targetId.slice(0, 8).toUpperCase()}`,
+                isRegistered: !targetId.startsWith('prospect_'),
+                channel_type: r.channel_type || 'web_chat',
+                lastMessage: r.content || '',
+                lastTime: nowTime,
+                isUrgent
+              }
+              return [newPat, ...prev]
+            }
+          })
+
+          if (r.sender_role !== 'doctor') {
+            playTone('arrival')
+            if (selectedPatientIdRef.current !== targetId) {
+              setUnreadPatients(prev => new Set(prev).add(targetId))
+            }
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'patients' },
+        (payload) => {
+          const p = payload.new as any
+          if (!p) return
+          setPatients(prev => {
+            if (prev.some(x => x.id === p.id)) return prev
+            const newPat: PatientDirectoryItem = {
+              id: p.id,
+              name: p.full_name || 'Paciente Registrado',
+              phone: p.phone || 'Sin teléfono',
+              folio: `EXP-${p.id.slice(0, 8).toUpperCase()}`,
+              isRegistered: true,
+              channel_type: 'web_chat',
+              lastMessage: 'Paciente registrado • Listo para chatear',
+              lastTime: 'Reciente',
+              isUrgent: false,
+              emergencyContact: p.emergency_contact_name ? `${p.emergency_contact_name} (${p.emergency_contact_phone || ''})` : undefined
+            }
+            return [newPat, ...prev]
+          })
+        }
+      )
+      .subscribe()
+
+    // B. Canal dedicado para eventos broadcast (mensajes en vivo y llamadas de voz)
+    const broadcastChannel = supabase
       .channel('chat_omnichannel_sync')
       .on('broadcast', { event: 'incoming_patient_message' }, ({ payload }) => {
         if (!payload) return
@@ -516,7 +618,7 @@ export function ChatInterface() {
           }
         })
 
-        if (selectedPatientId !== targetId) {
+        if (selectedPatientIdRef.current !== targetId) {
           setUnreadPatients(prev => new Set(prev).add(targetId))
         }
       })
@@ -586,102 +688,13 @@ export function ChatInterface() {
           })
         }
       })
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'chat_messages' },
-        (payload) => {
-          const r = payload.new as any
-          if (!r) return
-          const targetId = r.patient_id || r.metadata?.patientId || (r.metadata?.phone ? `prospect_${r.metadata.phone.replace(/\D/g, '')}` : 'prospect_general')
-          const nowTime = r.created_at ? new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date(r.created_at)) : 'Ahora'
-
-          const incomingMsg: ChatMessageItem = {
-            id: r.id,
-            senderName: r.sender_name || (r.sender_role === 'doctor' ? 'Dra. Aura Estudillo' : 'Paciente'),
-            senderRole: r.sender_role || 'patient',
-            channel_type: r.channel_type || 'web_chat',
-            content: r.content || '',
-            time: nowTime,
-            isOwn: r.sender_role === 'doctor',
-            metadata: r.metadata
-          }
-
-          setMessages(prev => {
-            const current = prev[targetId] || []
-            if (current.some(m => m.id === incomingMsg.id)) return prev
-            return {
-              ...prev,
-              [targetId]: [...current, incomingMsg]
-            }
-          })
-
-          setPatients(prev => {
-            const idx = prev.findIndex(p => p.id === targetId)
-            const isUrgent = /(?:dolor|duele|muela|urgente|emergencia|sangr|inflamad)/i.test(r.content || '')
-            if (idx >= 0) {
-              const updated = [...prev]
-              updated[idx] = {
-                ...updated[idx],
-                lastMessage: r.content || updated[idx].lastMessage,
-                lastTime: nowTime,
-                isUrgent: updated[idx].isUrgent || isUrgent,
-                channel_type: r.channel_type || updated[idx].channel_type
-              }
-              return updated
-            } else {
-              const newPat: PatientDirectoryItem = {
-                id: targetId,
-                name: r.sender_name || 'Nuevo Contacto',
-                phone: r.metadata?.phone || 'Sin teléfono',
-                folio: targetId.startsWith('prospect_') ? `PROS-${targetId.slice(-6).toUpperCase()}` : `EXP-${targetId.slice(0, 8).toUpperCase()}`,
-                isRegistered: !targetId.startsWith('prospect_'),
-                channel_type: r.channel_type || 'web_chat',
-                lastMessage: r.content || '',
-                lastTime: nowTime,
-                isUrgent
-              }
-              return [newPat, ...prev]
-            }
-          })
-
-          if (r.sender_role !== 'doctor') {
-            playTone('arrival')
-            if (selectedPatientId !== targetId) {
-              setUnreadPatients(prev => new Set(prev).add(targetId))
-            }
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'patients' },
-        (payload) => {
-          const p = payload.new as any
-          if (!p) return
-          setPatients(prev => {
-            if (prev.some(x => x.id === p.id)) return prev
-            const newPat: PatientDirectoryItem = {
-              id: p.id,
-              name: p.full_name || 'Paciente Registrado',
-              phone: p.phone || 'Sin teléfono',
-              folio: `EXP-${p.id.slice(0, 8).toUpperCase()}`,
-              isRegistered: true,
-              channel_type: 'web_chat',
-              lastMessage: 'Paciente registrado • Listo para chatear',
-              lastTime: 'Reciente',
-              isUrgent: false,
-              emergencyContact: p.emergency_contact_name ? `${p.emergency_contact_name} (${p.emergency_contact_phone || ''})` : undefined
-            }
-            return [newPat, ...prev]
-          })
-        }
-      )
       .subscribe()
 
     return () => {
-      supabase.removeChannel(channel)
+      supabase.removeChannel(dbChannel)
+      supabase.removeChannel(broadcastChannel)
     }
-  }, [selectedPatientId, playTone, supabase])
+  }, [playTone, supabase])
 
   // 3. Envío de mensaje desde el panel (Respuesta médica al paciente o Nota Privada)
   const handleSendMessage = async (e?: React.FormEvent) => {
