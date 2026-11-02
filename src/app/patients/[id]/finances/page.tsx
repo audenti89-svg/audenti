@@ -15,9 +15,8 @@ interface FinancialRecord {
   created_at: string
 }
 
-export default function PatientFinancesPage({ params }: { params: Promise<{ id: string }> | { id: string } }) {
-  // Manejo compatible de params en Next.js App Router (síncrono o Promise vía React.use)
-  const resolvedParams = typeof (params as any)?.then === 'function' ? use(params as Promise<{ id: string }>) : (params as { id: string })
+export default function PatientFinancesPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params)
   const patientId = resolvedParams.id
 
   const [records, setRecords] = useState<FinancialRecord[]>([])
