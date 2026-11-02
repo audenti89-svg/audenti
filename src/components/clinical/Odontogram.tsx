@@ -363,7 +363,19 @@ function AnatomicalToothSVG({
   )
 }
 
-export function Odontogram() {
+export interface OdontogramProps {
+  patientId?: string
+  patientName?: string
+  doctorRole?: string
+  branch?: string
+}
+
+export function Odontogram({
+  patientId,
+  patientName = 'Paciente General',
+  doctorRole = 'socio',
+  branch = 'Sucursal Balbuena (Matriz)'
+}: OdontogramProps = {}) {
   const [teeth, setTeeth] = useState<Record<number, ToothState>>(initTeethRecord)
   const [selectedToothNum, setSelectedToothNum] = useState<number>(16)
   const [dentition, setDentition] = useState<'adult' | 'pediatric'>('adult')
@@ -407,6 +419,28 @@ export function Odontogram() {
       }
     } catch {}
   }, [])
+
+  // Cargar odontograma específico del paciente desde Supabase si se proporciona patientId
+  useEffect(() => {
+    if (!patientId) return
+    const fetchPatientOdontogram = async () => {
+      try {
+        const res = await fetch(`/api/clinical/odontogram?patientId=${patientId}`)
+        if (res.ok) {
+          const json = await res.json()
+          if (json.data?.teeth) {
+            setTeeth(json.data.teeth)
+          }
+          if (json.data?.evolution && json.data.evolution.length > 0) {
+            setEvolutionHistory(json.data.evolution)
+          }
+        }
+      } catch (err) {
+        console.warn('Error fetching patient odontogram from Supabase:', err)
+      }
+    }
+    fetchPatientOdontogram()
+  }, [patientId])
 
   const selectedTooth = teeth[selectedToothNum] || teeth[16]
 
@@ -559,14 +593,37 @@ export function Odontogram() {
     }
   }
 
-  // Guardar Odontograma de forma persistente
-  const handleSaveOdontogram = () => {
+  // Guardar Odontograma de forma persistente (LocalStorage + Supabase)
+  const handleSaveOdontogram = async () => {
     try {
       localStorage.setItem('audenti_odontogram_data', JSON.stringify({
         teeth,
         treatments: linkedTreatments,
+        evolution: evolutionHistory,
         updatedAt: new Date().toISOString()
       }))
+
+      if (patientId) {
+        await fetch('/api/clinical/odontogram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientId,
+            patientName,
+            toothFdi: selectedToothNum,
+            surfaces: selectedTooth.surfaces,
+            condition: selectedTooth.wholeCondition,
+            procedure: 'Consolidación de Odontograma General',
+            specialty: activeSpecialty,
+            notes: selectedTooth.notes || 'Actualización y guardado general de ficha clínica',
+            estimatedCost: totalBudget,
+            doctorRole,
+            branch,
+            fullTeethState: teeth
+          })
+        })
+      }
+
       setSavedSuccess(true)
       setTimeout(() => setSavedSuccess(false), 2500)
     } catch {}
@@ -697,6 +754,10 @@ export function Odontogram() {
             selectedToothNum={selectedToothNum}
             onSelectTooth={setSelectedToothNum}
             teethState={teeth}
+            patientId={patientId}
+            patientName={patientName}
+            doctorRole={doctorRole}
+            branch={branch}
             onUpdateToothSurfaces={handleUpdateToothSurfacesFrom3D}
             onAddTreatment={handleAddTreatmentFrom3D}
           />

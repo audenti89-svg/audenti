@@ -655,7 +655,12 @@ export default function ExpedientePage() {
 
           {/* Columna Derecha: Odontograma Vectorial Interactivo */}
           <div className="lg:col-span-2">
-            <Odontogram />
+            <Odontogram
+              patientId={selectedPatient?.id}
+              patientName={selectedPatient?.full_name || selectedPatient?.name}
+              doctorRole="socio"
+              branch="Sucursal Balbuena (Matriz)"
+            />
           </div>
         </div>
       )}
