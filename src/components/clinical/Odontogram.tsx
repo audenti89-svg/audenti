@@ -379,7 +379,7 @@ export function Odontogram({
   const [teeth, setTeeth] = useState<Record<number, ToothState>>(initTeethRecord)
   const [selectedToothNum, setSelectedToothNum] = useState<number>(16)
   const [dentition, setDentition] = useState<'adult' | 'pediatric'>('adult')
-  const [viewMode, setViewMode] = useState<'2d' | '3d'>('2d')
+  const [viewMode, setViewMode] = useState<'2d' | '3d'>('3d')
   const [activeSpecialty, setActiveSpecialty] = useState<DentalSpecialty>('operatoria')
   const [activeSurfaceCondition, setActiveSurfaceCondition] = useState<SurfaceCondition>('caries')
   const [linkedTreatments, setLinkedTreatments] = useState<LinkedTreatment[]>([])
@@ -657,25 +657,27 @@ export function Odontogram({
           <div className="flex p-1 bg-slate-200/80 rounded-xl">
             <button
               type="button"
-              onClick={() => setViewMode('2d')}
+              onClick={() => setViewMode('3d')}
               className={cn(
-                'px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer',
-                viewMode === '2d' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                'px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5',
+                viewMode === '3d'
+                  ? 'bg-slate-950 text-amber-400 shadow-md font-black ring-2 ring-amber-400/50'
+                  : 'text-slate-600 hover:text-slate-900'
               )}
+              title="Arcada Dental 3D OrganUI BodyParts3D con Detección Interproximal"
             >
-              Diagrama 2D
+              <Box className="w-4 h-4 text-amber-400" />
+              <span>Visor 3D OrganUI</span>
             </button>
             <button
               type="button"
-              onClick={() => setViewMode('3d')}
+              onClick={() => setViewMode('2d')}
               className={cn(
-                'px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5',
-                viewMode === '3d' ? 'bg-slate-950 text-amber-400 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                'px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer',
+                viewMode === '2d' ? 'bg-white text-slate-900 shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900'
               )}
-              title="Explorador 3D de Arcada Dental GLTF/GLB"
             >
-              <Box className="w-3.5 h-3.5 text-amber-400" />
-              <span>Modelo 3D (GLB)</span>
+              Diagrama 2D
             </button>
           </div>
 
@@ -713,39 +715,41 @@ export function Odontogram({
         </div>
       </div>
 
-      {/* Paleta de Caras y Condiciones */}
-      <div className="px-6 py-3 bg-slate-50 border-y border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 mr-1">
-            Herramienta activa:
-          </span>
-          {(['caries', 'resina', 'amalgama', 'sellador', 'fractura', 'incrustacion'] as SurfaceCondition[]).map(cond => {
-            const cInfo = SURFACE_COLORS[cond]
-            return (
-              <button
-                key={cond}
-                type="button"
-                onClick={() => setActiveSurfaceCondition(cond)}
-                className={cn(
-                  'px-3 py-1 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs',
-                  activeSurfaceCondition === cond
-                    ? 'ring-2 ring-slate-900 ring-offset-1 scale-105 font-black text-slate-900 bg-white'
-                    : 'bg-white/80 text-slate-700 hover:bg-white'
-                )}
-              >
-                <span className="w-3 h-3 rounded-md border" style={{ backgroundColor: cInfo.fill, borderColor: cInfo.stroke }} />
-                <span>{cInfo.label}</span>
-              </button>
-            )
-          })}
-        </div>
+      {/* Paleta de Caras y Condiciones (Solo visible en Modo 2D) */}
+      {viewMode === '2d' && (
+        <div className="px-6 py-3 bg-slate-50 border-y border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 mr-1">
+              Herramienta activa:
+            </span>
+            {(['caries', 'resina', 'amalgama', 'sellador', 'fractura', 'incrustacion'] as SurfaceCondition[]).map(cond => {
+              const cInfo = SURFACE_COLORS[cond]
+              return (
+                <button
+                  key={cond}
+                  type="button"
+                  onClick={() => setActiveSurfaceCondition(cond)}
+                  className={cn(
+                    'px-3 py-1 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs',
+                    activeSurfaceCondition === cond
+                      ? 'ring-2 ring-slate-900 ring-offset-1 scale-105 font-black text-slate-900 bg-white'
+                      : 'bg-white/80 text-slate-700 hover:bg-white'
+                  )}
+                >
+                  <span className="w-3 h-3 rounded-md border" style={{ backgroundColor: cInfo.fill, borderColor: cInfo.stroke }} />
+                  <span>{cInfo.label}</span>
+                </button>
+              )
+            })}
+          </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-slate-600">
-            Pieza Seleccionada: <strong className="text-amber-700 font-black text-sm">#{selectedToothNum}</strong>
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-600">
+              Pieza Seleccionada: <strong className="text-amber-700 font-black text-sm">#{selectedToothNum}</strong>
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Visualizador 3D Dental o Diagrama 2D */}
       {viewMode === '3d' ? (
@@ -922,7 +926,26 @@ export function Odontogram({
             </p>
           </div>
 
-          
+          {/* Selector de Especialidad Odontológica */}
+          <div className="flex flex-wrap gap-1.5 p-1 bg-white rounded-2xl border border-slate-200 shadow-2xs">
+            {(['operatoria', 'endodoncia', 'periodoncia', 'implantes', 'ortodoncia', 'cirugia'] as DentalSpecialty[]).map(spec => (
+              <button
+                key={spec}
+                type="button"
+                onClick={() => setActiveSpecialty(spec)}
+                className={cn(
+                  'px-3 py-1.5 rounded-xl text-xs font-bold transition-all capitalize cursor-pointer',
+                  activeSpecialty === spec
+                    ? 'bg-amber-400 text-slate-950 font-black shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                )}
+              >
+                {spec}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* DESGLOSE DETALLADO DE LAS 5 CARAS DE LA PIEZA SELECCIONADA */}
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -973,26 +996,6 @@ export function Odontogram({
                 </div>
               )
             })}
-          </div>
-        </div>
-
-        {/* Selector de Especialidad Odontológica */}
-          <div className="flex flex-wrap gap-1.5 p-1 bg-white rounded-2xl border border-slate-200 shadow-2xs">
-            {(['operatoria', 'endodoncia', 'periodoncia', 'implantes', 'ortodoncia', 'cirugia'] as DentalSpecialty[]).map(spec => (
-              <button
-                key={spec}
-                type="button"
-                onClick={() => setActiveSpecialty(spec)}
-                className={cn(
-                  'px-3 py-1.5 rounded-xl text-xs font-bold transition-all capitalize cursor-pointer',
-                  activeSpecialty === spec
-                    ? 'bg-amber-400 text-slate-950 font-black shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                )}
-              >
-                {spec}
-              </button>
-            ))}
           </div>
         </div>
 
