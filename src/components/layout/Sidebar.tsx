@@ -94,9 +94,10 @@ function NavGroup({ title, items, unconfirmedCount }: { title: string; items: Na
 }
 
 import { AudentiLogo } from '@/components/ui/AudentiLogo'
-import { X, UserPlus } from 'lucide-react'
+import { X, UserPlus, GraduationCap } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { InviteDoctorModal } from '@/components/admin/InviteDoctorModal'
+import { QuickStudentPassModal } from '@/components/admin/QuickStudentPassModal'
 
 export interface SidebarProps {
   isOpen?: boolean
@@ -110,6 +111,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [doctorType, setDoctorType] = useState<string>('')
   const [userName, setUserName] = useState<string>('Dra. Aura Estudillo')
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
+  const [isStudentModalOpen, setIsStudentModalOpen] = useState(false)
 
   const supabase = createClient()
 
@@ -162,8 +164,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   }, [])
 
   const isSuperAdmin = currentUser?.email === 'audenti89@gmail.com'
-  const isTrabajador = !isSuperAdmin && (userRole === 'trabajador' || doctorType === 'trabajador')
-  const isSocio = !isTrabajador && (userRole === 'socio' || doctorType === 'socio')
+  const isEstudiante = doctorType === 'estudiante'
+  const isTrabajador = !isSuperAdmin && !isEstudiante && (userRole === 'trabajador' || doctorType === 'trabajador')
+  const isSocio = !isTrabajador && !isEstudiante && (userRole === 'socio' || doctorType === 'socio')
   const canInvite = isSuperAdmin || isSocio || userRole === 'owner' || userRole === 'director' || userRole === 'superadmin'
 
   const initials = userName
@@ -179,6 +182,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     ? 'Odontólogo Socio'
     : isTrabajador
     ? 'Odontólogo Colaborador'
+    : isEstudiante
+    ? 'Servicio Social (Solo Lectura)'
     : 'Equipo Médico'
 
   return (
@@ -211,15 +216,23 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           )}
         </div>
 
-        {/* Botón de Invitar Odontólogo (Solo Dra. Aura o Socios) */}
+        {/* Botones de Activación Rápida (Solo Dra. Aura o Socios) */}
         {canInvite && (
-          <div className="px-4 pt-4">
+          <div className="px-4 pt-4 space-y-2">
             <button
               onClick={() => setIsInviteModalOpen(true)}
-              className="w-full py-2.5 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-95 cursor-pointer"
+              className="w-full py-2 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-95 cursor-pointer"
             >
               <UserPlus className="w-4 h-4 shrink-0" />
-              <span>Invitar a Odontólogo</span>
+              <span>Invitar Odontólogo</span>
+            </button>
+
+            <button
+              onClick={() => setIsStudentModalOpen(true)}
+              className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-95 cursor-pointer"
+            >
+              <GraduationCap className="w-4 h-4 shrink-0" />
+              <span>Pase Rápido Estudiante</span>
             </button>
           </div>
         )}
@@ -228,12 +241,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
           <NavGroup title="Gestión Clínica" items={clinicalNav} unconfirmedCount={unconfirmedCount} />
 
-          {/* REGLA 2027: Ocultar Operación & Negocio para Odontólogos Trabajadores */}
-          {!isTrabajador && (
+          {/* Ocultar Operación & Negocio para Trabajadores y Estudiantes */}
+          {!isTrabajador && !isEstudiante && (
             <NavGroup title="Operación & Negocio" items={businessNav} unconfirmedCount={unconfirmedCount} />
           )}
 
-          {!isTrabajador && (
+          {!isTrabajador && !isEstudiante && (
             <NavGroup title="Sistema" items={systemNav} unconfirmedCount={unconfirmedCount} />
           )}
         </div>
@@ -246,13 +259,27 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         >
           <div className="flex items-center gap-3 min-w-0">
             <div className={`w-9 h-9 rounded-full flex items-center justify-center font-black text-xs shrink-0 shadow-xs ${
-              isSocio ? 'bg-amber-400 text-slate-950' : isTrabajador ? 'bg-blue-500 text-white' : 'bg-amber-400 text-slate-950'
+              isSocio
+                ? 'bg-amber-400 text-slate-950'
+                : isEstudiante
+                ? 'bg-emerald-500 text-white'
+                : isTrabajador
+                ? 'bg-blue-500 text-white'
+                : 'bg-amber-400 text-slate-950'
             }`}>
               {initials}
             </div>
             <div className="flex flex-col min-w-0">
               <span className="text-xs font-bold text-white truncate">{userName}</span>
-              <span className={`text-[10px] truncate ${isSocio ? 'text-amber-300' : isTrabajador ? 'text-blue-300' : 'text-amber-300'}`}>
+              <span className={`text-[10px] truncate ${
+                isSocio
+                  ? 'text-amber-300'
+                  : isEstudiante
+                  ? 'text-emerald-300'
+                  : isTrabajador
+                  ? 'text-blue-300'
+                  : 'text-amber-300'
+              }`}>
                 {roleBadgeLabel}
               </span>
             </div>
@@ -265,6 +292,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       <InviteDoctorModal
         isOpen={isInviteModalOpen}
         onClose={() => setIsInviteModalOpen(false)}
+      />
+
+      {/* Modal de Pase Rápido para Estudiante / Servicio Social */}
+      <QuickStudentPassModal
+        isOpen={isStudentModalOpen}
+        onClose={() => setIsStudentModalOpen(false)}
       />
     </>
   )

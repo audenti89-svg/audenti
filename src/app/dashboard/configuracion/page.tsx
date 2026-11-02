@@ -14,16 +14,19 @@ import {
   Lock,
   ShieldAlert,
   Key,
-  UserPlus
+  UserPlus,
+  GraduationCap
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { StaffDepartment, resolveAutomaticRolePermissions } from '@/lib/auth/roleProvisioning'
 import { InviteDoctorModal } from '@/components/admin/InviteDoctorModal'
+import { QuickStudentPassModal } from '@/components/admin/QuickStudentPassModal'
 
 export default function ConfiguracionPage() {
   const supabase = createClient()
   const [saved, setSaved] = useState(false)
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
+  const [isStudentModalOpen, setIsStudentModalOpen] = useState(false)
   const [clinicName, setClinicName] = useState('DentalCloud Pro — Dirección General Dra. Aura Estudillo')
   const [licenseKey, setLicenseKey] = useState('DCL-PRO-2026-AE01')
   const [autoInactivation, setAutoInactivation] = useState(true)
@@ -94,14 +97,23 @@ export default function ConfiguracionPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setIsInviteModalOpen(true)}
             type="button"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-400 text-slate-950 text-xs font-bold hover:bg-amber-300 transition-colors shadow-xs cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-400 text-slate-950 text-xs font-bold hover:bg-amber-300 transition-colors shadow-xs cursor-pointer"
           >
             <UserPlus className="w-4 h-4" />
             Invitar Odontólogo
+          </button>
+
+          <button
+            onClick={() => setIsStudentModalOpen(true)}
+            type="button"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500 transition-colors shadow-xs cursor-pointer"
+          >
+            <GraduationCap className="w-4 h-4" />
+            Pase Estudiante
           </button>
 
           <button
@@ -353,6 +365,11 @@ export default function ConfiguracionPage() {
       <InviteDoctorModal
         isOpen={isInviteModalOpen}
         onClose={() => setIsInviteModalOpen(false)}
+      />
+
+      <QuickStudentPassModal
+        isOpen={isStudentModalOpen}
+        onClose={() => setIsStudentModalOpen(false)}
       />
     </div>
   )

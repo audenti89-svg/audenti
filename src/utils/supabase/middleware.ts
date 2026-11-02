@@ -1,7 +1,14 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { ImmuneSystem } from '@/lib/security/immune-system';
 
 export async function updateSession(request: NextRequest) {
+  // ── ESCUDO INMUNOLÓGICO Y ANTI-HACKEO (CIBERSEGURIDAD IA) ──
+  const threatOrLimitResponse = ImmuneSystem.inspect(request);
+  if (threatOrLimitResponse) {
+    return threatOrLimitResponse;
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   });
@@ -74,26 +81,31 @@ export async function updateSession(request: NextRequest) {
 
     let userRole = jwtRole;
     let doctorType: string | undefined = undefined;
+    let studentExpiresAt: string | undefined = undefined;
 
-    // 2. Si no viene en los claims del token, consultar la tabla `users` como fallback
-    if (!isStaffOrOwner || !userRole) {
-      const { data: userProfile } = await supabase
-        .from('users')
-        .select('role, doctor_type, onboarding_completed')
-        .eq('id', user.id)
-        .maybeSingle();
+    // 2. Consultar perfil en tabla users para permisos granulares y expiración
+    const { data: userProfile } = await supabase
+      .from('users')
+      .select('role, doctor_type, student_expires_at, onboarding_completed')
+      .eq('id', user.id)
+      .maybeSingle();
 
-      userRole = userProfile?.role || userRole;
-      doctorType = userProfile?.doctor_type;
+    if (userProfile) {
+      userRole = userProfile.role || userRole;
+      doctorType = userProfile.doctor_type;
+      studentExpiresAt = userProfile.student_expires_at;
 
       isStaffOrOwner =
         isSuperAdmin ||
-        userProfile?.role === 'owner' ||
-        userProfile?.role === 'admin' ||
-        userProfile?.role === 'director' ||
-        userProfile?.role === 'doctor' ||
-        userProfile?.role === 'socio' ||
-        userProfile?.role === 'trabajador';
+        userProfile.role === 'owner' ||
+        userProfile.role === 'admin' ||
+        userProfile.role === 'director' ||
+        userProfile.role === 'doctor' ||
+        userProfile.role === 'socio' ||
+        userProfile.role === 'trabajador' ||
+        userProfile.doctor_type === 'socio' ||
+        userProfile.doctor_type === 'trabajador' ||
+        userProfile.doctor_type === 'estudiante';
     }
 
     // REGLA CLAVE: Validación estricta de personal clínico vs pacientes
@@ -110,21 +122,42 @@ export async function updateSession(request: NextRequest) {
     }
 
     if (isAdmin) {
-      // ─────────────────────────────────────────────────────────────
-      // REGLA 2027: RESTRICCIÓN GRANULAR DE ODONTÓLOGOS (Socio vs Trabajador)
-      // ─────────────────────────────────────────────────────────────
-      const isTrabajador =
-        !isSuperAdmin &&
-        (userRole === 'trabajador' || doctorType === 'trabajador');
-
       const isFinancialOrAdminRestricted =
         redirectUrl.pathname.startsWith('/admin') ||
         redirectUrl.pathname.startsWith('/dashboard/finanzas') ||
         redirectUrl.pathname.startsWith('/dashboard/reportes') ||
         redirectUrl.pathname.startsWith('/dashboard/configuracion');
 
+      // ─────────────────────────────────────────────────────────────
+      // REGLA 1: GESTIÓN DE ACCESOS TEMPORALES PARA ESTUDIANTES (Servicio Social)
+      // ─────────────────────────────────────────────────────────────
+      const isEstudiante = doctorType === 'estudiante';
+      if (isEstudiante) {
+        // Verificar caducidad/expiración automática programable
+        if (studentExpiresAt && new Date(studentExpiresAt).getTime() < Date.now()) {
+          redirectUrl.pathname = '/auth/login';
+          redirectUrl.searchParams.set('error', 'Tu pase temporal de servicio social ha concluido. Consulta a la Dra. Aura Estudillo.');
+          return NextResponse.redirect(redirectUrl);
+        }
+
+        // Estudiante tiene permisos de solo lectura clínica en su sucursal; finanzas y administración bloqueados
+        if (isFinancialOrAdminRestricted || redirectUrl.pathname.startsWith('/dashboard/crm')) {
+          redirectUrl.pathname = '/dashboard/pacientes';
+          redirectUrl.searchParams.set('notice', 'student_read_only');
+          return NextResponse.redirect(redirectUrl);
+        }
+      }
+
+      // ─────────────────────────────────────────────────────────────
+      // REGLA 2: JERARQUÍA MÉDICA (Socios vs. Trabajadores)
+      // Los "Socios" tienen control total de sucursales, finanzas y BI;
+      // los "Trabajadores" operan exclusivamente su agenda clínica asignada.
+      // ─────────────────────────────────────────────────────────────
+      const isTrabajador =
+        !isSuperAdmin &&
+        (userRole === 'trabajador' || doctorType === 'trabajador');
+
       if (isTrabajador && isFinancialOrAdminRestricted) {
-        // Redirigir al trabajador a su agenda clínica permitida
         redirectUrl.pathname = '/dashboard/calendar';
         redirectUrl.searchParams.set('restricted', 'financial_views_locked');
         return NextResponse.redirect(redirectUrl);
