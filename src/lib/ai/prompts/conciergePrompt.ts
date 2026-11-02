@@ -19,19 +19,27 @@ export interface ConciergeContextInput {
 export function isCurrentTimeAfterHours(): boolean {
   try {
     const nowMx = getNowInMexico();
+    const is2027OrLater = nowMx.getFullYear() >= 2027;
     const day = nowMx.getDay(); // 0 = Domingo, 1 = Lunes, ..., 6 = Sábado
     const hour = nowMx.getHours();
     const minutes = nowMx.getMinutes();
     const totalMinutes = hour * 60 + minutes;
 
-    // Domingos: habilitado según disponibilidad de agenda (fuera de horario de 16:00 a 21:00 salvo cita)
+    if (!is2027OrLater) {
+      // Noviembre y Diciembre 2026: Horario normal completo (09:00 a 20:00 hrs)
+      if (day === 0) return totalMinutes < 10 * 60 || totalMinutes > 17 * 60;
+      if (totalMinutes < 9 * 60 || totalMinutes > 20 * 60) return true;
+      return false;
+    }
+
+    // A partir de 2027:
+    // Domingos: habilitado según disponibilidad de agenda
     if (day === 0) {
       if (totalMinutes < 16 * 60 || totalMinutes > 21 * 60) return true;
       return false;
     }
 
     // Lunes a Sábado: Turno vespertino exclusivo de 16:00 a 21:00 hrs (4:00 PM a 9:00 PM)
-    // Turno matutino estrictamente bloqueado
     if (totalMinutes < 16 * 60 || totalMinutes > 21 * 60) return true;
 
     return false;
@@ -70,14 +78,13 @@ FECHA Y HORA ACTUAL DEL SERVIDOR (CDMX):
 - Sede Activa: ${doctorBranch} (Balbuena / Chalma de Guadalupe / Roma)
 - Teléfono Oficial de la Clínica: 55 2242 7769 (ESTRICTAMENTE PROHIBIDO inventar o usar números falsos como 55 1234 5678).
 
-POLÍTICA OFICIAL DE HORARIOS Y CITAS (A PARTIR DE ENERO DE 2027):
-- HORARIO DE ATENCIÓN VESPERTINO: Lunes a Sábado exclusivamente de 4:00 PM a 9:00 PM (16:00 a 21:00 hrs).
-- DOMINGOS: Habilitado para consulta según disponibilidad de agenda.
-- TURNO MATUTINO ESTRICTAMENTE BLOQUEADO: A partir de enero de 2027, el turno matutino está TOTALMENTE DESHABILITADO y cancelado para cualquier tipo de consulta, valoración o procedimiento clínico.
-- DIRECTIVA DE COMUNICACIÓN OBLIGATORIA CON PACIENTES:
-  * Si un paciente pide una cita por la mañana o pregunta por horarios matutinos, explícale con amabilidad y calidez que a partir de 2027 la atención es exclusivamente en turno vespertino (lunes a sábado de 4:00 PM a 9:00 PM) o domingos con cita previa según agenda.
-  * TIENES ESTRICTAMENTE PROHIBIDO ofrecer, aceptar o sugerir horarios matutinos.
-  * Guía siempre al usuario a elegir un bloque disponible dentro de la franja vespertina (entre 16:00 y 20:30 hrs) o en domingo según disponibilidad.
+POLÍTICA OFICIAL DE HORARIOS Y CITAS:
+- VIGENCIA ACTUAL (NOVIEMBRE Y DICIEMBRE 2026): Horario normal completo de Lunes a Sábado de 09:00 a 20:00 hrs y citas según agenda.
+- A PARTIR DEL 1 DE ENERO DE 2027:
+  * HORARIO DE ATENCIÓN VESPERTINO: Lunes a Sábado exclusivamente de 4:00 PM a 9:00 PM (16:00 a 21:00 hrs).
+  * DOMINGOS: Habilitado para consulta según disponibilidad de agenda.
+  * TURNO MATUTINO EN 2027: A partir de enero de 2027, el turno matutino pasa a estar totalmente deshabilitado.
+  * Si el paciente solicita cita para 2026, indícale la disponibilidad normal. Si solicita para 2027, indícale el nuevo horario vespertino a partir de enero.
 
 ROL Y DIRECTRICES DE ATENCIÓN DE AURA AI:
 - Eres el asistente clínico y orientador de la clínica dental de la Dra. Aura Estudillo (Cédula 8492019).

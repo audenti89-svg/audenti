@@ -98,7 +98,7 @@ export function AttributionDashboard() {
   const [branchStats, setBranchStats] = useState<BranchStat[]>([])
   const [pendingPatients, setPendingPatients] = useState<PendingPatient[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'canales' | 'referidores' | 'familias' | 'sucursales' | 'pendientes'>('canales')
+  const [activeTab, setActiveTab] = useState<'canales' | 'referidores' | 'familias' | 'sucursales' | 'pendientes' | 'auditoria2027'>('canales')
 
   // Estado para modal de asignación rápida en recepción
   const [assigningPatient, setAssigningPatient] = useState<PendingPatient | null>(null)
@@ -290,6 +290,7 @@ export function AttributionDashboard() {
         {([
           { key: 'canales', label: 'Canales de Origen', icon: <BarChart3 className="w-4 h-4 text-amber-600" /> },
           { key: 'sucursales', label: 'Finanzas por Sede', icon: <Building2 className="w-4 h-4 text-amber-600" /> },
+          { key: 'auditoria2027', label: 'Auditoría Horarios 2027', icon: <Clock className="w-4 h-4 text-emerald-600" /> },
           { key: 'referidores', label: 'Red de Embajadores', icon: <Award className="w-4 h-4 text-amber-600" /> },
           { key: 'familias', label: 'Árbol Familiar', icon: <GitBranch className="w-4 h-4 text-amber-600" /> },
           { key: 'pendientes', label: 'Atribución Pendiente', icon: <Clock className="w-4 h-4 text-amber-600" />, badge: pendingPatients.length },
@@ -477,6 +478,153 @@ export function AttributionDashboard() {
                           </td>
                         </tr>
                       ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── TAB: AUDITORÍA DE HORARIOS Y FINANZAS 2027 ── */}
+          {activeTab === 'auditoria2027' && (
+            <div className="space-y-6">
+              {/* Banner de Estado de la Política */}
+              <div className="p-6 rounded-3xl bg-gradient-to-r from-[#202D4C] to-slate-900 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black text-xl shrink-0 shadow-lg">
+                    2027
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-400 text-slate-950">
+                        Vigencia Programada
+                      </span>
+                      <span className="text-xs text-slate-300">Auditoría Financiera por Franja Horaria</span>
+                    </div>
+                    <h3 className="text-lg font-bold text-white tracking-tight mt-1">
+                      Directiva de Operación Vespertina y Cierre Anual
+                    </h3>
+                    <p className="text-xs text-slate-300 mt-0.5 max-w-2xl">
+                      <strong>Noviembre y Diciembre 2026:</strong> Rige horario normal diurno y vespertino completo (08:00 a 21:00 hrs).<br />
+                      <strong>A partir del 1 de Enero de 2027:</strong> Rige estrictamente el Turno Vespertino (16:00 a 21:00 hrs de Lunes a Sábado, Domingos habilitados por agenda y mañanas bloqueadas).
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-md border border-white/10 shrink-0 text-right">
+                  <span className="text-[10px] uppercase font-bold text-slate-300 block">Estatus de Auditoría</span>
+                  <span className="text-sm font-black text-emerald-300">100% Conforme a Directiva</span>
+                </div>
+              </div>
+
+              {/* 3 Tarjetas de Resumen Financiero Cruzado */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Ingresos Totales en Caja
+                  </span>
+                  <p className="text-2xl font-black text-slate-900 mt-1">
+                    ${totalRevenue.toLocaleString('es-MX')} MXN
+                  </p>
+                  <span className="text-xs text-emerald-600 font-semibold block mt-0.5">
+                    Consolidado Balbuena + Guadalupe Chalma
+                  </span>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Atribución por Código QR Físico/Digital
+                  </span>
+                  <p className="text-2xl font-black text-emerald-600 mt-1">
+                    ${(channelStats.find(c => c.canal === 'qr')?.ingresos_totales || 0).toLocaleString('es-MX')} MXN
+                  </p>
+                  <span className="text-xs text-slate-500 font-medium block mt-0.5">
+                    {channelStats.find(c => c.canal === 'qr')?.total_pacientes || 0} pacientes captados por QR
+                  </span>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Atribución por Referidos &amp; Red Familiar
+                  </span>
+                  <p className="text-2xl font-black text-amber-600 mt-1">
+                    ${(channelStats.find(c => c.canal === 'referral')?.ingresos_totales || 0).toLocaleString('es-MX')} MXN
+                  </p>
+                  <span className="text-xs text-slate-500 font-medium block mt-0.5">
+                    {totalReferrals} pacientes en red de embajadores
+                  </span>
+                </div>
+              </div>
+
+              {/* Matriz Cruzada: Canales de Adquisición x Sucursales */}
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">
+                      Rendimiento Financiero Cruzado por Canal y Sucursal
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Ingresos auditados desglosados por canal de origen comercial y sede médica de atención
+                    </p>
+                  </div>
+                  <span className="text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1 rounded-xl">
+                    Dra. Aura Estudillo (Titular en Balbuena y Chalma)
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      <tr>
+                        <th className="px-6 py-4">Canal Comercial</th>
+                        <th className="px-6 py-4 text-center">Tipo de Atribución</th>
+                        <th className="px-6 py-4 text-center">Pacientes Atribuidos</th>
+                        <th className="px-6 py-4 text-right">Ticket Promedio</th>
+                        <th className="px-6 py-4 text-right">Ingresos Totales Auditados</th>
+                        <th className="px-6 py-4 text-center">Horario Aplicable</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {channelStats.map(c => {
+                        const conf = CHANNEL_CONFIG[c.canal] || CHANNEL_CONFIG.otro
+                        return (
+                          <tr key={c.canal} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="px-6 py-4 font-bold text-slate-900 flex items-center gap-2.5">
+                              <span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${conf.color}`}>
+                                {conf.icon}
+                              </span>
+                              <span>{conf.label}</span>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              {c.canal === 'qr' ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                  QR Físico / Digital
+                                </span>
+                              ) : c.canal === 'referral' ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900">
+                                  Boca a Boca / Familiar
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                                  Campaña Web
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-center font-bold text-slate-700">
+                              {c.total_pacientes}
+                            </td>
+                            <td className="px-6 py-4 text-right font-medium text-slate-600">
+                              ${Number(c.ticket_promedio).toFixed(2)} MXN
+                            </td>
+                            <td className="px-6 py-4 text-right font-black text-emerald-700 text-sm">
+                              ${Number(c.ingresos_totales).toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN
+                            </td>
+                            <td className="px-6 py-4 text-center text-[11px] text-slate-500 font-medium">
+                              Nov-Dic: Diurno • 2027: 4-9 PM
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -752,6 +900,153 @@ export function AttributionDashboard() {
                   >
                     {savingAttribution ? 'Guardando...' : 'Confirmar y Atribuir'}
                   </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── TAB: AUDITORÍA DE HORARIOS Y FINANZAS 2027 ── */}
+          {activeTab === 'auditoria2027' && (
+            <div className="space-y-6">
+              {/* Banner de Estado de la Política */}
+              <div className="p-6 rounded-3xl bg-gradient-to-r from-[#202D4C] to-slate-900 text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black text-xl shrink-0 shadow-lg">
+                    2027
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-400 text-slate-950">
+                        Vigencia Programada
+                      </span>
+                      <span className="text-xs text-slate-300">Auditoría Financiera por Franja Horaria</span>
+                    </div>
+                    <h3 className="text-lg font-bold text-white tracking-tight mt-1">
+                      Directiva de Operación Vespertina y Cierre Anual
+                    </h3>
+                    <p className="text-xs text-slate-300 mt-0.5 max-w-2xl">
+                      <strong>Noviembre y Diciembre 2026:</strong> Rige horario normal diurno y vespertino completo (08:00 a 21:00 hrs).<br />
+                      <strong>A partir del 1 de Enero de 2027:</strong> Rige estrictamente el Turno Vespertino (16:00 a 21:00 hrs de Lunes a Sábado, Domingos habilitados por agenda y mañanas bloqueadas).
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-md border border-white/10 shrink-0 text-right">
+                  <span className="text-[10px] uppercase font-bold text-slate-300 block">Estatus de Auditoría</span>
+                  <span className="text-sm font-black text-emerald-300">100% Conforme a Directiva</span>
+                </div>
+              </div>
+
+              {/* 3 Tarjetas de Resumen Financiero Cruzado */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Ingresos Totales en Caja
+                  </span>
+                  <p className="text-2xl font-black text-slate-900 mt-1">
+                    ${totalRevenue.toLocaleString('es-MX')} MXN
+                  </p>
+                  <span className="text-xs text-emerald-600 font-semibold block mt-0.5">
+                    Consolidado Balbuena + Guadalupe Chalma
+                  </span>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Atribución por Código QR Físico/Digital
+                  </span>
+                  <p className="text-2xl font-black text-emerald-600 mt-1">
+                    ${(channelStats.find(c => c.canal === 'qr')?.ingresos_totales || 0).toLocaleString('es-MX')} MXN
+                  </p>
+                  <span className="text-xs text-slate-500 font-medium block mt-0.5">
+                    {channelStats.find(c => c.canal === 'qr')?.total_pacientes || 0} pacientes captados por QR
+                  </span>
+                </div>
+
+                <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Atribución por Referidos &amp; Red Familiar
+                  </span>
+                  <p className="text-2xl font-black text-amber-600 mt-1">
+                    ${(channelStats.find(c => c.canal === 'referral')?.ingresos_totales || 0).toLocaleString('es-MX')} MXN
+                  </p>
+                  <span className="text-xs text-slate-500 font-medium block mt-0.5">
+                    {totalReferrals} pacientes en red de embajadores
+                  </span>
+                </div>
+              </div>
+
+              {/* Matriz Cruzada: Canales de Adquisición x Sucursales */}
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">
+                      Rendimiento Financiero Cruzado por Canal y Sucursal
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Ingresos auditados desglosados por canal de origen comercial y sede médica de atención
+                    </p>
+                  </div>
+                  <span className="text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-3 py-1 rounded-xl">
+                    Dra. Aura Estudillo (Titular en Balbuena y Chalma)
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      <tr>
+                        <th className="px-6 py-4">Canal Comercial</th>
+                        <th className="px-6 py-4 text-center">Tipo de Atribución</th>
+                        <th className="px-6 py-4 text-center">Pacientes Atribuidos</th>
+                        <th className="px-6 py-4 text-right">Ticket Promedio</th>
+                        <th className="px-6 py-4 text-right">Ingresos Totales Auditados</th>
+                        <th className="px-6 py-4 text-center">Horario Aplicable</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {channelStats.map(c => {
+                        const conf = CHANNEL_CONFIG[c.canal] || CHANNEL_CONFIG.otro
+                        return (
+                          <tr key={c.canal} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="px-6 py-4 font-bold text-slate-900 flex items-center gap-2.5">
+                              <span className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${conf.color}`}>
+                                {conf.icon}
+                              </span>
+                              <span>{conf.label}</span>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              {c.canal === 'qr' ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
+                                  QR Físico / Digital
+                                </span>
+                              ) : c.canal === 'referral' ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900">
+                                  Boca a Boca / Familiar
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">
+                                  Campaña Web
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 text-center font-bold text-slate-700">
+                              {c.total_pacientes}
+                            </td>
+                            <td className="px-6 py-4 text-right font-medium text-slate-600">
+                              ${Number(c.ticket_promedio).toFixed(2)} MXN
+                            </td>
+                            <td className="px-6 py-4 text-right font-black text-emerald-700 text-sm">
+                              ${Number(c.ingresos_totales).toLocaleString('es-MX', { minimumFractionDigits: 2 })} MXN
+                            </td>
+                            <td className="px-6 py-4 text-center text-[11px] text-slate-500 font-medium">
+                              Nov-Dic: Diurno • 2027: 4-9 PM
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>

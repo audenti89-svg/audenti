@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ChatInterface } from '@/components/chat/ChatInterface'
 import { InternalMessagingCenter } from '@/components/InternalMessagingCenter'
+import { WhatsAppQRModal } from '@/components/chat/WhatsAppQRModal'
 import {
   MessageSquare,
   Users,
@@ -11,11 +12,13 @@ import {
   Share2,
   Megaphone,
   Cpu,
-  Layers
+  Layers,
+  QrCode
 } from 'lucide-react'
 
 export default function ComunicacionUnifiedPage() {
   const [activeTab, setActiveTab] = useState<'chat' | 'circulars'>('chat')
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false)
 
   return (
     <div className="flex flex-col w-full space-y-6 pb-12">
@@ -34,11 +37,20 @@ export default function ComunicacionUnifiedPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             Pasarela OpenWA &amp; WhatsApp Conectada
           </span>
+
+          <button
+            onClick={() => setIsQRModalOpen(true)}
+            type="button"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500 transition-colors shadow-xs cursor-pointer"
+          >
+            <QrCode className="w-3.5 h-3.5" />
+            <span>Escanear QR WhatsApp</span>
+          </button>
         </div>
       </div>
 
@@ -77,6 +89,12 @@ export default function ComunicacionUnifiedPage() {
       ) : (
         <InternalMessagingCenter />
       )}
+
+      {/* Modal de Vinculación de WhatsApp Business (Código QR) */}
+      <WhatsAppQRModal
+        isOpen={isQRModalOpen}
+        onClose={() => setIsQRModalOpen(false)}
+      />
     </div>
   )
 }

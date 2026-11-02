@@ -54,6 +54,18 @@ export interface ConcurrencyResult<T> {
  * - Turnos Matutinos: ESTRICTAMENTE BLOQUEADOS
  */
 export function validate2027SchedulePolicy(dateStr: string, timeStr: string): { valid: boolean; error?: string } {
+  // En noviembre y diciembre de 2026 rige el horario normal completo (08:00 a 21:00 hrs)
+  if (dateStr < '2027-01-01') {
+    const [hour] = timeStr.split(':').map(Number)
+    if (hour < 8 || hour > 21) {
+      return {
+        valid: false,
+        error: 'Horario normal 2026: Las consultas se realizan entre las 08:00 y las 21:00 hrs.'
+      }
+    }
+    return { valid: true }
+  }
+
   const [year, month, day] = dateStr.split('-').map(Number)
   const [hour, minute] = timeStr.split(':').map(Number)
 

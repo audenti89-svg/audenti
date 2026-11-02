@@ -72,19 +72,28 @@ export async function createAppointmentAction(input: CreateAppointmentInput) {
     const appBranch = branch || 'Sede Balbuena (Matriz)'
     const appTreatment = treatment || 'Consulta / Valoración Estética Oral'
 
-    // Validación de Horarios 2027: Turno Vespertino exclusivo (16:00 a 21:00 hrs)
+    // Validación de Horarios: en 2027 aplica Turno Vespertino exclusivo (16:00 a 21:00); en 2026 horario normal (08:00 a 21:00)
     const [hStr, mStr] = appTime.split(':')
     const totalMin = parseInt(hStr || '0', 10) * 60 + parseInt(mStr || '0', 10)
-    if (totalMin < 16 * 60) {
-      return {
-        success: false,
-        error: 'Turno matutino bloqueado. A partir de 2027, el horario de atención es exclusivamente de Lunes a Sábado de 16:00 a 21:00 hrs (Turno Vespertino) y Domingos según agenda.'
+    if (appDate >= '2027-01-01') {
+      if (totalMin < 16 * 60) {
+        return {
+          success: false,
+          error: 'Turno matutino bloqueado. A partir del 1 de enero de 2027, el horario de atención es exclusivamente de Lunes a Sábado de 16:00 a 21:00 hrs (Turno Vespertino) y Domingos según agenda.'
+        }
       }
-    }
-    if (totalMin > 21 * 60) {
-      return {
-        success: false,
-        error: 'Horario fuera de rango. Las citas de turno vespertino concluyen a las 21:00 hrs (9:00 PM).'
+      if (totalMin > 21 * 60) {
+        return {
+          success: false,
+          error: 'Horario fuera de rango. Las citas de turno vespertino concluyen a las 21:00 hrs (9:00 PM).'
+        }
+      }
+    } else {
+      if (totalMin < 8 * 60 || totalMin > 21 * 60) {
+        return {
+          success: false,
+          error: 'Horario normal 2026: Por favor selecciona un horario entre las 08:00 y las 21:00 hrs.'
+        }
       }
     }
 

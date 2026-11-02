@@ -165,15 +165,20 @@ export async function executeConciergeTool(name: string, args: Record<string, an
         })
       );
 
-      // Franjas oficiales Turno Vespertino (16:00 a 21:00 hrs) - Turno matutino bloqueado
-      const standardSlots = ['16:00', '16:45', '17:30', '18:15', '19:00', '19:45', '20:15'];
+      // Franjas: en 2026 horario normal (09:00 a 20:00); en 2027 vespertino (16:00 a 21:00)
+      const is2027 = targetDate >= '2027-01-01';
+      const standardSlots = is2027
+        ? ['16:00', '16:45', '17:30', '18:15', '19:00', '19:45', '20:15']
+        : ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'];
       const availableSlots = standardSlots.filter(s => !bookedHours.has(s));
 
       return {
         fechaConsultada: targetDate,
         sede: branch,
-        horariosDisponibles: availableSlots.length > 0 ? availableSlots : ['19:00 (Sobre-cupo vespertino a autorizar por Dra. Aura)'],
-        politicaHorario: 'Lunes a Sábado exclusivamente Turno Vespertino (16:00 a 21:00 hrs) y Domingos según agenda. Turno matutino estrictamente bloqueado.',
+        horariosDisponibles: availableSlots.length > 0 ? availableSlots : [is2027 ? '19:00 (Sobre-cupo vespertino a autorizar por Dra. Aura)' : '11:00 (Sobre-cupo a autorizar por Dra. Aura)'],
+        politicaHorario: is2027
+          ? 'A partir de 2027: Lunes a Sábado exclusivamente Turno Vespertino (16:00 a 21:00 hrs) y Domingos según agenda.'
+          : 'Noviembre y Diciembre 2026: Horario normal de atención (09:00 a 20:00 hrs).',
         sedeInfo: branch.toLowerCase().includes('balbuena')
           ? 'Sede Balbuena activa (con próxima mudanza a Colonia Roma)'
           : 'Sede Chalma de Guadalupe activa con normalidad'
@@ -212,24 +217,34 @@ export async function executeConciergeTool(name: string, args: Record<string, an
       const appointmentMinute = parseInt(minutesStr || '0', 10);
       const totalAppMinutes = appointmentHour * 60 + appointmentMinute;
 
-      // Bloqueo estricto del Turno Matutino (cualquier horario antes de las 16:00 hrs)
-      if (totalAppMinutes < 16 * 60) {
-        return {
-          status: 400,
-          confirmed: false,
-          error: 'TURNO_MATUTINO_BLOQUEADO',
-          mensajeError: 'A partir de 2027, el turno matutino se encuentra estrictamente bloqueado y deshabilitado para consultas. El horario de atención oficial es de Lunes a Sábado exclusivamente de 4:00 PM a 9:00 PM (16:00 a 21:00 hrs) y Domingos según disponibilidad de agenda. Por favor elige un horario en turno vespertino.'
-        };
-      }
-
-      // Bloqueo de horarios posteriores a las 21:00 hrs
-      if (totalAppMinutes > 21 * 60) {
-        return {
-          status: 400,
-          confirmed: false,
-          error: 'HORARIO_EXCEDE_CIERRE',
-          mensajeError: 'El horario seleccionado supera las 21:00 hrs. El turno vespertino concluye a las 9:00 PM. Por favor selecciona un bloque entre las 16:00 y las 20:15 hrs.'
-        };
+      // Bloqueo del Turno Matutino solo a partir del 1 de enero de 2027
+      if (date >= '2027-01-01') {
+        if (totalAppMinutes < 16 * 60) {
+          return {
+            status: 400,
+            confirmed: false,
+            error: 'TURNO_MATUTINO_BLOQUEADO',
+            mensajeError: 'A partir del 1 de enero de 2027, el turno matutino se encuentra estrictamente bloqueado y deshabilitado para consultas. El horario de atención oficial es de Lunes a Sábado exclusivamente de 4:00 PM a 9:00 PM (16:00 a 21:00 hrs) y Domingos según disponibilidad de agenda. Por favor elige un horario en turno vespertino.'
+          };
+        }
+        if (totalAppMinutes > 21 * 60) {
+          return {
+            status: 400,
+            confirmed: false,
+            error: 'HORARIO_EXCEDE_CIERRE',
+            mensajeError: 'El horario seleccionado supera las 21:00 hrs. El turno vespertino concluye a las 9:00 PM. Por favor selecciona un bloque entre las 16:00 y las 20:15 hrs.'
+          };
+        }
+      } else {
+        // En noviembre y diciembre de 2026: horario normal (08:00 a 21:00)
+        if (totalAppMinutes < 8 * 60 || totalAppMinutes > 21 * 60) {
+          return {
+            status: 400,
+            confirmed: false,
+            error: 'HORARIO_FUERA_DE_RANGO',
+            mensajeError: 'En 2026 el horario de atención normal es de 08:00 a 21:00 hrs. Por favor selecciona un horario en ese rango.'
+          };
+        }
       }
 
       // Validar horario y márgenes permitidos

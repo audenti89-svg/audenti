@@ -49,7 +49,8 @@ const DOCTORS = [
 const CHAIRS = ['Gabinete 1 (Principal)', 'Gabinete 2', 'Quirófano Quirúrgico']
 
 const HOURS = [
-  '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'
+  '08:00', '09:00', '10:00', '11:00', '12:00', '13:00',
+  '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'
 ]
 
 const INITIAL_APPOINTMENTS: CalendarAppointment[] = []
@@ -74,7 +75,10 @@ export default function CalendarPage() {
 
   // Modal de Creación Rápida Estilo Google Calendar
   const [showQuickCreateModal, setShowQuickCreateModal] = useState(false)
-  const [modalSlot, setModalSlot] = useState({ date: getTodayStr(), time: '16:00' })
+  const [modalSlot, setModalSlot] = useState({
+    date: getTodayStr(),
+    time: getTodayStr() >= '2027-01-01' ? '16:00' : '10:00'
+  })
   const [newTitle, setNewTitle] = useState('')
   const [newPatient, setNewPatient] = useState('')
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null)
@@ -293,12 +297,20 @@ export default function CalendarPage() {
     e.preventDefault()
     if (!newTitle || !newPatient) return
 
-    // Validación de horario vespertino 2027 (16:00 a 21:00 hrs)
+    // Validación de horario: en 2026 (Nov y Dic) horario normal (08:00 a 21:00); en 2027 horario vespertino (16:00 a 21:00)
     const [hStr, mStr] = modalSlot.time.split(':')
     const totalMin = parseInt(hStr || '0', 10) * 60 + parseInt(mStr || '0', 10)
-    if (totalMin < 16 * 60 || totalMin > 21 * 60) {
-      alert('Horario no permitido: A partir de enero de 2027, el turno matutino está estrictamente bloqueado. Las citas deben agendarse en Turno Vespertino (16:00 a 21:00 hrs) o en domingo según disponibilidad.')
-      return
+    if (modalSlot.date >= '2027-01-01') {
+      if (totalMin < 16 * 60 || totalMin > 21 * 60) {
+        alert('Horario no permitido: A partir del 1 de enero de 2027, el turno matutino está estrictamente bloqueado. Las citas deben agendarse en Turno Vespertino (16:00 a 21:00 hrs) o en domingo según disponibilidad.')
+        return
+      }
+    } else {
+      // Noviembre y Diciembre 2026: horario normal (08:00 a 21:00)
+      if (totalMin < 8 * 60 || totalMin > 21 * 60) {
+        alert('Horario normal 2026: Por favor selecciona un horario entre las 08:00 y las 21:00 hrs.')
+        return
+      }
     }
 
     playTone('message')
@@ -598,13 +610,24 @@ export default function CalendarPage() {
               {/* Grilla Horaria */}
               <div className="divide-y divide-slate-100 relative">
                 {/* Línea roja de hora actual estilo Google */}
-                <div
-                  className="absolute left-0 right-0 z-20 flex items-center pointer-events-none"
-                  style={{ top: '225px' }}
-                >
-                  <div className="w-2.5 h-2.5 rounded-full bg-rose-600 -ml-1" />
-                  <div className="flex-1 h-0.5 bg-rose-600" />
-                </div>
+                {(() => {
+                  const now = new Date()
+                  const h = now.getHours()
+                  const m = now.getMinutes()
+                  if (h >= 8 && h <= 21) {
+                    const topPx = (h - 8 + m / 60) * 58
+                    return (
+                      <div
+                        className="absolute left-0 right-0 z-20 flex items-center pointer-events-none"
+                        style={{ top: `${topPx}px` }}
+                      >
+                        <div className="w-2.5 h-2.5 rounded-full bg-rose-600 -ml-1 shadow-xs" />
+                        <div className="flex-1 h-0.5 bg-rose-600 shadow-xs" />
+                      </div>
+                    )
+                  }
+                  return null
+                })()}
 
                 {HOURS.map(hour => (
                   <div key={hour} className="grid grid-cols-8 min-h-[58px] group">
@@ -882,16 +905,20 @@ export default function CalendarPage() {
                   )}
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Hora Inicio (16:00 - 21:00)</label>
+                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">
+                    {modalSlot.date >= '2027-01-01' ? 'Hora Inicio (16:00 - 21:00)' : 'Hora Inicio (08:00 - 21:00)'}
+                  </label>
                   <input
                     type="time"
-                    min="16:00"
+                    min={modalSlot.date >= '2027-01-01' ? '16:00' : '08:00'}
                     max="21:00"
                     value={modalSlot.time}
                     onChange={e => setModalSlot({ ...modalSlot, time: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none"
                   />
-                  <span className="text-[10px] text-amber-700 font-bold block mt-1">🌙 Turno Vespertino Oficial</span>
+                  <span className="text-[10px] text-slate-500 font-bold block mt-1">
+                    {modalSlot.date >= '2027-01-01' ? '🌙 Turno Vespertino Oficial (A partir de Enero 2027)' : '☀️ Horario Normal Completo (Nov - Dic 2026)'}
+                  </span>
                 </div>
               </div>
 

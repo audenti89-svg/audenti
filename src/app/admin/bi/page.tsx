@@ -17,6 +17,8 @@ import {
 import Link from 'next/link'
 
 import { AttributionDashboard } from '@/components/bi/AttributionDashboard'
+import { QuickStudentPassModal } from '@/components/admin/QuickStudentPassModal'
+import { GraduationCap } from 'lucide-react'
 
 interface BIData {
   totalPatients: number
@@ -26,6 +28,7 @@ interface BIData {
 }
 
 export default function BIDashboardPage() {
+  const [isStudentModalOpen, setIsStudentModalOpen] = useState(false)
   const [metrics, setMetrics] = useState<BIData>({
     totalPatients: 0,
     totalRevenue: 0,
@@ -122,14 +125,25 @@ export default function BIDashboardPage() {
           <p className="text-sm text-gray-500">Métricas clave y rendimiento financiero de la clínica en tiempo real.</p>
         </div>
 
-        <button
-          onClick={fetchBIMetrics}
-          title="Refrescar métricas"
-          className="p-2 border border-gray-300 rounded-lg hover:bg-gray-100 text-gray-600 transition flex items-center gap-2 text-xs font-semibold"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          <span>Actualizar</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsStudentModalOpen(true)}
+            type="button"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500 transition-colors shadow-xs cursor-pointer"
+          >
+            <GraduationCap className="w-4 h-4" />
+            <span>Pase Estudiante</span>
+          </button>
+
+          <button
+            onClick={fetchBIMetrics}
+            title="Refrescar métricas"
+            className="p-2 border border-gray-300 rounded-lg hover:bg-gray-100 text-gray-600 transition flex items-center gap-2 text-xs font-semibold cursor-pointer"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <span>Actualizar</span>
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -193,6 +207,15 @@ export default function BIDashboardPage() {
       <div className="mt-8">
         <AttributionDashboard />
       </div>
+
+      {/* Modal de Activación Express de Pases Temporales para Estudiantes */}
+      <QuickStudentPassModal
+        isOpen={isStudentModalOpen}
+        onClose={() => setIsStudentModalOpen(false)}
+        onSuccess={() => {
+          fetchBIMetrics()
+        }}
+      />
     </div>
   )
 }

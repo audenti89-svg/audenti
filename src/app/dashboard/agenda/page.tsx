@@ -75,7 +75,10 @@ export default function CalendarPage() {
   const [newPatientId, setNewPatientId] = useState('')
   const [newTreatment, setNewTreatment] = useState('Consulta Odontológica General')
   const [newDate, setNewDate] = useState(() => new Date().toISOString().split('T')[0])
-  const [newTime, setNewTime] = useState('16:00')
+  const [newTime, setNewTime] = useState(() => {
+    const today = new Date().toISOString().split('T')[0]
+    return today >= '2027-01-01' ? '16:00' : '10:00'
+  })
   const [newDuration, setNewDuration] = useState('45')
   const [newNotes, setNewNotes] = useState('')
   const [savingAppointment, setSavingAppointment] = useState(false)
@@ -280,13 +283,21 @@ export default function CalendarPage() {
       const patientFullName = selectedPatientObj?.full_name || 'Paciente'
       const patientPhone = selectedPatientObj?.phone || '5522427769'
 
-      // Validación de Turno Vespertino 2027 (16:00 a 21:00 hrs)
+      // Validación de Turno: en 2027 estricto vespertino (16:00 a 21:00); en 2026 horario normal (08:00 a 21:00)
       const [hStr, mStr] = newTime.split(':')
       const totalMin = parseInt(hStr || '0', 10) * 60 + parseInt(mStr || '0', 10)
-      if (totalMin < 16 * 60 || totalMin > 21 * 60) {
-        alert('Horario no permitido: A partir de enero de 2027, el turno matutino está estrictamente bloqueado. Las citas deben ser de 16:00 a 21:00 hrs (Lunes a Sábado) o en domingo según agenda.')
-        setSavingAppointment(false)
-        return
+      if (newDate >= '2027-01-01') {
+        if (totalMin < 16 * 60 || totalMin > 21 * 60) {
+          alert('Horario no permitido: A partir del 1 de enero de 2027, el turno matutino está estrictamente bloqueado. Las citas deben ser de 16:00 a 21:00 hrs (Lunes a Sábado) o en domingo según agenda.')
+          setSavingAppointment(false)
+          return
+        }
+      } else {
+        if (totalMin < 8 * 60 || totalMin > 21 * 60) {
+          alert('Horario normal 2026: Por favor selecciona una hora entre las 08:00 y las 21:00 hrs.')
+          setSavingAppointment(false)
+          return
+        }
       }
 
       // Guardar vía API de persistencia permanente (/api/appointments)
@@ -821,17 +832,21 @@ export default function CalendarPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Hora (16:00 - 21:00)</label>
+                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">
+                    {newDate >= '2027-01-01' ? 'Hora (16:00 - 21:00)' : 'Hora (08:00 - 21:00)'}
+                  </label>
                   <input
                     type="time"
-                    min="16:00"
+                    min={newDate >= '2027-01-01' ? '16:00' : '08:00'}
                     max="21:00"
                     required
                     value={newTime}
                     onChange={(e) => setNewTime(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-900"
                   />
-                  <span className="text-[10px] text-amber-700 font-bold block mt-1">🌙 Turno Vespertino Oficial</span>
+                  <span className="text-[10px] text-slate-500 font-bold block mt-1">
+                    {newDate >= '2027-01-01' ? '🌙 Turno Vespertino Oficial (A partir de Enero 2027)' : '☀️ Horario Normal (Nov - Dic 2026)'}
+                  </span>
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Duración</label>

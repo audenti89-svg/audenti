@@ -26,10 +26,12 @@ import {
   MapPin,
   ChevronRight,
   Filter,
-  CheckCheck
+  CheckCheck,
+  QrCode
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { useNotificationSound } from '@/hooks/useNotificationSound'
+import { WhatsAppQRModal } from '@/components/chat/WhatsAppQRModal'
 
 export type ChannelFilter = 'all' | 'voice_call' | 'whatsapp' | 'web_chat' | 'urgent'
 
@@ -91,6 +93,7 @@ export function ChatInterface() {
   const [loadingPatients, setLoadingPatients] = useState(true)
   const [selectedPatientId, setSelectedPatientId] = useState<string>('')
   const [unreadPatients, setUnreadPatients] = useState<Set<string>>(new Set())
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false)
 
   // Mensajes por ID de paciente
   const [messages, setMessages] = useState<Record<string, ChatMessageItem[]>>({})
@@ -101,124 +104,166 @@ export function ChatInterface() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // 1. Cargar historial persistido desde chat_omnichannel.json de Supabase Storage
+  // 1. Cargar pacientes directamente de Supabase (public.patients) y mensajes cruzados
   const loadOmnichannelHistory = async () => {
     try {
-      const { data: file } = await supabase.storage
-        .from('audenti_database')
-        .download('chat_omnichannel.json')
+      setLoadingPatients(true)
 
-      if (file) {
-        const text = await file.text()
-        if (text && text.trim()) {
-          const stored = JSON.parse(text)
-          const mappedMessages: Record<string, ChatMessageItem[]> = {}
-          const directoryList: PatientDirectoryItem[] = []
+      // A. Cargar lista oficial de pacientes registrados directamente de Supabase PostgreSQL
+      let registeredList: any[] = []
+      let registeredMap: Record<string, any> = {}
+      try {
+        const { data: dbPatients } = await supabase
+          .from('patients')
+          .select('id, full_name, phone, emergency_contact_name, emergency_contact_phone, branch_name, created_at, acquisition_channel, attribution_status')
+          .order('created_at', { ascending: false })
 
-          // Obtener lista oficial de pacientes registrados de la base de datos para cruzar datos
-          let registeredMap: Record<string, any> = {}
-          try {
-            const { data: dbPatients } = await supabase
-              .from('patients')
-              .select('id, full_name, phone, emergency_contact_name, emergency_contact_phone')
-            if (dbPatients) {
-              dbPatients.forEach(p => {
-                registeredMap[p.id] = p
-              })
-            }
-          } catch {}
+        if (dbPatients && dbPatients.length > 0) {
+          registeredList = dbPatients
+          dbPatients.forEach(p => {
+            registeredMap[p.id] = p
+          })
+        }
+      } catch (err: any) {
+        console.warn('[Chat Patients Load Note]:', err?.message)
+      }
 
-          // Consultar también directamente la tabla relacional chat_messages de Supabase
-          try {
-            const { data: dbChatRows } = await supabase
-              .from('chat_messages')
-              .select('*')
-              .order('created_at', { ascending: true })
+      // B. Cargar mensajes de la base de datos relacional (chat_messages)
+      const mappedMessages: Record<string, ChatMessageItem[]> = {}
+      try {
+        const { data: dbChatRows } = await supabase
+          .from('chat_messages')
+          .select('*')
+          .order('created_at', { ascending: true })
 
-            if (dbChatRows && dbChatRows.length > 0) {
-              dbChatRows.forEach((r: any) => {
-                const patId = r.patient_id || r.metadata?.patientId || (r.metadata?.phone ? `prospect_${r.metadata.phone.replace(/\D/g, '')}` : 'prospect_general')
-                if (!stored[patId]) stored[patId] = []
-                const exists = stored[patId].some((m: any) => m.id === r.id || (m.content === r.content && (m.timestamp === r.created_at || m.time === r.created_at)))
+        if (dbChatRows && dbChatRows.length > 0) {
+          dbChatRows.forEach((r: any) => {
+            const patId = r.patient_id || r.metadata?.patientId || (r.metadata?.phone ? `prospect_${r.metadata.phone.replace(/\D/g, '')}` : 'prospect_general')
+            if (!mappedMessages[patId]) mappedMessages[patId] = []
+            mappedMessages[patId].push({
+              id: r.id,
+              senderName: r.sender_name || (r.sender_role === 'ai' ? 'Asistente de Voz (Aura AI)' : (r.sender_role === 'doctor' ? 'Dra. Aura Estudillo' : 'Paciente')),
+              senderRole: r.sender_role || 'patient',
+              channel_type: r.channel_type || 'web_chat',
+              content: r.content || '',
+              time: r.created_at ? new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date(r.created_at)) : 'Hoy',
+              isOwn: r.sender_role === 'doctor',
+              metadata: r.metadata
+            })
+          })
+        }
+      } catch (dbErr: any) {
+        console.warn('[Chat DB Direct Check Note]:', dbErr?.message)
+      }
+
+      // C. Cargar Storage chat_omnichannel.json como fallback / sincronía adicional
+      try {
+        const { data: file } = await supabase.storage
+          .from('audenti_database')
+          .download('chat_omnichannel.json')
+
+        if (file) {
+          const text = await file.text()
+          if (text && text.trim()) {
+            const stored = JSON.parse(text)
+            Object.keys(stored).forEach(contactId => {
+              const chatArray = stored[contactId] || []
+              if (!mappedMessages[contactId]) mappedMessages[contactId] = []
+              chatArray.forEach((m: any) => {
+                const exists = mappedMessages[contactId].some(existing => existing.id === m.id || (existing.content === m.content && existing.time === (m.timestamp || m.time)))
                 if (!exists) {
-                  stored[patId].push({
-                    id: r.id,
-                    senderName: r.sender_name || (r.sender_role === 'ai' ? 'Asistente de Voz (Aura AI)' : (r.sender_role === 'doctor' ? 'Dra. Aura Estudillo' : 'Paciente')),
-                    senderRole: r.sender_role,
-                    channel_type: r.channel_type || 'web_chat',
-                    content: r.content,
-                    timestamp: r.created_at ? new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date(r.created_at)) : 'Hoy',
-                    time: r.created_at ? new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date(r.created_at)) : 'Hoy',
-                    isDoctor: r.sender_role === 'doctor',
-                    metadata: r.metadata
+                  mappedMessages[contactId].push({
+                    id: m.id || String(Math.random()),
+                    senderName: m.senderName || (m.isDoctor ? 'Dra. Aura Estudillo' : 'Paciente'),
+                    senderRole: m.senderRole || (m.isDoctor ? 'doctor' : 'patient'),
+                    channel_type: m.channel_type || m.metadata?.channel_type || (m.content?.includes('Llamada de Voz') ? 'voice_call' : 'web_chat'),
+                    content: m.content || '',
+                    time: m.timestamp || m.time || 'Reciente',
+                    isOwn: Boolean(m.isDoctor),
+                    isPrivateNote: Boolean(m.isPrivateNote),
+                    metadata: m.metadata
                   })
                 }
               })
-            }
-          } catch (dbErr: any) {
-            console.warn('[Chat DB Direct Check Note]:', dbErr?.message)
-          }
-
-          Object.keys(stored).forEach(contactId => {
-            const chatArray = stored[contactId] || []
-            mappedMessages[contactId] = chatArray.map((m: any) => ({
-              id: m.id || String(Math.random()),
-              senderName: m.senderName || (m.isDoctor ? 'Dra. Aura Estudillo' : 'Paciente'),
-              senderRole: m.senderRole || (m.isDoctor ? 'doctor' : 'patient'),
-              channel_type: m.channel_type || m.metadata?.channel_type || (m.content?.includes('Llamada de Voz') ? 'voice_call' : 'web_chat'),
-              content: m.content,
-              time: m.timestamp || m.time || (m.created_at ? new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date(m.created_at)) : 'Reciente'),
-              isOwn: Boolean(m.isDoctor),
-              isPrivateNote: Boolean(m.isPrivateNote),
-              metadata: m.metadata
-            }))
-
-            // Obtener último mensaje para el directorio
-            const lastMsg = chatArray[chatArray.length - 1]
-            const isReg = Boolean(registeredMap[contactId] || lastMsg?.isRegistered || lastMsg?.metadata?.isRegistered || !contactId.startsWith('prospect_'))
-            const regData = registeredMap[contactId]
-
-            const rawName = regData?.full_name || lastMsg?.metadata?.patientName || lastMsg?.senderName || 'Paciente'
-            const cleanName = rawName.replace(/\s*\(Prospecto\)/gi, '').replace(/\s*\(.*?folio.*?\)/gi, '').trim()
-            const phone = regData?.phone || lastMsg?.metadata?.phone || lastMsg?.phone || (contactId.startsWith('prospect_') ? contactId.replace('prospect_', '') : '')
-            const folio = isReg ? `EXP-${contactId.slice(0, 8).toUpperCase()}` : (lastMsg?.folio || `PROS-${contactId.slice(-6).toUpperCase()}`)
-
-            const msgText = lastMsg?.content || 'Sin mensajes'
-            const isUrgent = /(?:dolor|duele|muela|urgente|emergencia|sangr|inflamad)/i.test(msgText) || lastMsg?.metadata?.urgencyLevel === 'Urgente'
-
-            let chType: 'voice_call' | 'whatsapp' | 'web_chat' = 'web_chat'
-            if (lastMsg?.channel_type) chType = lastMsg.channel_type
-            else if (lastMsg?.metadata?.channel_type) chType = lastMsg.metadata.channel_type
-            else if (msgText.includes('Llamada de Voz') || lastMsg?.senderName?.includes('Voice')) chType = 'voice_call'
-            else if (lastMsg?.channel === 'whatsapp' || lastMsg?.metadata?.channel === 'whatsapp') chType = 'whatsapp'
-
-            directoryList.push({
-              id: contactId,
-              name: cleanName || 'Paciente Sin Nombre',
-              phone: phone || 'Sin teléfono',
-              folio,
-              isRegistered: isReg,
-              channel_type: chType,
-              lastMessage: msgText,
-              lastTime: lastMsg?.timestamp || lastMsg?.time || 'Hoy',
-              isUrgent,
-              consultationReason: lastMsg?.metadata?.consultationReason,
-              emergencyContact: regData?.emergency_contact_name ? `${regData.emergency_contact_name} (${regData.emergency_contact_phone || ''})` : undefined
             })
-          })
-
-          setMessages(mappedMessages)
-
-          // Si el directorio tiene items, actualizar
-          if (directoryList.length > 0) {
-            setPatients(directoryList)
-            // Si la URL traía un paciente específico, seleccionarlo
-            if (urlPatientId && directoryList.some(p => p.id === urlPatientId)) {
-              setSelectedPatientId(urlPatientId)
-            } else if (!selectedPatientId) {
-              setSelectedPatientId(directoryList[0].id)
-            }
           }
+        }
+      } catch {}
+
+      // D. Construir el Directorio de Pacientes (TODOS los pacientes registrados + prospectos con mensajes)
+      const directoryList: PatientDirectoryItem[] = []
+      const processedIds = new Set<string>()
+
+      // 1. Añadir primero a todos los pacientes registrados en la base de datos
+      registeredList.forEach(p => {
+        processedIds.add(p.id)
+        const chatArray = mappedMessages[p.id] || []
+        const lastMsg = chatArray.length > 0 ? chatArray[chatArray.length - 1] : null
+
+        const msgText = lastMsg ? lastMsg.content : 'Paciente registrado • Listo para chatear'
+        const isUrgent = lastMsg ? (/(?:dolor|duele|muela|urgente|emergencia|sangr|inflamad)/i.test(msgText) || lastMsg.metadata?.urgencyLevel === 'Urgente') : false
+
+        let chType: 'voice_call' | 'whatsapp' | 'web_chat' = 'web_chat'
+        if (lastMsg?.channel_type) chType = lastMsg.channel_type
+        else if (lastMsg?.metadata?.channel_type) chType = lastMsg.metadata.channel_type
+
+        directoryList.push({
+          id: p.id,
+          name: p.full_name || 'Paciente Registrado',
+          phone: p.phone || 'Sin teléfono',
+          folio: `EXP-${p.id.slice(0, 8).toUpperCase()}`,
+          isRegistered: true,
+          channel_type: chType,
+          lastMessage: msgText,
+          lastTime: lastMsg?.time || (p.created_at ? new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date(p.created_at)) : 'Hoy'),
+          isUrgent,
+          consultationReason: lastMsg?.metadata?.consultationReason,
+          emergencyContact: p.emergency_contact_name ? `${p.emergency_contact_name} (${p.emergency_contact_phone || ''})` : undefined
+        })
+      })
+
+      // 2. Añadir prospectos o contactos que tienen mensajes pero no están en la tabla patients
+      Object.keys(mappedMessages).forEach(contactId => {
+        if (!processedIds.has(contactId)) {
+          processedIds.add(contactId)
+          const chatArray = mappedMessages[contactId] || []
+          const lastMsg = chatArray[chatArray.length - 1]
+          const rawName = lastMsg?.metadata?.patientName || lastMsg?.senderName || 'Contacto'
+          const cleanName = rawName.replace(/\s*\(Prospecto\)/gi, '').trim()
+          const phone = lastMsg?.metadata?.phone || (contactId.startsWith('prospect_') ? contactId.replace('prospect_', '') : '')
+          const folio = `PROS-${contactId.slice(-6).toUpperCase()}`
+          const msgText = lastMsg?.content || 'Sin mensajes'
+          const isUrgent = /(?:dolor|duele|muela|urgente|emergencia|sangr|inflamad)/i.test(msgText) || lastMsg?.metadata?.urgencyLevel === 'Urgente'
+
+          let chType: 'voice_call' | 'whatsapp' | 'web_chat' = 'web_chat'
+          if (lastMsg?.channel_type) chType = lastMsg.channel_type
+          else if (lastMsg?.metadata?.channel_type) chType = lastMsg.metadata.channel_type
+          else if (msgText.includes('Llamada de Voz')) chType = 'voice_call'
+          else if ((lastMsg?.metadata as any)?.channel === 'whatsapp') chType = 'whatsapp'
+
+          directoryList.push({
+            id: contactId,
+            name: cleanName || 'Contacto Desconocido',
+            phone: phone || 'Sin teléfono',
+            folio,
+            isRegistered: false,
+            channel_type: chType,
+            lastMessage: msgText,
+            lastTime: lastMsg?.time || 'Reciente',
+            isUrgent,
+            consultationReason: lastMsg?.metadata?.consultationReason
+          })
+        }
+      })
+
+      setMessages(mappedMessages)
+
+      if (directoryList.length > 0) {
+        setPatients(directoryList)
+        if (urlPatientId && directoryList.some(p => p.id === urlPatientId)) {
+          setSelectedPatientId(urlPatientId)
+        } else if (!selectedPatientId) {
+          setSelectedPatientId(directoryList[0].id)
         }
       }
     } catch (e: any) {
@@ -541,6 +586,96 @@ export function ChatInterface() {
           })
         }
       })
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'chat_messages' },
+        (payload) => {
+          const r = payload.new as any
+          if (!r) return
+          const targetId = r.patient_id || r.metadata?.patientId || (r.metadata?.phone ? `prospect_${r.metadata.phone.replace(/\D/g, '')}` : 'prospect_general')
+          const nowTime = r.created_at ? new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date(r.created_at)) : 'Ahora'
+
+          const incomingMsg: ChatMessageItem = {
+            id: r.id,
+            senderName: r.sender_name || (r.sender_role === 'doctor' ? 'Dra. Aura Estudillo' : 'Paciente'),
+            senderRole: r.sender_role || 'patient',
+            channel_type: r.channel_type || 'web_chat',
+            content: r.content || '',
+            time: nowTime,
+            isOwn: r.sender_role === 'doctor',
+            metadata: r.metadata
+          }
+
+          setMessages(prev => {
+            const current = prev[targetId] || []
+            if (current.some(m => m.id === incomingMsg.id)) return prev
+            return {
+              ...prev,
+              [targetId]: [...current, incomingMsg]
+            }
+          })
+
+          setPatients(prev => {
+            const idx = prev.findIndex(p => p.id === targetId)
+            const isUrgent = /(?:dolor|duele|muela|urgente|emergencia|sangr|inflamad)/i.test(r.content || '')
+            if (idx >= 0) {
+              const updated = [...prev]
+              updated[idx] = {
+                ...updated[idx],
+                lastMessage: r.content || updated[idx].lastMessage,
+                lastTime: nowTime,
+                isUrgent: updated[idx].isUrgent || isUrgent,
+                channel_type: r.channel_type || updated[idx].channel_type
+              }
+              return updated
+            } else {
+              const newPat: PatientDirectoryItem = {
+                id: targetId,
+                name: r.sender_name || 'Nuevo Contacto',
+                phone: r.metadata?.phone || 'Sin teléfono',
+                folio: targetId.startsWith('prospect_') ? `PROS-${targetId.slice(-6).toUpperCase()}` : `EXP-${targetId.slice(0, 8).toUpperCase()}`,
+                isRegistered: !targetId.startsWith('prospect_'),
+                channel_type: r.channel_type || 'web_chat',
+                lastMessage: r.content || '',
+                lastTime: nowTime,
+                isUrgent
+              }
+              return [newPat, ...prev]
+            }
+          })
+
+          if (r.sender_role !== 'doctor') {
+            playTone('arrival')
+            if (selectedPatientId !== targetId) {
+              setUnreadPatients(prev => new Set(prev).add(targetId))
+            }
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'patients' },
+        (payload) => {
+          const p = payload.new as any
+          if (!p) return
+          setPatients(prev => {
+            if (prev.some(x => x.id === p.id)) return prev
+            const newPat: PatientDirectoryItem = {
+              id: p.id,
+              name: p.full_name || 'Paciente Registrado',
+              phone: p.phone || 'Sin teléfono',
+              folio: `EXP-${p.id.slice(0, 8).toUpperCase()}`,
+              isRegistered: true,
+              channel_type: 'web_chat',
+              lastMessage: 'Paciente registrado • Listo para chatear',
+              lastTime: 'Reciente',
+              isUrgent: false,
+              emergencyContact: p.emergency_contact_name ? `${p.emergency_contact_name} (${p.emergency_contact_phone || ''})` : undefined
+            }
+            return [newPat, ...prev]
+          })
+        }
+      )
       .subscribe()
 
     return () => {
@@ -658,7 +793,16 @@ export function ChatInterface() {
           </span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => setIsQRModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition-all border bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-400/40 shadow-xs cursor-pointer"
+          >
+            <QrCode className="w-3.5 h-3.5" />
+            <span>Vincular WhatsApp (QR)</span>
+          </button>
+
           <button
             type="button"
             onClick={() => {
@@ -1256,6 +1400,12 @@ export function ChatInterface() {
           )}
         </div>
       </div>
+
+      {/* Modal para Vincular WhatsApp Business mediante Código QR */}
+      <WhatsAppQRModal
+        isOpen={isQRModalOpen}
+        onClose={() => setIsQRModalOpen(false)}
+      />
     </div>
   )
 }

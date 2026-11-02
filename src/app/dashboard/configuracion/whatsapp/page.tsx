@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { WhatsAppQRModal } from '@/components/chat/WhatsAppQRModal'
 import {
   MessageSquare,
   ShieldCheck,
@@ -17,10 +18,12 @@ import {
   Server,
   Zap,
   Check,
-  Copy
+  Copy,
+  QrCode
 } from 'lucide-react'
 
 export default function WhatsAppSettingsPage() {
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false)
   const [messagingProvider, setMessagingProvider] = useState<'openwa' | 'zernio' | 'meta' | 'generic'>('openwa')
   const [messagingApiUrl, setMessagingApiUrl] = useState('http://localhost:2785')
   const [messagingApiKey, setMessagingApiKey] = useState('')
