@@ -22,12 +22,7 @@ export default function CleanPatientOdontogram({
   selectedTooth = 36,
   setSelectedTooth
 }: CleanPatientOdontogramProps) {
-  const records = clinicalRecords || diagnosisMap || {
-    '16': { status: 'resina', notes: 'Obturación oclusal con resina nanohíbrida intacta', label: 'Resina Estética', type: 'filled', date: '15/Sep/2026', arch: 'upper' },
-    '26': { status: 'corona', notes: 'Corona de Zirconia monolítica de alta resistencia', label: 'Corona Zirconia', type: 'crown', date: '20/Jul/2026', arch: 'upper' },
-    '36': { status: 'resina', notes: 'Restauración estética post-desinfección profiláctica', label: 'Resina Oclusal', type: 'filled', date: '12/Oct/2026', arch: 'lower' },
-    '46': { status: 'endodoncia', notes: 'Tratamiento de conductos rotatorio sin sintomatología', label: 'Endodoncia', type: 'root_canal', date: '02/Ago/2026', arch: 'lower' }
-  };
+  const records = clinicalRecords || diagnosisMap || {};
 
   const branchDisplay = patientData?.branch_name || patientData?.tenant_id || "Sucursal Chalma de Guadalupe";
 
@@ -99,39 +94,46 @@ export default function CleanPatientOdontogram({
             <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-2">
               Piezas con Historial Clínico ({upperTreatments.length})
             </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {upperTreatments.map(([num, data]: any) => {
-                const toothNum = parseInt(num, 10);
-                const isSelected = selectedTooth === toothNum;
-                return (
-                  <button
-                    key={`upper-${num}`}
-                    type="button"
-                    onClick={() => setSelectedTooth && setSelectedTooth(toothNum)}
-                    className={cn(
-                      'text-left p-2.5 rounded-xl border transition-all flex items-center justify-between gap-2 cursor-pointer',
-                      isSelected
-                        ? 'bg-amber-400/15 border-amber-400 text-white shadow-md ring-1 ring-amber-400/40'
-                        : 'bg-slate-900/60 border-gray-800 hover:border-gray-700 text-gray-300 hover:text-white'
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className={cn(
-                        'w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0 border',
-                        isSelected ? 'bg-amber-400 text-slate-950 border-amber-300' : 'bg-blue-600/20 text-blue-300 border-blue-500/30'
-                      )}>
-                        {num}
-                      </span>
-                      <div className="leading-tight">
-                        <p className="text-xs font-bold text-white">{data.label || 'Tratamiento'}</p>
-                        <p className="text-[10px] text-gray-400 truncate max-w-[110px]">{data.notes || 'Tratamiento clínico'}</p>
+{upperTreatments.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {upperTreatments.map(([num, data]: any) => {
+                  const toothNum = parseInt(num, 10);
+                  const isSelected = selectedTooth === toothNum;
+                  return (
+                    <button
+                      key={`upper-${num}`}
+                      type="button"
+                      onClick={() => setSelectedTooth && setSelectedTooth(toothNum)}
+                      className={cn(
+                        'text-left p-2.5 rounded-xl border transition-all flex items-center justify-between gap-2 cursor-pointer',
+                        isSelected
+                          ? 'bg-amber-400/15 border-amber-400 text-white shadow-md ring-1 ring-amber-400/40'
+                          : 'bg-slate-900/60 border-gray-800 hover:border-gray-700 text-gray-300 hover:text-white'
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          'w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0 border',
+                          isSelected ? 'bg-amber-400 text-slate-950 border-amber-300' : 'bg-blue-600/20 text-blue-300 border-blue-500/30'
+                        )}>
+                          {num}
+                        </span>
+                        <div className="leading-tight">
+                          <p className="text-xs font-bold text-white">{data.label || 'Tratamiento'}</p>
+                          <p className="text-[10px] text-gray-400 truncate max-w-[110px]">{data.notes || 'Tratamiento clínico'}</p>
+                        </div>
                       </div>
-                    </div>
-                    <ChevronRight className={cn('w-3.5 h-3.5 shrink-0', isSelected ? 'text-amber-400' : 'text-gray-500')} />
-                  </button>
-                );
-              })}
-            </div>
+                      <ChevronRight className={cn('w-3.5 h-3.5 shrink-0', isSelected ? 'text-amber-400' : 'text-gray-500')} />
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-300 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Arcada íntegra y sana (sin intervenciones registradas).</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -161,39 +163,46 @@ export default function CleanPatientOdontogram({
             <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-2">
               Piezas con Historial Clínico ({lowerTreatments.length})
             </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {lowerTreatments.map(([num, data]: any) => {
-                const toothNum = parseInt(num, 10);
-                const isSelected = selectedTooth === toothNum;
-                return (
-                  <button
-                    key={`lower-${num}`}
-                    type="button"
-                    onClick={() => setSelectedTooth && setSelectedTooth(toothNum)}
-                    className={cn(
-                      'text-left p-2.5 rounded-xl border transition-all flex items-center justify-between gap-2 cursor-pointer',
-                      isSelected
-                        ? 'bg-amber-400/15 border-amber-400 text-white shadow-md ring-1 ring-amber-400/40'
-                        : 'bg-slate-900/60 border-gray-800 hover:border-gray-700 text-gray-300 hover:text-white'
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className={cn(
-                        'w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0 border',
-                        isSelected ? 'bg-amber-400 text-slate-950 border-amber-300' : 'bg-orange-500/20 text-orange-300 border-orange-500/30'
-                      )}>
-                        {num}
-                      </span>
-                      <div className="leading-tight">
-                        <p className="text-xs font-bold text-white">{data.label || 'Tratamiento'}</p>
-                        <p className="text-[10px] text-gray-400 truncate max-w-[110px]">{data.notes || 'Tratamiento clínico'}</p>
+{lowerTreatments.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {lowerTreatments.map(([num, data]: any) => {
+                  const toothNum = parseInt(num, 10);
+                  const isSelected = selectedTooth === toothNum;
+                  return (
+                    <button
+                      key={`lower-${num}`}
+                      type="button"
+                      onClick={() => setSelectedTooth && setSelectedTooth(toothNum)}
+                      className={cn(
+                        'text-left p-2.5 rounded-xl border transition-all flex items-center justify-between gap-2 cursor-pointer',
+                        isSelected
+                          ? 'bg-amber-400/15 border-amber-400 text-white shadow-md ring-1 ring-amber-400/40'
+                          : 'bg-slate-900/60 border-gray-800 hover:border-gray-700 text-gray-300 hover:text-white'
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          'w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0 border',
+                          isSelected ? 'bg-amber-400 text-slate-950 border-amber-300' : 'bg-orange-500/20 text-orange-300 border-orange-500/30'
+                        )}>
+                          {num}
+                        </span>
+                        <div className="leading-tight">
+                          <p className="text-xs font-bold text-white">{data.label || 'Tratamiento'}</p>
+                          <p className="text-[10px] text-gray-400 truncate max-w-[110px]">{data.notes || 'Tratamiento clínico'}</p>
+                        </div>
                       </div>
-                    </div>
-                    <ChevronRight className={cn('w-3.5 h-3.5 shrink-0', isSelected ? 'text-amber-400' : 'text-gray-500')} />
-                  </button>
-                );
-              })}
-            </div>
+                      <ChevronRight className={cn('w-3.5 h-3.5 shrink-0', isSelected ? 'text-amber-400' : 'text-gray-500')} />
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-300 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Arcada íntegra y sana (sin intervenciones registradas).</span>
+              </div>
+            )}
           </div>
         </div>
 

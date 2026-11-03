@@ -59,6 +59,7 @@ export async function GET(request: Request) {
       exists: !!patient || authUserExists,
       patient: patient || null,
       hasAuthUser: authUserExists,
+      alreadyRegistered: authUserExists,
       authUserId: authUserId,
       isLinked: !!(patient?.user_id && patient.user_id === authUserId)
     });
@@ -106,6 +107,15 @@ export async function POST(request: Request) {
     const cleanPhone = phone ? phone.replace(/\D/g, '').slice(-10) : null;
     const defaultBranchId = branchId || '00000000-0000-0000-0000-000000000001';
     const defaultBranchName = branchName || (defaultBranchId.includes('0002') ? 'Sucursal Chalma de Guadalupe' : 'Sucursal Balbuena (Matriz)');
+
+    // Validación de Unicidad Estricta: Si es un registro nuevo y ya existe en Auth, notificar
+    if (body.isRegistration && existingAuthUser) {
+      return NextResponse.json({
+        error: 'Este correo ya está registrado, por favor inicia sesión o recupera tu contraseña.',
+        alreadyRegistered: true,
+        exists: true
+      }, { status: 409 });
+    }
 
     // 2. Si se proporcionó contraseña, CONFIGURAR/ACTUALIZAR EN SUPABASE AUTH DE FORMA INMEDIATA
     if (password && password.trim().length >= 6) {

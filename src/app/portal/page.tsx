@@ -77,13 +77,8 @@ type ToothDiagnosis = {
   notes: string;
 };
 
-const DEFAULT_DIAGNOSIS_MAP: Record<number, ToothDiagnosis> = {
-  16: { condition: 'filled', label: 'Resina Estética', badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-500/40', fillColor: '#3b82f6', treatmentName: 'Obturación con Resina Nanohíbrida 3M', appliedDate: '15/Sep/2026', notes: 'Obturación oclusal y mesial en perfecto estado de pulido y sellado.' },
-  26: { condition: 'crown', label: 'Corona Zirconia', badgeColor: 'bg-amber-500/20 text-amber-300 border-amber-500/40', fillColor: '#f59e0b', treatmentName: 'Corona Cerámica Monolítica de Alta Traslucidez', appliedDate: '20/Jul/2026', notes: 'Ajuste marginal verificado sin microfiltración ni irritación gingival.' },
-  36: { condition: 'filled', label: 'Resina Oclusal', badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-500/40', fillColor: '#3b82f6', treatmentName: 'Resina Fotocurable Filtek 3M', appliedDate: '12/Oct/2026', notes: 'Restauración estética post-desinfección profiláctica completada con éxito.' },
-  46: { condition: 'root_canal', label: 'Endodoncia', badgeColor: 'bg-orange-500/20 text-orange-300 border-orange-500/40', fillColor: '#f97316', treatmentName: 'Tratamiento de Conductos Rotatorio WaveOne', appliedDate: '02/Ago/2026', notes: 'Obturación tridimensional biocerámica sin sintomatología ni dolor a la percusión.' },
-  18: { condition: 'missing', label: 'Ausente (Tercer Molar)', badgeColor: 'bg-slate-500/20 text-slate-300 border-slate-500/40', fillColor: '#475569', treatmentName: 'Exodoncia Quirúrgica Atraumática', appliedDate: '10/Mar/2026', notes: 'Cicatrización ósea y gingival completa sin complicaciones.' }
-};
+// Diagnóstico por defecto limpio
+const EMPTY_DIAGNOSIS_MAP: Record<number, ToothDiagnosis> = {};
 
 // ── BITÁCORA CLÍNICA DE PROCEDIMIENTOS REALIZADOS (SIN PRECIOS) ──
 interface ClinicalTreatmentRecord {
@@ -99,80 +94,8 @@ interface ClinicalTreatmentRecord {
   notes: string;
 }
 
-const DEFAULT_CLINICAL_TIMELINE: ClinicalTreatmentRecord[] = [
-  {
-    id: 'tr-01',
-    toothCode: 'FDI #36 (UNS #19)',
-    toothName: 'Primer Molar Inferior Izquierdo',
-    surfaces: 'Oclusal (O)',
-    treatmentName: 'Restauración con Resina Nanohíbrida Filtek 3M',
-    appliedDate: '12 de Octubre, 2026',
-    doctor: 'Dra. Aura Estudillo',
-    license: 'Céd. Prof. 8492019',
-    status: 'Completado',
-    notes: 'Eliminación selectiva de tejido cariado, desinfección cavitaria con clorhexidina al 2% y grabado ácido selectivo.'
-  },
-  {
-    id: 'tr-02',
-    toothCode: 'Arcadas Superior e Inferior',
-    toothName: 'Boca Completa',
-    surfaces: 'Todas las superficies y surcos interdentales',
-    treatmentName: 'Detartraje Ultrasónico y Profilaxis Profunda con Flúor',
-    appliedDate: '12 de Octubre, 2026',
-    doctor: 'Dra. Aura Estudillo',
-    license: 'Céd. Prof. 8492019',
-    status: 'Preventivo',
-    notes: 'Eliminación de cálculo supragingival y subgingival incipiente, pulido con pasta abrasiva fina.'
-  },
-  {
-    id: 'tr-03',
-    toothCode: 'FDI #16 (UNS #3)',
-    toothName: 'Primer Molar Superior Derecho',
-    surfaces: 'Ocluso-Mesial (OM)',
-    treatmentName: 'Obturación Estética Fotopolimerizable con Base Cavitaria',
-    appliedDate: '15 de Septiembre, 2026',
-    doctor: 'Dra. Aura Estudillo',
-    license: 'Céd. Prof. 8492019',
-    status: 'Completado',
-    notes: 'Protección pulpar indirecta con ionómero de vidrio y resina estratificada color A2.'
-  },
-  {
-    id: 'tr-04',
-    toothCode: 'FDI #46 (UNS #30)',
-    toothName: 'Primer Molar Inferior Derecho',
-    surfaces: 'Sistema de Conductos Radiculares',
-    treatmentName: 'Endodoncia Rotatoria y Sellado Biocerámico Tridimensional',
-    appliedDate: '02 de Agosto, 2026',
-    doctor: 'Dra. Aura Estudillo',
-    license: 'Céd. Prof. 8492019',
-    status: 'Completado',
-    notes: 'Instrumentación rotatoria con limas WaveOne Gold, irrigación ultrasónica pasiva y cono único biocerámico.'
-  },
-  {
-    id: 'tr-05',
-    toothCode: 'FDI #26 (UNS #14)',
-    toothName: 'Primer Molar Superior Izquierdo',
-    surfaces: 'Corona Completa',
-    treatmentName: 'Corona Cerámica Monolítica de Zirconia Prettau',
-    appliedDate: '20 de Julio, 2026',
-    doctor: 'Dra. Aura Estudillo',
-    license: 'Céd. Prof. 8492019',
-    status: 'Completado',
-    notes: 'Cementación definitiva adhesiva con RelyX Ultimate. Oclusión comprobada con papel de articular 40µ.'
-  },
-  {
-    id: 'tr-06',
-    toothCode: 'FDI #18 (UNS #1)',
-    toothName: 'Tercer Molar Superior Derecho',
-    surfaces: 'Alvéolo Dentario',
-    treatmentName: 'Exodoncia Simple Atraumática Profiláctica',
-    appliedDate: '10 de Marzo, 2026',
-    doctor: 'Dra. Aura Estudillo',
-    license: 'Céd. Prof. 8492019',
-    status: 'Completado',
-    notes: 'Luxación y extracción sin osteotomía, hemostasia adecuada y puntos de sutura de seda 3-0.'
-  }
-];
+// Bitácora clínica vacía por defecto
+const EMPTY_CLINICAL_TIMELINE: ClinicalTreatmentRecord[] = [];
 
 // ── RECETAS MÉDICAS DIGITALES OFICIALES (NOM-004-SSA3) ──
 interface DigitalPrescription {
@@ -196,109 +119,8 @@ interface DigitalPrescription {
   verificationHash: string;
 }
 
-const DIGITAL_PRESCRIPTIONS: DigitalPrescription[] = [
-  {
-    id: 'rx-2026-0891',
-    folio: 'AUD-RX-2026-0891',
-    date: '12 de Octubre, 2026',
-    title: 'Receta Odontológica: Post-Operatorio de Restauración & Profilaxis',
-    diagnosis: 'Post-operatorio inmediato de restauración oclusal profunda y detartraje ultrasónico.',
-    doctorName: 'Dra. Aura Estudillo',
-    licenseNumber: '8492019',
-    institution: 'Secretaría de Educación Pública • DGP / Fac. Odontología UNAM',
-    medications: [
-      {
-        name: 'Ibuprofeno',
-        presentation: 'Tabletas de 400 mg',
-        dosage: '1 tableta vía oral',
-        frequency: 'Cada 8 horas con alimentos',
-        duration: 'Por 3 días (solo en caso de molestia o inflamación)',
-        indications: 'Tomar después del desayuno, comida y cena para proteger la mucosa gástrica.'
-      },
-      {
-        name: 'Clorhexidina al 0.12%',
-        presentation: 'Solución bucal / Colutorio 250 ml',
-        dosage: '15 ml sin diluir',
-        frequency: 'Cada 12 horas tras el cepillado dental',
-        duration: 'Por 5 días consecutivos',
-        indications: 'Realizar enjuagues durante 1 minuto completo y desechar. No ingerir agua ni alimentos en los 30 minutos posteriores.'
-      }
-    ],
-    generalInstructions: [
-      'Evitar alimentos excesivamente calientes, ácidos, duros o crujientes durante las primeras 24 horas.',
-      'Mantener cepillado suave con cerdas ultrafinas en el cuadrante intervenido sin suspender la higiene.',
-      'En caso de molestia aguda persistente o sangrado inusual, comunicarse de inmediato a la sucursal asignada.'
-    ],
-    verificationHash: 'SHA256: 9b2d8e41f7ac012b88301ec9472e81745dc031f798e'
-  },
-  {
-    id: 'rx-2026-0642',
-    folio: 'AUD-RX-2026-0642',
-    date: '20 de Julio, 2026',
-    title: 'Receta Odontológica: Cementación Protésica & Control de Sensibilidad',
-    diagnosis: 'Post-cementación de corona monolítica de zirconia en molar superior.',
-    doctorName: 'Dra. Aura Estudillo',
-    licenseNumber: '8492019',
-    institution: 'Secretaría de Educación Pública • DGP / Fac. Odontología UNAM',
-    medications: [
-      {
-        name: 'Ketorolaco Sublingual',
-        presentation: 'Tabletas sublinguales de 30 mg',
-        dosage: '1 tableta debajo de la lengua',
-        frequency: 'Cada 12 horas condicional a dolor agudo',
-        duration: 'Máximo 2 días',
-        indications: 'Colocar sublingual hasta disolución total sin masticar ni tragar entero.'
-      },
-      {
-        name: 'Dentífrico Desensibilizante de Nitrato de Potasio',
-        presentation: 'Tubo de pasta dental especializada 75 ml',
-        dosage: 'Aplicación tópica con cepillo suave',
-        frequency: 'Tres veces al día post-alimentos',
-        duration: 'Por 30 días continuo',
-        indications: 'Aplicar suavemente sin enjuagar en exceso para prolongar la acción mineralizante.'
-      }
-    ],
-    generalInstructions: [
-      'No masticar alimentos de consistencia rígida ni hielo sobre la restauración durante las primeras 48 horas.',
-      'Revisión oclusal de rutina agendada a los 14 días para verificar armonía mandibular.'
-    ],
-    verificationHash: 'SHA256: 41fca82d907312ee1098bca417382d61937ffac9018'
-  },
-  {
-    id: 'rx-2026-0315',
-    folio: 'AUD-RX-2026-0315',
-    date: '10 de Marzo, 2026',
-    title: 'Receta Odontológica: Cirugía de Tercer Molar (Exodoncia)',
-    diagnosis: 'Post-quirúrgico de extracción de tercer molar con sutura de cierre primario.',
-    doctorName: 'Dra. Aura Estudillo',
-    licenseNumber: '8492019',
-    institution: 'Secretaría de Educación Pública • DGP / Fac. Odontología UNAM',
-    medications: [
-      {
-        name: 'Amoxicilina con Ácido Clavulánico',
-        presentation: 'Tabletas de 875 mg / 125 mg',
-        dosage: '1 tableta vía oral',
-        frequency: 'Cada 12 horas con alimentos',
-        duration: 'Por 7 días completos',
-        indications: 'Completar el ciclo antibiótico sin suspender aunque no exista sintomatología.'
-      },
-      {
-        name: 'Dexketoprofeno',
-        presentation: 'Sobres de granulado para solución oral 25 mg',
-        dosage: '1 sobre diluido en medio vaso con agua',
-        frequency: 'Cada 8 horas',
-        duration: 'Por 4 días',
-        indications: 'Administrar preferentemente 30 minutos antes de alimentos.'
-      }
-    ],
-    generalInstructions: [
-      'Aplicar hielo local indirecto en carrillo durante 20 minutos por hora durante las primeras 24 horas.',
-      'Dieta blanda y fría durante las primeras 48 horas. Estrictamente prohibido fumar, escupir o usar popotes.',
-      'Retiro de puntos de sutura programado a los 7 días en sucursal.'
-    ],
-    verificationHash: 'SHA256: 88ba92019fe826130aa49129038bc1729013ef1994a'
-  }
-];
+// Recetas vacías por defecto
+const EMPTY_PRESCRIPTIONS: DigitalPrescription[] = [];
 
 export default function PatientPortalPage() {
   const router = useRouter();
@@ -313,6 +135,9 @@ export default function PatientPortalPage() {
   const [selectedPrescription, setSelectedPrescription] = useState<DigitalPrescription | null>(null);
   const [confirmingAppt, setConfirmingAppt] = useState(false);
   const [confirmationNotice, setConfirmationNotice] = useState<string>('');
+  const [diagnosisMap, setDiagnosisMap] = useState<Record<number, ToothDiagnosis>>({});
+  const [clinicalTimeline, setClinicalTimeline] = useState<ClinicalTreatmentRecord[]>([]);
+  const [prescriptions, setPrescriptions] = useState<DigitalPrescription[]>([]);
 
   useEffect(() => {
     async function loadPortal() {
@@ -366,12 +191,117 @@ export default function PatientPortalPage() {
         setPatient(myProfile);
 
         if (myProfile?.id) {
+          // 1. Cargar citas reales del paciente (sin mock)
           const { data: appts } = await supabase
             .from('appointments')
             .select('*')
             .eq('patient_id', myProfile.id)
             .order('start_time', { ascending: true });
           setAppointments(appts || []);
+
+          // 2. Cargar odontograma y bitácora clínica real desde chat_messages / api
+          try {
+            const { data: clinicalRecords } = await supabase
+              .from('chat_messages')
+              .select('*')
+              .eq('patient_id', myProfile.id)
+              .eq('channel_type', 'odontogram_clinical_entry')
+              .order('created_at', { ascending: false });
+
+            if (clinicalRecords && clinicalRecords.length > 0) {
+              const map: Record<number, ToothDiagnosis> = {};
+              const timeline: ClinicalTreatmentRecord[] = [];
+
+              clinicalRecords.forEach((r: any) => {
+                const meta = r.metadata || {};
+                const toothFdi = Number(meta.toothFdi) || 11;
+                const cond = (meta.condition || 'filled').toLowerCase();
+
+                let badgeColor = 'bg-blue-500/20 text-blue-300 border-blue-500/40';
+                let fillColor = '#3b82f6';
+                if (cond.includes('corona') || cond.includes('crown')) {
+                  badgeColor = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+                  fillColor = '#f59e0b';
+                } else if (cond.includes('endo') || cond.includes('canal')) {
+                  badgeColor = 'bg-orange-500/20 text-orange-300 border-orange-500/40';
+                  fillColor = '#f97316';
+                } else if (cond.includes('ausente') || cond.includes('missing') || cond.includes('extrac')) {
+                  badgeColor = 'bg-slate-500/20 text-slate-300 border-slate-500/40';
+                  fillColor = '#475569';
+                }
+
+                if (!map[toothFdi]) {
+                  map[toothFdi] = {
+                    condition: cond as any,
+                    label: meta.procedure || 'Tratamiento Certificado',
+                    badgeColor,
+                    fillColor,
+                    treatmentName: meta.procedure || 'Procedimiento Clínico',
+                    appliedDate: new Date(r.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }),
+                    notes: meta.notes || r.content || 'Procedimiento certificado por la Dirección Médica.'
+                  };
+                }
+
+                timeline.push({
+                  id: r.id,
+                  toothCode: `FDI #${toothFdi} (UNS #${meta.toothUniversal || '?'})`,
+                  toothName: meta.toothName || `Pieza Dental #${toothFdi}`,
+                  surfaces: meta.surfacesSummary || 'General / Oclusal',
+                  treatmentName: meta.procedure || 'Tratamiento Odontológico',
+                  appliedDate: new Date(r.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' }),
+                  doctor: r.sender_name || 'Dra. Aura Estudillo',
+                  license: 'Céd. Prof. 8492019',
+                  status: (meta.status?.includes('Confirmado') || meta.status?.includes('Finalizado')) ? 'Completado' : 'En Seguimiento',
+                  notes: meta.notes || 'Procedimiento certificado bajo protocolo NOM-004-SSA3.'
+                });
+              });
+
+              setDiagnosisMap(map);
+              setClinicalTimeline(timeline);
+              if (clinicalRecords[0]?.metadata?.toothFdi) {
+                setSelectedTooth(Number(clinicalRecords[0].metadata.toothFdi));
+              }
+            } else {
+              setDiagnosisMap({});
+              setClinicalTimeline([]);
+            }
+          } catch (clinicalErr) {
+            console.warn('Nota cargando bitácora clínica:', clinicalErr);
+            setDiagnosisMap({});
+            setClinicalTimeline([]);
+          }
+
+          // 3. Cargar recetas médicas reales NOM-004-SSA3
+          try {
+            const { data: rxRecords } = await supabase
+              .from('chat_messages')
+              .select('*')
+              .eq('patient_id', myProfile.id)
+              .eq('channel_type', 'prescription')
+              .order('created_at', { ascending: false });
+
+            if (rxRecords && rxRecords.length > 0) {
+              const loadedPrescriptions: DigitalPrescription[] = rxRecords.map((rx: any) => ({
+                id: rx.id,
+                folio: rx.metadata?.folio || `AUD-RX-${rx.id.slice(0, 8).toUpperCase()}`,
+                date: new Date(rx.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' }),
+                title: rx.metadata?.title || 'Receta Médica Digital Certificada',
+                diagnosis: rx.metadata?.diagnosis || rx.content || 'Diagnóstico odontológico',
+                doctorName: rx.sender_name || 'Dra. Aura Estudillo',
+                licenseNumber: rx.metadata?.licenseNumber || '8492019',
+                institution: 'Secretaría de Educación Pública • DGP / Fac. Odontología UNAM',
+                medications: rx.metadata?.medications || [],
+                generalInstructions: rx.metadata?.generalInstructions || [],
+                verificationHash: rx.metadata?.verificationHash || 'SHA256: CERTIFICADA-NOM-004-SSA3'
+              }));
+              setPrescriptions(loadedPrescriptions);
+            } else {
+              setPrescriptions([]);
+            }
+          } catch (rxErr) {
+            console.warn('Nota cargando recetas:', rxErr);
+            setPrescriptions([]);
+          }
         }
       } catch (err) {
         console.error('Error cargando portal del paciente:', err);
@@ -409,37 +339,10 @@ export default function PatientPortalPage() {
     return BRANCH_DETAILS['00000000-0000-0000-0000-000000000002'];
   }, [patient, branchDisplay]);
 
-  // Citas Próximas y Pasadas
+  // Citas Próximas y Pasadas (Estrictamente reales)
   const { upcomingAppointment, upcomingList, pastList } = useMemo(() => {
     if (!appointments || appointments.length === 0) {
-      // Cita de demostración por defecto si aún no tiene registradas
-      const mockUpcoming = {
-        id: 'mock-next-appt',
-        start_time: new Date(Date.now() + 86400000 * 4).toISOString(), // Dentro de 4 días
-        title: 'Revisión y Pulido de Resina Oclusal (Control a 30 días)',
-        doctor_name: 'Dra. Aura Estudillo',
-        branch_name: branchInfo.name,
-        status: 'confirmed'
-      };
-      const mockPast = [
-        {
-          id: 'mock-past-1',
-          start_time: '2026-10-12T17:00:00Z',
-          title: 'Restauración Estética con Resina 3M & Profilaxis Profunda',
-          doctor_name: 'Dra. Aura Estudillo',
-          branch_name: branchInfo.name,
-          status: 'completed'
-        },
-        {
-          id: 'mock-past-2',
-          start_time: '2026-09-15T18:30:00Z',
-          title: 'Obturación y Evaluación Oclusal Pieza #16',
-          doctor_name: 'Dra. Aura Estudillo',
-          branch_name: branchInfo.name,
-          status: 'completed'
-        }
-      ];
-      return { upcomingAppointment: mockUpcoming, upcomingList: [mockUpcoming], pastList: mockPast };
+      return { upcomingAppointment: null, upcomingList: [], pastList: [] };
     }
 
     const now = new Date();
@@ -451,20 +354,20 @@ export default function PatientPortalPage() {
       upcomingList: upcoming,
       pastList: past
     };
-  }, [appointments, branchInfo]);
+  }, [appointments]);
 
-  // Diagnóstico del diente seleccionado en el odontograma
+  // Diagnóstico del diente seleccionado en el odontograma (Dinámico y Real)
   const activeToothDiagnosis = useMemo(() => {
-    return DEFAULT_DIAGNOSIS_MAP[selectedTooth] || {
+    return diagnosisMap[selectedTooth] || {
       condition: 'healthy',
       label: 'Pieza Sana',
       badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
       fillColor: '#10b981',
-      treatmentName: 'Esmalte y Dentina en Estado Óptimo',
-      appliedDate: 'Revisión Reciente',
-      notes: 'Sin presencia de caries activas ni requerimiento operatorio.'
+      treatmentName: 'Esmalte y Dentina en Estado Natural Óptimo',
+      appliedDate: 'Sin intervenciones previas',
+      notes: 'Órgano dentario íntegro. No presenta patologías activas ni requerimiento operatorio registrado.'
     };
-  }, [selectedTooth]);
+  }, [selectedTooth, diagnosisMap]);
 
   if (loading) {
     return (
@@ -706,7 +609,7 @@ export default function PatientPortalPage() {
             )}
           >
             <Activity className="w-4 h-4" />
-            Bitácora de Tratamientos Realizados
+            Bitácora de Tratamientos Realizados ({clinicalTimeline.length})
           </button>
 
           <button
@@ -732,7 +635,7 @@ export default function PatientPortalPage() {
             )}
           >
             <FileCheck2 className="w-4 h-4" />
-            Recetas Médicas Digitales ({DIGITAL_PRESCRIPTIONS.length})
+            Recetas Médicas Digitales ({prescriptions.length})
           </button>
         </div>
 
@@ -746,7 +649,7 @@ export default function PatientPortalPage() {
               }}
               selectedTooth={selectedTooth}
               setSelectedTooth={setSelectedTooth}
-              diagnosisMap={DEFAULT_DIAGNOSIS_MAP}
+              diagnosisMap={diagnosisMap}
             />
 
             {/* Tarjeta de Detalle Anatómico de la Pieza Seleccionada */}
@@ -788,58 +691,70 @@ export default function PatientPortalPage() {
               </div>
               <span className="text-xs text-emerald-300 bg-emerald-950/60 border border-emerald-500/40 px-3 py-1 rounded-full font-bold flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                6 Procedimientos Certificados
+                {clinicalTimeline.length} Procedimiento(s) Certificado(s)
               </span>
             </div>
 
-            <div className="space-y-4">
-              {DEFAULT_CLINICAL_TIMELINE.map((item, idx) => (
-                <div
-                  key={item.id}
-                  className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800/80 hover:border-amber-500/30 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
-                >
-                  <div className="space-y-1.5 flex-1">
-                    <div className="flex items-center gap-2.5 flex-wrap">
-                      <span className="px-2.5 py-0.5 rounded-md bg-amber-400/10 text-amber-300 border border-amber-400/30 font-black text-xs">
-                        {item.toothCode}
-                      </span>
-                      <span className="text-xs font-bold text-slate-200">
-                        {item.toothName}
-                      </span>
-                      <span className="text-[10px] text-slate-400">
-                        • Caras: <strong className="text-slate-300">{item.surfaces}</strong>
-                      </span>
+            {clinicalTimeline.length > 0 ? (
+              <div className="space-y-4">
+                {clinicalTimeline.map((item, idx) => (
+                  <div
+                    key={item.id}
+                    className="p-5 rounded-2xl bg-slate-900/70 border border-slate-800/80 hover:border-amber-500/30 transition-all flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+                  >
+                    <div className="space-y-1.5 flex-1">
+                      <div className="flex items-center gap-2.5 flex-wrap">
+                        <span className="px-2.5 py-0.5 rounded-md bg-amber-400/10 text-amber-300 border border-amber-400/30 font-black text-xs">
+                          {item.toothCode}
+                        </span>
+                        <span className="text-xs font-bold text-slate-200">
+                          {item.toothName}
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          • Caras: <strong className="text-slate-300">{item.surfaces}</strong>
+                        </span>
+                      </div>
+
+                      <p className="text-sm font-bold text-white mt-1">
+                        {item.treatmentName}
+                      </p>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        {item.notes}
+                      </p>
+
+                      <div className="flex items-center gap-3 text-[11px] text-slate-400 pt-1">
+                        <span>Fecha: <strong className="text-slate-300">{item.appliedDate}</strong></span>
+                        <span>•</span>
+                        <span>Especialista: <strong className="text-amber-300">{item.doctor}</strong> ({item.license})</span>
+                      </div>
                     </div>
 
-                    <p className="text-sm font-bold text-white mt-1">
-                      {item.treatmentName}
-                    </p>
-                    <p className="text-xs text-slate-300 leading-relaxed">
-                      {item.notes}
-                    </p>
-
-                    <div className="flex items-center gap-3 text-[11px] text-slate-400 pt-1">
-                      <span>Fecha: <strong className="text-slate-300">{item.appliedDate}</strong></span>
-                      <span>•</span>
-                      <span>Especialista: <strong className="text-amber-300">{item.doctor}</strong> ({item.license})</span>
+                    <div className="flex items-center gap-2 self-stretch md:self-auto justify-end">
+                      <span className={cn(
+                        'text-xs font-bold px-3 py-1 rounded-full border',
+                        item.status === 'Completado'
+                          ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                          : item.status === 'Preventivo'
+                            ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
+                            : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                      )}>
+                        {item.status}
+                      </span>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-2 self-stretch md:self-auto justify-end">
-                    <span className={cn(
-                      'text-xs font-bold px-3 py-1 rounded-full border',
-                      item.status === 'Completado'
-                        ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
-                        : item.status === 'Preventivo'
-                          ? 'bg-blue-500/15 text-blue-300 border-blue-500/30'
-                          : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                    )}>
-                      {item.status}
-                    </span>
-                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center rounded-2xl bg-slate-900/40 border border-slate-800 space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 mx-auto">
+                  <Activity className="w-6 h-6" />
                 </div>
-              ))}
-            </div>
+                <h4 className="font-bold text-white text-sm">Expediente Clínico Inicializado (Sin Tratamientos Registrados)</h4>
+                <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                  Tu bitácora clínica se encuentra limpia y lista. En cuanto la Dra. Aura Estudillo o el equipo médico realicen o certifiquen un procedimiento en sucursal Balbuena o Chalma, quedará registrado aquí cronológicamente con total transparencia clínica.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
@@ -922,32 +837,38 @@ export default function PatientPortalPage() {
                 </span>
               </div>
 
-              <div className="space-y-3">
-                {pastList.map((appt, idx) => (
-                  <div
-                    key={appt.id || idx}
-                    className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs"
-                  >
-                    <div className="space-y-0.5">
-                      <p className="font-bold text-white">{appt.title || 'Consulta Odontológica'}</p>
-                      <p className="text-slate-400">
-                        {new Date(appt.start_time).toLocaleDateString('es-MX', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })} • {appt.branch_name || branchInfo.name}
-                      </p>
-                      <p className="text-[11px] text-amber-400/90 font-medium">
-                        Atendida por: Dra. Aura Estudillo (Céd. 8492019)
-                      </p>
-                    </div>
+              {pastList.length > 0 ? (
+                <div className="space-y-3">
+                  {pastList.map((appt, idx) => (
+                    <div
+                      key={appt.id || idx}
+                      className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="space-y-0.5">
+                        <p className="font-bold text-white">{appt.title || 'Consulta Odontológica'}</p>
+                        <p className="text-slate-400">
+                          {new Date(appt.start_time).toLocaleDateString('es-MX', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                          })} • {appt.branch_name || branchInfo.name}
+                        </p>
+                        <p className="text-[11px] text-amber-400/90 font-medium">
+                          Atendida por: Dra. Aura Estudillo (Céd. 8492019)
+                        </p>
+                      </div>
 
-                    <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-3 py-1 rounded-full self-start sm:self-auto">
-                      Atendida &amp; Registrada
-                    </span>
-                  </div>
-                ))}
-              </div>
+                      <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-3 py-1 rounded-full self-start sm:self-auto">
+                        Atendida &amp; Registrada
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-6 text-center rounded-2xl bg-slate-900/30 border border-slate-800/60 text-xs text-slate-400">
+                  Aún no cuentas con consultas históricas concluidas registradas en el sistema.
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -966,47 +887,59 @@ export default function PatientPortalPage() {
                 </p>
               </div>
               <span className="text-xs text-amber-300 bg-amber-400/10 border border-amber-400/30 px-3 py-1 rounded-full font-bold">
-                {DIGITAL_PRESCRIPTIONS.length} Recetas Disponibles
+                {prescriptions.length} Receta(s) Disponible(s)
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {DIGITAL_PRESCRIPTIONS.map((rx) => (
-                <div
-                  key={rx.id}
-                  className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-amber-500/40 transition-all flex flex-col justify-between gap-4 shadow-lg"
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="px-2.5 py-0.5 rounded-md bg-amber-400/10 text-amber-300 border border-amber-400/30 text-[10px] font-black uppercase">
-                        {rx.folio}
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-medium">{rx.date}</span>
-                    </div>
-
-                    <h4 className="font-bold text-white text-sm line-clamp-2">
-                      {rx.title}
-                    </h4>
-                    <p className="text-xs text-slate-300 line-clamp-2">
-                      {rx.diagnosis}
-                    </p>
-
-                    <div className="pt-2 border-t border-slate-800/80 text-[11px] text-slate-400 space-y-1">
-                      <p>Médico: <strong className="text-white">{rx.doctorName}</strong></p>
-                      <p>Cédula: <strong className="text-amber-300">{rx.licenseNumber}</strong></p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => setSelectedPrescription(rx)}
-                    className="w-full py-2.5 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-amber-500/15"
+            {prescriptions.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {prescriptions.map((rx) => (
+                  <div
+                    key={rx.id}
+                    className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-amber-500/40 transition-all flex flex-col justify-between gap-4 shadow-lg"
                   >
-                    <Printer className="w-3.5 h-3.5" />
-                    Ver Receta / Imprimir PDF
-                  </button>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="px-2.5 py-0.5 rounded-md bg-amber-400/10 text-amber-300 border border-amber-400/30 text-[10px] font-black uppercase">
+                          {rx.folio}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-medium">{rx.date}</span>
+                      </div>
+
+                      <h4 className="font-bold text-white text-sm line-clamp-2">
+                        {rx.title}
+                      </h4>
+                      <p className="text-xs text-slate-300 line-clamp-2">
+                        {rx.diagnosis}
+                      </p>
+
+                      <div className="pt-2 border-t border-slate-800/80 text-[11px] text-slate-400 space-y-1">
+                        <p>Médico: <strong className="text-white">{rx.doctorName}</strong></p>
+                        <p>Cédula: <strong className="text-amber-300">{rx.licenseNumber}</strong></p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setSelectedPrescription(rx)}
+                      className="w-full py-2.5 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-amber-500/15"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      Ver Receta / Imprimir PDF
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center rounded-2xl bg-slate-900/40 border border-slate-800 space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center text-amber-400 mx-auto">
+                  <FileCheck2 className="w-6 h-6" />
                 </div>
-              ))}
-            </div>
+                <h4 className="font-bold text-white text-sm">Recetario Digital Vacío</h4>
+                <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                  No cuentas con recetas médicas pendientes. Las prescripciones emitidas bajo normativa NOM-004-SSA3 por la Dra. Aura Estudillo durante tus consultas se certificarán aquí listas para su visualización, descarga e impresión en PDF.
+                </p>
+              </div>
+            )}
           </div>
         )}
 

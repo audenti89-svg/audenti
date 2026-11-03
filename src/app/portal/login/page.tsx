@@ -95,6 +95,7 @@ function PatientLoginForm() {
 
   // Estado de detección previa de paciente en clínica
   const [checkingRecord, setCheckingRecord] = useState(false);
+  const [isEmailAlreadyRegistered, setIsEmailAlreadyRegistered] = useState(false);
   const [existingMatch, setExistingMatch] = useState<{
     id: string;
     full_name?: string;
@@ -162,7 +163,11 @@ function PatientLoginForm() {
         }
 
         if (res.hasAuthUser) {
-          setSuccessMsg('¡Cuenta localizada en el sistema! Configura tu contraseña abajo para acceder inmediatamente.');
+          setIsEmailAlreadyRegistered(true);
+          setErrorMsg('Este correo ya está registrado, por favor inicia sesión o recupera tu contraseña.');
+          setSuccessMsg('');
+        } else {
+          setIsEmailAlreadyRegistered(false);
         }
       }
     } catch (err) {
@@ -307,6 +312,13 @@ function PatientLoginForm() {
       return;
     }
 
+    if (isEmailAlreadyRegistered) {
+      setErrorMsg('Este correo ya está registrado, por favor inicia sesión o recupera tu contraseña.');
+      setLoginEmailOrPhone(cleanEmail);
+      setMode('login');
+      return;
+    }
+
     if (actPassword.length < 6) {
       setErrorMsg('La contraseña debe tener al menos 6 caracteres.');
       return;
@@ -399,6 +411,7 @@ function PatientLoginForm() {
           onClick={() => {
             setMode('login');
             setErrorMsg('');
+            setIsEmailAlreadyRegistered(false);
             setSuccessMsg('');
           }}
           className={`py-2 px-3 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
@@ -416,6 +429,7 @@ function PatientLoginForm() {
           onClick={() => {
             setMode('activate');
             setErrorMsg('');
+            setIsEmailAlreadyRegistered(false);
             setSuccessMsg('');
             if (loginEmailOrPhone.includes('@') && !actEmail) {
               setActEmail(loginEmailOrPhone.trim().toLowerCase());
@@ -593,8 +607,32 @@ function PatientLoginForm() {
               />
             </div>
 
+            {/* AVISO DE CORREO YA REGISTRADO */}
+            {isEmailAlreadyRegistered && (
+              <div className="mt-2 p-3 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs font-semibold text-left space-y-2">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <span className="leading-snug">Este correo ya está registrado, por favor inicia sesión o recupera tu contraseña.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginEmailOrPhone(actEmail.trim().toLowerCase());
+                    setMode('login');
+                    setErrorMsg('');
+                    setSuccessMsg('');
+                    setIsEmailAlreadyRegistered(false);
+                  }}
+                  className="w-full py-2 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>Iniciar Sesión con este Correo</span>
+                </button>
+              </div>
+            )}
+
             {/* FEEDBACK DE VALIDACIÓN CONTRA SUPABASE */}
-            {existingMatch && (
+            {existingMatch && !isEmailAlreadyRegistered && (
               <div className="mt-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-[11px] text-emerald-300 flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
                 <span>
