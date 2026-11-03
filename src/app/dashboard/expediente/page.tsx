@@ -1255,9 +1255,9 @@ export default function ExpedientePage() {
 
               {/* CONTENIDO SUB-TAB: ANAMNESIS / FAMILIA */}
               {leftTab === 'questionnaire' && (
-                <div className="space-y-4 flex-1 overflow-y-auto max-h-[480px] pr-1">
+                <div className="space-y-6 flex-1 overflow-y-auto max-h-[680px] pr-2 scrollbar-thin scrollbar-thumb-amber-500/20 scrollbar-track-transparent">
                   <MedicalQuestionnaire />
-                  <div className="pt-3 border-t border-slate-800">
+                  <div className="pt-4 border-t border-slate-800">
                     <FamilyNucleusManager patient={selectedPatient} patientName={selectedPatient.full_name} />
                   </div>
                 </div>
