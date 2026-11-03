@@ -31,7 +31,7 @@ const BRANCH_OPTIONS = [
   { id: '00000000-0000-0000-0000-000000000002', name: 'Sucursal Chalma de Guadalupe' }
 ];
 
-const INTERNAL_ROLES = ['owner', 'admin', 'director', 'doctor', 'socio', 'trabajador', 'pasante', 'estudiante'];
+const INTERNAL_ROLES = ['owner', 'admin', 'director', 'doctor', 'socio', 'trabajador', 'pasante', 'estudiante', 'superadmin'];
 
 // Determina automáticamente el destino post-login según el rol
 async function determineTargetRoute(supabaseClient: any, authUser: any): Promise<string> {
@@ -143,7 +143,6 @@ function PatientLoginForm() {
 
     setCheckingRecord(true);
     try {
-      // Usar endpoint administrativo para evitar bloqueos por RLS y detectar estado real
       const resp = await fetch(`/api/auth/sync-profile?email=${encodeURIComponent(clean)}`);
       if (resp.ok) {
         const res = await resp.json();
@@ -163,8 +162,7 @@ function PatientLoginForm() {
         }
 
         if (res.hasAuthUser) {
-          // El usuario ya existe en auth.users
-          setSuccessMsg('¡Usuario registrado detectado! Puedes ingresar directamente con tu contraseña en "Iniciar Sesión".');
+          setSuccessMsg('¡Cuenta localizada en el sistema! Configura tu contraseña abajo para acceder inmediatamente.');
         }
       }
     } catch (err) {
@@ -257,7 +255,7 @@ function PatientLoginForm() {
       if (error) throw error;
 
       if (data?.user) {
-        setSuccessMsg('¡Inicio de sesión exitoso! Ingresando a tu expediente dental...');
+        setSuccessMsg('¡Inicio de sesión exitoso! Ingresando a la plataforma...');
 
         // Sincronizar y vincular administrativamente el UUID exacto de auth.users con patients y users
         try {
@@ -282,14 +280,20 @@ function PatientLoginForm() {
       }
     } catch (err: any) {
       console.error('Error al iniciar sesión:', err);
-      setErrorMsg(err?.message === 'Invalid login credentials'
-        ? 'Credenciales incorrectas. Si te diste de alta en clínica pero aún no configuras tu contraseña, haz clic en "Activar Cuenta".'
-        : err?.message || 'Error al iniciar sesión en tu portal.');
+      const isBadCreds = err?.message === 'Invalid login credentials';
+      if (isBadCreds) {
+        setErrorMsg('Contraseña incorrecta. Si es tu primera vez en la plataforma o deseas configurar/restablecer tu contraseña, haz clic en "Activar Cuenta" arriba.');
+        if (loginEmailOrPhone.includes('@')) {
+          setActEmail(loginEmailOrPhone.trim().toLowerCase());
+        }
+      } else {
+        setErrorMsg(err?.message || 'Error al iniciar sesión en tu portal.');
+      }
       setLoadingLogin(false);
     }
   };
 
-  // 3. REGISTRARME / ACTIVAR CUENTA (AUTO-LOGIN SI YA EXISTE, SIN BUCLES INFINITOS)
+  // 3. REGISTRARME / ACTIVAR CUENTA (CONFIGURACIÓN 100% FUNCIONAL Y DIRECTA)
   const handleActivateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -318,103 +322,48 @@ function PatientLoginForm() {
     try {
       const selectedBranchObj = BRANCH_OPTIONS.find(b => b.id === actBranchId) || BRANCH_OPTIONS[0];
 
-      // A) Registrar credenciales en Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: cleanEmail,
-        password: actPassword.trim(),
-        options: {
-          data: {
-            full_name: actFullName.trim() || existingMatch?.full_name || 'Paciente Audenti',
-            role: 'patient',
-            phone: cleanPhone,
-            branch_id: selectedBranchObj.id,
-            branch_name: selectedBranchObj.name,
-          },
-        },
+      // A) Configurar administrativamente la cuenta y contraseña en Supabase Auth y vincular expediente
+      const syncRes = await fetch('/api/auth/sync-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: cleanEmail,
+          password: actPassword.trim(),
+          fullName: actFullName.trim() || existingMatch?.full_name || 'Paciente Audenti',
+          phone: cleanPhone || existingMatch?.phone || null,
+          branchId: selectedBranchObj.id,
+          branchName: selectedBranchObj.name,
+          autoConfirm: true
+        })
       });
 
-      // Si el correo ya tiene usuario de Auth, ELIMINAR EL BUCLE:
-      // Iniciar sesión inmediatamente con la contraseña proporcionada
-      if (authError) {
-        if (
-          authError.message?.toLowerCase().includes('already registered') || 
-          authError.message?.toLowerCase().includes('already in use')
-        ) {
-          const { data: autoLogin, error: autoLoginErr } = await supabase.auth.signInWithPassword({
-            email: cleanEmail,
-            password: actPassword.trim(),
-          });
-
-          if (!autoLoginErr && autoLogin?.user) {
-            setSuccessMsg('¡Bienvenido! Tu cuenta ya estaba registrada. Redirigiendo a tu expediente dental...');
-            try {
-              await fetch('/api/auth/sync-profile', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  userId: autoLogin.user.id,
-                  email: cleanEmail,
-                  fullName: actFullName.trim() || existingMatch?.full_name || 'Paciente Audenti',
-                  phone: cleanPhone,
-                  branchId: selectedBranchObj.id,
-                  branchName: selectedBranchObj.name,
-                  autoConfirm: true
-                })
-              });
-            } catch {}
-
-            const target = await determineTargetRoute(supabase, autoLogin.user);
-            setTimeout(() => {
-              window.location.href = target;
-            }, 400);
-            return;
-          }
-
-          // Si la contraseña no coincidió con la de Auth, alternar a Iniciar Sesión limpiamente
-          setErrorMsg('Este correo ya cuenta con usuario activo en la clínica. Ingresa tu contraseña en la pestaña "Iniciar Sesión" para acceder.');
-          setLoginEmailOrPhone(cleanEmail);
-          setMode('login');
-          setLoadingActivate(false);
-          return;
-        }
-        throw authError;
+      const syncResult = await syncRes.json();
+      if (!syncRes.ok || syncResult.error) {
+        throw new Error(syncResult.error || 'No se pudo configurar la cuenta en el servidor.');
       }
 
-      // B) Vincular tabla patients y users con el UUID exacto de authData.user.id
-      const targetUserId = authData?.user?.id || null;
-      try {
-        await fetch('/api/auth/sync-profile', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: targetUserId,
-            email: cleanEmail,
-            fullName: actFullName.trim() || existingMatch?.full_name || 'Paciente Audenti',
-            phone: cleanPhone || existingMatch?.phone || null,
-            branchId: selectedBranchObj.id,
-            branchName: selectedBranchObj.name,
-            autoConfirm: true
-          })
-        });
-      } catch (syncErr) {
-        console.warn('Nota sync-profile en activación:', syncErr);
-      }
+      setSuccessMsg('¡Contraseña configurada con éxito! Ingresando a tu expediente...');
 
-      // C) Si se obtuvo sesión inmediata o si iniciamos sesión con la clave provista
-      setSuccessMsg('¡Cuenta activada con éxito! Redirigiendo a tu expediente dental...');
-      const { data: directLogin } = await supabase.auth.signInWithPassword({
+      // B) Iniciar sesión de forma inmediata con la contraseña recién establecida
+      const { data: directLogin, error: directLoginErr } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
         password: actPassword.trim(),
       });
 
-      if (directLogin?.session) {
+      if (directLoginErr) {
+        console.warn('Nota login inmediato post-sync:', directLoginErr.message);
+      }
+
+      if (directLogin?.user) {
+        const target = await determineTargetRoute(supabase, directLogin.user);
         setTimeout(() => {
-          window.location.href = '/portal';
-        }, 500);
+          window.location.href = target;
+        }, 300);
       } else {
+        const fallbackTarget = syncResult.targetRoute || (isSystemAdminEmail(cleanEmail) ? '/dashboard' : '/portal');
         setTimeout(() => {
-          window.location.href = '/portal';
-        }, 800);
+          window.location.href = fallbackTarget;
+        }, 500);
       }
     } catch (err: any) {
       console.error('Error al activar cuenta de paciente:', err);
@@ -468,6 +417,10 @@ function PatientLoginForm() {
             setMode('activate');
             setErrorMsg('');
             setSuccessMsg('');
+            if (loginEmailOrPhone.includes('@') && !actEmail) {
+              setActEmail(loginEmailOrPhone.trim().toLowerCase());
+              handleCheckEmailInClinic(loginEmailOrPhone.trim().toLowerCase());
+            }
           }}
           className={`py-2 px-3 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
             mode === 'activate'
@@ -567,8 +520,9 @@ function PatientLoginForm() {
               onClick={() => {
                 setMode('activate');
                 if (loginEmailOrPhone.includes('@')) {
-                  setActEmail(loginEmailOrPhone);
-                  handleCheckEmailInClinic(loginEmailOrPhone);
+                  const clean = loginEmailOrPhone.trim().toLowerCase();
+                  setActEmail(clean);
+                  handleCheckEmailInClinic(clean);
                 }
               }}
               className="w-full mt-2 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-400/40 text-xs font-black transition-colors flex items-center justify-center gap-2 cursor-pointer"
@@ -609,9 +563,9 @@ function PatientLoginForm() {
           {/* BANNER INFORMATIVO UPSERT */}
           <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-[11px] text-slate-300 leading-snug">
             <span className="text-amber-300 font-bold block mb-0.5">
-              Activación Inteligente Sin Duplicados:
+              Activación Inmediata Sin Duplicados:
             </span>
-            Ingresa el correo que diste en clínica. Si ya existe en Supabase, tu cuenta se vinculará directamente a tu historial clínico y citas sin duplicar tu expediente.
+            Ingresa tu correo registrado en clínica para asignar tu contraseña de acceso seguro. Si eres un paciente nuevo, tu cuenta se creará y vinculará al instante.
           </div>
 
           {/* CORREO ELECTRÓNICO */}
@@ -718,11 +672,18 @@ function PatientLoginForm() {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
-                  placeholder="Mín. 6 carácteres"
+                  placeholder="Mín. 6 caracteres"
                   value={actPassword}
                   onChange={(e) => setActPassword(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-xl text-xs font-medium text-white placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-amber-400 transition-all"
+                  className="w-full pl-9 pr-8 py-2.5 bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-xl text-xs font-medium text-white placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-amber-400 transition-all"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
               </div>
             </div>
 
@@ -738,8 +699,15 @@ function PatientLoginForm() {
                   placeholder="Repite contraseña"
                   value={actConfirmPassword}
                   onChange={(e) => setActConfirmPassword(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-xl text-xs font-medium text-white placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-amber-400 transition-all"
+                  className="w-full pl-9 pr-8 py-2.5 bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-xl text-xs font-medium text-white placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-amber-400 transition-all"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
               </div>
             </div>
           </div>
@@ -750,7 +718,7 @@ function PatientLoginForm() {
             disabled={loadingActivate || loadingGoogle}
             className="w-full py-3 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-colors flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 cursor-pointer disabled:opacity-60 mt-3"
           >
-            {loadingActivate ? 'Validando y Vinculando Expediente...' : 'Activar Cuenta y Abrir Mi Expediente'}
+            {loadingActivate ? 'Configurando y Entrando...' : 'Activar Cuenta y Abrir Mi Expediente'}
           </button>
 
           {/* VOLVER A INICIAR SESIÓN */}
