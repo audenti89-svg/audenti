@@ -6,10 +6,12 @@ import { isSystemAdminEmail } from '@/lib/auth/admin-emails';
 /**
  * API DE VINCULACIÓN EXACTA Y ACTIVACIÓN UNIVERSAL AUTH-SUPABASE (Audenti 2027)
  * Arquitecto: Ricardo Sánchez
+ * Blindaje ECC: Protección contra Account Takeover y Reseteo Arbitrario de Contraseñas
  * 
  * Utiliza arquitectura dual:
- * 1. Admin Service Role para operaciones Auth (admin.auth.admin): actualizar y crear contraseñas.
- * 2. DB Client para tablas de datos (patients, etc.), garantizando que nunca se produzca error 42501.
+ * 1. Admin Service Role exclusivo para creación inicial de cuentas y auto-confirmación controlada.
+ *    PROHIBIDO: Sobrescribir contraseñas de cuentas preexistentes en esta ruta pública.
+ * 2. DB Client para tablas de datos (patients, etc.), garantizando integridad referencial.
  */
 
 function getDbClient() {
@@ -108,75 +110,56 @@ export async function POST(request: Request) {
     const defaultBranchId = branchId || '00000000-0000-0000-0000-000000000001';
     const defaultBranchName = branchName || (defaultBranchId.includes('0002') ? 'Sucursal Chalma de Guadalupe' : 'Sucursal Balbuena (Matriz)');
 
-    // Validación de Unicidad Estricta: Si es un registro nuevo y ya existe en Auth, notificar
-    if (body.isRegistration && existingAuthUser) {
-      return NextResponse.json({
-        error: 'Este correo ya está registrado, por favor inicia sesión o recupera tu contraseña.',
-        alreadyRegistered: true,
-        exists: true
-      }, { status: 409 });
-    }
+    // ── BLINDAJE ECC P0: CONTROL ESTRICTO DE MODIFICACIÓN DE CONTRASEÑA ──
+    // Si el usuario ya existe en Supabase Auth, queda TERMINANTEMENTE PROHIBIDO
+    // sobrescribir su contraseña en esta ruta pública.
+    if (existingAuthUser) {
+      if (password) {
+        return NextResponse.json({
+          error: 'Este correo ya cuenta con una cuenta registrada. Por favor inicia sesión con tu contraseña o solicítala mediante recuperación oficial.',
+          alreadyRegistered: true,
+          exists: true
+        }, { status: 409 });
+      }
 
-    // 2. Si se proporcionó contraseña, CONFIGURAR/ACTUALIZAR EN SUPABASE AUTH DE FORMA INMEDIATA
-    if (password && password.trim().length >= 6) {
-      if (existingAuthUser && targetUserId) {
-        // Usuario ya existe: actualizar su contraseña y auto-confirmar su email
-        const updatePayload: any = {
-          password: password.trim(),
-          email_confirm: true,
-          user_metadata: {
-            ...(existingAuthUser.user_metadata || {}),
-            full_name: fullName || existingAuthUser.user_metadata?.full_name || 'Paciente Audenti',
-            phone: cleanPhone || existingAuthUser.user_metadata?.phone,
-            role: isSystemAdminEmail(cleanEmail) ? 'superadmin' : 'patient',
-            doctor_type: isSystemAdminEmail(cleanEmail) ? 'superadmin' : null,
-            branch_id: defaultBranchId,
-            branch_name: defaultBranchName,
-            email_verified: true,
-          }
-        };
-
-        const { error: updPassErr } = await admin.auth.admin.updateUserById(targetUserId, updatePayload);
-        if (updPassErr) {
-          console.error('[sync-profile POST] Error actualizando contraseña de usuario existente:', updPassErr);
-          throw new Error('No se pudo actualizar la contraseña: ' + updPassErr.message);
-        }
-      } else {
-        // Usuario no existe en Auth: crearlo administrativamente con email auto-confirmado
-        const { data: createdData, error: createAuthErr } = await admin.auth.admin.createUser({
-          email: cleanEmail,
-          password: password.trim(),
-          email_confirm: true,
-          user_metadata: {
-            full_name: fullName || 'Paciente Audenti',
-            phone: cleanPhone || '5500000000',
-            role: isSystemAdminEmail(cleanEmail) ? 'superadmin' : 'patient',
-            branch_id: defaultBranchId,
-            branch_name: defaultBranchName,
-          }
-        });
-
-        if (createAuthErr) {
-          console.error('[sync-profile POST] Error creando usuario en Supabase Auth:', createAuthErr);
-          throw new Error('No se pudo registrar la cuenta en autenticación: ' + createAuthErr.message);
-        }
-
-        if (createdData?.user) {
-          targetUserId = createdData.user.id;
+      // Sincronización post-login legítima o confirmación administrativa (sin alterar password)
+      if (autoConfirm && targetUserId) {
+        try {
+          await admin.auth.admin.updateUserById(targetUserId, {
+            email_confirm: true,
+            user_metadata: {
+              ...(existingAuthUser.user_metadata || {}),
+              full_name: fullName || existingAuthUser.user_metadata?.full_name || 'Paciente Audenti',
+              phone: cleanPhone || existingAuthUser.user_metadata?.phone,
+              email_verified: true,
+            }
+          });
+        } catch (confErr) {
+          console.warn('[sync-profile POST] Error en confirmación administrativa:', confErr);
         }
       }
-    } else if (targetUserId && autoConfirm) {
-      // Auto-confirmación sin cambio de contraseña
-      try {
-        await admin.auth.admin.updateUserById(targetUserId, {
-          email_confirm: true,
-          user_metadata: {
-            full_name: fullName || 'Paciente Audenti',
-            role: 'patient'
-          }
-        });
-      } catch (confErr) {
-        console.warn('[sync-profile POST] Error en confirmación administrativa:', confErr);
+    } else if (password && password.trim().length >= 6) {
+      // 2. Registro administrativo EXCLUSIVO para cuentas NUEVAS
+      const { data: createdData, error: createAuthErr } = await admin.auth.admin.createUser({
+        email: cleanEmail,
+        password: password.trim(),
+        email_confirm: true,
+        user_metadata: {
+          full_name: fullName || 'Paciente Audenti',
+          phone: cleanPhone || '5500000000',
+          role: isSystemAdminEmail(cleanEmail) ? 'superadmin' : 'patient',
+          branch_id: defaultBranchId,
+          branch_name: defaultBranchName,
+        }
+      });
+
+      if (createAuthErr) {
+        console.error('[sync-profile POST] Error creando usuario en Supabase Auth:', createAuthErr);
+        throw new Error('No se pudo registrar la cuenta en autenticación: ' + createAuthErr.message);
+      }
+
+      if (createdData?.user) {
+        targetUserId = createdData.user.id;
       }
     }
 
