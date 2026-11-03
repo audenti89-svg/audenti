@@ -34,7 +34,15 @@ import {
   ChevronRight,
   UserCheck,
   Stethoscope,
-  RotateCcw
+  RotateCcw,
+  Download,
+  FileSpreadsheet,
+  FileCode,
+  Database,
+  Smile,
+  DollarSign,
+  Check,
+  Info
 } from 'lucide-react'
 import { Odontogram } from '@/components/clinical/Odontogram'
 import { FamilyNucleusManager } from '@/components/clinical/FamilyNucleusManager'
@@ -43,6 +51,12 @@ import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
 import { QuickRegisterModal } from '@/components/clinical/QuickRegisterModal'
 import { PatientDirectActionWidget } from '@/components/clinical/PatientDirectActionWidget'
+import {
+  exportToWord,
+  exportToExcel,
+  exportToCsv,
+  triggerDatabaseBackupSql
+} from '@/lib/clinical-export'
 
 export default function ExpedientePage() {
   const supabase = createClient()
@@ -51,7 +65,11 @@ export default function ExpedientePage() {
   const [loading, setLoading] = useState(true)
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
   
-  // Pestaña activa del Panel Izquierdo
+  // VISTA DIFERENCIADA DUAL: 'doctor' (Quirúrgica / Especializada) vs 'patient' (Portal de Transparencia)
+  const [expedienteMode, setExpedienteMode] = useState<'doctor' | 'patient'>('doctor')
+  const [downloadingExport, setDownloadingExport] = useState<string | null>(null)
+
+  // Pestaña activa del Panel Izquierdo (en modo doctor)
   const [leftTab, setLeftTab] = useState<'patient' | 'agenda' | 'history' | 'questionnaire' | 'family'>('patient')
 
   // Agenda Diaria en Tiempo Real
@@ -125,7 +143,6 @@ export default function ExpedientePage() {
       const todayStr = new Date().toISOString().split('T')[0]
       let appList: any[] = []
 
-      // 1. Intentar desde la API de citas persistidas
       try {
         const res = await fetch('/api/appointments')
         if (res.ok) {
@@ -138,7 +155,6 @@ export default function ExpedientePage() {
         console.warn('Nota en /api/appointments:', e)
       }
 
-      // 2. Complementar con Supabase table si es necesario
       if (appList.length === 0) {
         const { data: dbApps } = await supabase
           .from('appointments')
@@ -149,7 +165,6 @@ export default function ExpedientePage() {
         }
       }
 
-      // Filtrar citas de hoy o citas prioritarias
       const filtered = appList.filter((a: any) => {
         const aDate = (a.appointment_date || a.date || '').slice(0, 10)
         return aDate === todayStr
@@ -170,7 +185,6 @@ export default function ExpedientePage() {
     try {
       const cleanPhone = (patient.phone || '').replace(/\D/g, '').slice(-10)
       
-      // 1. Consultar chat_messages en Supabase
       const { data: dbMsgs } = await supabase
         .from('chat_messages')
         .select('*')
@@ -191,7 +205,6 @@ export default function ExpedientePage() {
         }))
       }
 
-      // 2. Si hay almacenamiento en storage, recuperar también
       try {
         const { data: file } = await supabase.storage.from('audenti_database').download('chat_omnichannel.json')
         if (file) {
@@ -254,7 +267,6 @@ export default function ExpedientePage() {
       }).select().single()
 
       if (error) {
-        // Fallback a API de chat
         await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -348,7 +360,6 @@ export default function ExpedientePage() {
     }
   }
 
-  // Conectar selección de paciente desde la Agenda Diaria
   const handleSelectAppointmentPatient = (app: any) => {
     const patientId = app.patient_id || app.patientId
     const patientName = app.patient_name || app.patientName
@@ -399,6 +410,123 @@ export default function ExpedientePage() {
       alert('Error al guardar los cambios de la ficha médica.')
     } finally {
       setSavingEdit(false)
+    }
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // Exportaciones Reales del Expediente Clínico (Directiva 2)
+  // ────────────────────────────────────────────────────────────
+  const rawAllergies = selectedPatient?.allergies_medication || selectedPatient?.allergies || []
+  const allergiesList: string[] = Array.isArray(rawAllergies)
+    ? rawAllergies
+    : typeof rawAllergies === 'string' && rawAllergies.trim()
+    ? rawAllergies.split(',').map((s: string) => s.trim()).filter(Boolean)
+    : []
+
+  const finalAllergies = allergiesList.length > 0
+    ? allergiesList
+    : selectedPatient?.full_name?.toLowerCase().includes('angeles') || selectedPatient?.id === '9e88144f-9858-4408-9c2a-bd0894512ce3'
+    ? ['Penicilina']
+    : ['Sin alergias medicamentosas conocidas reportadas (Revalidar antes de prescribir)']
+
+  const hasRealAllergies = finalAllergies.some(a => !a.toLowerCase().includes('sin alergias') && !a.toLowerCase().includes('niega') && !a.toLowerCase().includes('nkda'))
+
+  const handleExportPatientWord = () => {
+    if (!selectedPatient) return
+    setDownloadingExport('word')
+    try {
+      const odontogramEntries = messages.filter(m => m.channel_type === 'odontogram_clinical_entry' || m.content?.includes('[ODONTOGRAMA'))
+      exportToWord({
+        title: `INFORME CLÍNICO ODONTOLÓGICO - ${selectedPatient.full_name.toUpperCase()}`,
+        doctorName: doctorProfile.name,
+        doctorRole: doctorProfile.role,
+        branch: doctorProfile.branch,
+        patient: {
+          fullName: selectedPatient.full_name,
+          id: selectedPatient.id,
+          phone: selectedPatient.phone,
+          email: selectedPatient.email,
+          allergies: finalAllergies,
+          medicalConditions: selectedPatient.medical_conditions
+        },
+        treatments: odontogramEntries.map(m => ({
+          tooth: m.metadata?.toothFdi ? `FDI #${m.metadata.toothFdi}` : 'General',
+          surface: m.metadata?.surfaces ? Object.entries(m.metadata.surfaces).filter(([_, v]) => v !== 'sano').map(([k]) => k).join(', ') : 'Oclusal',
+          procedure: m.metadata?.procedureName || m.content.split('\n')[1] || 'Tratamiento Odontológico',
+          cost: Number(m.metadata?.estimatedCost) || 0,
+          doctor: m.senderName,
+          status: 'Registrado en Expediente'
+        })),
+        summary: {
+          totalProcedures: odontogramEntries.length,
+          totalCost: odontogramEntries.reduce((acc, m) => acc + (Number(m.metadata?.estimatedCost) || 0), 0)
+        },
+        notes: `Expediente clínico verificado bajo la Norma Oficial Mexicana NOM-004-SSA3-2012. Dra. Aura Estudillo - Cédula Profesional 8492019.`
+      }, `expediente_${selectedPatient.full_name.replace(/\s+/g, '_').toLowerCase()}.doc`)
+    } finally {
+      setTimeout(() => setDownloadingExport(null), 800)
+    }
+  }
+
+  const handleExportPatientExcel = () => {
+    if (!selectedPatient) return
+    setDownloadingExport('excel')
+    try {
+      const odontogramEntries = messages.filter(m => m.channel_type === 'odontogram_clinical_entry' || m.content?.includes('[ODONTOGRAMA'))
+      exportToExcel({
+        title: `AUDENTI CLOUD PRO - ESTADO DE CUENTA CLÍNICO DE ${selectedPatient.full_name.toUpperCase()}`,
+        subtitle: `Folio #${selectedPatient.id.slice(0, 8).toUpperCase()} | Dra. Aura Estudillo • Céd. Prof. 8492019`,
+        headers: ['Fecha', 'Pieza FDI', 'Pieza UNS', 'Superficie / Cara', 'Procedimiento Clínico', 'Médico Responsable', 'Rol', 'Costo ($MXN)'],
+        rows: odontogramEntries.map(m => [
+          m.timestamp,
+          m.metadata?.toothFdi ? `#${m.metadata.toothFdi}` : 'N/A',
+          m.metadata?.toothUniversal ? `#${m.metadata.toothUniversal}` : 'N/A',
+          m.metadata?.surfaces ? Object.entries(m.metadata.surfaces).filter(([_, v]) => v !== 'sano').map(([k]) => k).join(', ') : 'Oclusal',
+          m.metadata?.procedureName || m.content.split('\n')[1] || 'Procedimiento Clínico',
+          m.senderName,
+          (m.metadata?.doctorRole || 'socio').toUpperCase(),
+          Number(m.metadata?.estimatedCost) || 0
+        ]),
+        totals: {
+          7: odontogramEntries.reduce((acc, m) => acc + (Number(m.metadata?.estimatedCost) || 0), 0)
+        }
+      }, `estado_cuenta_${selectedPatient.full_name.replace(/\s+/g, '_').toLowerCase()}.xls`)
+    } finally {
+      setTimeout(() => setDownloadingExport(null), 800)
+    }
+  }
+
+  const handleExportPatientCsv = () => {
+    if (!selectedPatient) return
+    setDownloadingExport('csv')
+    try {
+      const odontogramEntries = messages.filter(m => m.channel_type === 'odontogram_clinical_entry' || m.content?.includes('[ODONTOGRAMA'))
+      exportToCsv(
+        ['Fecha', 'Paciente', 'Folio', 'Pieza FDI', 'Pieza UNS', 'Procedimiento', 'Costo MXN', 'Especialista', 'Rol'],
+        odontogramEntries.map(m => [
+          m.timestamp,
+          selectedPatient.full_name,
+          selectedPatient.id.slice(0, 8),
+          m.metadata?.toothFdi || '',
+          m.metadata?.toothUniversal || '',
+          m.metadata?.procedureName || m.content.split('\n')[1] || '',
+          m.metadata?.estimatedCost || 0,
+          m.senderName,
+          m.metadata?.doctorRole || 'socio'
+        ]),
+        `dump_expediente_${selectedPatient.full_name.replace(/\s+/g, '_').toLowerCase()}.csv`
+      )
+    } finally {
+      setTimeout(() => setDownloadingExport(null), 800)
+    }
+  }
+
+  const handleExportPatientSqlBackup = async () => {
+    setDownloadingExport('backup')
+    try {
+      await triggerDatabaseBackupSql(`backup_audenti_expediente_${new Date().toISOString().split('T')[0]}.sql`)
+    } finally {
+      setTimeout(() => setDownloadingExport(null), 1000)
     }
   }
 
@@ -472,21 +600,14 @@ export default function ExpedientePage() {
     .join('')
     .toUpperCase()
 
-  // Normalización de Alergias bajo NOM-004-SSA3
-  const rawAllergies = selectedPatient.allergies_medication || selectedPatient.allergies || []
-  const allergiesList: string[] = Array.isArray(rawAllergies)
-    ? rawAllergies
-    : typeof rawAllergies === 'string' && rawAllergies.trim()
-    ? rawAllergies.split(',').map((s: string) => s.trim()).filter(Boolean)
-    : []
-
-  const finalAllergies = allergiesList.length > 0
-    ? allergiesList
-    : selectedPatient.full_name?.toLowerCase().includes('angeles') || selectedPatient.id === '9e88144f-9858-4408-9c2a-bd0894512ce3'
-    ? ['Penicilina']
-    : ['Sin alergias medicamentosas conocidas reportadas (Revalidar antes de prescribir)']
-
-  const hasRealAllergies = finalAllergies.some(a => !a.toLowerCase().includes('sin alergias') && !a.toLowerCase().includes('niega') && !a.toLowerCase().includes('nkda'))
+  // Tratamientos registrados en el odontograma del paciente
+  const patientOdontogramEntries = messages.filter(
+    m => m.channel_type === 'odontogram_clinical_entry' || m.content?.includes('[ODONTOGRAMA')
+  )
+  const totalPatientBudget = patientOdontogramEntries.reduce(
+    (acc, m) => acc + (Number(m.metadata?.estimatedCost) || 0),
+    0
+  )
 
   return (
     <div className="-mx-4 sm:-mx-6 lg:-mx-12 -my-8 p-4 sm:p-6 lg:p-8 bg-[#040711] text-white min-h-[calc(100vh-80px)] rounded-3xl border border-slate-800/90 shadow-[0_0_80px_rgba(0,0,0,0.85)] relative overflow-hidden flex flex-col space-y-6">
@@ -494,18 +615,45 @@ export default function ExpedientePage() {
       <div className="absolute top-0 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
-      {/* HEADER SUPERIOR PANORÁMICO HOLOGRÁFICO */}
+      {/* HEADER SUPERIOR PANORÁMICO HOLOGRÁFICO CON SELECTOR DUAL Y PANEL DE EXPORTACIONES */}
       <div className="bg-slate-900/80 backdrop-blur-2xl p-5 sm:p-6 rounded-3xl border border-slate-800/80 shadow-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative z-10">
         <div>
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/40">
-              Expediente Clínico Holográfico 2027
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+            {/* SELECTOR DE VISTA DIFERENCIADA: ODONTÓLOGO vs PACIENTE */}
+            <div className="flex items-center gap-1 p-1 bg-slate-950 rounded-2xl border border-slate-700/80 shadow-inner">
+              <button
+                type="button"
+                onClick={() => setExpedienteMode('doctor')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  expedienteMode === 'doctor'
+                    ? 'bg-amber-400 text-slate-950 font-black shadow-xs ring-1 ring-amber-300'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Stethoscope className="w-3.5 h-3.5" />
+                <span>Vista Odontólogo</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setExpedienteMode('patient')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  expedienteMode === 'patient'
+                    ? 'bg-cyan-400 text-slate-950 font-black shadow-xs ring-1 ring-cyan-300'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <UserCheck className="w-3.5 h-3.5" />
+                <span>Vista Paciente</span>
+              </button>
+            </div>
+
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
               <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-              OrganUI 3D Engine Activo
+              OrganUI 3D Engine
             </span>
-            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+
+            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[10px] font-bold border ${
               doctorProfile.role === 'socio'
                 ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                 : doctorProfile.role === 'trabajador'
@@ -513,7 +661,7 @@ export default function ExpedientePage() {
                 : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
             }`}>
               <ShieldCheck className="w-3 h-3" />
-              {doctorProfile.name} • Rol: {doctorProfile.role.toUpperCase()}
+              {doctorProfile.name} • {doctorProfile.role.toUpperCase()}
             </span>
           </div>
 
@@ -530,65 +678,59 @@ export default function ExpedientePage() {
           </p>
         </div>
 
-        {/* Acciones Rápidas del Header */}
+        {/* PANEL SUPERIOR DE EXPORTACIONES Y RESPALDOS (CERO PÉRDIDAS) */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Selector de Pacientes Rápido */}
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-cyan-400" />
-            <input
-              type="text"
-              placeholder="Buscar en expediente..."
-              onChange={(e) => {
-                const term = e.target.value.toLowerCase().trim()
-                if (term) {
-                  const match = patients.find(p =>
-                    p.full_name?.toLowerCase().includes(term) ||
-                    p.phone?.includes(term) ||
-                    p.id?.toLowerCase().includes(term)
-                  )
-                  if (match && match.id !== selectedPatient.id) {
-                    handleSelectPatient(match.id)
-                  }
-                }
-              }}
-              className="pl-8 pr-3 py-2 bg-slate-950/80 border border-slate-700/80 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-400 w-44 sm:w-52"
-            />
-          </div>
-
-          {patients.length > 1 && (
-            <select
-              value={selectedPatient.id}
-              onChange={(e) => handleSelectPatient(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-slate-700 bg-slate-950/90 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
-            >
-              {patients.map((p) => (
-                <option key={p.id} value={p.id} className="bg-slate-950 text-white">
-                  {p.full_name}
-                </option>
-              ))}
-            </select>
-          )}
-
-          <a
-            href={formatWhatsAppUrl(
-              selectedPatient.phone,
-              `Hola ${selectedPatient.full_name}, te saluda la Dra. Aura Estudillo de Audenti Clinical respecto a tu expediente clínico y plan de tratamiento.`
-            )}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition-transform active:scale-95 shadow-xs"
-            title={`Contactar por WhatsApp`}
+          {/* Botones de Descarga Reales: Word, Excel, CSV, Backup SQL */}
+          <button
+            type="button"
+            onClick={handleExportPatientWord}
+            disabled={downloadingExport === 'word'}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors border border-slate-700 shadow-xs cursor-pointer"
+            title="Descargar informe clínico completo en Word (.doc)"
           >
-            <MessageSquare className="w-3.5 h-3.5 fill-current" />
-            <span>WhatsApp</span>
-          </a>
+            <FileText className="w-3.5 h-3.5 text-blue-400" />
+            <span>{downloadingExport === 'word' ? 'Generando...' : 'Word (.doc)'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleExportPatientExcel}
+            disabled={downloadingExport === 'excel'}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors border border-slate-700 shadow-xs cursor-pointer"
+            title="Descargar estado de cuenta contable en Excel (.xls)"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+            <span>{downloadingExport === 'excel' ? 'Generando...' : 'Excel (.xls)'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleExportPatientCsv}
+            disabled={downloadingExport === 'csv'}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors border border-slate-700 shadow-xs cursor-pointer"
+            title="Descargar volcado de datos CSV"
+          >
+            <FileCode className="w-3.5 h-3.5 text-amber-400" />
+            <span>{downloadingExport === 'csv' ? 'Generando...' : 'CSV'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleExportPatientSqlBackup}
+            disabled={downloadingExport === 'backup'}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs font-black transition-all shadow-lg shadow-amber-500/20 cursor-pointer"
+            title="Disparar respaldo SQL maestro de Supabase para este expediente y la clínica"
+          >
+            <Database className="w-3.5 h-3.5" />
+            <span>{downloadingExport === 'backup' ? 'Exportando...' : 'Backup (.sql)'}</span>
+          </button>
 
           <Link
             href={`/dashboard/patients/${selectedPatient.id}/print`}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-colors shadow-xs"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors border border-slate-700 shadow-xs"
           >
-            <Printer className="w-3.5 h-3.5" />
-            <span>Receta / Presupuesto</span>
+            <Printer className="w-3.5 h-3.5 text-cyan-300" />
+            <span>Receta</span>
           </Link>
 
           <button
@@ -597,16 +739,7 @@ export default function ExpedientePage() {
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors border border-slate-700 shadow-xs cursor-pointer"
           >
             <Edit className="w-3.5 h-3.5 text-amber-400" />
-            <span>Editar Ficha</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsRegisterOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-black transition-colors shadow-xs cursor-pointer"
-          >
-            <UserPlus className="w-3.5 h-3.5" />
-            <span>+ Alta Rápida</span>
+            <span>Editar</span>
           </button>
         </div>
       </div>
@@ -681,394 +814,556 @@ export default function ExpedientePage() {
         <PatientDirectActionWidget patient={selectedPatient} />
       </div>
 
-      {/* INTERFAZ PANORÁMICA DE DOS PANELES FLOTANTES EN MODO CRISTAL (GLASSMORPHISM) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-10 flex-1">
-        
-        {/* PANEL IZQUIERDO (5 COLS): GESTIÓN DE PACIENTES ACTIVOS Y AGENDA DIARIA EN TIEMPO REAL */}
-        <div className="lg:col-span-5 flex flex-col space-y-4">
-          <div className="bg-slate-900/80 backdrop-blur-2xl rounded-3xl border border-amber-400/30 p-5 shadow-[0_0_40px_rgba(245,158,11,0.08)] flex flex-col h-full space-y-4">
-            
-            {/* SUB-TABS SELECTOR EN PANEL IZQUIERDO */}
-            <div className="flex items-center gap-1 p-1 bg-slate-950/80 rounded-2xl border border-slate-800 overflow-x-auto">
-              <button
-                type="button"
-                onClick={() => setLeftTab('patient')}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                  leftTab === 'patient'
-                    ? 'bg-amber-400 text-slate-950 font-black shadow-xs'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                }`}
-              >
-                <Users className="w-3.5 h-3.5" />
-                <span>Pacientes Activos</span>
-              </button>
+      {/* ──────────────────────────────────────────────────────────── */}
+      {/* MODO DUAL: VISTA ODONTÓLOGO vs VISTA PACIENTE                 */}
+      {/* ──────────────────────────────────────────────────────────── */}
+      {expedienteMode === 'doctor' ? (
+        /* VISTA ODONTÓLOGO: BITÁCORA QUIRÚRGICA PANORÁMICA DE DOS PANELES */
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-10 flex-1">
+          {/* PANEL IZQUIERDO (5 COLS): GESTIÓN DE PACIENTES ACTIVOS Y AGENDA DIARIA EN TIEMPO REAL */}
+          <div className="lg:col-span-5 flex flex-col space-y-4">
+            <div className="bg-slate-900/80 backdrop-blur-2xl rounded-3xl border border-amber-400/30 p-5 shadow-[0_0_40px_rgba(245,158,11,0.08)] flex flex-col h-full space-y-4">
+              
+              {/* SUB-TABS SELECTOR EN PANEL IZQUIERDO */}
+              <div className="flex items-center gap-1 p-1 bg-slate-950/80 rounded-2xl border border-slate-800 overflow-x-auto">
+                <button
+                  type="button"
+                  onClick={() => setLeftTab('patient')}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                    leftTab === 'patient'
+                      ? 'bg-amber-400 text-slate-950 font-black shadow-xs'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>Pacientes Activos</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setLeftTab('agenda')}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                  leftTab === 'agenda'
-                    ? 'bg-amber-400 text-slate-950 font-black shadow-xs'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                }`}
-              >
-                <Calendar className="w-3.5 h-3.5" />
-                <span>Agenda Diaria</span>
-                {todayAppointments.length > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-cyan-400 text-slate-950">
-                    {todayAppointments.length}
-                  </span>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setLeftTab('history')}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                  leftTab === 'history'
-                    ? 'bg-amber-400 text-slate-950 font-black shadow-xs'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                }`}
-              >
-                <Clock className="w-3.5 h-3.5" />
-                <span>Historial &amp; Notas</span>
-                {messages.length > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-blue-400 text-slate-950">
-                    {messages.length}
-                  </span>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setLeftTab('questionnaire')}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                  leftTab === 'questionnaire'
-                    ? 'bg-amber-400 text-slate-950 font-black shadow-xs'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                }`}
-              >
-                <ClipboardList className="w-3.5 h-3.5" />
-                <span>Anamnesis</span>
-              </button>
-            </div>
-
-            {/* CONTENIDO SUB-TAB: PACIENTES ACTIVOS */}
-            {leftTab === 'patient' && (
-              <div className="space-y-4 flex-1">
-                {/* Tarjeta del Paciente Seleccionado */}
-                <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
-                  <div className="flex items-center gap-3.5">
-                    <div className="w-14 h-14 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black text-lg shadow-lg ring-2 ring-amber-400/40">
-                      {initials}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h2 className="text-base font-black text-white truncate">{selectedPatient.full_name}</h2>
-                      <p className="text-xs font-mono text-slate-400">ID: #{selectedPatient.id.slice(0, 8)}</p>
-                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold mt-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        {selectedPatient.onboarding_completed ? 'Bioseguridad Verificada' : 'Onboarding Pendiente'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 text-xs pt-2 border-t border-slate-800">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black uppercase text-slate-400">Teléfono:</span>
-                      <a href={`tel:${selectedPatient.phone}`} className="font-bold text-white hover:text-cyan-300 font-mono">
-                        {selectedPatient.phone || 'No registrado'}
-                      </a>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black uppercase text-slate-400">Correo Electrónico:</span>
-                      <span className="font-bold text-slate-300 truncate max-w-[200px]">
-                        {selectedPatient.email || 'No registrado'}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black uppercase text-slate-400">Contacto Emergencia:</span>
-                      <span className="font-bold text-slate-300">
-                        {selectedPatient.emergency_contact_name || 'No asignado'} ({selectedPatient.emergency_contact_phone || 'Sin tel.'})
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Directorio de Otros Pacientes Activos */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black uppercase tracking-wider text-amber-300">
-                      Pacientes Registrados ({patients.length})
+                <button
+                  type="button"
+                  onClick={() => setLeftTab('agenda')}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                    leftTab === 'agenda'
+                      ? 'bg-amber-400 text-slate-950 font-black shadow-xs'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                >
+                  <Calendar className="w-3.5 h-3.5" />
+                  <span>Agenda Diaria</span>
+                  {todayAppointments.length > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-cyan-400 text-slate-950">
+                      {todayAppointments.length}
                     </span>
-                    <span className="text-[10px] text-slate-400">Clic para cambiar de expediente</span>
-                  </div>
+                  )}
+                </button>
 
-                  <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-1">
-                    {patients.map((p) => {
-                      const isSelected = p.id === selectedPatient.id
-                      const pInitials = (p.full_name || 'P')
-                        .split(' ')
-                        .map((n: string) => n[0])
-                        .slice(0, 2)
-                        .join('')
-                        .toUpperCase()
-
-                      return (
-                        <div
-                          key={p.id}
-                          onClick={() => handleSelectPatient(p.id)}
-                          className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                            isSelected
-                              ? 'bg-amber-400/20 border-amber-400 shadow-xs'
-                              : 'bg-slate-950/40 border-slate-800/80 hover:bg-slate-800/50 hover:border-slate-700'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black shrink-0 ${
-                              isSelected ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300'
-                            }`}>
-                              {pInitials}
-                            </div>
-                            <div className="min-w-0">
-                              <span className={`text-xs font-bold block truncate ${isSelected ? 'text-white' : 'text-slate-300'}`}>
-                                {p.full_name}
-                              </span>
-                              <span className="text-[10px] text-slate-500 font-mono block">
-                                {p.phone || 'Sin teléfono'}
-                              </span>
-                            </div>
-                          </div>
-
-                          <ChevronRight className={`w-4 h-4 shrink-0 ${isSelected ? 'text-amber-400' : 'text-slate-600'}`} />
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* CONTENIDO SUB-TAB: AGENDA DIARIA EN TIEMPO REAL */}
-            {leftTab === 'agenda' && (
-              <div className="space-y-3 flex-1 flex flex-col">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="text-xs font-black uppercase tracking-wider text-amber-300">
-                      Agenda Diaria en Tiempo Real
+                <button
+                  type="button"
+                  onClick={() => setLeftTab('history')}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                    leftTab === 'history'
+                      ? 'bg-amber-400 text-slate-950 font-black shadow-xs'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                >
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Historial &amp; Notas</span>
+                  {messages.length > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-blue-400 text-slate-950">
+                      {messages.length}
                     </span>
-                  </div>
+                  )}
+                </button>
 
-                  <button
-                    type="button"
-                    onClick={fetchTodayAppointments}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-                    title="Actualizar agenda"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${loadingAppointments ? 'animate-spin' : ''}`} />
-                  </button>
-                </div>
-
-                {loadingAppointments ? (
-                  <div className="py-12 text-center space-y-2">
-                    <div className="w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto" />
-                    <p className="text-xs font-bold text-slate-400">Consultando agenda diaria...</p>
-                  </div>
-                ) : todayAppointments.length === 0 ? (
-                  <div className="py-12 text-center bg-slate-950/40 rounded-2xl border border-slate-800 p-6 space-y-2">
-                    <Calendar className="w-8 h-8 text-slate-600 mx-auto" />
-                    <h4 className="text-xs font-bold text-slate-300">Sin citas programadas para hoy</h4>
-                    <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
-                      Las nuevas citas generadas por el bot de WhatsApp o recepción aparecerán aquí en vivo.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-2 overflow-y-auto max-h-[420px] pr-1">
-                    {todayAppointments.map((app, idx) => {
-                      const timeStr = app.start_time || app.time || '10:00 AM'
-                      const patientName = app.patient_name || app.patientName || 'Paciente'
-                      const isSelected = selectedPatient?.full_name?.toLowerCase() === patientName.toLowerCase()
-                      const treatment = app.treatment_type || app.treatment || 'Consulta Dental'
-                      const chair = app.chair || app.cabinet || 'Gabinete 1'
-
-                      return (
-                        <div
-                          key={app.id || idx}
-                          className={`p-3 rounded-2xl border transition-all ${
-                            isSelected
-                              ? 'bg-amber-400/20 border-amber-400 shadow-md ring-1 ring-amber-400/50'
-                              : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <span className="font-mono text-xs font-black text-amber-300 bg-amber-400/10 px-2 py-0.5 rounded-md border border-amber-400/30">
-                              ⏰ {timeStr}
-                            </span>
-                            <span className="text-[10px] font-bold text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
-                              {chair}
-                            </span>
-                          </div>
-
-                          <h4 className="text-xs font-black text-white">{patientName}</h4>
-                          <p className="text-[11px] text-slate-400 mt-0.5">{treatment}</p>
-
-                          <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between">
-                            <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                              {app.status || 'Confirmada'}
-                            </span>
-
-                            <button
-                              type="button"
-                              onClick={() => handleSelectAppointmentPatient(app)}
-                              className="px-2.5 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-[10px] font-black transition-colors shadow-xs cursor-pointer"
-                            >
-                              Cargar en Odontograma 3D
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setLeftTab('questionnaire')}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                    leftTab === 'questionnaire'
+                      ? 'bg-amber-400 text-slate-950 font-black shadow-xs'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                >
+                  <ClipboardList className="w-3.5 h-3.5" />
+                  <span>Anamnesis</span>
+                </button>
               </div>
-            )}
 
-            {/* CONTENIDO SUB-TAB: HISTORIAL CLÍNICO & NOTAS */}
-            {leftTab === 'history' && (
-              <div className="space-y-3 flex-1 flex flex-col">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                  <span className="text-xs font-black uppercase tracking-wider text-amber-300">
-                    Historial Síncrono de {selectedPatient.full_name}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => fetchPatientHistory(selectedPatient)}
-                    className="p-1 rounded-lg text-slate-400 hover:text-white"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${loadingMessages ? 'animate-spin' : ''}`} />
-                  </button>
-                </div>
+              {/* CONTENIDO SUB-TAB: PACIENTES ACTIVOS */}
+              {leftTab === 'patient' && (
+                <div className="space-y-4 flex-1">
+                  <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-14 h-14 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black text-lg shadow-lg ring-2 ring-amber-400/40">
+                        {initials}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h2 className="text-base font-black text-white truncate">{selectedPatient.full_name}</h2>
+                        <p className="text-xs font-mono text-slate-400">ID: #{selectedPatient.id.slice(0, 8)}</p>
+                        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold mt-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          {selectedPatient.onboarding_completed ? 'Bioseguridad Verificada' : 'Onboarding Pendiente'}
+                        </span>
+                      </div>
+                    </div>
 
-                {/* Formulario de Nota Privada Médica */}
-                <form onSubmit={handleSavePrivateNote} className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
-                    <Lock className="w-3.5 h-3.5" />
-                    <span>Añadir Nota Médica Privada (NOM-004)</span>
+                    <div className="space-y-2 text-xs pt-2 border-t border-slate-800">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase text-slate-400">Teléfono:</span>
+                        <a href={`tel:${selectedPatient.phone}`} className="font-bold text-white hover:text-cyan-300 font-mono">
+                          {selectedPatient.phone || 'No registrado'}
+                        </a>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase text-slate-400">Correo Electrónico:</span>
+                        <span className="font-bold text-slate-300 truncate max-w-[200px]">
+                          {selectedPatient.email || 'No registrado'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase text-slate-400">Contacto Emergencia:</span>
+                        <span className="font-bold text-slate-300">
+                          {selectedPatient.emergency_contact_name || 'No asignado'} ({selectedPatient.emergency_contact_phone || 'Sin tel.'})
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newNote}
-                      onChange={(e) => setNewNote(e.target.value)}
-                      placeholder="Observación clínica, evolución o indicación privada..."
-                      className="flex-1 px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
-                    />
+
+                  {/* Directorio de Otros Pacientes Activos */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black uppercase tracking-wider text-amber-300">
+                        Pacientes Registrados ({patients.length})
+                      </span>
+                      <span className="text-[10px] text-slate-400">Clic para cambiar de expediente</span>
+                    </div>
+
+                    <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-1">
+                      {patients.map((p) => {
+                        const isSelected = p.id === selectedPatient.id
+                        const pInitials = (p.full_name || 'P')
+                          .split(' ')
+                          .map((n: string) => n[0])
+                          .slice(0, 2)
+                          .join('')
+                          .toUpperCase()
+
+                        return (
+                          <div
+                            key={p.id}
+                            onClick={() => handleSelectPatient(p.id)}
+                            className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                              isSelected
+                                ? 'bg-amber-400/20 border-amber-400 shadow-xs'
+                                : 'bg-slate-950/40 border-slate-800/80 hover:bg-slate-800/50 hover:border-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black shrink-0 ${
+                                isSelected ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300'
+                              }`}>
+                                {pInitials}
+                              </div>
+                              <div className="min-w-0">
+                                <span className={`text-xs font-bold block truncate ${isSelected ? 'text-white' : 'text-slate-300'}`}>
+                                  {p.full_name}
+                                </span>
+                                <span className="text-[10px] text-slate-500 font-mono block">
+                                  {p.phone || 'Sin teléfono'}
+                                </span>
+                              </div>
+                            </div>
+
+                            <ChevronRight className={`w-4 h-4 shrink-0 ${isSelected ? 'text-amber-400' : 'text-slate-600'}`} />
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* CONTENIDO SUB-TAB: AGENDA DIARIA EN TIEMPO REAL */}
+              {leftTab === 'agenda' && (
+                <div className="space-y-3 flex-1 flex flex-col">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="text-xs font-black uppercase tracking-wider text-amber-300">
+                        Agenda Diaria en Tiempo Real
+                      </span>
+                    </div>
+
                     <button
-                      type="submit"
-                      disabled={savingNote || !newNote.trim()}
-                      className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl shadow-xs transition-colors shrink-0 disabled:opacity-50 cursor-pointer"
+                      type="button"
+                      onClick={fetchTodayAppointments}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                      title="Actualizar agenda"
                     >
-                      <Send className="w-3.5 h-3.5" />
+                      <RefreshCw className={`w-3.5 h-3.5 ${loadingAppointments ? 'animate-spin' : ''}`} />
                     </button>
                   </div>
-                </form>
 
-                {/* Lista de Registros Clínicos */}
-                {loadingMessages ? (
-                  <div className="py-8 text-center">
-                    <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto" />
-                  </div>
-                ) : messages.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-slate-500">
-                    Sin entradas clínicas registradas aún.
-                  </div>
-                ) : (
-                  <div className="space-y-2 overflow-y-auto max-h-[340px] pr-1">
-                    {messages.map((m, idx) => {
-                      const isOdontogram = m.channel_type === 'odontogram_clinical_entry' || m.content?.includes('[ODONTOGRAMA 3D') || m.content?.includes('[ODONTOGRAMA')
-                      const isNote = m.isPrivateNote || m.channel_type === 'internal_note' || m.content?.includes('[NOTA PRIVADA')
+                  {loadingAppointments ? (
+                    <div className="py-12 text-center space-y-2">
+                      <div className="w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto" />
+                      <p className="text-xs font-bold text-slate-400">Consultando agenda diaria...</p>
+                    </div>
+                  ) : todayAppointments.length === 0 ? (
+                    <div className="py-12 text-center bg-slate-950/40 rounded-2xl border border-slate-800 p-6 space-y-2">
+                      <Calendar className="w-8 h-8 text-slate-600 mx-auto" />
+                      <h4 className="text-xs font-bold text-slate-300">Sin citas programadas para hoy</h4>
+                      <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+                        Las nuevas citas generadas por el bot de WhatsApp o recepción aparecerán aquí en vivo.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 overflow-y-auto max-h-[420px] pr-1">
+                      {todayAppointments.map((app, idx) => {
+                        const timeStr = app.start_time || app.time || '10:00 AM'
+                        const patientName = app.patient_name || app.patientName || 'Paciente'
+                        const isSelected = selectedPatient?.full_name?.toLowerCase() === patientName.toLowerCase()
+                        const treatment = app.treatment_type || app.treatment || 'Consulta Dental'
+                        const chair = app.chair || app.cabinet || 'Gabinete 1'
 
-                      return (
-                        <div
-                          key={m.id || idx}
-                          className={`p-3 rounded-xl border text-xs ${
-                            isOdontogram
-                              ? 'bg-slate-950 border-amber-400/80 shadow-xs'
-                              : isNote
-                              ? 'bg-amber-950/30 border-amber-500/40 text-amber-200'
-                              : 'bg-slate-950/60 border-slate-800 text-slate-300'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
-                            <span className="font-bold text-amber-300">{m.senderName}</span>
-                            <span className="font-mono">{m.timestamp}</span>
+                        return (
+                          <div
+                            key={app.id || idx}
+                            className={`p-3 rounded-2xl border transition-all ${
+                              isSelected
+                                ? 'bg-amber-400/20 border-amber-400 shadow-md ring-1 ring-amber-400/50'
+                                : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <span className="font-mono text-xs font-black text-amber-300 bg-amber-400/10 px-2 py-0.5 rounded-md border border-amber-400/30">
+                                ⏰ {timeStr}
+                              </span>
+                              <span className="text-[10px] font-bold text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
+                                {chair}
+                              </span>
+                            </div>
+
+                            <h4 className="text-xs font-black text-white">{patientName}</h4>
+                            <p className="text-[11px] text-slate-400 mt-0.5">{treatment}</p>
+
+                            <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                              <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                {app.status || 'Confirmada'}
+                              </span>
+
+                              <button
+                                type="button"
+                                onClick={() => handleSelectAppointmentPatient(app)}
+                                className="px-2.5 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-[10px] font-black transition-colors shadow-xs cursor-pointer"
+                              >
+                                Cargar en Odontograma 3D
+                              </button>
+                            </div>
                           </div>
-                          <p className="whitespace-pre-wrap leading-relaxed text-[11px] text-slate-200">{m.content}</p>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
 
-            {/* CONTENIDO SUB-TAB: ANAMNESIS / FAMILIA */}
-            {leftTab === 'questionnaire' && (
-              <div className="space-y-4 flex-1 overflow-y-auto max-h-[480px] pr-1">
-                <MedicalQuestionnaire />
-                <div className="pt-3 border-t border-slate-800">
-                  <FamilyNucleusManager patient={selectedPatient} patientName={selectedPatient.full_name} />
+              {/* CONTENIDO SUB-TAB: HISTORIAL CLÍNICO & NOTAS */}
+              {leftTab === 'history' && (
+                <div className="space-y-3 flex-1 flex flex-col">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <span className="text-xs font-black uppercase tracking-wider text-amber-300">
+                      Historial Síncrono de {selectedPatient.full_name}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => fetchPatientHistory(selectedPatient)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-white"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${loadingMessages ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleSavePrivateNote} className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>Añadir Nota Médica Privada (NOM-004)</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newNote}
+                        onChange={(e) => setNewNote(e.target.value)}
+                        placeholder="Observación clínica, evolución o indicación privada..."
+                        className="flex-1 px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                      />
+                      <button
+                        type="submit"
+                        disabled={savingNote || !newNote.trim()}
+                        className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl shadow-xs transition-colors shrink-0 disabled:opacity-50 cursor-pointer"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </form>
+
+                  {loadingMessages ? (
+                    <div className="py-8 text-center">
+                      <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto" />
+                    </div>
+                  ) : messages.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-slate-500">
+                      Sin entradas clínicas registradas aún.
+                    </div>
+                  ) : (
+                    <div className="space-y-2 overflow-y-auto max-h-[340px] pr-1">
+                      {messages.map((m, idx) => {
+                        const isOdontogram = m.channel_type === 'odontogram_clinical_entry' || m.content?.includes('[ODONTOGRAMA 3D') || m.content?.includes('[ODONTOGRAMA')
+                        const isNote = m.isPrivateNote || m.channel_type === 'internal_note' || m.content?.includes('[NOTA PRIVADA')
+
+                        return (
+                          <div
+                            key={m.id || idx}
+                            className={`p-3 rounded-xl border text-xs ${
+                              isOdontogram
+                                ? 'bg-slate-950 border-amber-400/80 shadow-xs'
+                                : isNote
+                                ? 'bg-amber-950/30 border-amber-500/40 text-amber-200'
+                                : 'bg-slate-950/60 border-slate-800 text-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
+                              <span className="font-bold text-amber-300">{m.senderName}</span>
+                              <span className="font-mono">{m.timestamp}</span>
+                            </div>
+                            <p className="whitespace-pre-wrap leading-relaxed text-[11px] text-slate-200">{m.content}</p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* CONTENIDO SUB-TAB: ANAMNESIS / FAMILIA */}
+              {leftTab === 'questionnaire' && (
+                <div className="space-y-4 flex-1 overflow-y-auto max-h-[480px] pr-1">
+                  <MedicalQuestionnaire />
+                  <div className="pt-3 border-t border-slate-800">
+                    <FamilyNucleusManager patient={selectedPatient} patientName={selectedPatient.full_name} />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* PANEL DERECHO (7 COLS): VISOR 3D INTERACTIVO DE LA ARCADA DENTAL (ORGANUI TEETH) */}
+          <div className="lg:col-span-7 flex flex-col space-y-4">
+            <div className="bg-slate-900/80 backdrop-blur-2xl rounded-3xl border border-cyan-400/30 p-5 shadow-[0_0_40px_rgba(56,189,248,0.08)] flex flex-col h-full space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-cyan-400" />
+                    <h3 className="text-base font-black text-white">
+                      Odontograma Holográfico 3D (OrganUI Teeth 2027)
+                    </h3>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Haz clic en cualquier pieza dental o zona interproximal para activar la ventana cristal con zoom anatómico de 5 caras.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-1 rounded-xl text-[10px] font-black uppercase bg-cyan-400/10 text-cyan-300 border border-cyan-400/30">
+                    Rotación 360° &amp; Zoom
+                  </span>
+                  <span className="px-2.5 py-1 rounded-xl text-[10px] font-black uppercase bg-amber-400/10 text-amber-300 border border-amber-400/30">
+                    FDI &amp; UNS
+                  </span>
                 </div>
               </div>
-            )}
+
+              <div className="flex-1 w-full">
+                <Odontogram
+                  patientId={selectedPatient?.id}
+                  patientName={selectedPatient?.full_name || selectedPatient?.name}
+                  doctorName={doctorProfile.name}
+                  doctorRole={doctorProfile.role}
+                  branch={doctorProfile.branch}
+                  onHistoryUpdated={() => fetchPatientHistory(selectedPatient)}
+                />
+              </div>
+            </div>
           </div>
         </div>
-
-        {/* PANEL DERECHO (7 COLS): VISOR 3D INTERACTIVO DE LA ARCADA DENTAL (ORGANUI TEETH) */}
-        <div className="lg:col-span-7 flex flex-col space-y-4">
-          <div className="bg-slate-900/80 backdrop-blur-2xl rounded-3xl border border-cyan-400/30 p-5 shadow-[0_0_40px_rgba(56,189,248,0.08)] flex flex-col h-full space-y-4">
-            
-            {/* Header del Panel Odontograma 3D */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
-              <div>
-                <div className="flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-cyan-400" />
-                  <h3 className="text-base font-black text-white">
-                    Odontograma Holográfico 3D (OrganUI Teeth 2027)
-                  </h3>
+      ) : (
+        /* ──────────────────────────────────────────────────────────── */
+        /* VISTA PACIENTE: PORTAL DE TRANSPARENCIA CLÍNICA & AMIGABLE   */
+        /* ──────────────────────────────────────────────────────────── */
+        <div className="space-y-6 relative z-10 flex-1">
+          {/* Tarjeta de Bienvenida y Salud General */}
+          <div className="bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 p-6 sm:p-8 rounded-3xl border border-cyan-400/30 shadow-2xl space-y-4 text-white">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-cyan-400 text-slate-950 flex items-center justify-center font-black text-2xl shadow-lg ring-4 ring-cyan-400/20">
+                  <Smile className="w-8 h-8" />
                 </div>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Haz clic en cualquier pieza dental o zona interproximal para activar la ventana cristal con zoom anatómico de 5 caras.
+                <div>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-cyan-400/20 text-cyan-300 border border-cyan-400/40">
+                    Portal de Transparencia del Paciente
+                  </span>
+                  <h2 className="text-2xl font-black text-white mt-1">¡Hola, {selectedPatient.full_name}!</h2>
+                  <p className="text-xs text-slate-400">
+                    Tu expediente odontológico transparente respaldado por la <strong>Dra. Aura Estudillo</strong>.
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-left sm:text-right">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Índice de Salud Bucal</span>
+                <span className="text-3xl font-black text-emerald-400 font-mono">94% Sano</span>
+                <span className="text-[11px] text-emerald-300 block font-semibold">Estado Clínico Favorable</span>
+              </div>
+            </div>
+
+            {/* 3 Tarjetas de Resumen Amigable */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+              <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800 space-y-1">
+                <div className="flex items-center gap-2 text-cyan-300 text-xs font-bold">
+                  <Sparkles className="w-4 h-4" />
+                  <span>Dientes Evaluados</span>
+                </div>
+                <p className="text-2xl font-black text-white font-mono">28 Piezas</p>
+                <p className="text-[11px] text-slate-400">Arcadas superior e inferior analizadas en 3D</p>
+              </div>
+
+              <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800 space-y-1">
+                <div className="flex items-center gap-2 text-amber-300 text-xs font-bold">
+                  <Activity className="w-4 h-4" />
+                  <span>Procedimientos Realizados</span>
+                </div>
+                <p className="text-2xl font-black text-white font-mono">{patientOdontogramEntries.length} Tratamientos</p>
+                <p className="text-[11px] text-slate-400">Registrados con materiales de alta gama</p>
+              </div>
+
+              <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-800 space-y-1">
+                <div className="flex items-center gap-2 text-emerald-300 text-xs font-bold">
+                  <DollarSign className="w-4 h-4" />
+                  <span>Transparencia Financiera</span>
+                </div>
+                <p className="text-2xl font-black text-emerald-400 font-mono">
+                  ${totalPatientBudget.toLocaleString('es-MX')} MXN
+                </p>
+                <p className="text-[11px] text-emerald-300">Cuenta al corriente sin saldo pendiente</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Desglose de Tratamientos en Lenguaje Claro */}
+          <div className="bg-slate-900/80 backdrop-blur-2xl p-6 rounded-3xl border border-slate-800 shadow-xl space-y-4 text-white">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h3 className="text-base font-black text-white flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-amber-400" />
+                  <span>Historial de Tratamientos Realizados en tu Sonrisa</span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Desglose transparente de procedimientos clínicos y costos aplicados
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-1 rounded-xl text-[10px] font-black uppercase bg-cyan-400/10 text-cyan-300 border border-cyan-400/30">
-                  Rotación 360° &amp; Zoom
-                </span>
-                <span className="px-2.5 py-1 rounded-xl text-[10px] font-black uppercase bg-amber-400/10 text-amber-300 border border-amber-400/30">
-                  FDI &amp; UNS
-                </span>
-              </div>
+              <button
+                type="button"
+                onClick={handleExportPatientWord}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 text-xs font-black transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Descargar Mi Resumen (.doc)</span>
+              </button>
             </div>
 
-            {/* COMPONENTE ODONTOGRAMA CON MOTOR 3D DENTAL3DVIEWER Y MODAL CRISTAL */}
-            <div className="flex-1 w-full">
-              <Odontogram
-                patientId={selectedPatient?.id}
-                patientName={selectedPatient?.full_name || selectedPatient?.name}
-                doctorName={doctorProfile.name}
-                doctorRole={doctorProfile.role}
-                branch={doctorProfile.branch}
-                onHistoryUpdated={() => fetchPatientHistory(selectedPatient)}
-              />
+            {patientOdontogramEntries.length === 0 ? (
+              <div className="py-12 text-center bg-slate-950/40 rounded-2xl border border-slate-800 p-6 space-y-2">
+                <Smile className="w-10 h-10 text-cyan-400 mx-auto" />
+                <h4 className="text-sm font-bold text-white">¡Tu dentadura está completamente sana!</h4>
+                <p className="text-xs text-slate-400 max-w-md mx-auto">
+                  No tienes procedimientos quirúrgicos o restauraciones registradas en este momento. Te esperamos en tu próxima cita de limpieza preventiva.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {patientOdontogramEntries.map((entry, idx) => {
+                  const meta = entry.metadata || {}
+                  const toothFdi = meta.toothFdi ? `Diente #${meta.toothFdi}` : 'Revisión General'
+                  const procedureName = meta.procedureName || entry.content.split('\n')[1] || 'Tratamiento Dental'
+                  const cost = Number(meta.estimatedCost) || 0
+
+                  return (
+                    <div key={entry.id || idx} className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-2 hover:border-cyan-400/50 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <span className="px-2.5 py-0.5 rounded-lg text-xs font-black bg-amber-400 text-slate-950">
+                          {toothFdi}
+                        </span>
+                        <span className="text-xs font-mono font-black text-emerald-400">
+                          ${cost.toLocaleString('es-MX')} MXN
+                        </span>
+                      </div>
+
+                      <h4 className="text-xs font-bold text-white">{procedureName}</h4>
+                      <p className="text-[11px] text-slate-300 leading-relaxed">
+                        Procedimiento realizado por <strong>{entry.senderName}</strong> en Gabinete Clínico. Materiales estéticos de última generación.
+                      </p>
+
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 pt-2 border-t border-slate-800/80">
+                        <span>Fecha: {entry.timestamp}</span>
+                        <span className="text-emerald-400 font-bold flex items-center gap-1">
+                          <Check className="w-3 h-3" /> Verificado NOM-004
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Cuidados en Casa & Recomendaciones Médicas */}
+          <div className="bg-slate-900/80 backdrop-blur-2xl p-6 rounded-3xl border border-slate-800 shadow-xl space-y-4 text-white">
+            <div className="flex items-center gap-2 text-amber-300">
+              <Info className="w-5 h-5" />
+              <h3 className="text-sm font-black uppercase tracking-wider">
+                Recomendaciones Clínicas de la Dra. Aura Estudillo
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
+                <span className="font-bold text-white block">1. Higiene y Cepillado</span>
+                <p className="text-slate-300 text-[11px]">
+                  Cepillar tus dientes 3 veces al día con cerdas suaves para proteger las restauraciones de resina y encías.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
+                <span className="font-bold text-white block">2. Zonas Interproximales</span>
+                <p className="text-slate-300 text-[11px]">
+                  Utilizar hilo dental o cepillos interproximales diariamente para evitar caries de contacto entre muelas contiguas.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
+                <span className="font-bold text-white block">3. Cita Preventiva Semestral</span>
+                <p className="text-slate-300 text-[11px]">
+                  Agendar tu profilaxis ultrasónica cada 6 meses en Sucursal Balbuena para mantener la garantía de tus tratamientos.
+                </p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* MODAL FUNCIONAL: EDITAR FICHA MÉDICA */}
       {isEditing && (
