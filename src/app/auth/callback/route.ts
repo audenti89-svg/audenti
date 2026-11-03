@@ -158,7 +158,6 @@ export async function GET(request: Request) {
     // B) Paciente: Realizar Upsert Seguro y redirigir al Portal del Paciente
     try {
       await safeUpsertPatient(supabase as any, {
-        auth_user_id: user.id,
         user_id: user.id,
         email: user.email,
         full_name: user.user_metadata?.full_name || user.user_metadata?.name || 'Paciente Audenti',

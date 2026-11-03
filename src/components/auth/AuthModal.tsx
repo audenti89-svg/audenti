@@ -102,7 +102,6 @@ export function AuthModal({
         if (data.user) {
           try {
             await safeUpsertPatient(supabase, {
-              auth_user_id: data.user.id,
               user_id: data.user.id,
               email: email.trim(),
               full_name: fullName.trim(),

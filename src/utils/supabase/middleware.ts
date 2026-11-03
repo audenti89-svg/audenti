@@ -181,15 +181,15 @@ export async function updateSession(request: NextRequest) {
       return supabaseResponse;
     }
 
-    // Para pacientes: verificar registro médico en la tabla `patients`
+    // Para pacientes: verificar registro médico en la tabla `patients` usando FK real `user_id`
     const { data: patient } = await supabase
       .from('patients')
-      .select('id, onboarding_completed')
-      .or(`id.eq.${user.id},user_id.eq.${user.id},auth_user_id.eq.${user.id},email.eq.${user.email}`)
+      .select('id')
+      .or(`id.eq.${user.id},user_id.eq.${user.id},email.eq.${user.email}`)
       .maybeSingle();
 
     const hasPatientRecord = !!patient;
-    const hasCompletedOnboarding = hasPatientRecord && patient.onboarding_completed !== false;
+    const hasCompletedOnboarding = hasPatientRecord;
 
     // Si es paciente nuevo sin expediente y va a rutas protegidas -> redirigir a /onboarding
     if (!hasPatientRecord && (isDashboardRoute || redirectUrl.pathname.startsWith('/portal') || redirectUrl.pathname.startsWith('/mi-expediente'))) {

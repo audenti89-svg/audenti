@@ -454,32 +454,33 @@ export default function LandingPage() {
             <a href="#contacto" className="hover:text-amber-400 transition-colors">Ubicación</a>
           </nav>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Botón 1: Registrarme / Activar Cuenta (Pacientes) */}
             <Link
               href="/portal/login?mode=activate"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-amber-500/40 hover:border-amber-400 bg-slate-900/90 text-xs font-bold text-amber-300 hover:text-amber-200 transition-all shadow-sm cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-full border border-amber-500/40 hover:border-amber-400 bg-slate-900/90 text-xs font-bold text-amber-300 hover:text-amber-200 transition-all shadow-sm cursor-pointer whitespace-nowrap shrink-0"
               title="Registrarme o activar cuenta de paciente"
             >
-              <UserPlus className="w-3.5 h-3.5 text-amber-400" />
-              <span>Registrarme</span>
+              <UserPlus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="hidden xs:inline">Registrarme</span>
             </Link>
 
             {/* Botón 2: Portal Paciente (100% Visible) */}
             <Link
               href="/portal/login"
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-all shadow-md shadow-amber-500/20 cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-all shadow-md shadow-amber-500/20 cursor-pointer whitespace-nowrap shrink-0"
               title="Portal de Pacientes: Citas, Recetas y Odontograma"
             >
-              <UserCheck className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Portal Paciente</span>
+              <UserCheck className="w-3.5 h-3.5 shrink-0" />
+              <span>Portal</span>
+              <span className="hidden sm:inline">Paciente</span>
             </Link>
 
             {/* Botón Principal Agendar Cita */}
-            <a href="#reservar">
+            <a href="#reservar" className="hidden sm:inline-block shrink-0">
               <ShimmerButton variant="primary" className="py-1.5 px-3.5 text-xs font-black font-hanken">
                 <Calendar className="w-3.5 h-3.5 text-slate-950" />
-                <span className="hidden sm:inline">Agendar</span>
+                <span>Agendar</span>
               </ShimmerButton>
             </a>
 

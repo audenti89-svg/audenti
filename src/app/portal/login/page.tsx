@@ -224,7 +224,6 @@ function PatientLoginForm() {
           // Si es paciente, ejecutar Upsert seguro y redirigir al portal
           try {
             await safeUpsertPatient(supabase, {
-              auth_user_id: data.user.id,
               user_id: data.user.id,
               email: data.user.email,
               full_name: data.user.user_metadata?.full_name || 'Paciente Audenti',
@@ -305,7 +304,6 @@ function PatientLoginForm() {
       // Si el paciente ya fue registrado en recepción por la Dra. Aura, se actualiza sin duplicar
       const targetUserId = authData?.user?.id || null;
       await safeUpsertPatient(supabase, {
-        auth_user_id: targetUserId,
         user_id: targetUserId,
         email: cleanEmail,
         full_name: actFullName.trim() || existingMatch?.full_name || 'Paciente Audenti',

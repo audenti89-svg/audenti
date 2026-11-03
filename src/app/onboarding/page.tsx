@@ -87,7 +87,6 @@ function OnboardingContent() {
       const patientPayload: any = {
         id: user.id,
         user_id: user.id,
-        auth_user_id: user.id,
         full_name: formData.full_name.trim(),
         age: parsedAge,
         phone: formData.phone.trim(),

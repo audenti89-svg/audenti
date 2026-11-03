@@ -131,7 +131,6 @@ function LoginForm() {
           // Si el usuario autenticado es un paciente, redirigir automáticamente a su portal
           try {
             await safeUpsertPatient(supabase, {
-              auth_user_id: data.user.id,
               user_id: data.user.id,
               email: data.user.email,
               full_name: data.user.user_metadata?.full_name || 'Paciente Audenti',

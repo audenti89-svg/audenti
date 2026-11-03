@@ -52,7 +52,7 @@ export function PatientReferralCard({ patientId }: PatientReferralCardProps) {
             setLoading(false)
             return
           }
-          query = query.eq('auth_user_id', user.id)
+          query = query.eq('user_id', user.id)
         }
 
         const { data, error } = await query.maybeSingle()

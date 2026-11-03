@@ -324,11 +324,11 @@ export default function PatientPortalPage() {
 
         setUser(authUser);
 
-        // Consulta filtrada estrictamente al usuario autenticado
+        // Consulta filtrada estrictamente al usuario autenticado usando la FK user_id
         let { data: myProfile } = await supabase
           .from('patients')
           .select('*')
-          .or(`auth_user_id.eq.${authUser.id},user_id.eq.${authUser.id},email.eq.${authUser.email}`)
+          .or(`user_id.eq.${authUser.id},email.eq.${authUser.email}`)
           .maybeSingle();
 
         // Enlace de contingencia por email si no estaba vinculado
@@ -344,7 +344,7 @@ export default function PatientPortalPage() {
             myProfile = emailProfile;
             await supabase
               .from('patients')
-              .update({ user_id: authUser.id, auth_user_id: authUser.id })
+              .update({ user_id: authUser.id })
               .eq('id', emailProfile.id);
           }
         }
