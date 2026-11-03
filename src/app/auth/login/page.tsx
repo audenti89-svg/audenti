@@ -30,7 +30,7 @@ function LoginForm() {
         if (isSystemAdminEmail(userEmail) || isInternalUser(userEmail, userMetaRole)) {
           window.location.replace('/dashboard');
         } else {
-          window.location.replace('/portal');
+          window.location.replace('/portal-paciente');
         }
       }
     });
@@ -186,7 +186,7 @@ function LoginForm() {
           } catch (linkErr) {
             console.warn('Nota sync-profile en auth login:', linkErr);
           }
-          window.location.href = '/portal';
+          window.location.href = '/portal-paciente';
         }
       }
     } catch (err: any) {

@@ -17,10 +17,13 @@ export const INTERNAL_ROLES = [
   'director',
   'doctor',
   'socio',
+  'partner',
   'trabajador',
   'pasante',
+  'intern',
   'estudiante',
-  'superadmin'
+  'superadmin',
+  'receptionist'
 ];
 
 export function isSystemAdminEmail(email?: string | null): boolean {

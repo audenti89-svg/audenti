@@ -289,7 +289,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const targetRoute = isSystemAdminEmail(cleanEmail) ? '/dashboard' : '/portal';
+    const targetRoute = isSystemAdminEmail(cleanEmail) ? '/dashboard' : '/portal-paciente';
 
     return NextResponse.json({
       success: true,

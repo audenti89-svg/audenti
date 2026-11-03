@@ -58,12 +58,10 @@ export async function updateSession(request: NextRequest) {
   const isDashboardRoute = redirectUrl.pathname.startsWith('/dashboard');
   const isAdminRoute = redirectUrl.pathname.startsWith('/admin');
   const isPatientsRoute = redirectUrl.pathname.startsWith('/patients');
-  const isPortalRoute = (redirectUrl.pathname.startsWith('/portal') && redirectUrl.pathname !== '/portal/login') || redirectUrl.pathname.startsWith('/mi-expediente');
-
-  // Comprobar token directo de sesión (sb-access-token o auth de Supabase)
-  const sessionToken = request.cookies.get('sb-access-token')?.value ||
-                       request.cookies.get('sb-token')?.value ||
-                       user;
+  const isPortalRoute =
+    redirectUrl.pathname.startsWith('/portal-paciente') ||
+    (redirectUrl.pathname.startsWith('/portal') && redirectUrl.pathname !== '/portal/login' && redirectUrl.pathname !== '/portal/register') ||
+    redirectUrl.pathname.startsWith('/mi-expediente');
 
   // 1. Si no hay sesión e intenta acceder a rutas protegidas:
   if (!user) {
@@ -114,24 +112,31 @@ export async function updateSession(request: NextRequest) {
     // REGLA CLAVE: Validación estricta de personal clínico vs pacientes
     const isAdmin = isSuperAdmin || isStaffOrOwner;
 
-    // Si NO es personal clínico (es paciente):
+    // ─────────────────────────────────────────────────────────────
+    // SEPARACIÓN ESTRICTA: SI ES PACIENTE
+    // ─────────────────────────────────────────────────────────────
     if (!isAdmin) {
-      // 1. Si intenta acceder al dashboard interno, redirigir a su portal
-      if (isDashboardRoute || isAdminRoute || isPatientsRoute) {
-        redirectUrl.pathname = '/portal';
+      // 1. Si intenta acceder al dashboard interno, agenda general, finanzas o /portal antiguo:
+      // Redirigir ÚNICAMENTE a /portal-paciente
+      if (isDashboardRoute || isAdminRoute || isPatientsRoute || redirectUrl.pathname === '/portal') {
+        redirectUrl.pathname = '/portal-paciente';
         return NextResponse.redirect(redirectUrl);
       }
 
-      // 2. Si ya está autenticado e intenta entrar a login, activación u onboarding, enviarlo directo a su portal
+      // 2. Si ya está autenticado e intenta entrar a login, activación u onboarding:
+      // Redirigir directo a /portal-paciente
       if (isAuthRoute || isOnboardingRoute) {
-        redirectUrl.pathname = '/portal';
+        redirectUrl.pathname = '/portal-paciente';
         return NextResponse.redirect(redirectUrl);
       }
 
-      // 3. Permitir acceso directo y fluido a /portal sin bucles
+      // 3. Permitir acceso fluido y exclusivo a /portal-paciente
       return supabaseResponse;
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // SEPARACIÓN ESTRICTA: SI ES PERSONAL INTERNO (ADMIN, DOCTOR, PARTNER/SOCIO, INTERN/PASANTE)
+    // ─────────────────────────────────────────────────────────────
     if (isAdmin) {
       const isFinancialOrAdminRestricted =
         redirectUrl.pathname.startsWith('/admin') ||
@@ -139,15 +144,12 @@ export async function updateSession(request: NextRequest) {
         redirectUrl.pathname.startsWith('/dashboard/reportes') ||
         redirectUrl.pathname.startsWith('/dashboard/configuracion');
 
-      // ─────────────────────────────────────────────────────────────
-      // REGLA 1: GESTIÓN DE ACCESOS TEMPORALES PARA ESTUDIANTES (Servicio Social)
-      // ─────────────────────────────────────────────────────────────
-      const isEstudiante = doctorType === 'estudiante';
+      // A) Estudiantes / Pasantes (Servicio Social / Interns):
+      const isEstudiante = userRole === 'intern' || userRole === 'pasante' || userRole === 'estudiante' || doctorType === 'estudiante';
       if (isEstudiante) {
-        // Verificar caducidad/expiración automática programable
         if (studentExpiresAt && new Date(studentExpiresAt).getTime() < Date.now()) {
           redirectUrl.pathname = '/auth/login';
-          redirectUrl.searchParams.set('error', 'Tu pase temporal de servicio social ha concluido. Consulta a la Dra. Aura Estudillo.');
+          redirectUrl.searchParams.set('error', 'Tu pase temporal de servicio social ha concluido. Consulta a la Dirección Médica.');
           return NextResponse.redirect(redirectUrl);
         }
 
@@ -159,11 +161,7 @@ export async function updateSession(request: NextRequest) {
         }
       }
 
-      // ─────────────────────────────────────────────────────────────
-      // REGLA 2: JERARQUÍA MÉDICA (Socios vs. Trabajadores)
-      // Los "Socios" tienen control total de sucursales, finanzas y BI;
-      // los "Trabajadores" operan exclusivamente su agenda clínica asignada.
-      // ─────────────────────────────────────────────────────────────
+      // B) Odontólogos Trabajadores:
       const isTrabajador =
         !isSuperAdmin &&
         (userRole === 'trabajador' || doctorType === 'trabajador');
@@ -174,11 +172,12 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(redirectUrl);
       }
 
-      // Si el personal interno está en login u onboarding, enviar a su panel operativo
+      // Si el personal interno está en login u onboarding, enviar a su panel operativo (/dashboard)
       if (isAuthRoute || isOnboardingRoute) {
         redirectUrl.pathname = '/dashboard';
         return NextResponse.redirect(redirectUrl);
       }
+
       return supabaseResponse;
     }
   }

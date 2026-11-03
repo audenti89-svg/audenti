@@ -57,7 +57,7 @@ export default function DashboardLayout({
 
       // Si definitivamente no es personal interno (es paciente), redirigir a su portal sin cerrar sesión
       if (!isInternal) {
-        router.push('/portal')
+        router.push('/portal-paciente')
         return
       }
 

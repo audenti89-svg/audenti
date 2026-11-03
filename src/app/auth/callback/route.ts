@@ -173,7 +173,7 @@ export async function GET(request: Request) {
       console.warn('[auth/callback] Error en safeUpsertPatient portal:', upsertErr);
     }
 
-    return NextResponse.redirect(`${origin}/portal`);
+    return NextResponse.redirect(`${origin}/portal-paciente`);
   }
 
   return response;

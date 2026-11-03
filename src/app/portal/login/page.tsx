@@ -62,7 +62,7 @@ async function determineTargetRoute(supabaseClient: any, authUser: any): Promise
     console.warn('Nota determinación de rol en portal login:', err);
   }
 
-  return '/portal';
+  return '/portal-paciente';
 }
 
 function PatientLoginForm() {
@@ -181,7 +181,7 @@ function PatientLoginForm() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?next=/portal&portal=true`,
+          redirectTo: `${window.location.origin}/auth/callback?next=/portal-paciente&portal=true`,
         },
       });
       if (error) throw error;
@@ -360,7 +360,7 @@ function PatientLoginForm() {
           window.location.href = target;
         }, 300);
       } else {
-        const fallbackTarget = syncResult.targetRoute || (isSystemAdminEmail(cleanEmail) ? '/dashboard' : '/portal');
+        const fallbackTarget = syncResult.targetRoute || (isSystemAdminEmail(cleanEmail) ? '/dashboard' : '/portal-paciente');
         setTimeout(() => {
           window.location.href = fallbackTarget;
         }, 500);
