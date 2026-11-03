@@ -1073,7 +1073,7 @@ export function Dental3DViewer({
         onClick={handleCloseModal}
       >
         <div
-          className="relative w-full max-w-4xl max-h-[92vh] overflow-y-auto bg-slate-950/90 backdrop-blur-xl border border-amber-500/40 shadow-2xl rounded-3xl p-5 sm:p-7 text-white space-y-5 animate-in zoom-in-95 duration-200"
+          className="relative max-w-6xl w-[92vw] h-[88vh] bg-slate-950/95 backdrop-blur-2xl border border-amber-500/50 shadow-2xl rounded-2xl p-6 overflow-y-auto text-white flex flex-col justify-between space-y-5 animate-in zoom-in-95 duration-200"
           onClick={(e) => e.stopPropagation()}
         >
             {/* Notificación de Guardado / Sincronización en Supabase */}
@@ -1175,14 +1175,188 @@ export function Dental3DViewer({
                   })}
                 </div>
 
-                {/* LAS 5 CARAS ANATÓMICAS CON TARJETAS DETALLADAS (ESTILO IMAGEN 2) */}
-                <div className="space-y-2">
+                {/* CRUCETA ANATÓMICA GEOMÉTRICA INTERACTIVA DE 5 CARAS */}
+                <div className="bg-slate-900/90 rounded-2xl border border-slate-800 p-3 flex flex-col items-center justify-center relative shadow-inner">
+                  <div className="w-full flex items-center justify-between mb-2 px-1">
+                    <span className="text-[11px] font-mono uppercase text-slate-300 font-bold flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                      <span>Cruceta Anatómica Clínica</span>
+                    </span>
+                    <span className="text-[10px] text-amber-300 font-black">
+                      1-Clic: Aplicar {SURFACE_COLORS[modalActiveTool].label.split(' ')[0]}
+                    </span>
+                  </div>
+
+                  <svg viewBox="0 0 200 200" className="w-44 h-44 drop-shadow-[0_0_20px_rgba(56,189,248,0.2)] select-none">
+                    {/* Fondo oscuro contenedor */}
+                    <rect x="10" y="10" width="180" height="180" rx="16" fill="#020617" stroke="#334155" strokeWidth="2" />
+
+                    {/* Bucal / Vestibular (Arriba) */}
+                    <polygon
+                      points="20,20 180,20 135,65 65,65"
+                      fill={SURFACE_COLORS[modalData.activeSurfaces.vestibular].fill}
+                      stroke={SURFACE_COLORS[modalData.activeSurfaces.vestibular].stroke}
+                      strokeWidth="2.5"
+                      className="cursor-pointer hover:brightness-125 transition-all"
+                      onClick={() => handleApplyFaceCondition('vestibular')}
+                    />
+                    <text
+                      x="100"
+                      y="46"
+                      textAnchor="middle"
+                      fill={modalData.activeSurfaces.vestibular === 'sano' ? '#0f172a' : '#ffffff'}
+                      fontSize="9.5"
+                      fontWeight="900"
+                      pointerEvents="none"
+                      letterSpacing="0.5"
+                    >
+                      ▲ VESTIBULAR
+                    </text>
+
+                    {/* Lingual / Palatino (Abajo) */}
+                    <polygon
+                      points="65,135 135,135 180,180 20,180"
+                      fill={SURFACE_COLORS[modalData.activeSurfaces.lingual].fill}
+                      stroke={SURFACE_COLORS[modalData.activeSurfaces.lingual].stroke}
+                      strokeWidth="2.5"
+                      className="cursor-pointer hover:brightness-125 transition-all"
+                      onClick={() => handleApplyFaceCondition('lingual')}
+                    />
+                    <text
+                      x="100"
+                      y="162"
+                      textAnchor="middle"
+                      fill={modalData.activeSurfaces.lingual === 'sano' ? '#0f172a' : '#ffffff'}
+                      fontSize="9.5"
+                      fontWeight="900"
+                      pointerEvents="none"
+                      letterSpacing="0.5"
+                    >
+                      ▼ {modalData.toothFdi >= 31 && modalData.toothFdi <= 48 ? 'LINGUAL' : 'PALATINO'}
+                    </text>
+
+                    {/* Mesial (Izquierda) */}
+                    <polygon
+                      points="20,20 65,65 65,135 20,180"
+                      fill={SURFACE_COLORS[modalData.activeSurfaces.mesial].fill}
+                      stroke={SURFACE_COLORS[modalData.activeSurfaces.mesial].stroke}
+                      strokeWidth="2.5"
+                      className="cursor-pointer hover:brightness-125 transition-all"
+                      onClick={() => handleApplyFaceCondition('mesial')}
+                    />
+                    <text
+                      x="44"
+                      y="104"
+                      textAnchor="middle"
+                      fill={modalData.activeSurfaces.mesial === 'sano' ? '#0f172a' : '#ffffff'}
+                      fontSize="9.5"
+                      fontWeight="900"
+                      pointerEvents="none"
+                      transform="rotate(-90 44 104)"
+                      letterSpacing="0.5"
+                    >
+                      ◀ MESIAL
+                    </text>
+
+                    {/* Distal (Derecha) */}
+                    <polygon
+                      points="135,65 180,20 180,180 135,135"
+                      fill={SURFACE_COLORS[modalData.activeSurfaces.distal].fill}
+                      stroke={SURFACE_COLORS[modalData.activeSurfaces.distal].stroke}
+                      strokeWidth="2.5"
+                      className="cursor-pointer hover:brightness-125 transition-all"
+                      onClick={() => handleApplyFaceCondition('distal')}
+                    />
+                    <text
+                      x="156"
+                      y="104"
+                      textAnchor="middle"
+                      fill={modalData.activeSurfaces.distal === 'sano' ? '#0f172a' : '#ffffff'}
+                      fontSize="9.5"
+                      fontWeight="900"
+                      pointerEvents="none"
+                      transform="rotate(90 156 104)"
+                      letterSpacing="0.5"
+                    >
+                      DISTAL ▶
+                    </text>
+
+                    {/* Oclusal / Incisal (Centro) */}
+                    <rect
+                      x="65"
+                      y="65"
+                      width="70"
+                      height="70"
+                      rx="8"
+                      fill={SURFACE_COLORS[modalData.activeSurfaces.oclusal].fill}
+                      stroke={SURFACE_COLORS[modalData.activeSurfaces.oclusal].stroke}
+                      strokeWidth="3"
+                      className="cursor-pointer hover:brightness-125 transition-all"
+                      onClick={() => handleApplyFaceCondition('oclusal')}
+                    />
+                    <text
+                      x="100"
+                      y="98"
+                      textAnchor="middle"
+                      fill={modalData.activeSurfaces.oclusal === 'sano' ? '#0f172a' : '#ffffff'}
+                      fontSize="9.5"
+                      fontWeight="900"
+                      pointerEvents="none"
+                    >
+                      ⬢ {modalData.taxonomy?.isAnterior ? 'INCISAL' : 'OCLUSAL'}
+                    </text>
+                    <text
+                      x="100"
+                      y="111"
+                      textAnchor="middle"
+                      fill={modalData.activeSurfaces.oclusal === 'sano' ? '#475569' : '#fef08a'}
+                      fontSize="7.5"
+                      fontWeight="bold"
+                      pointerEvents="none"
+                    >
+                      CENTRO
+                    </text>
+                  </svg>
+                </div>
+
+                {/* TARJETAS ESTILIZADAS CON ICONOS DIRECCIONALES (5 CARAS) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {[
-                    { key: 'oclusal' as const, label: modalData.taxonomy?.isAnterior ? 'Incisal / Occlusal' : 'Occlusal', sub: modalData.taxonomy?.isAnterior ? 'Borde de corte incisal' : 'Superficie masticatoria' },
-                    { key: 'mesial' as const, label: 'Mesial', sub: 'Hacia línea media dental' },
-                    { key: 'distal' as const, label: 'Distal', sub: 'Hacia zona posterior' },
-                    { key: 'vestibular' as const, label: 'Buccal / Vestibular', sub: modalData.toothFdi >= 31 && modalData.toothFdi <= 48 ? 'Inferior (Labial)' : 'Superior (Labial)' },
-                    { key: 'lingual' as const, label: modalData.toothFdi >= 31 && modalData.toothFdi <= 48 ? 'Lingual' : 'Lingual / Palatino', sub: modalData.toothFdi >= 31 && modalData.toothFdi <= 48 ? 'Hacia lengua' : 'Hacia paladar' }
+                    {
+                      key: 'oclusal' as const,
+                      icon: '⬢',
+                      iconColor: 'text-amber-400',
+                      label: modalData.taxonomy?.isAnterior ? 'Incisal / Oclusal' : 'Oclusal',
+                      sub: modalData.taxonomy?.isAnterior ? 'Borde incisal' : 'Masticatoria'
+                    },
+                    {
+                      key: 'vestibular' as const,
+                      icon: '▲',
+                      iconColor: 'text-cyan-400',
+                      label: 'Bucal / Vestibular',
+                      sub: modalData.toothFdi >= 31 && modalData.toothFdi <= 48 ? 'Inferior (Labial)' : 'Superior (Labial)'
+                    },
+                    {
+                      key: 'lingual' as const,
+                      icon: '▼',
+                      iconColor: 'text-purple-400',
+                      label: modalData.toothFdi >= 31 && modalData.toothFdi <= 48 ? 'Lingual' : 'Palatino',
+                      sub: modalData.toothFdi >= 31 && modalData.toothFdi <= 48 ? 'Hacia lengua' : 'Hacia paladar'
+                    },
+                    {
+                      key: 'mesial' as const,
+                      icon: '◀',
+                      iconColor: 'text-emerald-400',
+                      label: 'Mesial',
+                      sub: 'Hacia línea media'
+                    },
+                    {
+                      key: 'distal' as const,
+                      icon: '▶',
+                      iconColor: 'text-rose-400',
+                      label: 'Distal',
+                      sub: 'Hacia posterior'
+                    }
                   ].map(face => {
                     const currentCond = modalData.activeSurfaces[face.key]
                     const info = SURFACE_COLORS[currentCond]
@@ -1191,29 +1365,32 @@ export function Dental3DViewer({
                         key={face.key}
                         onClick={() => handleApplyFaceCondition(face.key)}
                         className={cn(
-                          'p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 select-none',
+                          'p-2 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2 select-none hover:scale-[1.01] active:scale-[0.99]',
                           currentCond !== 'sano'
                             ? 'bg-slate-900 border-amber-400/80 shadow-xs shadow-amber-500/10'
                             : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
                         )}
                       >
-                        <div className="flex items-center gap-2.5">
-                          <span
-                            className="w-3.5 h-3.5 rounded-full border shadow-2xs shrink-0"
-                            style={{ backgroundColor: info.fill, borderColor: info.stroke }}
-                          />
-                          <div>
-                            <span className="text-xs font-bold text-white block">{face.label}</span>
-                            <span className="text-[10px] text-slate-400 block">{face.sub}</span>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-6 h-6 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0">
+                            <span className={cn('text-xs font-black', face.iconColor)}>{face.icon}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-xs font-bold text-white block truncate leading-tight">{face.label}</span>
+                            <span className="text-[9.5px] text-slate-400 block truncate">{face.sub}</span>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full border shadow-2xs shrink-0"
+                            style={{ backgroundColor: info.fill, borderColor: info.stroke }}
+                          />
                           <span className={cn(
-                            'text-[10px] font-black uppercase px-2 py-0.5 rounded-md',
-                            currentCond === 'sano' ? 'bg-slate-800 text-slate-400' : 'bg-amber-400 text-slate-950 font-black'
+                            'text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md',
+                            currentCond === 'sano' ? 'bg-slate-800 text-slate-400' : 'bg-amber-400 text-slate-950'
                           )}>
-                            {info.label}
+                            {info.label.split(' ')[0]}
                           </span>
                         </div>
                       </div>
@@ -1295,11 +1472,11 @@ export function Dental3DViewer({
                         <button
                           type="button"
                           onClick={() => handleLinkProcedure(item)}
-                          className="px-2.5 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-colors flex items-center gap-1 cursor-pointer shrink-0 shadow-xs"
+                          className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 whitespace-nowrap shadow-sm active:scale-95"
                           title="Vincular a esta pieza y sincronizar con Supabase"
                         >
                           <Plus className="w-3.5 h-3.5" />
-                          <span>Vincular</span>
+                          <span>+ Vincular</span>
                         </button>
                       </div>
                     ))}

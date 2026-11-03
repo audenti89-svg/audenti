@@ -95,6 +95,10 @@ export default function ExpedientePage() {
   })
   const [savingEdit, setSavingEdit] = useState(false)
 
+  // Selector dinámico de sucursal por paciente (Persistencia en Supabase)
+  const [savingBranch, setSavingBranch] = useState(false)
+  const [branchSavedSuccess, setBranchSavedSuccess] = useState(false)
+
   // Perfil del profesional en sesión (Socio, Trabajador o Pasante)
   const [doctorProfile, setDoctorProfile] = useState<{
     name: string
@@ -357,6 +361,33 @@ export default function ExpedientePage() {
       setSelectedPatient(p)
       initEditForm(p)
       fetchPatientHistory(p)
+    }
+  }
+
+  // Cambiar sucursal del paciente y guardar en tiempo real en Supabase
+  const handleUpdatePatientBranch = async (newBranch: string) => {
+    if (!selectedPatient) return
+    setSavingBranch(true)
+    try {
+      setSelectedPatient((prev: any) => ({ ...prev, branch_name: newBranch }))
+      setPatients((prev: any[]) =>
+        prev.map(p => (p.id === selectedPatient.id ? { ...p, branch_name: newBranch } : p))
+      )
+      const { error } = await supabase
+        .from('patients')
+        .update({ branch_name: newBranch })
+        .eq('id', selectedPatient.id)
+
+      if (error) {
+        console.warn('Error updating patient branch in Supabase:', error)
+      } else {
+        setBranchSavedSuccess(true)
+        setTimeout(() => setBranchSavedSuccess(false), 2500)
+      }
+    } catch (err) {
+      console.warn('Error in handleUpdatePatientBranch:', err)
+    } finally {
+      setSavingBranch(false)
     }
   }
 
@@ -665,15 +696,45 @@ export default function ExpedientePage() {
             </span>
           </div>
 
-          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3">
-            <span>{selectedPatient.full_name}</span>
-            <span className="text-xs font-mono font-bold text-slate-400 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700">
-              Folio #{selectedPatient.id.slice(0, 8).toUpperCase()}
-            </span>
-          </h1>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3">
+              <span>{selectedPatient.full_name}</span>
+              <span className="text-xs font-mono font-bold text-slate-400 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700">
+                Folio #{selectedPatient.id.slice(0, 8).toUpperCase()}
+              </span>
+            </h1>
+
+            {/* SELECTOR DESPLEGABLE DINÁMICO DE SUCURSAL POR PACIENTE */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-bold text-slate-400">Sucursal Asignada:</span>
+              <select
+                value={selectedPatient.branch_name || doctorProfile.branch || 'Sucursal Balbuena (Matriz)'}
+                onChange={(e) => handleUpdatePatientBranch(e.target.value)}
+                disabled={savingBranch}
+                className="bg-slate-900 border border-amber-400/60 hover:border-amber-300 text-amber-300 text-xs font-black rounded-xl px-3 py-1.5 focus:outline-hidden focus:ring-2 focus:ring-amber-400/50 cursor-pointer transition-all shadow-md"
+              >
+                <option value="Sucursal Balbuena (Matriz)" className="bg-slate-950 text-white">Sucursal Balbuena (Matriz)</option>
+                <option value="Sucursal Guadalupe Chalma" className="bg-slate-950 text-white">Sucursal Guadalupe Chalma</option>
+                <option value="Sucursal Colonia Roma" className="bg-slate-950 text-white">Sucursal Colonia Roma</option>
+                <option value="Sucursal Condesa" className="bg-slate-950 text-white">Sucursal Condesa</option>
+                <option value="Sucursal Polanco" className="bg-slate-950 text-white">Sucursal Polanco</option>
+                <option value="Sucursal Del Valle" className="bg-slate-950 text-white">Sucursal Del Valle</option>
+                <option value="Sucursal Satélite" className="bg-slate-950 text-white">Sucursal Satélite</option>
+              </select>
+              {savingBranch && (
+                <span className="text-[10px] font-bold text-amber-400 animate-pulse">Guardando...</span>
+              )}
+              {branchSavedSuccess && (
+                <span className="text-[10px] font-black text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/30">
+                  <CheckCircle2 className="w-3 h-3" />
+                  Sincronizado Supabase
+                </span>
+              )}
+            </div>
+          </div>
 
           <p className="text-xs text-slate-400 mt-1">
-            Sucursal: <strong className="text-amber-300">{doctorProfile.branch}</strong> • Registrado el{' '}
+            Expediente clínico activo • Registrado el{' '}
             {new Date(selectedPatient.created_at || Date.now()).toLocaleDateString('es-MX')}
           </p>
         </div>
@@ -1192,7 +1253,7 @@ export default function ExpedientePage() {
                   patientName={selectedPatient?.full_name || selectedPatient?.name}
                   doctorName={doctorProfile.name}
                   doctorRole={doctorProfile.role}
-                  branch={doctorProfile.branch}
+                  branch={selectedPatient?.branch_name || doctorProfile.branch}
                   onHistoryUpdated={() => fetchPatientHistory(selectedPatient)}
                 />
               </div>

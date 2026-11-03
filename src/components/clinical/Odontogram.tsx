@@ -356,23 +356,23 @@ export function Odontogram({
   const totalBudget = linkedTreatments.reduce((acc, t) => acc + t.estimatedCost, 0)
 
   return (
-    <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col space-y-4">
+    <div className="bg-slate-950/80 rounded-3xl border border-slate-800/90 shadow-2xl overflow-hidden flex flex-col space-y-4 text-white">
       {/* Encabezado Superior */}
-      <div className="p-5 border-b border-slate-200 bg-slate-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="p-4 sm:p-5 border-b border-slate-800/80 bg-slate-900/70 backdrop-blur-md flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 shadow-xs flex items-center gap-1">
               <Box className="w-3.5 h-3.5" />
               <span>Visor 3D OrganUI Holográfico (2027)</span>
             </span>
-            <span className="text-xs font-semibold text-slate-500">
+            <span className="text-xs font-semibold text-slate-400">
               Dra. Aura Estudillo • Odontología &amp; Alta Especialidad
             </span>
           </div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+          <h2 className="text-lg font-black text-white tracking-tight">
             Odontograma 3D Clínico &amp; Ventana Cristal
           </h2>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-400">
             Haz clic en cualquier pieza dental o zona interproximal del modelo 3D para abrir la <strong>Ventana Cristal</strong> con el desglose anatómico de 5 caras y vinculación de tratamientos.
           </p>
         </div>
@@ -381,16 +381,16 @@ export function Odontogram({
           <button
             type="button"
             onClick={handleSaveOdontogram}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors shadow-xs cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-400 text-slate-950 text-xs font-black hover:bg-amber-300 transition-colors shadow-lg shadow-amber-500/20 cursor-pointer"
           >
-            <Save className="w-4 h-4 text-amber-400" />
+            <Save className="w-4 h-4 text-slate-950" />
             <span>{savedSuccess ? '¡Expediente Guardado!' : 'Guardar Expediente & Supabase'}</span>
           </button>
         </div>
       </div>
 
       {/* Visualizador 3D Holográfico Único y Exclusivo */}
-      <div className="px-4 sm:px-6 py-2">
+      <div className="px-3 sm:px-5 py-1">
         <Dental3DViewer
           selectedToothNum={selectedToothNum}
           onSelectTooth={setSelectedToothNum}
@@ -408,51 +408,51 @@ export function Odontogram({
       </div>
 
       {/* SECCIÓN RESUMEN CLÍNICO: TRATAMIENTOS VINCULADOS & PRESUPUESTO */}
-      <div className="p-6 border-t border-slate-200 bg-slate-50/70 space-y-5">
+      <div className="p-5 sm:p-6 border-t border-slate-800/80 bg-slate-900/50 backdrop-blur-md space-y-4">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <h3 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
-              <FileText className="w-4 h-4 text-amber-500" />
+            <h3 className="text-sm font-black text-white tracking-tight flex items-center gap-2">
+              <FileText className="w-4 h-4 text-amber-400" />
               <span>Tratamientos Vinculados al Expediente ({linkedTreatments.length})</span>
             </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-slate-400 mt-0.5">
               Consolidación en tiempo real sincronizada con Supabase para {patientName}.
             </p>
           </div>
-          <span className="text-sm font-black text-emerald-700 font-mono bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
+          <span className="text-sm font-black text-emerald-400 font-mono bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/30">
             Presupuesto Total: ${totalBudget.toLocaleString('es-MX')} MXN
           </span>
         </div>
 
         {linkedTreatments.length === 0 ? (
-          <div className="p-6 text-center bg-white rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs">
+          <div className="p-6 text-center bg-slate-950/60 rounded-2xl border border-dashed border-slate-800 text-slate-400 text-xs">
             Selecciona cualquier pieza en el Visor 3D superior y haz clic en <strong>+ Vincular</strong> dentro de la Ventana Cristal para añadir tratamientos al presupuesto y expediente del paciente.
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
-            <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
+          <div className="bg-slate-950/80 rounded-2xl border border-slate-800 overflow-hidden shadow-xs">
+            <div className="divide-y divide-slate-800 max-h-64 overflow-y-auto">
               {linkedTreatments.map(t => (
-                <div key={t.id} className="p-3.5 flex items-center justify-between text-xs hover:bg-slate-50 transition-colors">
+                <div key={t.id} className="p-3 flex items-center justify-between text-xs hover:bg-slate-900/60 transition-colors">
                   <div className="flex items-center gap-3">
-                    <span className="w-9 h-9 rounded-xl bg-amber-100 text-amber-950 font-black flex items-center justify-center shrink-0 shadow-2xs">
+                    <span className="w-8 h-8 rounded-xl bg-amber-400 text-slate-950 font-black flex items-center justify-center shrink-0 shadow-xs">
                       #{t.toothNumber}
                     </span>
                     <div>
-                      <span className="font-bold text-slate-900 block">{t.procedure}</span>
-                      <span className="text-[11px] text-slate-500 capitalize">
-                        {t.specialty} • Caras: <strong className="text-slate-800">{t.surfaces}</strong>
+                      <span className="font-bold text-white block">{t.procedure}</span>
+                      <span className="text-[11px] text-slate-400 capitalize">
+                        {t.specialty} • Caras: <strong className="text-slate-200">{t.surfaces}</strong>
                       </span>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <span className="font-mono font-bold text-emerald-700 text-sm">
+                    <span className="font-mono font-bold text-emerald-400 text-sm">
                       ${t.estimatedCost.toLocaleString('es-MX')} MXN
                     </span>
                     <button
                       type="button"
                       onClick={() => handleRemoveTreatment(t.id)}
-                      className="p-1.5 rounded-lg text-rose-500 hover:text-white hover:bg-rose-600 transition-colors cursor-pointer"
+                      className="p-1.5 rounded-lg text-rose-400 hover:text-white hover:bg-rose-600 transition-colors cursor-pointer"
                       title="Eliminar del plan"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
