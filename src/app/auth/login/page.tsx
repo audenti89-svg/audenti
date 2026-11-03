@@ -231,14 +231,22 @@ function LoginForm() {
         {loadingGoogle ? 'Conectando...' : 'Iniciar Sesión Médica con Google'}
       </button>
 
-      {/* AVISO DE POLÍTICA DE SEGURIDAD Y REGISTRO CERRADO */}
-      <div className="mt-6 p-3 rounded-2xl bg-slate-900/60 border border-slate-800 text-[11px] text-slate-400 text-left space-y-1">
-        <span className="text-[10px] font-black uppercase text-amber-400 block tracking-wider">
-          Aviso de Seguridad NOM-004-SSA3:
-        </span>
-        <p className="leading-relaxed">
-          El registro público para pacientes está deshabilitado. Si eres paciente y requieres consulta o expediente, acude a recepción en Balbuena o Chalma de Guadalupe.
-        </p>
+      {/* AVISO DE POLÍTICA DE SEGURIDAD Y ACCESO A PACIENTES */}
+      <div className="mt-5 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-left">
+        <div>
+          <span className="text-[10px] font-black uppercase text-amber-300 block tracking-wider">
+            ¿Eres Paciente de Audenti?
+          </span>
+          <span className="text-[11px] text-slate-300 block">
+            Accede a tu historial clínico, citas y recetas
+          </span>
+        </div>
+        <Link
+          href="/portal/login"
+          className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-colors shadow-sm shrink-0"
+        >
+          Portal Paciente →
+        </Link>
       </div>
 
       <div className="mt-5 pt-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">

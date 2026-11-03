@@ -36,6 +36,27 @@ yarn-error.log*
 # vercel
 .vercel
 
+# AI tools & agent configs
+.agents/
+.augment/
+.claude/
+.codebuddy/
+.codewhale/
+.continue/
+.cursor/
+.factory/
+.gemini/
+.github/
+.kilocode/
+.kiro/
+.opencode/
+.qoder/
+.roo/
+.trae/
+.warp/
+.windsurf/
+
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
@@ -48,6 +69,27 @@ chatwoot-develop/
 
 
 .vercel
+
+# AI tools & agent configs
+.agents/
+.augment/
+.claude/
+.codebuddy/
+.codewhale/
+.continue/
+.cursor/
+.factory/
+.gemini/
+.github/
+.kilocode/
+.kiro/
+.opencode/
+.qoder/
+.roo/
+.trae/
+.warp/
+.windsurf/
+
 .env*
 
 OpenWA-main/

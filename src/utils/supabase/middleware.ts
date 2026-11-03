@@ -48,21 +48,28 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const redirectUrl = request.nextUrl.clone();
-  const isAuthRoute = redirectUrl.pathname.startsWith('/auth') || redirectUrl.pathname === '/login';
+  const isAuthRoute = redirectUrl.pathname.startsWith('/auth') || redirectUrl.pathname === '/login' || redirectUrl.pathname === '/portal/login';
   const isOnboardingRoute = redirectUrl.pathname.startsWith('/onboarding');
   const isDashboardRoute = redirectUrl.pathname.startsWith('/dashboard');
   const isAdminRoute = redirectUrl.pathname.startsWith('/admin');
   const isPatientsRoute = redirectUrl.pathname.startsWith('/patients');
+  const isPortalRoute = (redirectUrl.pathname.startsWith('/portal') && redirectUrl.pathname !== '/portal/login') || redirectUrl.pathname.startsWith('/mi-expediente');
 
   // Comprobar token directo de sesión (sb-access-token o auth de Supabase)
   const sessionToken = request.cookies.get('sb-access-token')?.value ||
                        request.cookies.get('sb-token')?.value ||
                        user;
 
-  // 1. Si no hay sesión e intenta acceder a /admin, /patients, /dashboard o /onboarding -> redirigir a login
-  if (!user && (isDashboardRoute || isOnboardingRoute || isAdminRoute || isPatientsRoute)) {
-    redirectUrl.pathname = '/auth/login';
-    return NextResponse.redirect(redirectUrl);
+  // 1. Si no hay sesión e intenta acceder a rutas protegidas:
+  if (!user) {
+    if (isDashboardRoute || isOnboardingRoute || isAdminRoute || isPatientsRoute) {
+      redirectUrl.pathname = '/auth/login';
+      return NextResponse.redirect(redirectUrl);
+    }
+    if (isPortalRoute) {
+      redirectUrl.pathname = '/portal/login';
+      return NextResponse.redirect(redirectUrl);
+    }
   }
 
   // 2. Si hay usuario autenticado, verificar su rol y registro
@@ -177,21 +184,22 @@ export async function updateSession(request: NextRequest) {
     // Para pacientes: verificar registro médico en la tabla `patients`
     const { data: patient } = await supabase
       .from('patients')
-      .select('onboarding_completed')
-      .eq('id', user.id)
+      .select('id, onboarding_completed')
+      .or(`id.eq.${user.id},user_id.eq.${user.id},auth_user_id.eq.${user.id},email.eq.${user.email}`)
       .maybeSingle();
 
-    const hasCompletedOnboarding = patient?.onboarding_completed === true;
+    const hasPatientRecord = !!patient;
+    const hasCompletedOnboarding = hasPatientRecord && patient.onboarding_completed !== false;
 
-    // Si es paciente y no ha completado el onboarding e intenta entrar a rutas protegidas -> redirigir a /onboarding
-    if (!hasCompletedOnboarding && (isDashboardRoute || redirectUrl.pathname.startsWith('/portal') || redirectUrl.pathname.startsWith('/mi-expediente'))) {
+    // Si es paciente nuevo sin expediente y va a rutas protegidas -> redirigir a /onboarding
+    if (!hasPatientRecord && (isDashboardRoute || redirectUrl.pathname.startsWith('/portal') || redirectUrl.pathname.startsWith('/mi-expediente'))) {
       redirectUrl.pathname = '/onboarding';
       return NextResponse.redirect(redirectUrl);
     }
 
-    // Si ya completó el onboarding e intenta entrar a login u onboarding -> redirigir a /mi-expediente
-    if (hasCompletedOnboarding && (isAuthRoute || isOnboardingRoute)) {
-      redirectUrl.pathname = '/mi-expediente';
+    // Si ya tiene perfil o completó el onboarding e intenta entrar a login u onboarding -> redirigir a /portal
+    if (hasPatientRecord && (isAuthRoute || isOnboardingRoute)) {
+      redirectUrl.pathname = '/portal';
       return NextResponse.redirect(redirectUrl);
     }
   }
