@@ -81,35 +81,35 @@ export interface ToothState {
 // Catálogo de Tratamientos Específicos por Especialidad
 export const TREATMENT_CATALOG: Record<DentalSpecialty, Array<{ name: string; cost: number; condition: ToothWholeCondition }>> = {
   operatoria: [
-    { name: 'Resina Estética 1 Cara (Oclusal/Vestibular)', cost: 850, condition: 'sano' },
-    { name: 'Resina Estética 2 Caras (MO / DO)', cost: 1100, condition: 'sano' },
-    { name: 'Resina Estética Compleja 3+ Caras (MOD)', cost: 1400, condition: 'sano' },
-    { name: 'Incrustación Estética Cerámica / E-Max', cost: 3500, condition: 'corona' },
+    { name: 'Composite / Resina Estética 1 Cara (Oclusal/Vestibular)', cost: 850, condition: 'sano' },
+    { name: 'Composite / Resina Estética 2 Caras (MO / DO)', cost: 1100, condition: 'sano' },
+    { name: 'Composite / Resina Estética Compleja 3+ Caras (MOD)', cost: 1400, condition: 'sano' },
+    { name: 'Crown / Incrustación Estética Cerámica / E-Max', cost: 3500, condition: 'corona' },
     { name: 'Sellador de Fosetas y Fisuras Preventivo', cost: 450, condition: 'sano' },
   ],
   endodoncia: [
-    { name: 'Tratamiento de Conductos Unirradicular', cost: 2800, condition: 'endodoncia' },
-    { name: 'Tratamiento de Conductos Birradicular', cost: 3400, condition: 'endodoncia' },
-    { name: 'Tratamiento de Conductos Molar (Rotatorio)', cost: 4200, condition: 'endodoncia' },
+    { name: 'Root Canal / Endodoncia Unirradicular', cost: 2800, condition: 'endodoncia' },
+    { name: 'Root Canal / Endodoncia Birradicular', cost: 3400, condition: 'endodoncia' },
+    { name: 'Root Canal / Endodoncia Molar Rotatorio', cost: 4200, condition: 'endodoncia' },
     { name: 'Poste de Fibra de Vidrio + Reconstrucción', cost: 1950, condition: 'endodoncia' },
     { name: 'Retratamiento Endodóntico Complejo', cost: 4800, condition: 'endodoncia' },
+  ],
+  cirugia: [
+    { name: 'Extraction / Extracción Simple de Órgano Dentario', cost: 950, condition: 'extraccion_indicada' },
+    { name: 'Extraction / Cirugía de Tercer Molar Incluido / Retenido', cost: 3200, condition: 'extraccion_indicada' },
+    { name: 'Alveoloplastía & Regularización Ósea', cost: 1800, condition: 'extraccion_indicada' },
+  ],
+  implantes: [
+    { name: 'Crown / Corona de Zirconia Atornillada sobre Implante', cost: 7500, condition: 'corona' },
+    { name: 'Fase Quirúrgica: Implante Oseointegrado Titanio', cost: 14500, condition: 'implante' },
+    { name: 'Pilar Transepitelial & Tornillo Clínico', cost: 3200, condition: 'implante' },
+    { name: 'Regeneración Ósea Guiada + Membrana PRF', cost: 4500, condition: 'implante' },
   ],
   ortodoncia: [
     { name: 'Cementado de Bracket Individual', cost: 600, condition: 'bracket' },
     { name: 'Colocación de Tubo Molar / Banda', cost: 750, condition: 'bracket' },
     { name: 'Alineador Transparente (Fase Activa)', cost: 2500, condition: 'bracket' },
     { name: 'Retenedor Fijo Lingual de Alambre Trenzado', cost: 1800, condition: 'bracket' },
-  ],
-  implantes: [
-    { name: 'Fase Quirúrgica: Implante Oseointegrado Titanio', cost: 14500, condition: 'implante' },
-    { name: 'Pilar Transepitelial & Tornillo Clínico', cost: 3200, condition: 'implante' },
-    { name: 'Corona de Zirconia Atornillada sobre Implante', cost: 7500, condition: 'corona' },
-    { name: 'Regeneración Ósea Guiada + Membrana PRF', cost: 4500, condition: 'implante' },
-  ],
-  cirugia: [
-    { name: 'Extracción Simple de Órgano Dentario', cost: 950, condition: 'extraccion_indicada' },
-    { name: 'Cirugía de Tercer Molar Incluido / Retenido', cost: 3200, condition: 'extraccion_indicada' },
-    { name: 'Alveoloplastía & Regularización Ósea', cost: 1800, condition: 'extraccion_indicada' },
   ],
   periodoncia: [
     { name: 'Raspado y Alisado Radicular por Cuadrante', cost: 1200, condition: 'sano' },

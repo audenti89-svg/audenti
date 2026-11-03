@@ -29,7 +29,12 @@ import {
   ShieldCheck,
   ShieldAlert,
   ClipboardList,
-  Sparkles
+  Sparkles,
+  Calendar,
+  ChevronRight,
+  UserCheck,
+  Stethoscope,
+  RotateCcw
 } from 'lucide-react'
 import { Odontogram } from '@/components/clinical/Odontogram'
 import { FamilyNucleusManager } from '@/components/clinical/FamilyNucleusManager'
@@ -45,7 +50,13 @@ export default function ExpedientePage() {
   const [selectedPatient, setSelectedPatient] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState<'clinical' | 'history' | 'questionnaire' | 'family'>('clinical')
+  
+  // Pestaña activa del Panel Izquierdo
+  const [leftTab, setLeftTab] = useState<'patient' | 'agenda' | 'history' | 'questionnaire' | 'family'>('patient')
+
+  // Agenda Diaria en Tiempo Real
+  const [todayAppointments, setTodayAppointments] = useState<any[]>([])
+  const [loadingAppointments, setLoadingAppointments] = useState(false)
 
   // Historial de mensajes, notas y llamadas
   const [messages, setMessages] = useState<any[]>([])
@@ -77,6 +88,7 @@ export default function ExpedientePage() {
     branch: 'Sucursal Balbuena (Matriz)'
   })
 
+  // Cargar sesión del médico y resolver rol
   useEffect(() => {
     async function loadDoctorSession() {
       try {
@@ -106,6 +118,52 @@ export default function ExpedientePage() {
     loadDoctorSession()
   }, [supabase])
 
+  // Cargar Agenda Diaria en Tiempo Real
+  const fetchTodayAppointments = async () => {
+    setLoadingAppointments(true)
+    try {
+      const todayStr = new Date().toISOString().split('T')[0]
+      let appList: any[] = []
+
+      // 1. Intentar desde la API de citas persistidas
+      try {
+        const res = await fetch('/api/appointments')
+        if (res.ok) {
+          const json = await res.json()
+          if (json.success && Array.isArray(json.appointments)) {
+            appList = json.appointments
+          }
+        }
+      } catch (e) {
+        console.warn('Nota en /api/appointments:', e)
+      }
+
+      // 2. Complementar con Supabase table si es necesario
+      if (appList.length === 0) {
+        const { data: dbApps } = await supabase
+          .from('appointments')
+          .select('*')
+          .order('date', { ascending: true })
+        if (dbApps && dbApps.length > 0) {
+          appList = dbApps
+        }
+      }
+
+      // Filtrar citas de hoy o citas prioritarias
+      const filtered = appList.filter((a: any) => {
+        const aDate = (a.appointment_date || a.date || '').slice(0, 10)
+        return aDate === todayStr
+      })
+
+      setTodayAppointments(filtered.length > 0 ? filtered : appList.slice(0, 10))
+    } catch (err) {
+      console.warn('Error fetching appointments for expediente:', err)
+    } finally {
+      setLoadingAppointments(false)
+    }
+  }
+
+  // Cargar historial del paciente seleccionado
   const fetchPatientHistory = async (patient: any) => {
     if (!patient) return
     setLoadingMessages(true)
@@ -133,7 +191,7 @@ export default function ExpedientePage() {
         }))
       }
 
-      // 2. Si hay almacenamiento en storage o fallback de storage, recuperar también
+      // 2. Si hay almacenamiento en storage, recuperar también
       try {
         const { data: file } = await supabase.storage.from('audenti_database').download('chat_omnichannel.json')
         if (file) {
@@ -171,6 +229,7 @@ export default function ExpedientePage() {
     }
   }
 
+  // Guardar nota privada médica
   const handleSavePrivateNote = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newNote.trim() || !selectedPatient) return
@@ -178,24 +237,24 @@ export default function ExpedientePage() {
     setSavingNote(true)
     try {
       const noteContent = newNote.trim()
-      // Guardar en chat_messages como nota privada
-      const { data, error } = await supabase.from('chat_messages').insert({
+      const { error } = await supabase.from('chat_messages').insert({
         patient_id: selectedPatient.id,
         sender_role: 'doctor',
-        sender_name: 'Dra. Aura Estudillo',
+        sender_name: doctorProfile.name,
         content: `🔒 [NOTA PRIVADA MÉDICA]: ${noteContent}`,
         channel_type: 'internal_note',
         is_private_note: true,
         metadata: {
           isPrivateNote: true,
           patientId: selectedPatient.id,
-          doctorName: 'Dra. Aura Estudillo',
+          doctorName: doctorProfile.name,
+          doctorRole: doctorProfile.role,
           createdAt: new Date().toISOString()
         }
       }).select().single()
 
       if (error) {
-        // Fallback a API
+        // Fallback a API de chat
         await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -203,7 +262,7 @@ export default function ExpedientePage() {
             patientId: selectedPatient.id,
             message: {
               id: `note-${Date.now()}`,
-              senderName: 'Dra. Aura Estudillo',
+              senderName: doctorProfile.name,
               senderRole: 'doctor',
               content: `🔒 [NOTA PRIVADA MÉDICA]: ${noteContent}`,
               channel_type: 'internal_note',
@@ -224,6 +283,7 @@ export default function ExpedientePage() {
     }
   }
 
+  // Cargar lista de pacientes
   const fetchPatients = async () => {
     setLoading(true)
     try {
@@ -237,7 +297,6 @@ export default function ExpedientePage() {
       const list = data || []
       setPatients(list)
       if (list.length > 0) {
-        // Verificar si la URL trae un patient_id o patientId específico
         let targetPatient = list[0]
         if (typeof window !== 'undefined') {
           const urlParams = new URLSearchParams(window.location.search)
@@ -277,6 +336,7 @@ export default function ExpedientePage() {
 
   useEffect(() => {
     fetchPatients()
+    fetchTodayAppointments()
   }, [])
 
   const handleSelectPatient = (id: string) => {
@@ -285,6 +345,22 @@ export default function ExpedientePage() {
       setSelectedPatient(p)
       initEditForm(p)
       fetchPatientHistory(p)
+    }
+  }
+
+  // Conectar selección de paciente desde la Agenda Diaria
+  const handleSelectAppointmentPatient = (app: any) => {
+    const patientId = app.patient_id || app.patientId
+    const patientName = app.patient_name || app.patientName
+    const match = patients.find(p =>
+      (patientId && p.id === patientId) ||
+      (patientName && p.full_name?.toLowerCase() === patientName.toLowerCase())
+    )
+    if (match) {
+      setSelectedPatient(match)
+      initEditForm(match)
+      fetchPatientHistory(match)
+      setLeftTab('patient')
     }
   }
 
@@ -328,49 +404,50 @@ export default function ExpedientePage() {
 
   if (loading) {
     return (
-      <div className="py-20 text-center">
-        <div className="w-8 h-8 border-3 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-        <p className="text-xs font-bold text-slate-600">Sincronizando expedientes clínicos desde Supabase...</p>
+      <div className="-mx-4 sm:-mx-6 lg:-mx-12 -my-8 p-12 bg-[#040711] text-white min-h-[calc(100vh-80px)] rounded-3xl border border-slate-800/80 shadow-2xl flex flex-col items-center justify-center space-y-4">
+        <div className="w-10 h-10 border-3 border-amber-400 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm font-bold text-amber-300">Cargando Expediente Clínico Holográfico 3D...</p>
+        <p className="text-xs text-slate-400">Sincronizando con Supabase PostgreSQL y OrganUI Teeth Engine</p>
       </div>
     )
   }
 
   if (!selectedPatient) {
     return (
-      <div className="flex flex-col w-full space-y-6 pb-12">
-        <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="-mx-4 sm:-mx-6 lg:-mx-12 -my-8 p-8 bg-[#040711] text-white min-h-[calc(100vh-80px)] rounded-3xl border border-slate-800/80 shadow-2xl flex flex-col space-y-6">
+        <div className="bg-slate-900/80 backdrop-blur-2xl p-6 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-200 uppercase tracking-wide">
-              Expediente Clínico Digital
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30 uppercase tracking-wide">
+              Expediente Clínico Digital 2027
             </span>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">Expediente Clínico</h1>
-            <p className="text-xs text-slate-500 mt-0.5">Dra. Aura Estudillo • Céd. Prof. 8492019</p>
+            <h1 className="text-2xl font-black text-white tracking-tight mt-1">Expediente Clínico Holográfico</h1>
+            <p className="text-xs text-slate-400 mt-0.5">Dra. Aura Estudillo • Céd. Prof. 8492019</p>
           </div>
           <button
             type="button"
             onClick={() => setIsRegisterOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold shadow-xs transition-colors cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shadow-lg transition-transform active:scale-95 cursor-pointer"
           >
             <UserPlus className="w-4 h-4" />
             + Registrar Paciente (Alta Rápida)
           </button>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center shadow-xs space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
-            <FileText className="w-6 h-6" />
+        <div className="bg-slate-900/60 backdrop-blur-xl rounded-3xl border border-slate-800 p-12 text-center shadow-2xl space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-slate-800 text-amber-400 flex items-center justify-center mx-auto shadow-inner">
+            <FileText className="w-7 h-7" />
           </div>
-          <h2 className="text-base font-bold text-slate-900">Base de Expedientes Lista y en Blanco</h2>
-          <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
-            No hay ningún paciente registrado todavía. Al dar de alta un paciente con el botón superior o cuando completen su onboarding post-login, se desplegará su ficha médica, odontograma interactivo y cuestionario de salud.
+          <h2 className="text-lg font-black text-white">Base de Expedientes Lista y en Blanco</h2>
+          <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+            No hay ningún paciente registrado todavía. Al dar de alta un paciente con el botón superior o cuando completen su onboarding post-login, se desplegará su visor 3D OrganUI y ficha clínica completa.
           </p>
           <div className="pt-2">
             <button
               type="button"
               onClick={() => setIsRegisterOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors shadow-xs cursor-pointer"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black shadow-lg transition-colors cursor-pointer"
             >
-              <UserPlus className="w-4 h-4 text-amber-400" />
+              <UserPlus className="w-4 h-4" />
               Dar de alta primer paciente ahora
             </button>
           </div>
@@ -395,127 +472,76 @@ export default function ExpedientePage() {
     .join('')
     .toUpperCase()
 
+  // Normalización de Alergias bajo NOM-004-SSA3
+  const rawAllergies = selectedPatient.allergies_medication || selectedPatient.allergies || []
+  const allergiesList: string[] = Array.isArray(rawAllergies)
+    ? rawAllergies
+    : typeof rawAllergies === 'string' && rawAllergies.trim()
+    ? rawAllergies.split(',').map((s: string) => s.trim()).filter(Boolean)
+    : []
+
+  const finalAllergies = allergiesList.length > 0
+    ? allergiesList
+    : selectedPatient.full_name?.toLowerCase().includes('angeles') || selectedPatient.id === '9e88144f-9858-4408-9c2a-bd0894512ce3'
+    ? ['Penicilina']
+    : ['Sin alergias medicamentosas conocidas reportadas (Revalidar antes de prescribir)']
+
+  const hasRealAllergies = finalAllergies.some(a => !a.toLowerCase().includes('sin alergias') && !a.toLowerCase().includes('niega') && !a.toLowerCase().includes('nkda'))
+
   return (
-    <div className="flex flex-col w-full space-y-6 pb-12">
-      {/* ALERTA CLÍNICA DE BIOSEGURIDAD (Prevención de Riesgos de la Dra. Aura - NOM-004-SSA3) */}
-      {(() => {
-        // Extraer y normalizar lista de alergias desde la base de datos
-        const rawAllergies = selectedPatient.allergies_medication || selectedPatient.allergies || []
-        const allergiesList: string[] = Array.isArray(rawAllergies)
-          ? rawAllergies
-          : typeof rawAllergies === 'string' && rawAllergies.trim()
-          ? rawAllergies.split(',').map((s: string) => s.trim()).filter(Boolean)
-          : []
+    <div className="-mx-4 sm:-mx-6 lg:-mx-12 -my-8 p-4 sm:p-6 lg:p-8 bg-[#040711] text-white min-h-[calc(100vh-80px)] rounded-3xl border border-slate-800/90 shadow-[0_0_80px_rgba(0,0,0,0.85)] relative overflow-hidden flex flex-col space-y-6">
+      {/* Glow Orbs Holográficos de Fondo */}
+      <div className="absolute top-0 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        // DIRECTIVA MÉDICA NOM-004-SSA3:
-        // - María de los Ángeles Sánchez Rivera: Alergia diagnosticada a Penicilina
-        // - Ricardo Sánchez: Sin alergias reportadas
-        const finalAllergies = allergiesList.length > 0
-          ? allergiesList
-          : selectedPatient.full_name?.toLowerCase().includes('angeles') || selectedPatient.id === '9e88144f-9858-4408-9c2a-bd0894512ce3'
-          ? ['Penicilina']
-          : ['Sin alergias medicamentosas conocidas reportadas (Revalidar antes de prescribir)']
-
-        const hasRealAllergies = finalAllergies.some(a => !a.toLowerCase().includes('sin alergias') && !a.toLowerCase().includes('niega') && !a.toLowerCase().includes('nkda'))
-
-        return (
-          <div className={`border-2 rounded-2xl p-4 sm:p-5 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all ${
-            hasRealAllergies
-              ? 'bg-rose-50 border-rose-500 shadow-rose-100'
-              : 'bg-amber-50/80 border-amber-400'
-          }`}>
-            <div className="flex items-start sm:items-center gap-3.5 flex-1 min-w-0">
-              <div className={`w-11 h-11 rounded-xl text-white flex items-center justify-center shrink-0 shadow-sm ${
-                hasRealAllergies ? 'bg-rose-600 animate-pulse' : 'bg-amber-500'
-              }`}>
-                {hasRealAllergies ? <HeartPulse className="w-6 h-6" /> : <AlertTriangle className="w-6 h-6" />}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
-                    hasRealAllergies
-                      ? 'text-rose-900 bg-rose-200 border-rose-300'
-                      : 'text-amber-900 bg-amber-200 border-amber-300'
-                  }`}>
-                    ALERTA CLÍNICA DE BIOSEGURIDAD (NOM-004-SSA3)
-                  </span>
-                  <span className="text-[11px] font-bold text-rose-800">
-                    ⚠️ Verificar antes de infiltrar anestesia o recetar medicamentos
-                  </span>
-                </div>
-
-                <div className="mt-2 flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-black uppercase text-slate-900 tracking-wide">
-                    ALÉRGICO ESPECÍFICO A:
-                  </span>
-                  {finalAllergies.map((allergy, aIdx) => (
-                    <span
-                      key={aIdx}
-                      className={`inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-black uppercase tracking-wide border shadow-xs ${
-                        hasRealAllergies
-                          ? 'bg-rose-600 text-white border-rose-700 animate-pulse'
-                          : 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                      }`}
-                    >
-                      🚫 {allergy}
-                    </span>
-                  ))}
-                </div>
-
-                <p className="text-xs font-bold text-slate-800 mt-1.5 flex items-center gap-1.5 flex-wrap">
-                  <span className="font-extrabold uppercase text-slate-700">Condiciones Sistémicas:</span>
-                  <span className="text-slate-600">
-                    {Array.isArray(selectedPatient.medical_conditions) && selectedPatient.medical_conditions.length > 0
-                      ? selectedPatient.medical_conditions.join(', ')
-                      : (typeof selectedPatient.medical_conditions === 'string' && selectedPatient.medical_conditions.trim()
-                          ? selectedPatient.medical_conditions
-                          : 'Sin antecedentes patológicos crónicos de importancia')}
-                  </span>
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-white/95 border-2 border-rose-300 rounded-xl px-4 py-2.5 text-xs text-rose-950 self-stretch sm:self-auto text-left sm:text-right shrink-0 shadow-xs">
-              <span className="text-[10px] uppercase font-black text-rose-700 block tracking-wider">Contacto de Emergencia</span>
-              <span className="font-extrabold text-slate-900 text-sm">{selectedPatient.emergency_contact_name || 'No especificado'}</span>
-              <p className="font-mono text-rose-900 text-xs font-bold mt-0.5">{selectedPatient.emergency_contact_phone || selectedPatient.emergency_phone || 'Sin teléfono'}</p>
-            </div>
-          </div>
-        )
-      })()}
-
-      {/* BARRA DE ACCIÓN DIRECTA OPERATIVA Y ESTADO DE CITA */}
-      <PatientDirectActionWidget patient={selectedPatient} />
-
-      {/* Header con Selector de Pacientes y Botones Funcionales */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      {/* HEADER SUPERIOR PANORÁMICO HOLOGRÁFICO */}
+      <div className="bg-slate-900/80 backdrop-blur-2xl p-5 sm:p-6 rounded-3xl border border-slate-800/80 shadow-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative z-10">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-200 uppercase tracking-wide">
-              Expediente Clínico Digital
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/40">
+              Expediente Clínico Holográfico 2027
             </span>
-            <span className="text-[11px] font-semibold text-slate-400">
-              Dra. Aura Estudillo • Céd. Prof. 8492019
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+              OrganUI 3D Engine Activo
+            </span>
+            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+              doctorProfile.role === 'socio'
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                : doctorProfile.role === 'trabajador'
+                ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+            }`}>
+              <ShieldCheck className="w-3 h-3" />
+              {doctorProfile.name} • Rol: {doctorProfile.role.toUpperCase()}
             </span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{selectedPatient.full_name}</h1>
-          <p className="text-xs text-slate-500 mt-0.5 font-mono">
-            Folio #{selectedPatient.id.slice(0, 8).toUpperCase()} • Registrado el{' '}
+
+          <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-3">
+            <span>{selectedPatient.full_name}</span>
+            <span className="text-xs font-mono font-bold text-slate-400 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700">
+              Folio #{selectedPatient.id.slice(0, 8).toUpperCase()}
+            </span>
+          </h1>
+
+          <p className="text-xs text-slate-400 mt-1">
+            Sucursal: <strong className="text-amber-300">{doctorProfile.branch}</strong> • Registrado el{' '}
             {new Date(selectedPatient.created_at || Date.now()).toLocaleDateString('es-MX')}
           </p>
         </div>
 
+        {/* Acciones Rápidas del Header */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Barra de Búsqueda Rápida de Pacientes en Expediente */}
+          {/* Selector de Pacientes Rápido */}
           <div className="relative">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-cyan-400" />
             <input
               type="text"
-              placeholder="Buscar paciente en expediente..."
+              placeholder="Buscar en expediente..."
               onChange={(e) => {
                 const term = e.target.value.toLowerCase().trim()
                 if (term) {
-                  const match = patients.find(p => 
+                  const match = patients.find(p =>
                     p.full_name?.toLowerCase().includes(term) ||
                     p.phone?.includes(term) ||
                     p.id?.toLowerCase().includes(term)
@@ -525,19 +551,18 @@ export default function ExpedientePage() {
                   }
                 }
               }}
-              className="pl-8 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400 w-48 sm:w-56"
+              className="pl-8 pr-3 py-2 bg-slate-950/80 border border-slate-700/80 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-400 w-44 sm:w-52"
             />
           </div>
 
-          {/* Selector de paciente si hay más de 1 */}
           {patients.length > 1 && (
             <select
               value={selectedPatient.id}
               onChange={(e) => handleSelectPatient(e.target.value)}
-              className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800"
+              className="px-3 py-2 rounded-xl border border-slate-700 bg-slate-950/90 text-xs font-bold text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
             >
               {patients.map((p) => (
-                <option key={p.id} value={p.id}>
+                <option key={p.id} value={p.id} className="bg-slate-950 text-white">
                   {p.full_name}
                 </option>
               ))}
@@ -547,432 +572,585 @@ export default function ExpedientePage() {
           <a
             href={formatWhatsAppUrl(
               selectedPatient.phone,
-              `Hola ${selectedPatient.full_name}, te saluda la Dra. Aura Estudillo de Audenti Clinical respecto a tu expediente clínico y seguimiento de tratamiento.`
+              `Hola ${selectedPatient.full_name}, te saluda la Dra. Aura Estudillo de Audenti Clinical respecto a tu expediente clínico y plan de tratamiento.`
             )}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold transition-transform active:scale-95 shadow-xs"
-            title={`Contactar a ${selectedPatient.full_name} por WhatsApp`}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black transition-transform active:scale-95 shadow-xs"
+            title={`Contactar por WhatsApp`}
           >
-            <MessageSquare className="w-4 h-4 fill-current" />
-            WhatsApp Directo
+            <MessageSquare className="w-3.5 h-3.5 fill-current" />
+            <span>WhatsApp</span>
           </a>
 
           <Link
             href={`/dashboard/patients/${selectedPatient.id}/print`}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold transition-colors shadow-xs"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-colors shadow-xs"
           >
-            <Printer className="w-4 h-4" />
-            Imprimir Receta / Presupuesto
+            <Printer className="w-3.5 h-3.5" />
+            <span>Receta / Presupuesto</span>
           </Link>
-          <button
-            type="button"
-            onClick={() => window.print()}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-50 text-slate-800 text-xs font-bold hover:bg-slate-100 transition-colors border border-slate-200 shadow-2xs cursor-pointer"
-          >
-            <FileText className="w-4 h-4 text-blue-600" />
-            Resumen Clínico
-          </button>
+
           <button
             type="button"
             onClick={() => setIsEditing(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors shadow-xs cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors border border-slate-700 shadow-xs cursor-pointer"
           >
-            <Edit className="w-4 h-4 text-amber-400" />
-            Editar Ficha
+            <Edit className="w-3.5 h-3.5 text-amber-400" />
+            <span>Editar Ficha</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsRegisterOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-black transition-colors shadow-xs cursor-pointer"
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            <span>+ Alta Rápida</span>
           </button>
         </div>
       </div>
 
-      {/* Selector de Pestañas del Expediente Clínico */}
-      <div className="flex flex-wrap gap-2 p-1.5 bg-slate-100 rounded-2xl w-fit border border-slate-200/70">
-        <button
-          type="button"
-          onClick={() => setActiveTab('clinical')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            activeTab === 'clinical'
-              ? 'bg-white text-slate-900 shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <Activity className="w-4 h-4 text-emerald-600" />
-          <span>Odontograma &amp; Ficha</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('history')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            activeTab === 'history'
-              ? 'bg-white text-slate-900 shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <Clock className="w-4 h-4 text-blue-600" />
-          <span>Historial de Chat, Llamadas &amp; Notas</span>
-          {messages.length > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-blue-100 text-blue-800">
-              {messages.length}
-            </span>
-          )}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('questionnaire')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            activeTab === 'questionnaire'
-              ? 'bg-white text-slate-900 shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <ClipboardList className="w-4 h-4 text-purple-600" />
-          <span>Cuestionario Médico (Anamnesis)</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('family')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-            activeTab === 'family'
-              ? 'bg-white text-slate-900 shadow-xs'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <Users className="w-4 h-4 text-amber-600" />
-          <span>Núcleo Familiar</span>
-        </button>
-      </div>
-
-      {/* Contenido según Pestaña Activa */}
-      {activeTab === 'clinical' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Columna Izquierda: Datos del Paciente */}
-          <div className="space-y-4">
-            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-4">
-              <div className="flex items-center gap-3.5">
-                <div className="w-14 h-14 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold text-lg shadow-xs">
-                  {initials}
-                </div>
-                <div>
-                  <h2 className="text-sm font-bold text-slate-900">{selectedPatient.full_name}</h2>
-                  <p className="text-[11px] text-slate-500 font-mono">ID: {selectedPatient.id.slice(0, 8)}</p>
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold mt-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    {selectedPatient.onboarding_completed ? 'Bioseguridad Verificada' : 'Onboarding Pendiente'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="space-y-2.5 text-xs pt-1 border-t border-slate-100">
-                <div className="flex items-start gap-2.5">
-                  <Phone className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Teléfono</span>
-                    <p className="text-slate-800 font-medium">{selectedPatient.phone || 'No registrado'}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <Mail className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Correo Electrónico</span>
-                    <p className="text-slate-800 font-medium">{selectedPatient.email || 'No registrado'}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-2.5">
-                  <Users className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Contacto de Emergencia</span>
-                    <p className="text-slate-800 font-medium">
-                      {selectedPatient.emergency_contact_name || 'No asignado'} • {selectedPatient.emergency_contact_phone || 'Sin tel.'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+      {/* ALERTA CLÍNICA DE BIOSEGURIDAD (NOM-004-SSA3) */}
+      <div className={`border-2 rounded-2xl p-4 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all relative z-10 ${
+        hasRealAllergies
+          ? 'bg-rose-950/60 border-rose-500/80 shadow-rose-950/40 backdrop-blur-md'
+          : 'bg-slate-900/80 border-amber-400/40 backdrop-blur-md'
+      }`}>
+        <div className="flex items-start sm:items-center gap-3.5 flex-1 min-w-0">
+          <div className={`w-10 h-10 rounded-xl text-white flex items-center justify-center shrink-0 shadow-md ${
+            hasRealAllergies ? 'bg-rose-600 animate-pulse' : 'bg-amber-500 text-slate-950'
+          }`}>
+            {hasRealAllergies ? <HeartPulse className="w-5 h-5 text-white" /> : <AlertTriangle className="w-5 h-5" />}
           </div>
 
-          {/* Columna Derecha: Odontograma Vectorial Interactivo */}
-          <div className="lg:col-span-2">
-            <Odontogram
-              patientId={selectedPatient?.id}
-              patientName={selectedPatient?.full_name || selectedPatient?.name}
-              doctorName={doctorProfile.name}
-              doctorRole={doctorProfile.role}
-              branch={doctorProfile.branch}
-              onHistoryUpdated={() => fetchPatientHistory(selectedPatient)}
-            />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                hasRealAllergies
+                  ? 'text-rose-200 bg-rose-900/80 border-rose-600'
+                  : 'text-amber-300 bg-amber-500/20 border-amber-400/40'
+              }`}>
+                ALERTA CLÍNICA DE BIOSEGURIDAD (NOM-004-SSA3)
+              </span>
+              <span className="text-[11px] font-bold text-slate-300">
+                Verificar antes de infiltrar anestesia o recetar medicamentos
+              </span>
+            </div>
+
+            <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-black uppercase text-amber-300 tracking-wide">
+                ALÉRGICO ESPECÍFICO A:
+              </span>
+              {finalAllergies.map((allergy, aIdx) => (
+                <span
+                  key={aIdx}
+                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-black uppercase tracking-wide border shadow-xs ${
+                    hasRealAllergies
+                      ? 'bg-rose-600 text-white border-rose-500 animate-pulse'
+                      : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                  }`}
+                >
+                  {hasRealAllergies ? '🚫' : '✓'} {allergy}
+                </span>
+              ))}
+            </div>
+
+            <p className="text-xs text-slate-300 mt-1 flex items-center gap-1.5 flex-wrap">
+              <span className="font-extrabold uppercase text-slate-400">Condiciones Sistémicas:</span>
+              <span className="text-slate-200">
+                {Array.isArray(selectedPatient.medical_conditions) && selectedPatient.medical_conditions.length > 0
+                  ? selectedPatient.medical_conditions.join(', ')
+                  : (typeof selectedPatient.medical_conditions === 'string' && selectedPatient.medical_conditions.trim()
+                      ? selectedPatient.medical_conditions
+                      : 'Sin antecedentes patológicos crónicos de importancia')}
+              </span>
+            </p>
           </div>
         </div>
-      )}
 
-      {activeTab === 'history' && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-            <div>
-              <div className="flex items-center gap-2">
-                <Clock className="w-5 h-5 text-blue-600" />
-                <h3 className="text-base font-bold text-slate-900">Historial de Comunicación, Llamadas &amp; Notas Privadas</h3>
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Registro síncrono e inmutable desde Supabase PostgreSQL para {selectedPatient.full_name}.
-              </p>
-            </div>
+        <div className="bg-slate-950/90 border border-slate-700 rounded-xl px-3.5 py-2 text-xs self-stretch sm:self-auto text-left sm:text-right shrink-0">
+          <span className="text-[9px] uppercase font-black text-rose-400 block tracking-wider">Contacto de Emergencia</span>
+          <span className="font-extrabold text-white text-xs">{selectedPatient.emergency_contact_name || 'No especificado'}</span>
+          <p className="font-mono text-slate-300 text-[11px] font-bold mt-0.5">{selectedPatient.emergency_contact_phone || selectedPatient.emergency_phone || 'Sin teléfono'}</p>
+        </div>
+      </div>
 
-            <button
-              type="button"
-              onClick={() => fetchPatientHistory(selectedPatient)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loadingMessages ? 'animate-spin' : ''}`} />
-              Actualizar Historial
-            </button>
-          </div>
+      {/* BARRA DE ACCIÓN DIRECTA OPERATIVA Y ESTADO DE CITA */}
+      <div className="relative z-10">
+        <PatientDirectActionWidget patient={selectedPatient} />
+      </div>
 
-          {/* Formulario de Nueva Nota Médica Privada */}
-          <form onSubmit={handleSavePrivateNote} className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-              <Lock className="w-3.5 h-3.5 text-amber-600" />
-              <span>Añadir Nota Privada de la Dra. Aura (Confidencial NOM-004)</span>
-            </div>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                placeholder="Escribe una observación clínica, evolución, prescripción o indicación privada..."
-                className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-400"
-              />
+      {/* INTERFAZ PANORÁMICA DE DOS PANELES FLOTANTES EN MODO CRISTAL (GLASSMORPHISM) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-10 flex-1">
+        
+        {/* PANEL IZQUIERDO (5 COLS): GESTIÓN DE PACIENTES ACTIVOS Y AGENDA DIARIA EN TIEMPO REAL */}
+        <div className="lg:col-span-5 flex flex-col space-y-4">
+          <div className="bg-slate-900/80 backdrop-blur-2xl rounded-3xl border border-amber-400/30 p-5 shadow-[0_0_40px_rgba(245,158,11,0.08)] flex flex-col h-full space-y-4">
+            
+            {/* SUB-TABS SELECTOR EN PANEL IZQUIERDO */}
+            <div className="flex items-center gap-1 p-1 bg-slate-950/80 rounded-2xl border border-slate-800 overflow-x-auto">
               <button
-                type="submit"
-                disabled={savingNote || !newNote.trim()}
-                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-colors flex items-center gap-1.5 shrink-0 disabled:opacity-50 cursor-pointer"
+                type="button"
+                onClick={() => setLeftTab('patient')}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                  leftTab === 'patient'
+                    ? 'bg-amber-400 text-slate-950 font-black shadow-xs'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
               >
-                <Send className="w-3.5 h-3.5 text-amber-400" />
-                <span>Guardar Nota</span>
+                <Users className="w-3.5 h-3.5" />
+                <span>Pacientes Activos</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setLeftTab('agenda')}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                  leftTab === 'agenda'
+                    ? 'bg-amber-400 text-slate-950 font-black shadow-xs'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Agenda Diaria</span>
+                {todayAppointments.length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-cyan-400 text-slate-950">
+                    {todayAppointments.length}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setLeftTab('history')}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                  leftTab === 'history'
+                    ? 'bg-amber-400 text-slate-950 font-black shadow-xs'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>Historial &amp; Notas</span>
+                {messages.length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-blue-400 text-slate-950">
+                    {messages.length}
+                  </span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setLeftTab('questionnaire')}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                  leftTab === 'questionnaire'
+                    ? 'bg-amber-400 text-slate-950 font-black shadow-xs'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <ClipboardList className="w-3.5 h-3.5" />
+                <span>Anamnesis</span>
               </button>
             </div>
-          </form>
 
-          {/* Lista de Mensajes y Transcripciones */}
-          {loadingMessages ? (
-            <div className="py-12 text-center space-y-2">
-              <div className="w-7 h-7 border-3 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto" />
-              <p className="text-xs font-bold text-slate-600">Consultando mensajes y llamadas desde Supabase...</p>
-            </div>
-          ) : messages.length === 0 ? (
-            <div className="py-12 text-center bg-slate-50/50 rounded-2xl border border-slate-200/60 space-y-2">
-              <MessageSquare className="w-8 h-8 text-slate-300 mx-auto" />
-              <h4 className="text-xs font-bold text-slate-700">Sin mensajes ni llamadas previas con este paciente</h4>
-              <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
-                Los mensajes de WhatsApp, el chat web y las transcripciones de llamadas con Aura IA aparecerán aquí automáticamente.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {messages.map((m, idx) => {
-                const isOdontogram = m.channel_type === 'odontogram_clinical_entry' || m.content?.includes('[ODONTOGRAMA 3D') || m.content?.includes('[ODONTOGRAMA')
-                const isVoice = m.channel_type === 'voice_call' || m.content?.includes('Llamada de Voz')
-                const isNote = m.isPrivateNote || m.channel_type === 'internal_note' || m.content?.includes('[NOTA PRIVADA')
-                const isDoctor = m.senderRole === 'doctor' || m.senderName?.includes('Aura Estudillo')
-
-                if (isOdontogram) {
-                  const meta = m.metadata || {}
-                  const isDraft = meta.status?.includes('Borrador') || meta.doctorRole === 'pasante' || meta.doctorRole === 'estudiante'
-                  return (
-                    <div
-                      key={m.id || idx}
-                      className="p-4 sm:p-5 rounded-2xl border-2 border-amber-400/80 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white shadow-lg space-y-3"
-                    >
-                      <div className="flex items-center justify-between gap-2 flex-wrap pb-2 border-b border-slate-800">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-xl text-xs font-black bg-amber-400 text-slate-950 shadow-xs">
-                            🦷 Pieza FDI #{meta.toothFdi || 'Dental'}
-                          </span>
-                          {meta.toothUniversal && (
-                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-cyan-400/20 text-cyan-300 border border-cyan-400/30">
-                              UNS #{meta.toothUniversal}
-                            </span>
-                          )}
-                          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                            isDraft
-                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                              : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                          }`}>
-                            {isDraft ? 'Borrador (Revisión Pendiente)' : 'Confirmado'}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-2 text-xs text-slate-400">
-                          <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                          <span>Profesional: <strong className="text-white">{m.senderName}</strong> ({String(meta.doctorRole || 'socio').toUpperCase()})</span>
-                          <span>•</span>
-                          <span className="font-mono text-[11px] text-slate-400">{m.timestamp}</span>
-                        </div>
-                      </div>
-
-                      <div className="p-3 bg-slate-900/90 rounded-xl border border-slate-800/80">
-                        <p className="whitespace-pre-wrap leading-relaxed text-slate-200 text-xs font-sans">
-                          {m.content}
-                        </p>
-                      </div>
-
-                      {meta.estimatedCost > 0 && (
-                        <div className="flex items-center justify-between pt-1 text-xs text-slate-300">
-                          <span className="text-[11px] text-slate-400">Presupuesto Registrado en Ficha:</span>
-                          <span className="font-mono font-black text-emerald-400 text-sm">
-                            ${Number(meta.estimatedCost).toLocaleString('es-MX')} MXN
-                          </span>
-                        </div>
-                      )}
+            {/* CONTENIDO SUB-TAB: PACIENTES ACTIVOS */}
+            {leftTab === 'patient' && (
+              <div className="space-y-4 flex-1">
+                {/* Tarjeta del Paciente Seleccionado */}
+                <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-14 h-14 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black text-lg shadow-lg ring-2 ring-amber-400/40">
+                      {initials}
                     </div>
-                  )
-                }
+                    <div className="flex-1 min-w-0">
+                      <h2 className="text-base font-black text-white truncate">{selectedPatient.full_name}</h2>
+                      <p className="text-xs font-mono text-slate-400">ID: #{selectedPatient.id.slice(0, 8)}</p>
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold mt-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        {selectedPatient.onboarding_completed ? 'Bioseguridad Verificada' : 'Onboarding Pendiente'}
+                      </span>
+                    </div>
+                  </div>
 
-                return (
-                  <div
-                    key={m.id || idx}
-                    className={`p-4 rounded-xl border text-xs transition-all ${
-                      isNote
-                        ? 'bg-amber-50/90 border-amber-300 shadow-2xs'
-                        : isVoice
-                        ? 'bg-slate-900 text-white border-slate-800 shadow-xs'
-                        : isDoctor
-                        ? 'bg-slate-50 border-slate-200 ml-6'
-                        : 'bg-emerald-50/50 border-emerald-200 mr-6'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <div className="flex items-center gap-2">
-                        {isVoice ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400 text-slate-950">
-                            <PhoneCall className="w-3 h-3" /> Transcripción de Voz
-                          </span>
-                        ) : isNote ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-200 text-amber-900 border border-amber-300">
-                            <Lock className="w-3 h-3" /> Nota Médica Privada
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-800">
-                            <MessageSquare className="w-3 h-3 text-slate-600" />
-                            {m.channel_type === 'whatsapp' ? 'WhatsApp' : 'Chat Clínico'}
-                          </span>
-                        )}
-                        <span className={`font-bold ${isVoice ? 'text-amber-400' : 'text-slate-900'}`}>
-                          {m.senderName}
-                        </span>
-                      </div>
-                      <span className={`text-[10px] font-mono ${isVoice ? 'text-slate-400' : 'text-slate-500'}`}>
-                        {m.timestamp}
+                  <div className="space-y-2 text-xs pt-2 border-t border-slate-800">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase text-slate-400">Teléfono:</span>
+                      <a href={`tel:${selectedPatient.phone}`} className="font-bold text-white hover:text-cyan-300 font-mono">
+                        {selectedPatient.phone || 'No registrado'}
+                      </a>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase text-slate-400">Correo Electrónico:</span>
+                      <span className="font-bold text-slate-300 truncate max-w-[200px]">
+                        {selectedPatient.email || 'No registrado'}
                       </span>
                     </div>
 
-                    <p className={`whitespace-pre-wrap leading-relaxed ${isVoice ? 'text-slate-200' : 'text-slate-800'}`}>
-                      {m.content}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase text-slate-400">Contacto Emergencia:</span>
+                      <span className="font-bold text-slate-300">
+                        {selectedPatient.emergency_contact_name || 'No asignado'} ({selectedPatient.emergency_contact_phone || 'Sin tel.'})
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Directorio de Otros Pacientes Activos */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black uppercase tracking-wider text-amber-300">
+                      Pacientes Registrados ({patients.length})
+                    </span>
+                    <span className="text-[10px] text-slate-400">Clic para cambiar de expediente</span>
+                  </div>
+
+                  <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-1">
+                    {patients.map((p) => {
+                      const isSelected = p.id === selectedPatient.id
+                      const pInitials = (p.full_name || 'P')
+                        .split(' ')
+                        .map((n: string) => n[0])
+                        .slice(0, 2)
+                        .join('')
+                        .toUpperCase()
+
+                      return (
+                        <div
+                          key={p.id}
+                          onClick={() => handleSelectPatient(p.id)}
+                          className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                            isSelected
+                              ? 'bg-amber-400/20 border-amber-400 shadow-xs'
+                              : 'bg-slate-950/40 border-slate-800/80 hover:bg-slate-800/50 hover:border-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black shrink-0 ${
+                              isSelected ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300'
+                            }`}>
+                              {pInitials}
+                            </div>
+                            <div className="min-w-0">
+                              <span className={`text-xs font-bold block truncate ${isSelected ? 'text-white' : 'text-slate-300'}`}>
+                                {p.full_name}
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-mono block">
+                                {p.phone || 'Sin teléfono'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <ChevronRight className={`w-4 h-4 shrink-0 ${isSelected ? 'text-amber-400' : 'text-slate-600'}`} />
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* CONTENIDO SUB-TAB: AGENDA DIARIA EN TIEMPO REAL */}
+            {leftTab === 'agenda' && (
+              <div className="space-y-3 flex-1 flex flex-col">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-xs font-black uppercase tracking-wider text-amber-300">
+                      Agenda Diaria en Tiempo Real
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={fetchTodayAppointments}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                    title="Actualizar agenda"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${loadingAppointments ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+
+                {loadingAppointments ? (
+                  <div className="py-12 text-center space-y-2">
+                    <div className="w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto" />
+                    <p className="text-xs font-bold text-slate-400">Consultando agenda diaria...</p>
+                  </div>
+                ) : todayAppointments.length === 0 ? (
+                  <div className="py-12 text-center bg-slate-950/40 rounded-2xl border border-slate-800 p-6 space-y-2">
+                    <Calendar className="w-8 h-8 text-slate-600 mx-auto" />
+                    <h4 className="text-xs font-bold text-slate-300">Sin citas programadas para hoy</h4>
+                    <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+                      Las nuevas citas generadas por el bot de WhatsApp o recepción aparecerán aquí en vivo.
                     </p>
                   </div>
-                )
-              })}
+                ) : (
+                  <div className="space-y-2 overflow-y-auto max-h-[420px] pr-1">
+                    {todayAppointments.map((app, idx) => {
+                      const timeStr = app.start_time || app.time || '10:00 AM'
+                      const patientName = app.patient_name || app.patientName || 'Paciente'
+                      const isSelected = selectedPatient?.full_name?.toLowerCase() === patientName.toLowerCase()
+                      const treatment = app.treatment_type || app.treatment || 'Consulta Dental'
+                      const chair = app.chair || app.cabinet || 'Gabinete 1'
+
+                      return (
+                        <div
+                          key={app.id || idx}
+                          className={`p-3 rounded-2xl border transition-all ${
+                            isSelected
+                              ? 'bg-amber-400/20 border-amber-400 shadow-md ring-1 ring-amber-400/50'
+                              : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <span className="font-mono text-xs font-black text-amber-300 bg-amber-400/10 px-2 py-0.5 rounded-md border border-amber-400/30">
+                              ⏰ {timeStr}
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
+                              {chair}
+                            </span>
+                          </div>
+
+                          <h4 className="text-xs font-black text-white">{patientName}</h4>
+                          <p className="text-[11px] text-slate-400 mt-0.5">{treatment}</p>
+
+                          <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                              {app.status || 'Confirmada'}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() => handleSelectAppointmentPatient(app)}
+                              className="px-2.5 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-[10px] font-black transition-colors shadow-xs cursor-pointer"
+                            >
+                              Cargar en Odontograma 3D
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* CONTENIDO SUB-TAB: HISTORIAL CLÍNICO & NOTAS */}
+            {leftTab === 'history' && (
+              <div className="space-y-3 flex-1 flex flex-col">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                  <span className="text-xs font-black uppercase tracking-wider text-amber-300">
+                    Historial Síncrono de {selectedPatient.full_name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => fetchPatientHistory(selectedPatient)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-white"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${loadingMessages ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+
+                {/* Formulario de Nota Privada Médica */}
+                <form onSubmit={handleSavePrivateNote} className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>Añadir Nota Médica Privada (NOM-004)</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newNote}
+                      onChange={(e) => setNewNote(e.target.value)}
+                      placeholder="Observación clínica, evolución o indicación privada..."
+                      className="flex-1 px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                    <button
+                      type="submit"
+                      disabled={savingNote || !newNote.trim()}
+                      className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl shadow-xs transition-colors shrink-0 disabled:opacity-50 cursor-pointer"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </form>
+
+                {/* Lista de Registros Clínicos */}
+                {loadingMessages ? (
+                  <div className="py-8 text-center">
+                    <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto" />
+                  </div>
+                ) : messages.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-slate-500">
+                    Sin entradas clínicas registradas aún.
+                  </div>
+                ) : (
+                  <div className="space-y-2 overflow-y-auto max-h-[340px] pr-1">
+                    {messages.map((m, idx) => {
+                      const isOdontogram = m.channel_type === 'odontogram_clinical_entry' || m.content?.includes('[ODONTOGRAMA 3D') || m.content?.includes('[ODONTOGRAMA')
+                      const isNote = m.isPrivateNote || m.channel_type === 'internal_note' || m.content?.includes('[NOTA PRIVADA')
+
+                      return (
+                        <div
+                          key={m.id || idx}
+                          className={`p-3 rounded-xl border text-xs ${
+                            isOdontogram
+                              ? 'bg-slate-950 border-amber-400/80 shadow-xs'
+                              : isNote
+                              ? 'bg-amber-950/30 border-amber-500/40 text-amber-200'
+                              : 'bg-slate-950/60 border-slate-800 text-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
+                            <span className="font-bold text-amber-300">{m.senderName}</span>
+                            <span className="font-mono">{m.timestamp}</span>
+                          </div>
+                          <p className="whitespace-pre-wrap leading-relaxed text-[11px] text-slate-200">{m.content}</p>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* CONTENIDO SUB-TAB: ANAMNESIS / FAMILIA */}
+            {leftTab === 'questionnaire' && (
+              <div className="space-y-4 flex-1 overflow-y-auto max-h-[480px] pr-1">
+                <MedicalQuestionnaire />
+                <div className="pt-3 border-t border-slate-800">
+                  <FamilyNucleusManager patient={selectedPatient} patientName={selectedPatient.full_name} />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* PANEL DERECHO (7 COLS): VISOR 3D INTERACTIVO DE LA ARCADA DENTAL (ORGANUI TEETH) */}
+        <div className="lg:col-span-7 flex flex-col space-y-4">
+          <div className="bg-slate-900/80 backdrop-blur-2xl rounded-3xl border border-cyan-400/30 p-5 shadow-[0_0_40px_rgba(56,189,248,0.08)] flex flex-col h-full space-y-4">
+            
+            {/* Header del Panel Odontograma 3D */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-cyan-400" />
+                  <h3 className="text-base font-black text-white">
+                    Odontograma Holográfico 3D (OrganUI Teeth 2027)
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Haz clic en cualquier pieza dental o zona interproximal para activar la ventana cristal con zoom anatómico de 5 caras.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-1 rounded-xl text-[10px] font-black uppercase bg-cyan-400/10 text-cyan-300 border border-cyan-400/30">
+                  Rotación 360° &amp; Zoom
+                </span>
+                <span className="px-2.5 py-1 rounded-xl text-[10px] font-black uppercase bg-amber-400/10 text-amber-300 border border-amber-400/30">
+                  FDI &amp; UNS
+                </span>
+              </div>
             </div>
-          )}
-        </div>
-      )}
 
-      {activeTab === 'questionnaire' && (
-        <div className="space-y-4">
-          <MedicalQuestionnaire />
+            {/* COMPONENTE ODONTOGRAMA CON MOTOR 3D DENTAL3DVIEWER Y MODAL CRISTAL */}
+            <div className="flex-1 w-full">
+              <Odontogram
+                patientId={selectedPatient?.id}
+                patientName={selectedPatient?.full_name || selectedPatient?.name}
+                doctorName={doctorProfile.name}
+                doctorRole={doctorProfile.role}
+                branch={doctorProfile.branch}
+                onHistoryUpdated={() => fetchPatientHistory(selectedPatient)}
+              />
+            </div>
+          </div>
         </div>
-      )}
+      </div>
 
-      {activeTab === 'family' && (
-        <div className="space-y-4">
-          <FamilyNucleusManager patient={selectedPatient} patientName={selectedPatient.full_name} />
-        </div>
-      )}
-
-      {/* Modal Funcional: Editar Ficha */}
+      {/* MODAL FUNCIONAL: EDITAR FICHA MÉDICA */}
       {isEditing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
           <div
             onClick={() => setIsEditing(false)}
-            className="fixed inset-0 bg-slate-950/60 backdrop-blur-md transition-opacity"
+            className="fixed inset-0 bg-slate-950/80 backdrop-blur-md transition-opacity"
           />
-          <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 sm:p-8 text-slate-900 z-10 animate-in zoom-in-95">
+          <div className="relative w-full max-w-lg bg-slate-900 rounded-3xl shadow-2xl border border-slate-700 p-6 sm:p-8 text-white z-10 animate-in zoom-in-95">
             <button
               onClick={() => setIsEditing(false)}
-              className="absolute top-5 right-5 p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              className="absolute top-5 right-5 p-2 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <h2 className="text-lg font-bold text-[#202D4C] mb-1">Editar Ficha del Paciente</h2>
-            <p className="text-xs text-slate-500 mb-4">Actualiza los datos clínicos en la base de datos de Supabase.</p>
+            <h2 className="text-lg font-black text-white mb-1">Editar Ficha del Paciente</h2>
+            <p className="text-xs text-slate-400 mb-4">Actualiza los datos clínicos en la base de datos de Supabase.</p>
 
             <form onSubmit={handleSaveEdit} className="space-y-3.5 text-xs">
               <div>
-                <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Nombre Completo</label>
+                <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1">Nombre Completo</label>
                 <input
                   type="text"
                   required
                   value={editForm.fullName}
                   onChange={e => setEditForm({ ...editForm, fullName: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Teléfono</label>
+                  <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1">Teléfono</label>
                   <input
                     type="tel"
                     required
                     value={editForm.phone}
                     onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Correo Electrónico</label>
+                  <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1">Correo Electrónico</label>
                   <input
                     type="email"
                     value={editForm.email}
                     onChange={e => setEditForm({ ...editForm, email: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Contacto Emergencia</label>
+                  <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1">Contacto Emergencia</label>
                   <input
                     type="text"
                     value={editForm.emergencyContact}
                     onChange={e => setEditForm({ ...editForm, emergencyContact: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Tel. Emergencia</label>
+                  <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1">Tel. Emergencia</label>
                   <input
                     type="tel"
                     value={editForm.emergencyPhone}
                     onChange={e => setEditForm({ ...editForm, emergencyPhone: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Alergias a Medicamentos</label>
+                <label className="block text-[11px] font-bold uppercase text-slate-400 mb-1">Alergias a Medicamentos</label>
                 <input
                   type="text"
                   value={editForm.allergies}
                   onChange={e => setEditForm({ ...editForm, allergies: e.target.value })}
                   placeholder="Ej. Penicilina, Lidocaína"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white"
                 />
               </div>
 
@@ -980,7 +1158,7 @@ export default function ExpedientePage() {
                 <button
                   type="submit"
                   disabled={savingEdit}
-                  className="w-full py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded-xl shadow-lg transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {savingEdit ? 'Guardando cambios...' : 'Guardar Cambios en Ficha'}
                 </button>

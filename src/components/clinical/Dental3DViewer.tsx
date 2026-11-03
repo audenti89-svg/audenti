@@ -1224,6 +1224,31 @@ export function Dental3DViewer({
                     <span className="text-[10px] text-emerald-400 font-bold">Autoguardado en Supabase</span>
                   </div>
 
+                  {/* Selector Rápido de Tratamientos Clave (Composite, Crown, Root Canal, Extraction) */}
+                  <div className="flex items-center gap-1.5 p-1 bg-slate-900 rounded-xl border border-slate-700/80 mb-2.5 overflow-x-auto">
+                    <span className="text-[10px] font-black uppercase text-amber-300 px-1.5 shrink-0">Tratamientos:</span>
+                    {[
+                      { label: 'Composite', spec: 'operatoria' as DentalSpecialty },
+                      { label: 'Crown', spec: 'implantes' as DentalSpecialty },
+                      { label: 'Root Canal', spec: 'endodoncia' as DentalSpecialty },
+                      { label: 'Extraction', spec: 'cirugia' as DentalSpecialty }
+                    ].map(btn => (
+                      <button
+                        key={btn.label}
+                        type="button"
+                        onClick={() => setModalSpecialty(btn.spec)}
+                        className={cn(
+                          'px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0',
+                          modalSpecialty === btn.spec
+                            ? 'bg-amber-400 text-slate-950 font-black shadow-xs ring-1 ring-amber-300'
+                            : 'bg-slate-800/90 text-slate-300 hover:text-white hover:bg-slate-700'
+                        )}
+                      >
+                        {btn.label}
+                      </button>
+                    ))}
+                  </div>
+
                   {/* Tabs de Especialidades Odontológicas */}
                   <div className="grid grid-cols-3 gap-1 p-1 bg-slate-900 rounded-xl border border-slate-800 mb-3">
                     {(['operatoria', 'endodoncia', 'periodoncia', 'implantes', 'ortodoncia', 'cirugia'] as DentalSpecialty[]).map(spec => (
