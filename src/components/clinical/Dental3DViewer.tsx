@@ -24,6 +24,7 @@ import {
 import { cn } from '@/lib/utils'
 import {
   TOOTH_BY_FDI,
+  TOOTH_CATALOG_LIST,
   INTERPROXIMAL_CONTACTS,
   ORGANUI_MESH_TO_NUMBERS,
   ToothTaxonomy
@@ -211,6 +212,19 @@ export function Dental3DViewer({
       cameraRef.current.position.set(0, 0.35, 3.2)
       controlsRef.current.update()
     }
+  }
+
+  // Navegación secuencial entre piezas dentales (11-48) dentro del modal
+  const handleNavigateTooth = (direction: 'prev' | 'next') => {
+    if (!modalData) return
+    const currentIndex = TOOTH_CATALOG_LIST.findIndex(t => t.fdi === modalData.toothFdi)
+    if (currentIndex === -1) return
+    let nextIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1
+    if (nextIndex >= TOOTH_CATALOG_LIST.length) nextIndex = 0
+    if (nextIndex < 0) nextIndex = TOOTH_CATALOG_LIST.length - 1
+    const nextTooth = TOOTH_CATALOG_LIST[nextIndex]
+    if (onSelectTooth) onSelectTooth(nextTooth.fdi)
+    handleOpenCrystalModal(nextTooth.fdi, false)
   }
 
   // 2. Inicialización de la Escena Three.js con OrganUI teeth.glb
@@ -687,6 +701,27 @@ export function Dental3DViewer({
     }
   }
 
+  // SELECCIONAR TRATAMIENTO DEL CATÁLOGO PARA APLICACIÓN MANUAL EN CARAS
+  const handleSelectProcedureItem = (item: { name: string; cost: number; condition: ToothWholeCondition }) => {
+    if (!modalData) return
+    let matchingTool: SurfaceCondition = 'resina'
+    const nameLow = item.name.toLowerCase()
+    if (nameLow.includes('sellador')) matchingTool = 'sellador'
+    else if (nameLow.includes('incrustación') || nameLow.includes('corona')) matchingTool = 'incrustacion'
+    else if (nameLow.includes('amalgama')) matchingTool = 'amalgama'
+    else if (nameLow.includes('fractura')) matchingTool = 'fractura'
+    else if (nameLow.includes('resina') || nameLow.includes('composite')) matchingTool = 'resina'
+
+    setModalActiveTool(matchingTool)
+    setModalData({
+      ...modalData,
+      procedure: item.name,
+      estimatedCost: item.cost,
+      specialty: modalSpecialty,
+      selectedCondition: item.condition !== 'sano' ? item.condition : modalData.selectedCondition
+    })
+  }
+
   // VINCULAR TRATAMIENTO DEL CATÁLOGO DIRECTO A LA PIEZA (IDÉNTICO A IMAGEN 3)
   const handleLinkProcedure = async (procedureItem: { name: string; cost: number; condition: ToothWholeCondition }) => {
     if (!modalData) return
@@ -1084,75 +1119,162 @@ export function Dental3DViewer({
               </div>
             )}
 
-            {/* ENCABEZADO CON IDENTIFICACIÓN DUAL UNS / FDI */}
-            <div className="flex items-start justify-between gap-3 pb-3 border-b border-slate-700/80">
-              <div className="flex items-center gap-3">
+            {/* ENCABEZADO HOLOGRÁFICO DINÁMICO POR PIEZA DENTAL */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-800/90 bg-slate-900/40 -mx-6 -mt-6 p-6 rounded-t-2xl">
+              <div className="flex items-start sm:items-center gap-3.5">
                 {modalData.isInterproximal ? (
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 text-slate-950 font-black text-lg flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                  <div className="w-13 h-13 rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 text-slate-950 font-black text-xl flex items-center justify-center shadow-lg shadow-cyan-500/25 shrink-0">
                     ↔
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-1 items-center">
-                    <span className="px-2.5 py-0.5 rounded-xl bg-cyan-400 text-slate-950 font-black text-xs shadow-xs">
-                      UNS #{modalData.toothUniversal}
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-xl bg-amber-400 text-slate-950 font-black text-xs shadow-xs">
+                  <div className="flex flex-col gap-1 items-center shrink-0">
+                    <span className="px-3 py-1 rounded-xl bg-amber-400 text-slate-950 font-black text-xs shadow-md">
                       FDI #{modalData.toothFdi}
+                    </span>
+                    <span className="px-3 py-0.5 rounded-xl bg-cyan-400 text-slate-950 font-black text-[10px] shadow-xs">
+                      UNS #{modalData.toothUniversal}
                     </span>
                   </div>
                 )}
 
-                <div>
+                <div className="space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
-                      {modalData.isInterproximal ? 'Contacto Interproximal' : 'Ventana Cristal 3D'}
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                      {modalData.isInterproximal ? 'Punto Interproximal' : 'Desglose Dinámico por Pieza'}
                     </span>
-                    <span className="text-[11px] text-slate-400">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold text-slate-300 bg-slate-800/90 border border-slate-700">
                       {modalData.taxonomy?.arch === 'upper' ? 'Maxilar Superior' : 'Mandíbula Inferior'} • Cuadrante {modalData.taxonomy?.quadrant || 1} FDI
                     </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                      {modalData.selectedCondition.toUpperCase()}
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold text-slate-300 bg-slate-800/90 border border-slate-700">
+                      {modalData.taxonomy?.kind || 'Órgano Dentario'}
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                      Estado: {modalData.selectedCondition.toUpperCase()}
                     </span>
                   </div>
 
-                  <h3 className="text-lg font-black text-white mt-0.5">
-                    {modalData.isInterproximal && modalData.pairFdi
-                      ? `Punto de Contacto: FDI #${modalData.pairFdi[0]} ↔ #${modalData.pairFdi[1]} (UNS #${modalData.pairUniversal?.[0]} ↔ #${modalData.pairUniversal?.[1]})`
-                      : modalData.taxonomy?.name || `Pieza Dental #${modalData.toothFdi}`}
+                  <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2 flex-wrap">
+                    <span>
+                      {modalData.isInterproximal && modalData.pairFdi
+                        ? `Punto de Contacto: FDI #${modalData.pairFdi[0]} ↔ #${modalData.pairFdi[1]} (UNS #${modalData.pairUniversal?.[0]} ↔ #${modalData.pairUniversal?.[1]})`
+                        : `${modalData.taxonomy?.name || `Pieza Dental #${modalData.toothFdi}`} — FDI #${modalData.toothFdi}`}
+                    </span>
                   </h3>
 
                   <p className="text-xs text-slate-400">
-                    Expediente: <strong className="text-slate-200">{patientName}</strong> • Sucursal: <strong className="text-amber-300">{branch}</strong>
+                    Paciente: <strong className="text-slate-200">{patientName}</strong> • Sucursal: <strong className="text-amber-300">{branch}</strong> • {modalData.taxonomy?.description}
                   </p>
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={handleCloseModal}
-                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
-                title="Cerrar y restablecer arcada"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              {/* SELECTOR RÁPIDO Y NAVEGADOR DE PIEZAS (11-48) + BOTÓN CERRAR */}
+              <div className="flex items-center gap-2 self-end lg:self-center shrink-0">
+                <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-700/80 shadow-md">
+                  <button
+                    type="button"
+                    onClick={() => handleNavigateTooth('prev')}
+                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-colors cursor-pointer"
+                    title="Pieza anterior"
+                  >
+                    ◀
+                  </button>
+                  <select
+                    value={modalData.toothFdi}
+                    onChange={(e) => {
+                      const fdi = Number(e.target.value)
+                      if (onSelectTooth) onSelectTooth(fdi)
+                      handleOpenCrystalModal(fdi, false)
+                    }}
+                    className="bg-slate-950 text-amber-300 text-xs font-black rounded-lg px-2 py-1 border border-amber-400/40 focus:outline-hidden cursor-pointer"
+                  >
+                    {TOOTH_CATALOG_LIST.map(t => (
+                      <option key={t.fdi} value={t.fdi} className="bg-slate-950 text-white">
+                        FDI #{t.fdi} (UNS #{t.universal}) — {t.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => handleNavigateTooth('next')}
+                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-colors cursor-pointer"
+                    title="Pieza siguiente"
+                  >
+                    ▶
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer border border-slate-700/60"
+                  title="Cerrar y restablecer arcada"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* CONTENIDO PRINCIPAL: 2 COLUMNAS (DESGLOSE 5 CARAS + ESPECIALIDADES / PROCEDIMIENTOS) */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-              {/* COLUMNA IZQUIERDA: ZOOM ANATÓMICO DE 5 CARAS (IDÉNTICO A CONCEPTO IMAGEN 2) */}
-              <div className="lg:col-span-6 space-y-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Activity className="w-4 h-4 text-amber-400" />
-                    <h4 className="text-xs font-black uppercase tracking-wider text-amber-300">
-                      Desglose Anatómico de 5 Caras
-                    </h4>
+              {/* COLUMNA IZQUIERDA: PANEL VISUAL HOLOGRÁFICO AVANZADO DE 5 CARAS INTERACTIVAS */}
+              <div className="lg:col-span-6 space-y-3 bg-gradient-to-b from-slate-950 via-slate-900/90 to-slate-950 p-4 sm:p-5 rounded-2xl border border-amber-500/40 shadow-2xl relative overflow-hidden">
+                {/* Resplandor ambiental de fondo */}
+                <div className="absolute -top-16 -left-16 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-16 -right-16 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+
+                <div className="flex items-center justify-between relative z-10">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-amber-400/20 border border-amber-400/50 flex items-center justify-center text-amber-300 shadow-sm">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                        <span>Corona Anatómica 5D</span>
+                        <span className="text-[10px] text-slate-400 font-mono">({modalData.taxonomy?.name || `Pieza #${modalData.toothFdi}`})</span>
+                      </h4>
+                      <p className="text-[10px] text-slate-400">
+                        Haz clic en cualquier cara para aplicar: <strong className="text-amber-300">{SURFACE_COLORS[modalActiveTool].label}</strong>
+                      </p>
+                    </div>
                   </div>
-                  <span className="text-[10px] text-slate-400">Clic en cara para aplicar</span>
+
+                  {/* Acciones Rápidas */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const healthySurfaces: ToothSurfaces = { vestibular: 'sano', lingual: 'sano', mesial: 'sano', distal: 'sano', oclusal: 'sano' };
+                        setModalData({ ...modalData, activeSurfaces: healthySurfaces });
+                        if (onUpdateToothSurfaces) onUpdateToothSurfaces(modalData.toothFdi, healthySurfaces, 'sano');
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-[10px] font-bold text-slate-300 hover:text-white border border-slate-700 transition-all cursor-pointer"
+                      title="Restablecer todas las caras como sanas"
+                    >
+                      Limpiar Caras
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const allSurfaces: ToothSurfaces = {
+                          vestibular: modalActiveTool,
+                          lingual: modalActiveTool,
+                          mesial: modalActiveTool,
+                          distal: modalActiveTool,
+                          oclusal: modalActiveTool
+                        };
+                        setModalData({ ...modalData, activeSurfaces: allSurfaces });
+                        if (onUpdateToothSurfaces) onUpdateToothSurfaces(modalData.toothFdi, allSurfaces, modalData.selectedCondition);
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 hover:text-amber-200 text-[10px] font-bold border border-amber-400/40 transition-all cursor-pointer"
+                      title="Aplicar la herramienta activa a toda la corona"
+                    >
+                      Toda la Corona
+                    </button>
+                  </div>
                 </div>
 
                 {/* Paleta rápida de condiciones activas */}
-                <div className="flex flex-wrap items-center gap-1.5 pb-2 border-b border-slate-800">
+                <div className="flex flex-wrap items-center gap-1.5 pb-2 border-b border-slate-800/80 relative z-10">
                   {(['caries', 'resina', 'amalgama', 'sellador', 'fractura', 'incrustacion', 'sano'] as SurfaceCondition[]).map(cond => {
                     const info = SURFACE_COLORS[cond]
                     const isActive = modalActiveTool === cond
@@ -1162,240 +1284,212 @@ export function Dental3DViewer({
                         type="button"
                         onClick={() => setModalActiveTool(cond)}
                         className={cn(
-                          'px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer flex items-center gap-1',
+                          'px-2.5 py-1 rounded-xl text-[10px] font-black border transition-all cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95',
                           isActive
-                            ? 'bg-amber-400 text-slate-950 border-amber-300 font-black shadow-xs'
-                            : 'bg-slate-900/80 text-slate-300 border-slate-700 hover:bg-slate-800'
+                            ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 border-amber-300 shadow-amber-500/20 ring-1 ring-amber-300'
+                            : 'bg-slate-900/90 text-slate-300 border-slate-700 hover:bg-slate-800 hover:border-slate-600'
                         )}
                       >
-                        <span className="w-2.5 h-2.5 rounded-full border" style={{ backgroundColor: info.fill, borderColor: info.stroke }} />
+                        <span className="w-2.5 h-2.5 rounded-full border shadow-xs" style={{ backgroundColor: info.fill, borderColor: info.stroke }} />
                         <span>{info.label.split(' ')[0]}</span>
                       </button>
                     )
                   })}
                 </div>
 
-                {/* CRUCETA ANATÓMICA GEOMÉTRICA INTERACTIVA DE 5 CARAS */}
-                <div className="bg-slate-900/90 rounded-2xl border border-slate-800 p-3 flex flex-col items-center justify-center relative shadow-inner">
-                  <div className="w-full flex items-center justify-between mb-2 px-1">
-                    <span className="text-[11px] font-mono uppercase text-slate-300 font-bold flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                      <span>Cruceta Anatómica Clínica</span>
-                    </span>
-                    <span className="text-[10px] text-amber-300 font-black">
-                      1-Clic: Aplicar {SURFACE_COLORS[modalActiveTool].label.split(' ')[0]}
-                    </span>
+                {/* DISPOSICIÓN ANATÓMICA HOLOGRÁFICA EN COCKPIT DE CRISTAL OSCURO (5 CARAS) */}
+                <div className="relative z-10 flex flex-col items-center gap-2.5 py-1">
+                  {/* 1. CARA BUCAL / VESTIBULAR (SUPERIOR / LABIAL) */}
+                  <div
+                    onClick={() => handleApplyFaceCondition('vestibular')}
+                    className={cn(
+                      'w-full max-w-md p-3 rounded-2xl border-2 backdrop-blur-xl transition-all cursor-pointer flex items-center justify-between gap-3 shadow-lg hover:scale-[1.01] active:scale-[0.99] group',
+                      modalData.activeSurfaces.vestibular !== 'sano'
+                        ? 'bg-slate-900/90 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.2)]'
+                        : 'bg-slate-950/80 border-cyan-500/30 hover:border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.1)]'
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 flex items-center justify-center font-black text-sm shrink-0 group-hover:scale-110 transition-transform">
+                        ▲
+                      </div>
+                      <div>
+                        <span className="text-xs font-black text-white block tracking-wide">Bucal / Vestibular</span>
+                        <span className="text-[10px] text-slate-400 block">
+                          {modalData.taxonomy?.arch === 'upper' ? 'Superior (Cara Labial)' : 'Inferior (Cara Labial)'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-3.5 h-3.5 rounded-full border shadow-md shrink-0"
+                        style={{
+                          backgroundColor: SURFACE_COLORS[modalData.activeSurfaces.vestibular].fill,
+                          borderColor: SURFACE_COLORS[modalData.activeSurfaces.vestibular].stroke
+                        }}
+                      />
+                      <span className={cn(
+                        'text-[10px] font-black uppercase px-2 py-0.5 rounded-lg border',
+                        modalData.activeSurfaces.vestibular === 'sano'
+                          ? 'bg-slate-800 text-slate-400 border-slate-700'
+                          : 'bg-amber-400 text-slate-950 border-amber-300 font-black'
+                      )}>
+                        {SURFACE_COLORS[modalData.activeSurfaces.vestibular].label.split(' ')[0]}
+                      </span>
+                    </div>
                   </div>
 
-                  <svg viewBox="0 0 200 200" className="w-44 h-44 drop-shadow-[0_0_20px_rgba(56,189,248,0.2)] select-none">
-                    {/* Fondo oscuro contenedor */}
-                    <rect x="10" y="10" width="180" height="180" rx="16" fill="#020617" stroke="#334155" strokeWidth="2" />
-
-                    {/* Bucal / Vestibular (Arriba) */}
-                    <polygon
-                      points="20,20 180,20 135,65 65,65"
-                      fill={SURFACE_COLORS[modalData.activeSurfaces.vestibular].fill}
-                      stroke={SURFACE_COLORS[modalData.activeSurfaces.vestibular].stroke}
-                      strokeWidth="2.5"
-                      className="cursor-pointer hover:brightness-125 transition-all"
-                      onClick={() => handleApplyFaceCondition('vestibular')}
-                    />
-                    <text
-                      x="100"
-                      y="46"
-                      textAnchor="middle"
-                      fill={modalData.activeSurfaces.vestibular === 'sano' ? '#0f172a' : '#ffffff'}
-                      fontSize="9.5"
-                      fontWeight="900"
-                      pointerEvents="none"
-                      letterSpacing="0.5"
-                    >
-                      ▲ VESTIBULAR
-                    </text>
-
-                    {/* Lingual / Palatino (Abajo) */}
-                    <polygon
-                      points="65,135 135,135 180,180 20,180"
-                      fill={SURFACE_COLORS[modalData.activeSurfaces.lingual].fill}
-                      stroke={SURFACE_COLORS[modalData.activeSurfaces.lingual].stroke}
-                      strokeWidth="2.5"
-                      className="cursor-pointer hover:brightness-125 transition-all"
-                      onClick={() => handleApplyFaceCondition('lingual')}
-                    />
-                    <text
-                      x="100"
-                      y="162"
-                      textAnchor="middle"
-                      fill={modalData.activeSurfaces.lingual === 'sano' ? '#0f172a' : '#ffffff'}
-                      fontSize="9.5"
-                      fontWeight="900"
-                      pointerEvents="none"
-                      letterSpacing="0.5"
-                    >
-                      ▼ {modalData.toothFdi >= 31 && modalData.toothFdi <= 48 ? 'LINGUAL' : 'PALATINO'}
-                    </text>
-
-                    {/* Mesial (Izquierda) */}
-                    <polygon
-                      points="20,20 65,65 65,135 20,180"
-                      fill={SURFACE_COLORS[modalData.activeSurfaces.mesial].fill}
-                      stroke={SURFACE_COLORS[modalData.activeSurfaces.mesial].stroke}
-                      strokeWidth="2.5"
-                      className="cursor-pointer hover:brightness-125 transition-all"
+                  {/* FILA MEDIA: MESIAL ◀ | OCLUSAL/INCISAL ⬢ | DISTAL ▶ */}
+                  <div className="w-full max-w-md grid grid-cols-12 gap-2.5 items-center">
+                    {/* 2. MESIAL (IZQUIERDA) */}
+                    <div
                       onClick={() => handleApplyFaceCondition('mesial')}
-                    />
-                    <text
-                      x="44"
-                      y="104"
-                      textAnchor="middle"
-                      fill={modalData.activeSurfaces.mesial === 'sano' ? '#0f172a' : '#ffffff'}
-                      fontSize="9.5"
-                      fontWeight="900"
-                      pointerEvents="none"
-                      transform="rotate(-90 44 104)"
-                      letterSpacing="0.5"
+                      className={cn(
+                        'col-span-3 h-32 p-2.5 rounded-2xl border-2 backdrop-blur-xl transition-all cursor-pointer flex flex-col items-center justify-between text-center shadow-lg hover:scale-[1.02] active:scale-[0.98] group',
+                        modalData.activeSurfaces.mesial !== 'sano'
+                          ? 'bg-slate-900/90 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.2)]'
+                          : 'bg-slate-950/80 border-emerald-500/30 hover:border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
+                      )}
                     >
-                      ◀ MESIAL
-                    </text>
-
-                    {/* Distal (Derecha) */}
-                    <polygon
-                      points="135,65 180,20 180,180 135,135"
-                      fill={SURFACE_COLORS[modalData.activeSurfaces.distal].fill}
-                      stroke={SURFACE_COLORS[modalData.activeSurfaces.distal].stroke}
-                      strokeWidth="2.5"
-                      className="cursor-pointer hover:brightness-125 transition-all"
-                      onClick={() => handleApplyFaceCondition('distal')}
-                    />
-                    <text
-                      x="156"
-                      y="104"
-                      textAnchor="middle"
-                      fill={modalData.activeSurfaces.distal === 'sano' ? '#0f172a' : '#ffffff'}
-                      fontSize="9.5"
-                      fontWeight="900"
-                      pointerEvents="none"
-                      transform="rotate(90 156 104)"
-                      letterSpacing="0.5"
-                    >
-                      DISTAL ▶
-                    </text>
-
-                    {/* Oclusal / Incisal (Centro) */}
-                    <rect
-                      x="65"
-                      y="65"
-                      width="70"
-                      height="70"
-                      rx="8"
-                      fill={SURFACE_COLORS[modalData.activeSurfaces.oclusal].fill}
-                      stroke={SURFACE_COLORS[modalData.activeSurfaces.oclusal].stroke}
-                      strokeWidth="3"
-                      className="cursor-pointer hover:brightness-125 transition-all"
-                      onClick={() => handleApplyFaceCondition('oclusal')}
-                    />
-                    <text
-                      x="100"
-                      y="98"
-                      textAnchor="middle"
-                      fill={modalData.activeSurfaces.oclusal === 'sano' ? '#0f172a' : '#ffffff'}
-                      fontSize="9.5"
-                      fontWeight="900"
-                      pointerEvents="none"
-                    >
-                      ⬢ {modalData.taxonomy?.isAnterior ? 'INCISAL' : 'OCLUSAL'}
-                    </text>
-                    <text
-                      x="100"
-                      y="111"
-                      textAnchor="middle"
-                      fill={modalData.activeSurfaces.oclusal === 'sano' ? '#475569' : '#fef08a'}
-                      fontSize="7.5"
-                      fontWeight="bold"
-                      pointerEvents="none"
-                    >
-                      CENTRO
-                    </text>
-                  </svg>
-                </div>
-
-                {/* TARJETAS ESTILIZADAS CON ICONOS DIRECCIONALES (5 CARAS) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {[
-                    {
-                      key: 'oclusal' as const,
-                      icon: '⬢',
-                      iconColor: 'text-amber-400',
-                      label: modalData.taxonomy?.isAnterior ? 'Incisal / Oclusal' : 'Oclusal',
-                      sub: modalData.taxonomy?.isAnterior ? 'Borde incisal' : 'Masticatoria'
-                    },
-                    {
-                      key: 'vestibular' as const,
-                      icon: '▲',
-                      iconColor: 'text-cyan-400',
-                      label: 'Bucal / Vestibular',
-                      sub: modalData.toothFdi >= 31 && modalData.toothFdi <= 48 ? 'Inferior (Labial)' : 'Superior (Labial)'
-                    },
-                    {
-                      key: 'lingual' as const,
-                      icon: '▼',
-                      iconColor: 'text-purple-400',
-                      label: modalData.toothFdi >= 31 && modalData.toothFdi <= 48 ? 'Lingual' : 'Palatino',
-                      sub: modalData.toothFdi >= 31 && modalData.toothFdi <= 48 ? 'Hacia lengua' : 'Hacia paladar'
-                    },
-                    {
-                      key: 'mesial' as const,
-                      icon: '◀',
-                      iconColor: 'text-emerald-400',
-                      label: 'Mesial',
-                      sub: 'Hacia línea media'
-                    },
-                    {
-                      key: 'distal' as const,
-                      icon: '▶',
-                      iconColor: 'text-rose-400',
-                      label: 'Distal',
-                      sub: 'Hacia posterior'
-                    }
-                  ].map(face => {
-                    const currentCond = modalData.activeSurfaces[face.key]
-                    const info = SURFACE_COLORS[currentCond]
-                    return (
-                      <div
-                        key={face.key}
-                        onClick={() => handleApplyFaceCondition(face.key)}
-                        className={cn(
-                          'p-2 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2 select-none hover:scale-[1.01] active:scale-[0.99]',
-                          currentCond !== 'sano'
-                            ? 'bg-slate-900 border-amber-400/80 shadow-xs shadow-amber-500/10'
-                            : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
-                        )}
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="w-6 h-6 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0">
-                            <span className={cn('text-xs font-black', face.iconColor)}>{face.icon}</span>
-                          </div>
-                          <div className="min-w-0">
-                            <span className="text-xs font-bold text-white block truncate leading-tight">{face.label}</span>
-                            <span className="text-[9.5px] text-slate-400 block truncate">{face.sub}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <span
-                            className="w-2.5 h-2.5 rounded-full border shadow-2xs shrink-0"
-                            style={{ backgroundColor: info.fill, borderColor: info.stroke }}
-                          />
-                          <span className={cn(
-                            'text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md',
-                            currentCond === 'sano' ? 'bg-slate-800 text-slate-400' : 'bg-amber-400 text-slate-950'
-                          )}>
-                            {info.label.split(' ')[0]}
-                          </span>
-                        </div>
+                      <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 flex items-center justify-center font-black text-xs group-hover:scale-110 transition-transform">
+                        ◀
                       </div>
-                    )
-                  })}
+                      <div>
+                        <span className="text-[11px] font-black text-white block">Mesial</span>
+                        <span className="text-[9px] text-slate-400 block leading-tight">Línea Media</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full border shadow-xs"
+                          style={{
+                            backgroundColor: SURFACE_COLORS[modalData.activeSurfaces.mesial].fill,
+                            borderColor: SURFACE_COLORS[modalData.activeSurfaces.mesial].stroke
+                          }}
+                        />
+                        <span className="text-[9px] font-black uppercase text-amber-300">
+                          {modalData.activeSurfaces.mesial === 'sano' ? 'SANO' : modalData.activeSurfaces.mesial.slice(0, 3).toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 3. OCLUSAL / INCISAL (CENTRO - PIEZA CLAVE) */}
+                    <div
+                      onClick={() => handleApplyFaceCondition('oclusal')}
+                      className={cn(
+                        'col-span-6 h-36 p-3 rounded-2xl border-2 backdrop-blur-2xl transition-all cursor-pointer flex flex-col items-center justify-between text-center shadow-2xl hover:scale-[1.03] active:scale-[0.98] relative overflow-hidden group',
+                        modalData.activeSurfaces.oclusal !== 'sano'
+                          ? 'bg-gradient-to-b from-amber-500/25 via-slate-900/95 to-slate-950 border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.35)]'
+                          : 'bg-gradient-to-b from-amber-500/10 via-slate-900/90 to-slate-950 border-amber-500/40 hover:border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.15)]'
+                      )}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-8 h-8 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-black text-sm shadow-md group-hover:rotate-12 transition-transform">
+                          ⬢
+                        </div>
+                        <span className="text-[10px] font-black uppercase text-amber-300 tracking-wider">Centro Oclusal</span>
+                      </div>
+
+                      <div>
+                        <span className="text-sm font-black text-white block">
+                          {modalData.taxonomy?.isAnterior ? 'Borde Incisal' : 'Oclusal Masticatoria'}
+                        </span>
+                        <span className="text-[10px] text-slate-400 block mt-0.5">
+                          {modalData.taxonomy?.isAnterior ? 'Cúspide / Corte' : 'Fosetas & Fisuras Oclusales'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-slate-950/80 border border-slate-700/80">
+                        <span
+                          className="w-3 h-3 rounded-full border shadow-sm"
+                          style={{
+                            backgroundColor: SURFACE_COLORS[modalData.activeSurfaces.oclusal].fill,
+                            borderColor: SURFACE_COLORS[modalData.activeSurfaces.oclusal].stroke
+                          }}
+                        />
+                        <span className={cn(
+                          'text-[10px] font-black uppercase',
+                          modalData.activeSurfaces.oclusal === 'sano' ? 'text-slate-400' : 'text-amber-300'
+                        )}>
+                          {SURFACE_COLORS[modalData.activeSurfaces.oclusal].label}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* 4. DISTAL (DERECHA) */}
+                    <div
+                      onClick={() => handleApplyFaceCondition('distal')}
+                      className={cn(
+                        'col-span-3 h-32 p-2.5 rounded-2xl border-2 backdrop-blur-xl transition-all cursor-pointer flex flex-col items-center justify-between text-center shadow-lg hover:scale-[1.02] active:scale-[0.98] group',
+                        modalData.activeSurfaces.distal !== 'sano'
+                          ? 'bg-slate-900/90 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.2)]'
+                          : 'bg-slate-950/80 border-rose-500/30 hover:border-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.1)]'
+                      )}
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-rose-500/20 border border-rose-400/40 text-rose-300 flex items-center justify-center font-black text-xs group-hover:scale-110 transition-transform">
+                        ▶
+                      </div>
+                      <div>
+                        <span className="text-[11px] font-black text-white block">Distal</span>
+                        <span className="text-[9px] text-slate-400 block leading-tight">Hacia Posterior</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full border shadow-xs"
+                          style={{
+                            backgroundColor: SURFACE_COLORS[modalData.activeSurfaces.distal].fill,
+                            borderColor: SURFACE_COLORS[modalData.activeSurfaces.distal].stroke
+                          }}
+                        />
+                        <span className="text-[9px] font-black uppercase text-amber-300">
+                          {modalData.activeSurfaces.distal === 'sano' ? 'SANO' : modalData.activeSurfaces.distal.slice(0, 3).toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 5. CARA LINGUAL / PALATINO (INFERIOR - LENGUA / PALADAR) */}
+                  <div
+                    onClick={() => handleApplyFaceCondition('lingual')}
+                    className={cn(
+                      'w-full max-w-md p-3 rounded-2xl border-2 backdrop-blur-xl transition-all cursor-pointer flex items-center justify-between gap-3 shadow-lg hover:scale-[1.01] active:scale-[0.99] group',
+                      modalData.activeSurfaces.lingual !== 'sano'
+                        ? 'bg-slate-900/90 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.2)]'
+                        : 'bg-slate-950/80 border-purple-500/30 hover:border-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.1)]'
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-400/40 text-purple-300 flex items-center justify-center font-black text-sm shrink-0 group-hover:scale-110 transition-transform">
+                        ▼
+                      </div>
+                      <div>
+                        <span className="text-xs font-black text-white block tracking-wide">
+                          {modalData.toothFdi >= 31 && modalData.toothFdi <= 48 ? 'Lingual (Inferior)' : 'Palatino (Superior)'}
+                        </span>
+                        <span className="text-[10px] text-slate-400 block">
+                          {modalData.toothFdi >= 31 && modalData.toothFdi <= 48 ? 'Hacia la Lengua' : 'Hacia la Bóveda Palatina'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-3.5 h-3.5 rounded-full border shadow-md shrink-0"
+                        style={{
+                          backgroundColor: SURFACE_COLORS[modalData.activeSurfaces.lingual].fill,
+                          borderColor: SURFACE_COLORS[modalData.activeSurfaces.lingual].stroke
+                        }}
+                      />
+                      <span className={cn(
+                        'text-[10px] font-black uppercase px-2 py-0.5 rounded-lg border',
+                        modalData.activeSurfaces.lingual === 'sano'
+                          ? 'bg-slate-800 text-slate-400 border-slate-700'
+                          : 'bg-amber-400 text-slate-950 border-amber-300 font-black'
+                      )}>
+                        {SURFACE_COLORS[modalData.activeSurfaces.lingual].label.split(' ')[0]}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1455,31 +1549,51 @@ export function Dental3DViewer({
 
                   {/* Listado de Procedimientos Vinculables (Estilo Tarjetas Imagen 3) */}
                   <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
-                    {TREATMENT_CATALOG[modalSpecialty].map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800 hover:border-amber-400/60 transition-colors flex items-center justify-between gap-2 shadow-xs"
-                      >
-                        <div>
-                          <span className="text-xs font-bold text-white block leading-tight">
-                            {item.name}
-                          </span>
-                          <span className="text-xs font-black text-emerald-400 font-mono block mt-0.5">
-                            ${item.cost.toLocaleString('es-MX')} MXN
-                          </span>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleLinkProcedure(item)}
-                          className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 whitespace-nowrap shadow-sm active:scale-95"
-                          title="Vincular a esta pieza y sincronizar con Supabase"
+                    {TREATMENT_CATALOG[modalSpecialty].map((item, idx) => {
+                      const isSelected = modalData.procedure === item.name
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => handleSelectProcedureItem(item)}
+                          className={cn(
+                            'p-2.5 rounded-xl border transition-all flex items-center justify-between gap-2 shadow-xs cursor-pointer select-none',
+                            isSelected
+                              ? 'bg-amber-400/15 border-amber-400 ring-1 ring-amber-400/50'
+                              : 'bg-slate-900/90 border-slate-800 hover:border-amber-400/60 hover:bg-slate-800/80'
+                          )}
+                          title="Haz clic para seleccionar este tratamiento y estamparlo en las caras deseadas"
                         >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>+ Vincular</span>
-                        </button>
-                      </div>
-                    ))}
+                          <div className="min-w-0">
+                            <span className="text-xs font-bold text-white block leading-tight truncate">
+                              {item.name}
+                            </span>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-xs font-black text-emerald-400 font-mono">
+                                ${item.cost.toLocaleString('es-MX')} MXN
+                              </span>
+                              {isSelected && (
+                                <span className="text-[9px] font-black uppercase text-amber-300 bg-amber-500/20 px-1.5 py-0.2 rounded-md">
+                                  Activo
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleLinkProcedure(item)
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 whitespace-nowrap shadow-sm active:scale-95"
+                            title="Vincular a esta pieza y sincronizar con Supabase"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>+ Vincular</span>
+                          </button>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
 

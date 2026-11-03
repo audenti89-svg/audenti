@@ -105,12 +105,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Datos incompletos: patientId y toothFdi son obligatorios' }, { status: 400 })
     }
 
-    // Validación de permisos según rol
-    const isInternOrStudent = doctorRole === 'estudiante' || doctorRole === 'pasante'
-    const entryStatus = isInternOrStudent ? 'Borrador (Revisión Pendiente)' : 'Confirmado'
+    // Validación de permisos estructurada según rol clínico (Socio, Trabajador, Pasante)
+    let entryStatus = 'Confirmado (Socio Autorizado)'
+    let rolePermissionLevel = 'full_bi_and_clinical'
+
+    const normalizedRole = (doctorRole || 'socio').toLowerCase()
+    if (normalizedRole === 'pasante' || normalizedRole === 'estudiante') {
+      entryStatus = 'Borrador Clínico (Supervisión Pendiente Dra. Aura Estudillo)'
+      rolePermissionLevel = 'read_and_draft'
+    } else if (normalizedRole === 'trabajador' || normalizedRole === 'doctor' || normalizedRole === 'asistente') {
+      entryStatus = 'Registrado por Clínico Adscrito'
+      rolePermissionLevel = 'clinical_operator'
+    } else {
+      entryStatus = 'Confirmado (Socio Director)'
+      rolePermissionLevel = 'full_bi_and_clinical'
+    }
 
     const toothTaxonomy = TOOTH_BY_FDI[toothFdi]
     const uNum = toothUniversal || toothTaxonomy?.universal || 0
+    const toothFullName = toothTaxonomy?.name
+      ? `${toothTaxonomy.name} — FDI #${toothFdi}`
+      : `Pieza Dental FDI #${toothFdi}`
 
     // Resumen de caras trabajadas
     const treatedSurfaces = Object.entries(surfaces || {})
@@ -120,9 +135,9 @@ export async function POST(req: NextRequest) {
 
     const titlePrefix = isInterproximal && pairFdi
       ? `[ODONTOGRAMA 3D - CONTACTO INTERPROXIMAL]: Piezas #${pairFdi[0]} (UNS #${pairUniversal?.[0] || '?'}) ↔ #${pairFdi[1]} (UNS #${pairUniversal?.[1] || '?'})`
-      : `[ODONTOGRAMA 3D]: Pieza FDI #${toothFdi} (Universal #${uNum}) — ${toothTaxonomy?.name || 'Pieza Dental'}`
+      : `[ODONTOGRAMA 3D]: ${toothFullName} (Universal #${uNum})`
 
-    const clinicalContent = `${titlePrefix}\n• Procedimiento: ${procedure} [Especialidad: ${specialty}]\n• Caras afectadas: ${surfacesSummary}\n• Diagnóstico: ${condition.toUpperCase()}\n• Costo Estimado: $${estimatedCost || 0} MXN\n• Notas: ${notes || 'Sin observaciones adicionales'}\n• Sucursal: ${branch}\n• Profesional: ${doctorName} (${doctorRole.toUpperCase()})`
+    const clinicalContent = `${titlePrefix}\n• Procedimiento: ${procedure} [Especialidad: ${specialty}]\n• Caras afectadas: ${surfacesSummary}\n• Diagnóstico: ${condition.toUpperCase()}\n• Costo Estimado: $${estimatedCost || 0} MXN\n• Notas: ${notes || 'Sin observaciones adicionales'}\n• Sucursal: ${branch}\n• Profesional: ${doctorName} (${doctorRole.toUpperCase()} • ${rolePermissionLevel})\n• Validación: ${entryStatus}`
 
     // 1. Almacenar registro en chat_messages (Timeline clínico integrado)
     const { data: savedMessage, error: msgError } = await supabase
@@ -138,17 +153,27 @@ export async function POST(req: NextRequest) {
           isOdontogram3D: true,
           toothFdi,
           toothUniversal: uNum,
+          toothName: toothFullName,
+          arch: toothTaxonomy?.arch || (toothFdi <= 28 ? 'upper' : 'lower'),
+          quadrant: toothTaxonomy?.quadrant || 1,
           surfaces,
           surfacesSummary,
+          treatedSurfacesDetail: Object.entries(surfaces || {}).map(([face, cond]) => ({
+            face,
+            condition: cond,
+            label: `${face.toUpperCase()}: ${cond}`
+          })),
           condition,
           procedure,
           specialty,
-          estimatedCost,
+          estimatedCost: Number(estimatedCost) || 0,
           notes,
           isInterproximal: Boolean(isInterproximal),
           pairFdi,
           pairUniversal,
+          doctorName,
           doctorRole,
+          rolePermissionLevel,
           branch,
           status: entryStatus,
           timestamp: new Date().toISOString()
@@ -170,21 +195,29 @@ export async function POST(req: NextRequest) {
         lastUpdated: new Date().toISOString(),
         lastDoctor: doctorName,
         lastRole: doctorRole,
+        rolePermissionLevel,
         lastBranch: branch,
         teeth: fullTeethState || {},
         latestEntry: {
           toothFdi,
           toothUniversal: uNum,
+          toothName: toothFullName,
+          arch: toothTaxonomy?.arch || (toothFdi <= 28 ? 'upper' : 'lower'),
+          quadrant: toothTaxonomy?.quadrant || 1,
           surfaces,
+          surfacesSummary,
           condition,
           procedure,
           specialty,
           notes,
-          estimatedCost,
+          estimatedCost: Number(estimatedCost) || 0,
           isInterproximal: Boolean(isInterproximal),
           pairFdi,
           pairUniversal,
-          status: entryStatus
+          doctorName,
+          doctorRole,
+          status: entryStatus,
+          timestamp: new Date().toISOString()
         }
       }
 
