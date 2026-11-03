@@ -42,7 +42,8 @@ import {
   Smile,
   DollarSign,
   Check,
-  Info
+  Info,
+  Building2
 } from 'lucide-react'
 import { Odontogram } from '@/components/clinical/Odontogram'
 import { FamilyNucleusManager } from '@/components/clinical/FamilyNucleusManager'
@@ -109,6 +110,15 @@ export default function ExpedientePage() {
     role: 'socio',
     branch: 'Sucursal Balbuena (Matriz)'
   })
+
+  // Filtro estricto de sucursales (Balbuena y Chalma de Guadalupe)
+  const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>('all')
+
+  useEffect(() => {
+    if (doctorProfile.role !== 'socio') {
+      setSelectedBranchFilter(doctorProfile.branch || 'Sucursal Balbuena (Matriz)')
+    }
+  }, [doctorProfile])
 
   // Cargar sesión del médico y resolver rol
   useEffect(() => {
@@ -640,6 +650,20 @@ export default function ExpedientePage() {
     0
   )
 
+  // Filtrado dinámico de pacientes por sucursal
+  const filteredPatients = patients.filter((p) => {
+    if (selectedBranchFilter === 'all') return true
+    const pBranch = p.branch_name || p.branch || 'Sucursal Balbuena (Matriz)'
+    return pBranch === selectedBranchFilter
+  })
+
+  // Filtrado dinámico de agenda diaria por sucursal
+  const filteredAppointments = todayAppointments.filter((a) => {
+    if (selectedBranchFilter === 'all') return true
+    const aBranch = a.branch_name || a.branch || 'Sucursal Balbuena (Matriz)'
+    return aBranch === selectedBranchFilter
+  })
+
   return (
     <div className="-mx-4 sm:-mx-6 lg:-mx-12 -my-8 p-4 sm:p-6 lg:p-8 bg-[#040711] text-white min-h-[calc(100vh-80px)] rounded-3xl border border-slate-800/90 shadow-[0_0_80px_rgba(0,0,0,0.85)] relative overflow-hidden flex flex-col space-y-6">
       {/* Glow Orbs Holográficos de Fondo */}
@@ -714,12 +738,7 @@ export default function ExpedientePage() {
                 className="bg-slate-900 border border-amber-400/60 hover:border-amber-300 text-amber-300 text-xs font-black rounded-xl px-3 py-1.5 focus:outline-hidden focus:ring-2 focus:ring-amber-400/50 cursor-pointer transition-all shadow-md"
               >
                 <option value="Sucursal Balbuena (Matriz)" className="bg-slate-950 text-white">Sucursal Balbuena (Matriz)</option>
-                <option value="Sucursal Guadalupe Chalma" className="bg-slate-950 text-white">Sucursal Guadalupe Chalma</option>
-                <option value="Sucursal Colonia Roma" className="bg-slate-950 text-white">Sucursal Colonia Roma</option>
-                <option value="Sucursal Condesa" className="bg-slate-950 text-white">Sucursal Condesa</option>
-                <option value="Sucursal Polanco" className="bg-slate-950 text-white">Sucursal Polanco</option>
-                <option value="Sucursal Del Valle" className="bg-slate-950 text-white">Sucursal Del Valle</option>
-                <option value="Sucursal Satélite" className="bg-slate-950 text-white">Sucursal Satélite</option>
+                <option value="Sucursal Chalma de Guadalupe" className="bg-slate-950 text-white">Sucursal Chalma de Guadalupe</option>
               </select>
               {savingBranch && (
                 <span className="text-[10px] font-bold text-amber-400 animate-pulse">Guardando...</span>
@@ -885,6 +904,31 @@ export default function ExpedientePage() {
           <div className="lg:col-span-5 flex flex-col space-y-4">
             <div className="bg-slate-900/80 backdrop-blur-2xl rounded-3xl border border-amber-400/30 p-5 shadow-[0_0_40px_rgba(245,158,11,0.08)] flex flex-col h-full space-y-4">
               
+              {/* SELECTOR Y FILTRO ESTRICTO DE SUCURSAL EN TIEMPO REAL */}
+              <div className="flex items-center justify-between gap-2 p-2.5 rounded-2xl bg-slate-950/90 border border-slate-800">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Building2 className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-300 truncate">
+                    Sucursal Activa:
+                  </span>
+                </div>
+                {doctorProfile.role === 'socio' ? (
+                  <select
+                    value={selectedBranchFilter}
+                    onChange={(e) => setSelectedBranchFilter(e.target.value)}
+                    className="bg-slate-900 border border-amber-400/50 text-amber-300 text-xs font-bold rounded-xl px-2.5 py-1 focus:outline-hidden cursor-pointer"
+                  >
+                    <option value="all" className="bg-slate-950 text-white">Todas las Sucursales</option>
+                    <option value="Sucursal Balbuena (Matriz)" className="bg-slate-950 text-white">Sucursal Balbuena (Matriz)</option>
+                    <option value="Sucursal Chalma de Guadalupe" className="bg-slate-950 text-white">Sucursal Chalma de Guadalupe</option>
+                  </select>
+                ) : (
+                  <span className="text-xs font-bold text-slate-200 bg-slate-800/80 px-2.5 py-1 rounded-xl border border-slate-700 truncate">
+                    {doctorProfile.branch || 'Sucursal Balbuena (Matriz)'}
+                  </span>
+                )}
+              </div>
+
               {/* SUB-TABS SELECTOR EN PANEL IZQUIERDO */}
               <div className="flex items-center gap-1 p-1 bg-slate-950/80 rounded-2xl border border-slate-800 overflow-x-auto">
                 <button
@@ -911,9 +955,9 @@ export default function ExpedientePage() {
                 >
                   <Calendar className="w-3.5 h-3.5" />
                   <span>Agenda Diaria</span>
-                  {todayAppointments.length > 0 && (
+                  {filteredAppointments.length > 0 && (
                     <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-cyan-400 text-slate-950">
-                      {todayAppointments.length}
+                      {filteredAppointments.length}
                     </span>
                   )}
                 </button>
@@ -996,13 +1040,13 @@ export default function ExpedientePage() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-black uppercase tracking-wider text-amber-300">
-                        Pacientes Registrados ({patients.length})
+                        Pacientes Registrados ({filteredPatients.length})
                       </span>
                       <span className="text-[10px] text-slate-400">Clic para cambiar de expediente</span>
                     </div>
 
                     <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-1">
-                      {patients.map((p) => {
+                      {filteredPatients.map((p) => {
                         const isSelected = p.id === selectedPatient.id
                         const pInitials = (p.full_name || 'P')
                           .split(' ')
@@ -1072,7 +1116,7 @@ export default function ExpedientePage() {
                       <div className="w-6 h-6 border-2 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto" />
                       <p className="text-xs font-bold text-slate-400">Consultando agenda diaria...</p>
                     </div>
-                  ) : todayAppointments.length === 0 ? (
+                  ) : filteredAppointments.length === 0 ? (
                     <div className="py-12 text-center bg-slate-950/40 rounded-2xl border border-slate-800 p-6 space-y-2">
                       <Calendar className="w-8 h-8 text-slate-600 mx-auto" />
                       <h4 className="text-xs font-bold text-slate-300">Sin citas programadas para hoy</h4>
@@ -1082,7 +1126,7 @@ export default function ExpedientePage() {
                     </div>
                   ) : (
                     <div className="space-y-2 overflow-y-auto max-h-[420px] pr-1">
-                      {todayAppointments.map((app, idx) => {
+                      {filteredAppointments.map((app, idx) => {
                         const timeStr = app.start_time || app.time || '10:00 AM'
                         const patientName = app.patient_name || app.patientName || 'Paciente'
                         const isSelected = selectedPatient?.full_name?.toLowerCase() === patientName.toLowerCase()

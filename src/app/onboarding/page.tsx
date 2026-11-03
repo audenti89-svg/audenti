@@ -7,8 +7,7 @@ import { ShieldCheck, UserCheck, HeartPulse, PhoneCall, AlertTriangle, QrCode, S
 
 const BRANCHES = [
   { id: '00000000-0000-0000-0000-000000000001', code: 'balbuena', name: 'Sucursal Balbuena (Matriz)' },
-  { id: '00000000-0000-0000-0000-000000000002', code: 'guadalupe-chalma', name: 'Sucursal Guadalupe Chalma' },
-  { id: '00000000-0000-0000-0000-000000000003', code: 'colonia-roma', name: 'Sucursal Colonia Roma' },
+  { id: '00000000-0000-0000-0000-000000000002', code: 'guadalupe-chalma', name: 'Sucursal Chalma de Guadalupe' },
 ];
 
 function OnboardingContent() {

@@ -628,7 +628,7 @@ export default function ReportesPage() {
           >
             <option value="all">Todas las Sucursales</option>
             <option value="balbuena">Sucursal Balbuena (Matriz)</option>
-            <option value="condesa">Sucursal Condesa</option>
+            <option value="guadalupe-chalma">Sucursal Chalma de Guadalupe</option>
           </select>
 
           <select

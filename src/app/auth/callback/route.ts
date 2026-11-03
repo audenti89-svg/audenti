@@ -22,6 +22,9 @@ function normalizeChannel(raw: string): string | null {
   return VALID_CHANNELS.includes(lower) ? lower : null;
 }
 
+const ADMIN_EMAILS = ['audenti89@gmail.com'];
+const INTERNAL_ROLES = ['owner', 'admin', 'director', 'doctor', 'socio', 'trabajador', 'pasante', 'estudiante'];
+
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code       = requestUrl.searchParams.get('code');
@@ -50,7 +53,10 @@ export async function GET(request: Request) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options);
+            response.cookies.set(name, value, {
+              ...options,
+              maxAge: 43200, // 12 horas de jornada laboral activa
+            });
           });
         },
       },
@@ -63,8 +69,10 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/auth/login?error=${encodeURIComponent(sessionError.message)}`);
   }
 
+  const { data: { user } } = await supabase.auth.getUser();
+
   // ────────────────────────────────────────────────────────
-  // Si es registro o viene atribución: guardar en Supabase
+  // Si viene atribución o invitación médica:
   // ────────────────────────────────────────────────────────
   const cookieHeader = request.headers.get('cookie') ?? '';
   let cookieAttr: Record<string, string> = {};
@@ -77,154 +85,73 @@ export async function GET(request: Request) {
 
   const stateAttr = parseAttributionState(stateParam);
   const attr = { ...cookieAttr, ...stateAttr };
-  const hasAttribution = Object.keys(attr).length > 0;
 
-  if (isRegistration || hasAttribution) {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    // 1. Si viene con token de invitación médica
+    if (attr.invite_token) {
+      try {
+        const { data: inv } = await supabase
+          .from('doctor_invitations')
+          .select('*')
+          .eq('token', attr.invite_token)
+          .eq('status', 'pending')
+          .gt('expires_at', new Date().toISOString())
+          .maybeSingle();
 
-      if (user) {
-        // ── Si viene token de invitación médica a odontólogo (Socio vs Trabajador) ──
-        if (attr.invite_token) {
-          try {
-            const { data: inv } = await supabase
-              .from('doctor_invitations')
-              .select('*')
-              .eq('token', attr.invite_token)
-              .eq('status', 'pending')
-              .gt('expires_at', new Date().toISOString())
-              .maybeSingle();
+        if (inv) {
+          const docRole = inv.role === 'socio' ? 'socio' : 'trabajador';
+          const docName = user.user_metadata?.full_name || user.user_metadata?.name || inv.full_name || 'Odontólogo Especialista';
 
-            if (inv) {
-              const docRole = inv.role === 'socio' ? 'socio' : 'trabajador';
-              const docName = user.user_metadata?.full_name || user.user_metadata?.name || inv.full_name || 'Odontólogo Especialista';
+          await supabase.from('doctor_invitations').update({
+            status: 'accepted',
+            accepted_by: user.id,
+            accepted_at: new Date().toISOString()
+          }).eq('id', inv.id);
 
-              await supabase.from('doctor_invitations').update({
-                status: 'accepted',
-                accepted_by: user.id,
-                accepted_at: new Date().toISOString()
-              }).eq('id', inv.id);
+          await supabase.from('users').upsert({
+            id: user.id,
+            email: user.email,
+            full_name: docName,
+            role: docRole,
+            doctor_type: docRole,
+            branch_id: inv.branch_id,
+            branch_name: inv.branch_name,
+            invited_by: inv.created_by,
+            onboarding_completed: true,
+            is_active: true
+          }, { onConflict: 'id' });
 
-              await supabase.from('users').upsert({
-                id: user.id,
-                email: user.email,
-                full_name: docName,
-                role: docRole,
-                doctor_type: docRole,
-                branch_id: inv.branch_id,
-                branch_name: inv.branch_name,
-                invited_by: inv.created_by,
-                onboarding_completed: true,
-                is_active: true
-              }, { onConflict: 'id' });
-
-              return NextResponse.redirect(`${origin}/dashboard`);
-            }
-          } catch (invErr) {
-            console.warn('[auth/callback] Error procesando invitación de odontólogo:', invErr);
-          }
+          return NextResponse.redirect(`${origin}/dashboard`);
         }
+      } catch (invErr) {
+        console.warn('[auth/callback] Error procesando invitación de odontólogo:', invErr);
+      }
+    }
 
-        // Preparar objeto de atribución para pacientes
-        const rawChannel = attr.channel || attr.canal || attr.utm_source || '';
-        const channel = normalizeChannel(rawChannel);
-        const updatePayload: Record<string, unknown> = {
-          email: user.email ?? null,
-        };
+    // 2. Validación de acceso exclusivo a personal interno
+    const userEmail = user.email || '';
+    const userMetaRole = (user.user_metadata?.role || user.app_metadata?.role || user.user_metadata?.doctor_type || '').toLowerCase();
+    let isInternal = ADMIN_EMAILS.includes(userEmail) || INTERNAL_ROLES.includes(userMetaRole);
 
-        if (attr.full_name)     updatePayload.full_name     = attr.full_name;
-        if (attr.phone)         updatePayload.phone         = attr.phone;
-        if (channel)            updatePayload.acquisition_channel = channel;
-        if (attr.qr_code_id || attr.qr) updatePayload.qr_code_id = attr.qr_code_id || attr.qr;
-        if (attr.utm_source)    updatePayload.utm_source     = attr.utm_source;
-        if (attr.utm_medium)    updatePayload.utm_medium     = attr.utm_medium;
-        if (attr.utm_campaign)  updatePayload.utm_campaign   = attr.utm_campaign;
-        if (attr.utm_content)   updatePayload.utm_content    = attr.utm_content;
+    if (!isInternal) {
+      const { data: profile } = await supabase
+        .from('users')
+        .select('role, doctor_type')
+        .eq('id', user.id)
+        .maybeSingle();
 
-        if (attr.branch_name)   updatePayload.branch_name    = attr.branch_name;
-        if (attr.branch_id)     updatePayload.branch_id      = attr.branch_id;
-        if (attr.tenant_id)     updatePayload.tenant_id      = attr.tenant_id;
-
-        // Resolver referidor directo por ID o por código AUD-XXXXX / ref param
-        let finalReferrerId = attr.referrer_id || null;
-        const refCandidate = attr.referrer_code || attr.ref;
-
-        if (!finalReferrerId && refCandidate) {
-          const { data: referrer } = await supabase
-            .from('patients')
-            .select('id')
-            .eq('referral_code', refCandidate.toUpperCase())
-            .maybeSingle();
-
-          if (referrer?.id) {
-            finalReferrerId = referrer.id;
-          }
-        }
-
-        if (finalReferrerId) {
-          updatePayload.referrer_id = finalReferrerId;
-          try {
-            await supabase.rpc('increment_referral_count', { referrer: finalReferrerId });
-          } catch {}
-
-          // Si viene parentesco o red familiar, insertar relación
-          if (attr.relationship_type) {
-            try {
-              await supabase.from('family_relationships').insert({
-                patient_id: finalReferrerId,
-                related_patient_id: user.id,
-                relationship_type: attr.relationship_type,
-                notes: `Vinculado en Google OAuth (${attr.relationship_type})`
-              });
-            } catch {}
-          }
-        }
-
-        if (attr.referrer_name && !updatePayload.referrer_id) {
-          updatePayload.referrer_name = attr.referrer_name;
-        }
-
-        // Determinar estado de atribución ('completed' vs 'pending_review')
-        const isAttributed = Boolean(
-          channel ||
-          attr.qr_code_id ||
-          attr.qr ||
-          updatePayload.referrer_id ||
-          attr.referrer_name
-        );
-        const attributionStatus = attr.attribution_status || (isAttributed ? 'completed' : 'pending_review');
-        updatePayload.attribution_status = attributionStatus;
-
-        // Upsert en patients (usando auth user id como referencia de email)
-        const { error: upsertError } = await supabase
-          .from('patients')
-          .upsert(
-            { ...updatePayload, auth_user_id: user.id },
-            { onConflict: 'auth_user_id', ignoreDuplicates: false }
-          );
-
-        if (upsertError) {
-          console.warn('[auth/callback] No se pudo guardar atribución en patients:', upsertError.message);
-        }
-
-        // Sincronizar también con tabla users (perfiles)
-        try {
-          await supabase.from('users').update({
-            full_name: updatePayload.full_name || user.user_metadata?.full_name || user.user_metadata?.name,
-            phone: updatePayload.phone,
-            acquisition_channel: channel,
-            referrer_name: updatePayload.referrer_name,
-            qr_code_id: updatePayload.qr_code_id,
-            branch_id: updatePayload.branch_id,
-            branch_name: updatePayload.branch_name,
-            attribution_status: attributionStatus,
-          }).eq('id', user.id);
-        } catch {
-          // Soporte opcional si tabla users no tiene todas las columnas
+      if (profile) {
+        const dbRole = (profile.role || profile.doctor_type || '').toLowerCase();
+        if (INTERNAL_ROLES.includes(dbRole)) {
+          isInternal = true;
         }
       }
-    } catch (err) {
-      console.warn('[auth/callback] Error procesando atribución (no crítico):', err);
+    }
+
+    // Si el usuario no es personal interno autorizado, cerrar sesión y rechazar
+    if (!isInternal) {
+      await supabase.auth.signOut();
+      return NextResponse.redirect(`${origin}/auth/login?error=acceso_denegado_personal_interno`);
     }
   }
 

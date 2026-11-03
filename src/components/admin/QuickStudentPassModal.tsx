@@ -22,8 +22,7 @@ interface QuickStudentPassModalProps {
 
 const BRANCHES = [
   { id: 'balbuena', name: 'Sucursal Balbuena (Matriz)' },
-  { id: 'guadalupe-chalma', name: 'Sucursal Guadalupe Chalma' },
-  { id: 'colonia-roma', name: 'Sucursal Colonia Roma' }
+  { id: 'guadalupe-chalma', name: 'Sucursal Chalma de Guadalupe' }
 ]
 
 export function QuickStudentPassModal({ isOpen, onClose, onSuccess }: QuickStudentPassModalProps) {

@@ -32,7 +32,10 @@ export async function updateSession(request: NextRequest) {
             request,
           });
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, {
+              ...options,
+              maxAge: 43200, // 12 horas de jornada laboral activa (Audenti 2027)
+            })
           );
         },
       },

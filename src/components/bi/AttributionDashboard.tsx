@@ -157,8 +157,7 @@ export function AttributionDashboard() {
 
         const map: Record<string, { pacientes: Set<string>; transacciones: number; ingresos: number; egresos: number }> = {
           'Sucursal Balbuena (Matriz)': { pacientes: new Set(), transacciones: 0, ingresos: 0, egresos: 0 },
-          'Sucursal Guadalupe Chalma': { pacientes: new Set(), transacciones: 0, ingresos: 0, egresos: 0 },
-          'Sucursal Colonia Roma': { pacientes: new Set(), transacciones: 0, ingresos: 0, egresos: 0 },
+          'Sucursal Chalma de Guadalupe': { pacientes: new Set(), transacciones: 0, ingresos: 0, egresos: 0 },
         }
 
         const patientMap: Record<string, string> = {}

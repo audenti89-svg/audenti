@@ -1255,17 +1255,8 @@ export default function LandingPage() {
               <div className="relative z-10 flex items-center gap-3">
                 <div className="w-3.5 h-3.5 rounded-full bg-blue-400 ring-4 ring-blue-400/20" />
                 <div>
-                  <h4 className="text-xs font-bold text-white">Sede Norte — Guadalupe Chalma</h4>
-                  <p className="text-[11px] text-slate-400">Av. Morelos 144, Gustavo A. Madero</p>
-                </div>
-              </div>
-
-              {/* Punto Roma */}
-              <div className="relative z-10 flex items-center gap-3">
-                <div className="w-3.5 h-3.5 rounded-full bg-emerald-400 ring-4 ring-emerald-400/20" />
-                <div>
-                  <h4 className="text-xs font-bold text-white">Sede Poniente — Colonia Roma Norte</h4>
-                  <p className="text-[11px] text-slate-400">Álvaro Obregón 180, Cuauhtémoc (Próxima Apertura)</p>
+                  <h4 className="text-xs font-bold text-white">Sede Norte — Chalma de Guadalupe</h4>
+                  <p className="text-[11px] text-slate-400">Av. Guadalupe Victoria 45, Gustavo A. Madero</p>
                 </div>
               </div>
 

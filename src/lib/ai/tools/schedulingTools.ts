@@ -180,7 +180,7 @@ export async function executeConciergeTool(name: string, args: Record<string, an
           ? 'A partir de 2027: Lunes a Sábado exclusivamente Turno Vespertino (16:00 a 21:00 hrs) y Domingos según agenda.'
           : 'Noviembre y Diciembre 2026: Horario normal de atención (09:00 a 20:00 hrs).',
         sedeInfo: branch.toLowerCase().includes('balbuena')
-          ? 'Sede Balbuena activa (con próxima mudanza a Colonia Roma)'
+          ? 'Sede Balbuena (Matriz) activa con normalidad'
           : 'Sede Chalma de Guadalupe activa con normalidad'
       };
     }

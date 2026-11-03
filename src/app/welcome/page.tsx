@@ -41,7 +41,7 @@ export default function LandingPresentationPage() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
   const [isInstallable, setIsInstallable] = useState(false)
   const [installed, setInstalled] = useState(false)
-  const [activeBranchTab, setActiveBranchTab] = useState<'balbuena' | 'guadalupe' | 'roma'>('balbuena')
+  const [activeBranchTab, setActiveBranchTab] = useState<'balbuena' | 'guadalupe'>('balbuena')
 
   useEffect(() => {
     const handleBeforeInstall = (e: any) => {
@@ -127,7 +127,7 @@ export default function LandingPresentationPage() {
       mapUrl: 'https://maps.google.com/?q=Jardin+Balbuena+CDMX',
     },
     guadalupe: {
-      name: 'Sucursal Guadalupe Chalma',
+      name: 'Sucursal Chalma de Guadalupe',
       doctor: 'Dra. Aura Estudillo — Dirección Médica General',
       address: 'Av. Morelos 144, Guadalupe Chalma, Gustavo A. Madero, CDMX',
       phone: '+52 55 5306 9920',
@@ -135,16 +135,6 @@ export default function LandingPresentationPage() {
       facilities: 'Quirófano Odontológico Esterilizado • Gabinete Quirúrgico para Cirugías e Implantes',
       badge: 'Unidad Quirúrgica Activa',
       mapUrl: 'https://maps.google.com/?q=Guadalupe+Chalma+Gustavo+A+Madero',
-    },
-    roma: {
-      name: 'Sucursal Colonia Roma',
-      doctor: 'Dra. Gutiérrez Morales — Dirección Clínica Local',
-      address: 'Álvaro Obregón / Insurgentes Sur, Col. Roma Norte, Cuauhtémoc, CDMX',
-      phone: '+52 55 5922 4110',
-      hours: 'Lunes a Sábado: 16:00 - 21:00 hrs (Turno Vespertino) | Domingos según agenda',
-      facilities: '3 Sillones Ergonómicos de Última Generación • Escáner Intraoral 3D • Centro de Estética',
-      badge: 'Próxima Apertura • Preventa VIP',
-      mapUrl: 'https://maps.google.com/?q=Roma+Norte+CDMX',
     },
   }
 
@@ -450,17 +440,7 @@ export default function LandingPresentationPage() {
                   : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
               }`}
             >
-              Guadalupe Chalma
-            </button>
-            <button
-              onClick={() => setActiveBranchTab('roma')}
-              className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
-                activeBranchTab === 'roma'
-                  ? 'bg-amber-400 text-slate-950 shadow-md'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
-              }`}
-            >
-              Colonia Roma (Próximamente)
+              Chalma de Guadalupe
             </button>
           </div>
 

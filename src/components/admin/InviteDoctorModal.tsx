@@ -22,8 +22,7 @@ interface InviteDoctorModalProps {
 
 const BRANCHES = [
   { id: 'balbuena', name: 'Sucursal Balbuena (Matriz)' },
-  { id: 'guadalupe-chalma', name: 'Sucursal Guadalupe Chalma' },
-  { id: 'colonia-roma', name: 'Sucursal Colonia Roma' }
+  { id: 'guadalupe-chalma', name: 'Sucursal Chalma de Guadalupe' }
 ]
 
 export function InviteDoctorModal({ isOpen, onClose, onSuccess }: InviteDoctorModalProps) {

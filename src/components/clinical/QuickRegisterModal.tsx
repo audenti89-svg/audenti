@@ -18,8 +18,7 @@ import { useBranchStore, BranchId, BRANCHES_DATA } from '@/stores/branchStore'
 // Lista de sucursales disponibles para la selección del paciente con UUIDs de tenant:
 export const BRANCHES = [
   { id: '00000000-0000-0000-0000-000000000001', code: 'balbuena', name: 'Sucursal Balbuena (Matriz)' },
-  { id: '00000000-0000-0000-0000-000000000002', code: 'guadalupe-chalma', name: 'Sucursal Guadalupe Chalma' },
-  { id: '00000000-0000-0000-0000-000000000003', code: 'colonia-roma', name: 'Sucursal Colonia Roma' },
+  { id: '00000000-0000-0000-0000-000000000002', code: 'guadalupe-chalma', name: 'Sucursal Chalma de Guadalupe' },
 ];
 export const branches = BRANCHES; // Compatibilidad
 
