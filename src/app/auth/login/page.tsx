@@ -19,6 +19,26 @@ function LoginForm() {
   const [errorMsg, setErrorMsg] = useState('');
   const [loginMode, setLoginMode] = useState<'both'>('both');
 
+  // Redirección inmediata si ya existe sesión activa
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user && mounted) {
+        const userEmail = (user.email || '').toLowerCase();
+        const userMetaRole = (user.user_metadata?.role || user.app_metadata?.role || '').toLowerCase();
+        const INTERNAL_ROLES = ['owner', 'admin', 'director', 'doctor', 'socio', 'trabajador', 'pasante', 'estudiante'];
+        if (userEmail === 'audenti89@gmail.com' || INTERNAL_ROLES.includes(userMetaRole)) {
+          window.location.replace('/dashboard');
+        } else {
+          window.location.replace('/portal');
+        }
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [supabase]);
+
   useEffect(() => {
     // Captura de atribución si viniera en URL
     const utmKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'ref', 'canal', 'qr'];
@@ -126,7 +146,7 @@ function LoginForm() {
         }
 
         if (isInternal) {
-          router.push('/dashboard');
+          window.location.href = '/dashboard';
         } else {
           // Si el usuario autenticado es un paciente, redirigir automáticamente a su portal
           try {
@@ -134,12 +154,17 @@ function LoginForm() {
               user_id: data.user.id,
               email: data.user.email,
               full_name: data.user.user_metadata?.full_name || 'Paciente Audenti',
+              status: 'active',
               onboarding_completed: true
             });
+            await supabase
+              .from('users')
+              .update({ is_active: true, onboarding_completed: true })
+              .eq('id', data.user.id);
           } catch (linkErr) {
             console.warn('Nota safeUpsertPatient en auth login:', linkErr);
           }
-          router.push('/portal');
+          window.location.href = '/portal';
         }
       }
     } catch (err: any) {

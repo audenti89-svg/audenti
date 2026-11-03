@@ -123,12 +123,22 @@ export async function updateSession(request: NextRequest) {
     const userEmail = user.email || '';
     const isAdmin = ADMIN_EMAILS.includes(userEmail) || isStaffOrOwner;
 
-    // Si NO es personal clínico (es paciente) y está intentando entrar al dashboard o admin:
+    // Si NO es personal clínico (es paciente):
     if (!isAdmin) {
+      // 1. Si intenta acceder al dashboard interno, redirigir a su portal
       if (isDashboardRoute || isAdminRoute || isPatientsRoute) {
         redirectUrl.pathname = '/portal';
         return NextResponse.redirect(redirectUrl);
       }
+
+      // 2. Si ya está autenticado e intenta entrar a login, activación u onboarding, enviarlo directo a su portal
+      if (isAuthRoute || isOnboardingRoute) {
+        redirectUrl.pathname = '/portal';
+        return NextResponse.redirect(redirectUrl);
+      }
+
+      // 3. Permitir acceso directo y fluido a /portal sin bucles
+      return supabaseResponse;
     }
 
     if (isAdmin) {
@@ -173,34 +183,12 @@ export async function updateSession(request: NextRequest) {
         return NextResponse.redirect(redirectUrl);
       }
 
-      // Si está en auth o onboarding, enviar al dashboard
+      // Si el personal interno está en login u onboarding, enviar a su panel operativo
       if (isAuthRoute || isOnboardingRoute) {
         redirectUrl.pathname = '/dashboard';
         return NextResponse.redirect(redirectUrl);
       }
       return supabaseResponse;
-    }
-
-    // Para pacientes: verificar registro médico en la tabla `patients` usando FK real `user_id`
-    const { data: patient } = await supabase
-      .from('patients')
-      .select('id')
-      .or(`id.eq.${user.id},user_id.eq.${user.id},email.eq.${user.email}`)
-      .maybeSingle();
-
-    const hasPatientRecord = !!patient;
-    const hasCompletedOnboarding = hasPatientRecord;
-
-    // Si es paciente nuevo sin expediente y va a rutas protegidas -> redirigir a /onboarding
-    if (!hasPatientRecord && (isDashboardRoute || redirectUrl.pathname.startsWith('/portal') || redirectUrl.pathname.startsWith('/mi-expediente'))) {
-      redirectUrl.pathname = '/onboarding';
-      return NextResponse.redirect(redirectUrl);
-    }
-
-    // Si ya tiene perfil o completó el onboarding e intenta entrar a login u onboarding -> redirigir a /portal
-    if (hasPatientRecord && (isAuthRoute || isOnboardingRoute)) {
-      redirectUrl.pathname = '/portal';
-      return NextResponse.redirect(redirectUrl);
     }
   }
 

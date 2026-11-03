@@ -162,8 +162,13 @@ export async function GET(request: Request) {
         email: user.email,
         full_name: user.user_metadata?.full_name || user.user_metadata?.name || 'Paciente Audenti',
         branch_name: 'Sucursal Balbuena (Matriz)',
+        status: 'active',
         onboarding_completed: true
       });
+      await supabase
+        .from('users')
+        .update({ is_active: true, onboarding_completed: true })
+        .eq('id', user.id);
     } catch (upsertErr) {
       console.warn('[auth/callback] Error en safeUpsertPatient portal:', upsertErr);
     }

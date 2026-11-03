@@ -101,6 +101,21 @@ function PatientLoginForm() {
     phone?: string;
   } | null>(null);
 
+  // 0. AUTO-REDIRECCIÓN: Si el usuario ya cuenta con sesión activa en Supabase,
+  // validar inmediatamente y redirigir sin mostrar bucles de login o activación.
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (user && mounted) {
+        const target = await determineTargetRoute(supabase, user);
+        window.location.replace(target);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [supabase]);
+
   // Sincronizar parámetro URL (?mode=activate o ?mode=register)
   useEffect(() => {
     const modeParam = searchParams.get('mode');
@@ -174,7 +189,7 @@ function PatientLoginForm() {
     }
   };
 
-  // 2. INICIAR SESIÓN CON CREDENCIALES (REDIRECCIÓN AUTOMÁTICA SEGÚN ROL)
+  // 2. INICIAR SESIÓN CON CREDENCIALES (REDIRECCIÓN AUTOMÁTICA SIN BUCLES)
   const handlePatientLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginEmailOrPhone.trim() || !loginPassword.trim()) {
@@ -217,22 +232,33 @@ function PatientLoginForm() {
         // Redirección inteligente según el rol del usuario
         const targetRoute = await determineTargetRoute(supabase, data.user);
 
+        // Asegurar que el estado en la base de datos se marque como active / is_active: true
+        try {
+          await supabase
+            .from('users')
+            .update({ is_active: true, onboarding_completed: true })
+            .eq('id', data.user.id);
+        } catch (uErr) {
+          console.warn('Nota actualización is_active en users:', uErr);
+        }
+
         if (targetRoute === '/dashboard') {
-          // Si el usuario es un Odontólogo/Socio/Pasante/Admin, redirigir a la vista operativa
-          router.push('/dashboard');
+          // Si el usuario es un Odontólogo/Socio/Pasante/Admin, redirigir a dashboard
+          window.location.href = '/dashboard';
         } else {
-          // Si es paciente, ejecutar Upsert seguro y redirigir al portal
+          // Si es paciente, asegurar status: active y redirigir directamente al portal
           try {
             await safeUpsertPatient(supabase, {
               user_id: data.user.id,
               email: data.user.email,
               full_name: data.user.user_metadata?.full_name || 'Paciente Audenti',
+              status: 'active',
               onboarding_completed: true
             });
           } catch (linkErr) {
             console.warn('Nota safeUpsertPatient en login:', linkErr);
           }
-          router.push('/portal');
+          window.location.href = '/portal';
         }
       }
     } catch (err: any) {
@@ -244,7 +270,7 @@ function PatientLoginForm() {
     }
   };
 
-  // 3. REGISTRARME / ACTIVAR CUENTA (PRIMER ACCESO CON LÓGICA UPSERT)
+  // 3. REGISTRARME / ACTIVAR CUENTA (AUTO-LOGIN SI YA EXISTE, SIN BUCLES INFINITOS)
   const handleActivateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -288,20 +314,51 @@ function PatientLoginForm() {
         },
       });
 
-      // Si el correo ya tiene usuario de Auth, avisar al usuario
+      // Si el correo ya tiene usuario de Auth, ELIMINAR EL BUCLE:
+      // Iniciar sesión inmediatamente con la contraseña proporcionada
       if (authError) {
-        if (authError.message?.toLowerCase().includes('already registered') || 
-            authError.message?.toLowerCase().includes('already in use')) {
-          setErrorMsg('Este correo ya cuenta con usuario activo. Puedes iniciar sesión directamente con tu contraseña o recuperarla si la olvidaste.');
+        if (
+          authError.message?.toLowerCase().includes('already registered') || 
+          authError.message?.toLowerCase().includes('already in use')
+        ) {
+          const { data: autoLogin, error: autoLoginErr } = await supabase.auth.signInWithPassword({
+            email: cleanEmail,
+            password: actPassword.trim(),
+          });
+
+          if (!autoLoginErr && autoLogin?.user) {
+            setSuccessMsg('¡Bienvenido! Tu cuenta ya estaba registrada. Redirigiendo a tu expediente dental...');
+            try {
+              await safeUpsertPatient(supabase, {
+                user_id: autoLogin.user.id,
+                email: cleanEmail,
+                status: 'active',
+                onboarding_completed: true,
+              });
+              await supabase
+                .from('users')
+                .update({ is_active: true, onboarding_completed: true })
+                .eq('id', autoLogin.user.id);
+            } catch {}
+
+            const target = await determineTargetRoute(supabase, autoLogin.user);
+            setTimeout(() => {
+              window.location.href = target;
+            }, 500);
+            return;
+          }
+
+          // Si la contraseña no coincidió con la de Auth, alternar a Iniciar Sesión limpiamente
+          setErrorMsg('Este correo ya cuenta con usuario activo. Ingresa tu contraseña en la pestaña "Iniciar Sesión" para acceder.');
           setLoginEmailOrPhone(cleanEmail);
+          setMode('login');
           setLoadingActivate(false);
           return;
         }
         throw authError;
       }
 
-      // B) Aplicar Upsert Seguro en la tabla `patients`
-      // Si el paciente ya fue registrado en recepción por la Dra. Aura, se actualiza sin duplicar
+      // B) Aplicar Upsert Seguro en la tabla `patients` con status: active
       const targetUserId = authData?.user?.id || null;
       await safeUpsertPatient(supabase, {
         user_id: targetUserId,
@@ -310,22 +367,44 @@ function PatientLoginForm() {
         phone: cleanPhone || existingMatch?.phone || null,
         tenant_id: selectedBranchObj.id,
         branch_name: selectedBranchObj.name,
+        status: 'active',
         onboarding_completed: true,
       });
 
-      // C) Si se obtuvo sesión inmediata, redirigir al portal
+      if (targetUserId) {
+        try {
+          await supabase
+            .from('users')
+            .update({ is_active: true, onboarding_completed: true })
+            .eq('id', targetUserId);
+        } catch {}
+      }
+
+      // C) Si se obtuvo sesión inmediata o si iniciamos sesión con la clave provista
       if (authData?.session) {
         setSuccessMsg('¡Cuenta activada con éxito! Redirigiendo a tu expediente dental...');
         setTimeout(() => {
-          router.push('/portal');
-        }, 1200);
+          window.location.href = '/portal';
+        }, 600);
       } else {
-        // En caso de requerir confirmación por correo
-        setSuccessMsg('¡Cuenta registrada exitosamente! Revisa tu correo o inicia sesión con tu nueva contraseña para ingresar a tu expediente.');
-        setLoginEmailOrPhone(cleanEmail);
-        setTimeout(() => {
-          setMode('login');
-        }, 2500);
+        // Autologin de confirmación inmediata
+        const { data: directLogin } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password: actPassword.trim(),
+        });
+
+        if (directLogin?.session) {
+          setSuccessMsg('¡Cuenta activada con éxito! Redirigiendo a tu expediente dental...');
+          setTimeout(() => {
+            window.location.href = '/portal';
+          }, 600);
+        } else {
+          setSuccessMsg('¡Cuenta registrada exitosamente! Inicia sesión con tus datos para ingresar a tu expediente.');
+          setLoginEmailOrPhone(cleanEmail);
+          setTimeout(() => {
+            setMode('login');
+          }, 1500);
+        }
       }
     } catch (err: any) {
       console.error('Error al activar cuenta de paciente:', err);

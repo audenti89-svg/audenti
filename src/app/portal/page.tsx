@@ -318,7 +318,7 @@ export default function PatientPortalPage() {
         const { data: { user: authUser } } = await supabase.auth.getUser();
 
         if (!authUser) {
-          router.push('/portal/login');
+          window.location.href = '/portal/login';
           return;
         }
 
@@ -344,10 +344,16 @@ export default function PatientPortalPage() {
             myProfile = emailProfile;
             await supabase
               .from('patients')
-              .update({ user_id: authUser.id })
+              .update({ user_id: authUser.id, status: 'active' })
               .eq('id', emailProfile.id);
           }
         }
+
+        // Asegurar status activo en tabla users y patients para evitar bloqueos
+        if (myProfile && myProfile.status !== 'active') {
+          supabase.from('patients').update({ status: 'active' }).eq('id', myProfile.id).then(() => {});
+        }
+        supabase.from('users').update({ is_active: true, onboarding_completed: true }).eq('id', authUser.id).then(() => {});
 
         setPatient(myProfile);
 
@@ -371,8 +377,7 @@ export default function PatientPortalPage() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    router.push('/portal/login');
-    router.refresh();
+    window.location.href = '/portal/login';
   };
 
   // Sucursal asignada al paciente

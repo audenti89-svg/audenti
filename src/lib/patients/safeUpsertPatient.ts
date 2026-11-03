@@ -132,12 +132,15 @@ export async function safeUpsertPatient(
     }
   }
 
-  // Si se envió estado de onboarding y se tiene user_id, sincronizar en la tabla `users`
-  if (targetUserId && patientData.onboarding_completed !== undefined) {
+  // Si se envió estado de onboarding o se tiene user_id, sincronizar en la tabla `users` con is_active: true
+  if (targetUserId) {
     try {
       await supabase
         .from('users')
-        .update({ onboarding_completed: patientData.onboarding_completed })
+        .update({
+          is_active: true,
+          onboarding_completed: patientData.onboarding_completed ?? true
+        })
         .eq('id', targetUserId);
     } catch {}
   }
@@ -201,6 +204,8 @@ export async function safeUpsertPatient(
     if (patientData.attribution_status) {
       updatePayload.attribution_status = patientData.attribution_status;
     }
+    // Asegurar estado activo en base de datos para evitar bloqueos
+    updatePayload.status = patientData.status || existingPatient.status || 'active';
 
     if (extraNotes || patientData.notes) {
       const currentNotes = existingPatient.notes || '';
