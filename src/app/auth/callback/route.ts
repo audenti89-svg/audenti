@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { safeUpsertPatient } from '@/lib/patients/safeUpsertPatient';
+import { isSystemAdminEmail, isInternalUser, ADMIN_EMAILS, INTERNAL_ROLES } from '@/lib/auth/admin-emails';
 
 // ────────────────────────────────────────────────────────────
 // Helper: decodificar estado de atribución del parámetro state
@@ -22,9 +23,6 @@ function normalizeChannel(raw: string): string | null {
   const lower = raw?.toLowerCase()?.trim();
   return VALID_CHANNELS.includes(lower) ? lower : null;
 }
-
-const ADMIN_EMAILS = ['audenti89@gmail.com'];
-const INTERNAL_ROLES = ['owner', 'admin', 'director', 'doctor', 'socio', 'trabajador', 'pasante', 'estudiante'];
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
@@ -132,21 +130,23 @@ export async function GET(request: Request) {
     // 2. Validación y enrutamiento inteligente según rol (Audenti 2027)
     const userEmail = (user.email || '').toLowerCase().trim();
     const userMetaRole = (user.user_metadata?.role || user.app_metadata?.role || user.user_metadata?.doctor_type || '').toLowerCase();
-    let isInternal = ADMIN_EMAILS.includes(userEmail) || INTERNAL_ROLES.includes(userMetaRole);
+    let isInternal = isSystemAdminEmail(userEmail) || isInternalUser(userEmail, userMetaRole);
 
     if (!isInternal) {
-      const { data: profile } = await supabase
-        .from('users')
-        .select('role, doctor_type')
-        .eq('id', user.id)
-        .maybeSingle();
+      try {
+        const { data: profile } = await supabase
+          .from('users')
+          .select('role, doctor_type')
+          .eq('id', user.id)
+          .maybeSingle();
 
-      if (profile) {
-        const dbRole = (profile.role || profile.doctor_type || '').toLowerCase();
-        if (INTERNAL_ROLES.includes(dbRole)) {
-          isInternal = true;
+        if (profile) {
+          const dbRole = (profile.role || profile.doctor_type || '').toLowerCase();
+          if (isInternalUser(userEmail, dbRole)) {
+            isInternal = true;
+          }
         }
-      }
+      } catch {}
     }
 
     // A) Personal Clínico (Doctores, Socios, Pasantes, Directores, Administradores):

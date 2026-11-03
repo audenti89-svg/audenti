@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { ImmuneSystem } from '@/lib/security/immune-system';
+import { isSystemAdminEmail, isInternalUser } from '@/lib/auth/admin-emails';
 
 export async function updateSession(request: NextRequest) {
   // ── ESCUDO INMUNOLÓGICO Y ANTI-HACKEO (CIBERSEGURIDAD IA) ──
@@ -78,54 +79,40 @@ export async function updateSession(request: NextRequest) {
 
   // 2. Si hay usuario autenticado, verificar su rol y registro
   if (user) {
-    // Lista de correos administradores / dueños del sistema (Dra. Aura Estudillo)
-    const isSuperAdmin = user.email === 'audenti89@gmail.com';
+    const userEmail = (user.email || '').toLowerCase().trim();
+    // Lista de correos administradores / dueños del sistema (Ricardo Sánchez y Dra. Aura Estudillo)
+    const isSuperAdmin = isSystemAdminEmail(userEmail);
 
     // 1. Leer rol prioritariamente desde los Claims del JWT
     const jwtRole = user.app_metadata?.user_role || user.app_metadata?.role || user.user_metadata?.role;
 
-    let isStaffOrOwner =
-      isSuperAdmin ||
-      jwtRole === 'owner' ||
-      jwtRole === 'admin' ||
-      jwtRole === 'director' ||
-      jwtRole === 'doctor' ||
-      jwtRole === 'socio' ||
-      jwtRole === 'trabajador';
-
+    let isStaffOrOwner = isSuperAdmin || isInternalUser(userEmail, jwtRole);
     let userRole = jwtRole;
     let doctorType: string | undefined = undefined;
     let studentExpiresAt: string | undefined = undefined;
 
-    // 2. Consultar perfil en tabla users para permisos granulares y expiración
-    const { data: userProfile } = await supabase
-      .from('users')
-      .select('role, doctor_type, student_expires_at, onboarding_completed')
-      .eq('id', user.id)
-      .maybeSingle();
+    // 2. Consultar perfil en tabla users para permisos granulares (con tolerancia si la tabla falla)
+    try {
+      const { data: userProfile } = await supabase
+        .from('users')
+        .select('role, doctor_type, student_expires_at, onboarding_completed')
+        .eq('id', user.id)
+        .maybeSingle();
 
-    if (userProfile) {
-      userRole = userProfile.role || userRole;
-      doctorType = userProfile.doctor_type;
-      studentExpiresAt = userProfile.student_expires_at;
+      if (userProfile) {
+        userRole = userProfile.role || userRole;
+        doctorType = userProfile.doctor_type;
+        studentExpiresAt = userProfile.student_expires_at;
 
-      isStaffOrOwner =
-        isSuperAdmin ||
-        userProfile.role === 'owner' ||
-        userProfile.role === 'admin' ||
-        userProfile.role === 'director' ||
-        userProfile.role === 'doctor' ||
-        userProfile.role === 'socio' ||
-        userProfile.role === 'trabajador' ||
-        userProfile.doctor_type === 'socio' ||
-        userProfile.doctor_type === 'trabajador' ||
-        userProfile.doctor_type === 'estudiante';
-    }
+        isStaffOrOwner =
+          isSuperAdmin ||
+          isInternalUser(userEmail, userProfile.role) ||
+          isInternalUser(userEmail, userProfile.doctor_type);
+      }
+    } catch {}
 
     // REGLA CLAVE: Validación estricta de personal clínico vs pacientes
-    const ADMIN_EMAILS = ['audenti89@gmail.com'];
-    const userEmail = user.email || '';
-    const isAdmin = ADMIN_EMAILS.includes(userEmail) || isStaffOrOwner;
+    const isAdmin = isSuperAdmin || isStaffOrOwner;
 
     // Si NO es personal clínico (es paciente):
     if (!isAdmin) {

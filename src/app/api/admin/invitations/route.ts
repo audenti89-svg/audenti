@@ -3,7 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import crypto from 'crypto'
 
 // Lista de correos administradores
-const ADMIN_EMAILS = ['audenti89@gmail.com']
+const ADMIN_EMAILS = ['audenti89@gmail.com', 'rricardos76@gmail.com', 'pruevaz2022@gmail.com', 'ricardo@audenti.com']
 
 // ── GET: Listar invitaciones a odontólogos ──────────────────────
 export async function GET(req: NextRequest) {

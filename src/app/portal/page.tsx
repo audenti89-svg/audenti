@@ -37,6 +37,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import PatientOdontogram from '@/components/PatientOdontogram';
 import { UnifiedCommunicationWidget } from '@/components/chat/UnifiedCommunicationWidget';
+import { isSystemAdminEmail } from '@/lib/auth/admin-emails';
 
 // ── SUCURSALES OFICIALES AUDENTI (CANÓNICAS) ──
 const BRANCH_DETAILS: Record<string, {
@@ -496,6 +497,16 @@ export default function PatientPortalPage() {
         </div>
 
         <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+          {isSystemAdminEmail(user?.email) && (
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-all shadow-md shadow-amber-400/20"
+              title="Volver al Panel Clínico / Dashboard"
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              <span>Ir a Dashboard</span>
+            </Link>
+          )}
           <div className="text-xs text-slate-300 flex items-center gap-2 bg-slate-900/80 px-3.5 py-1.5 rounded-xl border border-slate-800">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
             <span className="truncate max-w-[200px]">

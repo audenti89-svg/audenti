@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import crypto from 'crypto'
 
-const ADMIN_EMAILS = ['audenti89@gmail.com']
+const ADMIN_EMAILS = ['audenti89@gmail.com', 'rricardos76@gmail.com', 'pruevaz2022@gmail.com', 'ricardo@audenti.com']
 
 // ── GET: Listar pases de estudiantes / servicio social ─────────
 export async function GET(req: NextRequest) {

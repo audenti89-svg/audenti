@@ -133,11 +133,11 @@ export default function ExpedientePage() {
           resolvedRole = 'pasante'
         } else if (rawRole === 'trabajador' || rawRole === 'doctor' || rawRole === 'asistente') {
           resolvedRole = 'trabajador'
-        } else if (email === 'audenti89@gmail.com' || rawRole === 'owner' || rawRole === 'admin' || rawRole === 'socio') {
+        } else if (email === 'audenti89@gmail.com' || email === 'rricardos76@gmail.com' || email === 'pruevaz2022@gmail.com' || rawRole === 'owner' || rawRole === 'admin' || rawRole === 'socio' || rawRole === 'superadmin') {
           resolvedRole = 'socio'
         }
 
-        const name = user.user_metadata?.full_name || user.user_metadata?.name || (resolvedRole === 'socio' ? 'Dra. Aura Estudillo' : 'Dr. Clínico Audenti')
+        const name = user.user_metadata?.full_name || user.user_metadata?.name || (email === 'rricardos76@gmail.com' || email === 'pruevaz2022@gmail.com' ? 'Ricardo Sánchez (Arquitecto)' : (resolvedRole === 'socio' ? 'Dra. Aura Estudillo' : 'Dr. Clínico Audenti'))
         setDoctorProfile({
           name,
           role: resolvedRole,

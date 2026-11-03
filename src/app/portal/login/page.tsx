@@ -23,6 +23,7 @@ import {
   EyeOff
 } from 'lucide-react';
 import { AudentiLogo } from '@/components/ui/AudentiLogo';
+import { isSystemAdminEmail, isInternalUser } from '@/lib/auth/admin-emails';
 
 // Sucursales activas autorizadas en Audenti 2027
 const BRANCH_OPTIONS = [
@@ -35,12 +36,12 @@ const INTERNAL_ROLES = ['owner', 'admin', 'director', 'doctor', 'socio', 'trabaj
 // Determina automáticamente el destino post-login según el rol
 async function determineTargetRoute(supabaseClient: any, authUser: any): Promise<string> {
   const userEmail = (authUser.email || '').toLowerCase().trim();
-  if (userEmail === 'audenti89@gmail.com') {
+  if (isSystemAdminEmail(userEmail)) {
     return '/dashboard';
   }
 
   const metaRole = (authUser.user_metadata?.role || authUser.app_metadata?.role || '').toLowerCase().trim();
-  if (INTERNAL_ROLES.includes(metaRole)) {
+  if (isInternalUser(userEmail, metaRole)) {
     return '/dashboard';
   }
 
@@ -53,7 +54,7 @@ async function determineTargetRoute(supabaseClient: any, authUser: any): Promise
 
     if (profile) {
       const dbRole = (profile.role || profile.doctor_type || '').toLowerCase().trim();
-      if (INTERNAL_ROLES.includes(dbRole)) {
+      if (isInternalUser(userEmail, dbRole)) {
         return '/dashboard';
       }
     }

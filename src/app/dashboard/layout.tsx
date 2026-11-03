@@ -8,10 +8,7 @@ import { Header } from '@/components/layout/Header'
 import { NightEmergencyRedAlertBanner } from '@/components/ai/NightEmergencyRedAlertBanner'
 import { OmnipresentDoctorLiveAlerts } from '@/components/notifications/OmnipresentDoctorLiveAlerts'
 import { InactivityLockout } from '@/components/auth/InactivityLockout'
-
-// Validación estricta de personal clínico interno (Doctores, Socios, Pasantes, Administradores)
-const ADMIN_EMAILS = ['audenti89@gmail.com']
-const INTERNAL_ROLES = ['owner', 'admin', 'director', 'doctor', 'socio', 'trabajador', 'pasante', 'estudiante']
+import { isSystemAdminEmail, isInternalUser as checkIsInternalUser } from '@/lib/auth/admin-emails'
 
 export default function DashboardLayout({
   children,
@@ -34,34 +31,33 @@ export default function DashboardLayout({
         return
       }
 
-      const userEmail = user.email || ''
+      const userEmail = (user.email || '').toLowerCase().trim()
       const userMetaRole = (user.user_metadata?.role || user.app_metadata?.role || user.user_metadata?.doctor_type || '').toLowerCase()
       
-      let isInternalUser =
-        ADMIN_EMAILS.includes(userEmail) ||
-        INTERNAL_ROLES.includes(userMetaRole)
+      // Ricardo Sánchez y Dra. Aura Estudillo tienen acceso irrestricto de SuperAdmin / Dueño
+      let isInternal = isSystemAdminEmail(userEmail) || checkIsInternalUser(userEmail, userMetaRole)
 
       // Si no viene en metadata, verificar en tabla users
-      if (!isInternalUser) {
-        const { data: profile } = await supabase
-          .from('users')
-          .select('role, doctor_type')
-          .eq('id', user.id)
-          .maybeSingle()
+      if (!isInternal) {
+        try {
+          const { data: profile } = await supabase
+            .from('users')
+            .select('role, doctor_type')
+            .eq('id', user.id)
+            .maybeSingle()
 
-        if (profile) {
-          const dbRole = (profile.role || profile.doctor_type || '').toLowerCase()
-          if (INTERNAL_ROLES.includes(dbRole)) {
-            isInternalUser = true
+          if (profile) {
+            const dbRole = (profile.role || profile.doctor_type || '').toLowerCase()
+            if (checkIsInternalUser(userEmail, dbRole)) {
+              isInternal = true
+            }
           }
-        }
+        } catch {}
       }
 
-      // REGLA CLAVE: Acceso exclusivo para personal interno creado previamente por la dirección
-      if (!isInternalUser) {
-        // Cerrar sesión y redirigir con error explícito de personal interno
-        await supabase.auth.signOut()
-        window.location.href = '/auth/login?error=acceso_denegado_personal_interno'
+      // Si definitivamente no es personal interno (es paciente), redirigir a su portal sin cerrar sesión
+      if (!isInternal) {
+        router.push('/portal')
         return
       }
 
@@ -73,7 +69,7 @@ export default function DashboardLayout({
 
   if (!authorized) {
     return (
-      <div className="min-h-screen bg-[#080d19] flex items-center justify-center p-4 text-white">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 text-white">
         <div className="flex flex-col items-center gap-3">
           <div className="w-9 h-9 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
           <p className="text-xs font-semibold text-slate-300">Verificando credenciales de acceso clínico...</p>
@@ -83,7 +79,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-[100dvh] bg-[radial-gradient(circle_at_top_center,_var(--tw-gradient-stops))] from-slate-50 via-slate-100 to-slate-200">
+    <div className="min-h-[100dvh] bg-slate-950 text-slate-100">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="lg:pl-72 flex flex-col min-h-[100dvh]">
         <Header onMenuToggle={() => setSidebarOpen(true)} />

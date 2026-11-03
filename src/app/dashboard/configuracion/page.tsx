@@ -21,6 +21,7 @@ import { createClient } from '@/utils/supabase/client'
 import { StaffDepartment, resolveAutomaticRolePermissions } from '@/lib/auth/roleProvisioning'
 import { InviteDoctorModal } from '@/components/admin/InviteDoctorModal'
 import { QuickStudentPassModal } from '@/components/admin/QuickStudentPassModal'
+import { isSystemAdminEmail } from '@/lib/auth/admin-emails'
 
 export default function ConfiguracionPage() {
   const supabase = createClient()
@@ -55,7 +56,7 @@ export default function ConfiguracionPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         setCurrentUser(user)
-        const isSuper = user.email === 'audenti89@gmail.com'
+        const isSuper = isSystemAdminEmail(user.email)
 
         const { data: profile } = await supabase
           .from('users')

@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/client';
 import { safeUpsertPatient } from '@/lib/patients/safeUpsertPatient';
+import { isSystemAdminEmail, isInternalUser } from '@/lib/auth/admin-emails';
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -26,8 +27,7 @@ function LoginForm() {
       if (user && mounted) {
         const userEmail = (user.email || '').toLowerCase();
         const userMetaRole = (user.user_metadata?.role || user.app_metadata?.role || '').toLowerCase();
-        const INTERNAL_ROLES = ['owner', 'admin', 'director', 'doctor', 'socio', 'trabajador', 'pasante', 'estudiante'];
-        if (userEmail === 'audenti89@gmail.com' || INTERNAL_ROLES.includes(userMetaRole)) {
+        if (isSystemAdminEmail(userEmail) || isInternalUser(userEmail, userMetaRole)) {
           window.location.replace('/dashboard');
         } else {
           window.location.replace('/portal');
@@ -147,25 +147,26 @@ function LoginForm() {
 
       if (data?.user) {
         // Verificar que el usuario tenga rol interno
-        const userEmail = data.user.email || '';
+        const userEmail = (data.user.email || '').toLowerCase().trim();
         const userMetaRole = (data.user.user_metadata?.role || data.user.app_metadata?.role || '').toLowerCase();
-        const INTERNAL_ROLES = ['owner', 'admin', 'director', 'doctor', 'socio', 'trabajador', 'pasante', 'estudiante'];
 
-        let isInternal = userEmail === 'audenti89@gmail.com' || INTERNAL_ROLES.includes(userMetaRole);
+        let isInternal = isSystemAdminEmail(userEmail) || isInternalUser(userEmail, userMetaRole);
 
         if (!isInternal) {
-          const { data: profile } = await supabase
-            .from('users')
-            .select('role, doctor_type')
-            .eq('id', data.user.id)
-            .maybeSingle();
+          try {
+            const { data: profile } = await supabase
+              .from('users')
+              .select('role, doctor_type')
+              .eq('id', data.user.id)
+              .maybeSingle();
 
-          if (profile) {
-            const dbRole = (profile.role || profile.doctor_type || '').toLowerCase();
-            if (INTERNAL_ROLES.includes(dbRole)) {
-              isInternal = true;
+            if (profile) {
+              const dbRole = (profile.role || profile.doctor_type || '').toLowerCase();
+              if (isInternalUser(userEmail, dbRole)) {
+                isInternal = true;
+              }
             }
-          }
+          } catch {}
         }
 
         if (isInternal) {

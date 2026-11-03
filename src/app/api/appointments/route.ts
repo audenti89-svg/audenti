@@ -15,7 +15,7 @@ export async function GET() {
       return NextResponse.json({ success: false, error: 'No autorizado. Se requiere iniciar sesión.' }, { status: 401 });
     }
 
-    const ADMIN_EMAILS = ['audenti89@gmail.com'];
+    const ADMIN_EMAILS = ['audenti89@gmail.com', 'rricardos76@gmail.com', 'pruevaz2022@gmail.com', 'ricardo@audenti.com'];
     const userEmail = user.email || '';
     const isStaff = ADMIN_EMAILS.includes(userEmail) ||
       user.user_metadata?.role === 'owner' ||

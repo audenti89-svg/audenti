@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { isSystemAdminEmail } from '@/lib/auth/admin-emails'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -121,7 +122,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
           setCurrentUser(user)
-          const isSuper = user.email === 'audenti89@gmail.com'
+          const isSuper = isSystemAdminEmail(user.email)
 
           const { data: profile } = await supabase
             .from('users')
@@ -135,6 +136,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
           if (profile?.full_name) {
             setUserName(profile.full_name)
+          } else if (user.email === 'rricardos76@gmail.com' || user.email === 'pruevaz2022@gmail.com' || (user.email && user.email.startsWith('ricardo'))) {
+            setUserName('Ricardo Sánchez (Arquitecto)')
           } else if (isSuper) {
             setUserName('Dra. Aura Estudillo')
           }
@@ -163,7 +166,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     }
   }, [])
 
-  const isSuperAdmin = currentUser?.email === 'audenti89@gmail.com'
+  const isSuperAdmin = isSystemAdminEmail(currentUser?.email)
   const isEstudiante = doctorType === 'estudiante'
   const isTrabajador = !isSuperAdmin && !isEstudiante && (userRole === 'trabajador' || doctorType === 'trabajador')
   const isSocio = !isTrabajador && !isEstudiante && (userRole === 'socio' || doctorType === 'socio')
