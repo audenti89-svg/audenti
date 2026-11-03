@@ -142,25 +142,29 @@ function PatientLoginForm() {
 
     setCheckingRecord(true);
     try {
-      const { data: found } = await supabase
-        .from('patients')
-        .select('id, full_name, phone, tenant_id, branch_name')
-        .ilike('email', clean)
-        .maybeSingle();
+      // Usar endpoint administrativo para evitar bloqueos por RLS y detectar estado real
+      const resp = await fetch(`/api/auth/sync-profile?email=${encodeURIComponent(clean)}`);
+      if (resp.ok) {
+        const res = await resp.json();
+        if (res.patient) {
+          setExistingMatch(res.patient);
+          if (res.patient.full_name && !actFullName) {
+            setActFullName(res.patient.full_name);
+          }
+          if (res.patient.phone && !actPhone) {
+            setActPhone(res.patient.phone);
+          }
+          if (res.patient.tenant_id) {
+            setActBranchId(res.patient.tenant_id);
+          }
+        } else {
+          setExistingMatch(null);
+        }
 
-      if (found) {
-        setExistingMatch(found);
-        if (found.full_name && !actFullName) {
-          setActFullName(found.full_name);
+        if (res.hasAuthUser) {
+          // El usuario ya existe en auth.users
+          setSuccessMsg('¡Usuario registrado detectado! Puedes ingresar directamente con tu contraseña en "Iniciar Sesión".');
         }
-        if (found.phone && !actPhone) {
-          setActPhone(found.phone);
-        }
-        if (found.tenant_id) {
-          setActBranchId(found.tenant_id);
-        }
-      } else {
-        setExistingMatch(null);
       }
     } catch (err) {
       console.warn('Nota comprobación previa de paciente:', err);
@@ -189,7 +193,7 @@ function PatientLoginForm() {
     }
   };
 
-  // 2. INICIAR SESIÓN CON CREDENCIALES (REDIRECCIÓN AUTOMÁTICA SIN BUCLES)
+  // 2. INICIAR SESIÓN CON CREDENCIALES (VINCULACIÓN EXACTA Y REDIRECCIÓN SIN BUCLES)
   const handlePatientLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginEmailOrPhone.trim() || !loginPassword.trim()) {
@@ -221,45 +225,59 @@ function PatientLoginForm() {
         }
       }
 
-      const { data, error } = await supabase.auth.signInWithPassword({
+      let { data, error } = await supabase.auth.signInWithPassword({
         email: loginEmail,
         password: loginPassword.trim(),
       });
 
+      // Si Supabase devuelve "Email not confirmed", auto-confirmar y reintentar de inmediato
+      if (error && error.message?.toLowerCase().includes('email not confirmed')) {
+        try {
+          const autoConfRes = await fetch('/api/auth/sync-profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: loginEmail, autoConfirm: true })
+          });
+          if (autoConfRes.ok) {
+            const retry = await supabase.auth.signInWithPassword({
+              email: loginEmail,
+              password: loginPassword.trim()
+            });
+            if (!retry.error && retry.data?.user) {
+              data = retry.data;
+              error = null;
+            }
+          }
+        } catch (confErr) {
+          console.warn('Nota resolución de email no confirmado:', confErr);
+        }
+      }
+
       if (error) throw error;
 
       if (data?.user) {
-        // Redirección inteligente según el rol del usuario
-        const targetRoute = await determineTargetRoute(supabase, data.user);
+        setSuccessMsg('¡Inicio de sesión exitoso! Ingresando a tu expediente dental...');
 
-        // Asegurar que el estado en la base de datos se marque como active / is_active: true
+        // Sincronizar y vincular administrativamente el UUID exacto de auth.users con patients y users
         try {
-          await supabase
-            .from('users')
-            .update({ is_active: true, onboarding_completed: true })
-            .eq('id', data.user.id);
-        } catch (uErr) {
-          console.warn('Nota actualización is_active en users:', uErr);
+          await fetch('/api/auth/sync-profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: data.user.id,
+              email: data.user.email,
+              fullName: data.user.user_metadata?.full_name || 'Paciente Audenti',
+            })
+          });
+        } catch (syncErr) {
+          console.warn('Nota sync-profile en login:', syncErr);
         }
 
-        if (targetRoute === '/dashboard') {
-          // Si el usuario es un Odontólogo/Socio/Pasante/Admin, redirigir a dashboard
-          window.location.href = '/dashboard';
-        } else {
-          // Si es paciente, asegurar status: active y redirigir directamente al portal
-          try {
-            await safeUpsertPatient(supabase, {
-              user_id: data.user.id,
-              email: data.user.email,
-              full_name: data.user.user_metadata?.full_name || 'Paciente Audenti',
-              status: 'active',
-              onboarding_completed: true
-            });
-          } catch (linkErr) {
-            console.warn('Nota safeUpsertPatient en login:', linkErr);
-          }
-          window.location.href = '/portal';
-        }
+        // Determinar destino según rol
+        const targetRoute = await determineTargetRoute(supabase, data.user);
+        setTimeout(() => {
+          window.location.href = targetRoute;
+        }, 300);
       }
     } catch (err: any) {
       console.error('Error al iniciar sesión:', err);
@@ -329,27 +347,30 @@ function PatientLoginForm() {
           if (!autoLoginErr && autoLogin?.user) {
             setSuccessMsg('¡Bienvenido! Tu cuenta ya estaba registrada. Redirigiendo a tu expediente dental...');
             try {
-              await safeUpsertPatient(supabase, {
-                user_id: autoLogin.user.id,
-                email: cleanEmail,
-                status: 'active',
-                onboarding_completed: true,
+              await fetch('/api/auth/sync-profile', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId: autoLogin.user.id,
+                  email: cleanEmail,
+                  fullName: actFullName.trim() || existingMatch?.full_name || 'Paciente Audenti',
+                  phone: cleanPhone,
+                  branchId: selectedBranchObj.id,
+                  branchName: selectedBranchObj.name,
+                  autoConfirm: true
+                })
               });
-              await supabase
-                .from('users')
-                .update({ is_active: true, onboarding_completed: true })
-                .eq('id', autoLogin.user.id);
             } catch {}
 
             const target = await determineTargetRoute(supabase, autoLogin.user);
             setTimeout(() => {
               window.location.href = target;
-            }, 500);
+            }, 400);
             return;
           }
 
           // Si la contraseña no coincidió con la de Auth, alternar a Iniciar Sesión limpiamente
-          setErrorMsg('Este correo ya cuenta con usuario activo. Ingresa tu contraseña en la pestaña "Iniciar Sesión" para acceder.');
+          setErrorMsg('Este correo ya cuenta con usuario activo en la clínica. Ingresa tu contraseña en la pestaña "Iniciar Sesión" para acceder.');
           setLoginEmailOrPhone(cleanEmail);
           setMode('login');
           setLoadingActivate(false);
@@ -358,53 +379,41 @@ function PatientLoginForm() {
         throw authError;
       }
 
-      // B) Aplicar Upsert Seguro en la tabla `patients` con status: active
+      // B) Vincular tabla patients y users con el UUID exacto de authData.user.id
       const targetUserId = authData?.user?.id || null;
-      await safeUpsertPatient(supabase, {
-        user_id: targetUserId,
-        email: cleanEmail,
-        full_name: actFullName.trim() || existingMatch?.full_name || 'Paciente Audenti',
-        phone: cleanPhone || existingMatch?.phone || null,
-        tenant_id: selectedBranchObj.id,
-        branch_name: selectedBranchObj.name,
-        status: 'active',
-        onboarding_completed: true,
-      });
-
-      if (targetUserId) {
-        try {
-          await supabase
-            .from('users')
-            .update({ is_active: true, onboarding_completed: true })
-            .eq('id', targetUserId);
-        } catch {}
+      try {
+        await fetch('/api/auth/sync-profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: targetUserId,
+            email: cleanEmail,
+            fullName: actFullName.trim() || existingMatch?.full_name || 'Paciente Audenti',
+            phone: cleanPhone || existingMatch?.phone || null,
+            branchId: selectedBranchObj.id,
+            branchName: selectedBranchObj.name,
+            autoConfirm: true
+          })
+        });
+      } catch (syncErr) {
+        console.warn('Nota sync-profile en activación:', syncErr);
       }
 
       // C) Si se obtuvo sesión inmediata o si iniciamos sesión con la clave provista
-      if (authData?.session) {
-        setSuccessMsg('¡Cuenta activada con éxito! Redirigiendo a tu expediente dental...');
+      setSuccessMsg('¡Cuenta activada con éxito! Redirigiendo a tu expediente dental...');
+      const { data: directLogin } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password: actPassword.trim(),
+      });
+
+      if (directLogin?.session) {
         setTimeout(() => {
           window.location.href = '/portal';
-        }, 600);
+        }, 500);
       } else {
-        // Autologin de confirmación inmediata
-        const { data: directLogin } = await supabase.auth.signInWithPassword({
-          email: cleanEmail,
-          password: actPassword.trim(),
-        });
-
-        if (directLogin?.session) {
-          setSuccessMsg('¡Cuenta activada con éxito! Redirigiendo a tu expediente dental...');
-          setTimeout(() => {
-            window.location.href = '/portal';
-          }, 600);
-        } else {
-          setSuccessMsg('¡Cuenta registrada exitosamente! Inicia sesión con tus datos para ingresar a tu expediente.');
-          setLoginEmailOrPhone(cleanEmail);
-          setTimeout(() => {
-            setMode('login');
-          }, 1500);
-        }
+        setTimeout(() => {
+          window.location.href = '/portal';
+        }, 800);
       }
     } catch (err: any) {
       console.error('Error al activar cuenta de paciente:', err);

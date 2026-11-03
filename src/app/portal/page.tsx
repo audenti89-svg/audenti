@@ -331,21 +331,26 @@ export default function PatientPortalPage() {
           .or(`user_id.eq.${authUser.id},email.eq.${authUser.email}`)
           .maybeSingle();
 
-        // Enlace de contingencia por email si no estaba vinculado
-        const isEmailVerified = !!authUser.email_confirmed_at || !!authUser.confirmed_at;
-        if (!myProfile && authUser.email && isEmailVerified) {
-          const { data: emailProfile } = await supabase
-            .from('patients')
-            .select('*')
-            .eq('email', authUser.email)
-            .maybeSingle();
-
-          if (emailProfile) {
-            myProfile = emailProfile;
-            await supabase
-              .from('patients')
-              .update({ user_id: authUser.id, status: 'active' })
-              .eq('id', emailProfile.id);
+        // Enlace de contingencia administrativa si no estaba vinculado o RLS limitó la consulta
+        if (!myProfile && authUser.email) {
+          try {
+            const syncRes = await fetch('/api/auth/sync-profile', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: authUser.id,
+                email: authUser.email,
+                fullName: authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'Paciente Audenti'
+              })
+            });
+            if (syncRes.ok) {
+              const syncData = await syncRes.json();
+              if (syncData.patient) {
+                myProfile = syncData.patient;
+              }
+            }
+          } catch (syncErr) {
+            console.warn('Nota sincronización de perfil en portal:', syncErr);
           }
         }
 

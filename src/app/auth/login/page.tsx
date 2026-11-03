@@ -113,10 +113,33 @@ function LoginForm() {
     setErrorMsg('');
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      let { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password: password.trim(),
       });
+
+      // Si Supabase devuelve "Email not confirmed", auto-confirmar administrativamente
+      if (error && error.message?.toLowerCase().includes('email not confirmed')) {
+        try {
+          const autoConfRes = await fetch('/api/auth/sync-profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email.trim(), autoConfirm: true })
+          });
+          if (autoConfRes.ok) {
+            const retry = await supabase.auth.signInWithPassword({
+              email: email.trim(),
+              password: password.trim()
+            });
+            if (!retry.error && retry.data?.user) {
+              data = retry.data;
+              error = null;
+            }
+          }
+        } catch (confErr) {
+          console.warn('Nota resolución email no confirmado:', confErr);
+        }
+      }
 
       if (error) {
         throw error;
@@ -148,21 +171,19 @@ function LoginForm() {
         if (isInternal) {
           window.location.href = '/dashboard';
         } else {
-          // Si el usuario autenticado es un paciente, redirigir automáticamente a su portal
+          // Si el usuario autenticado es un paciente, vincular administrativamente y redirigir
           try {
-            await safeUpsertPatient(supabase, {
-              user_id: data.user.id,
-              email: data.user.email,
-              full_name: data.user.user_metadata?.full_name || 'Paciente Audenti',
-              status: 'active',
-              onboarding_completed: true
+            await fetch('/api/auth/sync-profile', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: data.user.id,
+                email: data.user.email,
+                fullName: data.user.user_metadata?.full_name || 'Paciente Audenti',
+              })
             });
-            await supabase
-              .from('users')
-              .update({ is_active: true, onboarding_completed: true })
-              .eq('id', data.user.id);
           } catch (linkErr) {
-            console.warn('Nota safeUpsertPatient en auth login:', linkErr);
+            console.warn('Nota sync-profile en auth login:', linkErr);
           }
           window.location.href = '/portal';
         }

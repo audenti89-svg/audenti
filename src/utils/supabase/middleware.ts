@@ -48,7 +48,11 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const redirectUrl = request.nextUrl.clone();
-  const isAuthRoute = redirectUrl.pathname.startsWith('/auth') || redirectUrl.pathname === '/login' || redirectUrl.pathname === '/portal/login';
+  const isAuthRoute =
+    redirectUrl.pathname.startsWith('/auth') ||
+    redirectUrl.pathname === '/login' ||
+    redirectUrl.pathname.startsWith('/portal/login') ||
+    redirectUrl.pathname.startsWith('/portal/register');
   const isOnboardingRoute = redirectUrl.pathname.startsWith('/onboarding');
   const isDashboardRoute = redirectUrl.pathname.startsWith('/dashboard');
   const isAdminRoute = redirectUrl.pathname.startsWith('/admin');
