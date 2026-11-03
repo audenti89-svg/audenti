@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
@@ -120,6 +121,10 @@ export function Dental3DViewer({
   } | null>(null)
 
   // ESTADO DE LA VENTANA FLOTANTE MODO CRISTAL (GLASSMORPHISM)
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
   const [modalOpen, setModalOpen] = useState(false)
   const [modalSpecialty, setModalSpecialty] = useState<DentalSpecialty>('operatoria')
   const [modalActiveTool, setModalActiveTool] = useState<SurfaceCondition>('caries')
@@ -837,7 +842,8 @@ export function Dental3DViewer({
   }
 
   return (
-    <div className={cn('relative w-full h-[620px] rounded-3xl bg-[#040711] border border-slate-800 shadow-2xl overflow-hidden flex flex-col', className)}>
+    <>
+      <div className={cn('relative w-full h-[620px] rounded-3xl bg-[#040711] border border-slate-800 shadow-2xl overflow-hidden flex flex-col', className)}>
       {/* BARRA SUPERIOR DE HERRAMIENTAS HOLOGRÁFICAS */}
       <div className="absolute top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
         {/* Selector de Arcadas */}
@@ -1055,19 +1061,21 @@ export function Dental3DViewer({
         <Database className="w-3.5 h-3.5 text-cyan-300" />
         <span>OrganUI 3D • Supabase Sync • 26 Puntos Interproximales</span>
       </div>
+    </div>
 
-      {/* =========================================================================
-          MODAL FLOTANTE EN MODO CRISTAL (GLASSMORPHISM) - REQUERIMIENTOS 2 Y 3
-          ========================================================================= */}
-      {modalOpen && modalData && (
+    {/* =========================================================================
+        MODAL FLOTANTE EN MODO CRISTAL (GLASSMORPHISM) - FUERA DE CONTENEDORES
+        Teletransportado con React Portal directamente a document.body
+        ========================================================================= */}
+    {mounted && typeof document !== 'undefined' && modalOpen && modalData && createPortal(
+      <div
+        className="fixed inset-0 z-50 w-screen h-screen bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200"
+        onClick={handleCloseModal}
+      >
         <div
-          className="fixed inset-0 z-50 w-screen h-screen bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
-          onClick={handleCloseModal}
+          className="relative w-full max-w-4xl max-h-[92vh] overflow-y-auto bg-slate-950/90 backdrop-blur-xl border border-amber-500/40 shadow-2xl rounded-3xl p-5 sm:p-7 text-white space-y-5 animate-in zoom-in-95 duration-200"
+          onClick={(e) => e.stopPropagation()}
         >
-          <div
-            className="relative w-full max-w-4xl max-h-[92vh] overflow-y-auto bg-slate-900/90 backdrop-blur-2xl border-2 border-amber-400/60 shadow-[0_0_60px_rgba(245,158,11,0.35)] rounded-3xl p-5 sm:p-6 text-white space-y-5"
-            onClick={(e) => e.stopPropagation()}
-          >
             {/* Notificación de Guardado / Sincronización en Supabase */}
             {saveSuccessNotification && (
               <div className="absolute top-4 right-16 z-50 px-4 py-2 rounded-xl bg-emerald-500/95 text-white text-xs font-black shadow-lg flex items-center gap-2 animate-in slide-in-from-top-2 duration-200">
@@ -1353,8 +1361,9 @@ export function Dental3DViewer({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   )
 }
