@@ -26,7 +26,7 @@ export async function GET() {
       return NextResponse.json({ success: true, appointments: list });
     }
 
-    // Si es paciente, filtrar estrictamente a sus citas aplicando RLS
+    // Si es paciente, filtrar estrictamente a sus citas aplicando aislamiento
     const { data: patientProfile } = await supabase
       .from('patients')
       .select('id, full_name, phone')
@@ -37,12 +37,25 @@ export async function GET() {
       return NextResponse.json({ success: true, appointments: [] });
     }
 
+    const cleanPatientPhone = patientProfile.phone ? patientProfile.phone.replace(/\D/g, '').slice(-10) : '';
+
     const list = await getPersistedAppointments();
-    const patientFiltered = list.filter((a: any) => 
-      a.patient_id === patientProfile.id ||
-      (a.patient_phone && patientProfile.phone && a.patient_phone.includes(patientProfile.phone)) ||
-      (a.patient_name && patientProfile.full_name && a.patient_name.toLowerCase() === patientProfile.full_name.toLowerCase())
-    );
+    const patientFiltered = list.filter((a: any) => {
+      // 1. Coincidencia estricta por ID único de paciente
+      if (a.patient_id && a.patient_id === patientProfile.id) {
+        return true;
+      }
+
+      // 2. Coincidencia por teléfono normalizado a 10 dígitos (igualdad estricta, jamás substring)
+      if (cleanPatientPhone && cleanPatientPhone.length === 10) {
+        const cleanApptPhone = (a.patient_phone || a.phone || '').replace(/\D/g, '').slice(-10);
+        if (cleanApptPhone.length === 10 && cleanApptPhone === cleanPatientPhone) {
+          return true;
+        }
+      }
+
+      return false;
+    });
 
     return NextResponse.json({ success: true, appointments: patientFiltered });
   } catch (err: any) {

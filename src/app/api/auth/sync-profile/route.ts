@@ -6,7 +6,9 @@ import { isSystemAdminEmail } from '@/lib/auth/admin-emails';
 /**
  * API DE VINCULACIÓN EXACTA Y ACTIVACIÓN UNIVERSAL AUTH-SUPABASE (Audenti 2027)
  * Arquitecto: Ricardo Sánchez
- * Blindaje ECC: Protección contra Account Takeover y Reseteo Arbitrario de Contraseñas
+ * Blindaje ECC P0 & P1:
+ * - Protección contra Account Takeover y Reseteo Arbitrario de Contraseñas.
+ * - Anonimización estricta de PII en endpoints públicos (sin fuga de nombres ni teléfonos).
  * 
  * Utiliza arquitectura dual:
  * 1. Admin Service Role exclusivo para creación inicial de cuentas y auto-confirmación controlada.
@@ -35,7 +37,7 @@ export async function GET(request: Request) {
     // 1. Buscar en patients por email
     const { data: patient, error: patientErr } = await db
       .from('patients')
-      .select('id, user_id, full_name, phone, branch_name, tenant_id, status')
+      .select('id, user_id, branch_name, tenant_id, status')
       .ilike('email', email)
       .maybeSingle();
 
@@ -57,12 +59,12 @@ export async function GET(request: Request) {
       console.warn('[sync-profile GET] Nota verificando auth.users:', authErr);
     }
 
+    // Retornar exclusivamente indicadores de existencia y vinculación (cero PII de nombres ni teléfonos)
     return NextResponse.json({
       exists: !!patient || authUserExists,
-      patient: patient || null,
+      patient: patient ? { id: patient.id, tenant_id: patient.tenant_id, branch_name: patient.branch_name } : null,
       hasAuthUser: authUserExists,
       alreadyRegistered: authUserExists,
-      authUserId: authUserId,
       isLinked: !!(patient?.user_id && patient.user_id === authUserId)
     });
   } catch (err: any) {

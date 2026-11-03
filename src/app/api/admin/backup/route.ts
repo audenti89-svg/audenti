@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getPersistedAppointments } from '@/lib/supabase/appointments-storage'
+import { isSystemAdminEmail } from '@/lib/auth/admin-emails'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -8,6 +9,45 @@ export const dynamic = 'force-dynamic'
 export async function GET() {
   try {
     const supabase = await createClient()
+
+    // ── BLINDAJE DE SEGURIDAD ECC P1: AUTENTICACIÓN Y AUTORIZACIÓN ESTRICTA ──
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'No autorizado. Se requiere iniciar sesión con cuenta administrativa.' },
+        { status: 401 }
+      )
+    }
+
+    const userEmail = (user.email || '').toLowerCase().trim()
+    const userRole = (user.user_metadata?.role || user.app_metadata?.role || '').toLowerCase().trim()
+
+    // Verificar si es SuperAdmin o Dirección Médica autorizada
+    const isSuperAdmin = isSystemAdminEmail(userEmail, userRole)
+
+    let isMedicalDirector = false
+    try {
+      const { data: profile } = await supabase
+        .from('users')
+        .select('role, doctor_type')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      if (profile) {
+        const dbRole = (profile.role || profile.doctor_type || '').toLowerCase().trim()
+        if (dbRole === 'superadmin' || dbRole === 'owner' || dbRole === 'director') {
+          isMedicalDirector = true
+        }
+      }
+    } catch {}
+
+    if (!isSuperAdmin && !isMedicalDirector) {
+      return NextResponse.json(
+        { error: 'Acceso denegado. Solo la Dirección Médica (Dra. Aura / SuperAdmin) puede descargar respaldos de base de datos.' },
+        { status: 403 }
+      )
+    }
 
     // 1. Obtener pacientes
     let patients: any[] = []
