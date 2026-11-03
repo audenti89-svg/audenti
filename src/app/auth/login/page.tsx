@@ -4,7 +4,7 @@ import { createClient } from '@/utils/supabase/client';
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Lock, ShieldCheck, Mail, KeyRound, AlertCircle, Sparkles, Building2 } from 'lucide-react';
+import { Lock, ShieldCheck, Mail, KeyRound, AlertCircle, Sparkles, Building2, UserCheck, UserPlus } from 'lucide-react';
 
 function LoginForm() {
   const router = useRouter();
@@ -231,22 +231,34 @@ function LoginForm() {
         {loadingGoogle ? 'Conectando...' : 'Iniciar Sesión Médica con Google'}
       </button>
 
-      {/* AVISO DE POLÍTICA DE SEGURIDAD Y ACCESO A PACIENTES */}
-      <div className="mt-5 p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-left">
-        <div>
-          <span className="text-[10px] font-black uppercase text-amber-300 block tracking-wider">
+      {/* AVISO DE ACCESO Y ACTIVACIÓN PARA PACIENTES */}
+      <div className="mt-5 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-left space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-[10px] font-black uppercase text-amber-300 tracking-wider flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             ¿Eres Paciente de Audenti?
           </span>
-          <span className="text-[11px] text-slate-300 block">
-            Accede a tu historial clínico, citas y recetas
-          </span>
+          <span className="text-[10px] font-semibold text-slate-400">Balbuena &amp; Chalma</span>
         </div>
-        <Link
-          href="/portal/login"
-          className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-colors shadow-sm shrink-0"
-        >
-          Portal Paciente →
-        </Link>
+        <p className="text-[11px] text-slate-300 leading-snug">
+          Consulta tu odontograma, citas y recetas, o activa tu cuenta si ya te diste de alta en recepción.
+        </p>
+        <div className="pt-1 flex items-center gap-2">
+          <Link
+            href="/portal/login"
+            className="flex-1 py-2 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-colors text-center shadow-sm flex items-center justify-center gap-1"
+          >
+            <UserCheck className="w-3.5 h-3.5" />
+            <span>Iniciar Sesión</span>
+          </Link>
+          <Link
+            href="/portal/login?mode=activate"
+            className="flex-1 py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 hover:text-amber-200 border border-amber-500/40 font-bold text-xs transition-colors text-center shadow-sm flex items-center justify-center gap-1"
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            <span>Activar Cuenta →</span>
+          </Link>
+        </div>
       </div>
 
       <div className="mt-5 pt-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">

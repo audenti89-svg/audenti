@@ -279,6 +279,18 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               </div>
               <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
             </Link>
+
+            <Link
+              href="/portal/login?mode=activate"
+              className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+              title="Activar cuenta o configurar contraseña para pacientes dados de alta en clínica"
+            >
+              <div className="flex items-center gap-2.5">
+                <UserPlus className="w-4 h-4 shrink-0 text-amber-400" />
+                <span>Activar Cuenta Paciente</span>
+              </div>
+              <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+            </Link>
           </div>
         </div>
 

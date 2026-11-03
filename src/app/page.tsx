@@ -27,7 +27,8 @@ import {
   X,
   Coffee,
   Wine,
-  UserCheck
+  UserCheck,
+  UserPlus
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { SpotlightCard } from '@/components/ui/spotlight-card'
@@ -519,6 +520,15 @@ export default function LandingPage() {
               >
                 <UserCheck className="w-4 h-4" />
                 Portal del Paciente (Citas &amp; Recetas)
+              </Link>
+
+              <Link
+                href="/portal/login?mode=activate"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full py-2.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-amber-400 text-slate-200 font-bold inline-flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+              >
+                <UserPlus className="w-4 h-4 text-amber-400" />
+                Activar Cuenta / Primer Acceso
               </Link>
             </div>
           </div>

@@ -321,13 +321,13 @@ export function Header({ onMenuToggle }: HeaderProps) {
           <UserCheck className="w-3.5 h-3.5 text-amber-400" />
           <span className="hidden md:inline">Portal Paciente</span>
         </Link>
-        <div className="hidden sm:flex relative items-center bg-slate-100/70 px-2.5 py-1.5 rounded-xl border border-slate-200/50">
-          <ShieldCheck className="w-3.5 h-3.5 text-slate-600 mr-1.5 shrink-0" />
-          <select className="bg-transparent text-[11px] font-bold text-slate-700 pr-4 appearance-none focus:outline-none cursor-pointer">
-            <option>Rol: Director Médico</option>
-            <option>Rol: Especialista</option>
-            <option>Rol: Recepción / Caja</option>
-            <option>Rol: Asistente Dental</option>
+        <div className="hidden sm:flex relative items-center bg-slate-900 px-2.5 py-1.5 rounded-xl border border-slate-800">
+          <ShieldCheck className="w-3.5 h-3.5 text-amber-400 mr-1.5 shrink-0" />
+          <select className="bg-transparent text-[11px] font-bold text-slate-300 pr-4 appearance-none focus:outline-none cursor-pointer">
+            <option className="bg-slate-950 text-white">Rol: Director Médico</option>
+            <option className="bg-slate-950 text-white">Rol: Especialista</option>
+            <option className="bg-slate-950 text-white">Rol: Recepción / Caja</option>
+            <option className="bg-slate-950 text-white">Rol: Asistente Dental</option>
           </select>
           <ChevronDown className="w-3 h-3 absolute right-1 pointer-events-none text-slate-400" />
         </div>
@@ -379,14 +379,14 @@ export function Header({ onMenuToggle }: HeaderProps) {
             }}
             className={`relative p-2 rounded-xl transition-all cursor-pointer ${
               showNotifications
-                ? 'bg-amber-100 text-amber-950 ring-2 ring-amber-400'
+                ? 'bg-amber-400/20 text-amber-300 ring-2 ring-amber-400/50'
                 : notifications.length > 0
-                ? 'text-amber-800 bg-amber-50 hover:bg-amber-100'
-                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+                ? 'text-amber-400 bg-amber-400/10 hover:bg-amber-400/20'
+                : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
             }`}
             title="Bandeja de Alertas y Citas (Dra. Aura)"
           >
-            <Bell className={`w-4 h-4 ${notifications.length > 0 ? 'text-amber-600 animate-pulse' : ''}`} />
+            <Bell className={`w-4 h-4 ${notifications.length > 0 ? 'text-amber-400 animate-pulse' : ''}`} />
             {notifications.length > 0 && (
               <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-600 text-white text-[10px] font-extrabold flex items-center justify-center ring-2 ring-white animate-pulse shadow-xs">
                 {notifications.length}
@@ -488,7 +488,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
 
         <button
           type="button"
-          className="p-2 rounded-xl text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
+          className="p-2 rounded-xl text-slate-400 hover:bg-slate-900 hover:text-slate-200 transition-colors"
         >
           <HelpCircle className="w-4 h-4" />
         </button>
