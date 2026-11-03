@@ -311,6 +311,8 @@ export default function PatientPortalPage() {
   const [selectedTooth, setSelectedTooth] = useState<number>(36);
   const [activeTab, setActiveTab] = useState<'odontograma' | 'bitacora' | 'citas' | 'recetas'>('odontograma');
   const [selectedPrescription, setSelectedPrescription] = useState<DigitalPrescription | null>(null);
+  const [confirmingAppt, setConfirmingAppt] = useState(false);
+  const [confirmationNotice, setConfirmationNotice] = useState<string>('');
 
   useEffect(() => {
     async function loadPortal() {
@@ -497,7 +499,7 @@ export default function PatientPortalPage() {
         </div>
 
         <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
-          {isSystemAdminEmail(user?.email) && (
+          {isSystemAdminEmail(user?.email, user?.user_metadata?.role) && (
             <Link
               href="/dashboard"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-all shadow-md shadow-amber-400/20"

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { isSystemAdminEmail } from '@/lib/auth/admin-emails'
 import crypto from 'crypto'
 
-const ADMIN_EMAILS = ['audenti89@gmail.com', 'rricardos76@gmail.com', 'pruevaz2022@gmail.com', 'ricardo@audenti.com']
+// Solo la Dirección Médica gestiona pases de estudiantes
 
 // ── GET: Listar pases de estudiantes / servicio social ─────────
 export async function GET(req: NextRequest) {
@@ -14,7 +15,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const isSuperAdmin = ADMIN_EMAILS.includes(user.email || '')
+    const isSuperAdmin = isSystemAdminEmail(user.email, user.user_metadata?.role)
     const { data: profile } = await supabase
       .from('users')
       .select('role, doctor_type')
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    const isSuperAdmin = ADMIN_EMAILS.includes(user.email || '')
+    const isSuperAdmin = isSystemAdminEmail(user.email, user.user_metadata?.role)
     const { data: profile } = await supabase
       .from('users')
       .select('role, doctor_type, full_name')

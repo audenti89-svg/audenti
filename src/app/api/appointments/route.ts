@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getPersistedAppointments, savePersistedAppointments } from '@/lib/supabase/appointments-storage';
+import { isInternalUser } from '@/lib/auth/admin-emails';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,15 +16,9 @@ export async function GET() {
       return NextResponse.json({ success: false, error: 'No autorizado. Se requiere iniciar sesión.' }, { status: 401 });
     }
 
-    const ADMIN_EMAILS = ['audenti89@gmail.com', 'rricardos76@gmail.com', 'pruevaz2022@gmail.com', 'ricardo@audenti.com'];
-    const userEmail = user.email || '';
-    const isStaff = ADMIN_EMAILS.includes(userEmail) ||
-      user.user_metadata?.role === 'owner' ||
-      user.user_metadata?.role === 'admin' ||
-      user.user_metadata?.role === 'doctor' ||
-      user.app_metadata?.role === 'owner' ||
-      user.app_metadata?.role === 'admin' ||
-      user.app_metadata?.role === 'doctor';
+    const userEmail = (user.email || '').toLowerCase().trim();
+    const userRole = (user.user_metadata?.role || user.app_metadata?.role || '').toLowerCase().trim();
+    const isStaff = isInternalUser(userEmail, userRole);
 
     // Si es personal clínico (Doctora / Administrador)
     if (isStaff) {
@@ -120,6 +115,7 @@ export async function POST(request: Request) {
       treatment_type: treatment,
       branch,
       status,
+      attendance_confirmed: false,
       notes: notes || 'Cita generada en plataforma Audenti',
       created_at: new Date().toISOString()
     };
@@ -145,6 +141,64 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, appointment: newAppt });
   } catch (err: any) {
     console.error('[API appointments POST Error]:', err);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  }
+}
+
+// ── PATCH: Confirmar Asistencia de Cita por parte del Paciente o Staff ──
+export async function PATCH(request: Request) {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ success: false, error: 'No autorizado. Se requiere iniciar sesión.' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { id, attendance_confirmed = true } = body;
+
+    if (!id) {
+      return NextResponse.json({ success: false, error: 'ID de la cita requerido.' }, { status: 400 });
+    }
+
+    const current = await getPersistedAppointments();
+    let found = false;
+    const updated = current.map((a: any) => {
+      if (a.id === id || a.folio === id) {
+        found = true;
+        return {
+          ...a,
+          status: 'confirmed',
+          attendance_confirmed: !!attendance_confirmed,
+          attendance_confirmed_at: new Date().toISOString()
+        };
+      }
+      return a;
+    });
+
+    if (!found) {
+      return NextResponse.json({ success: false, error: 'Cita no encontrada.' }, { status: 404 });
+    }
+
+    await savePersistedAppointments(updated);
+
+    // Notificar en realtime
+    try {
+      await supabase.channel('calendar_page_realtime').send({
+        type: 'broadcast',
+        event: 'appointment_updated',
+        payload: { id, attendance_confirmed: true, status: 'confirmed' }
+      });
+    } catch {}
+
+    return NextResponse.json({
+      success: true,
+      message: 'Asistencia confirmada exitosamente.',
+      appointment: updated.find((a: any) => a.id === id || a.folio === id)
+    });
+  } catch (err: any) {
+    console.error('[API appointments PATCH Error]:', err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }

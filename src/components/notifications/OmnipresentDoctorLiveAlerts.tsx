@@ -28,6 +28,7 @@ export function OmnipresentDoctorLiveAlerts() {
   const [toasts, setToasts] = useState<OmnipresentToast[]>([])
   const [pushPermission, setPushPermission] = useState<NotificationPermission>('default')
   const [showPermissionPrompt, setShowPermissionPrompt] = useState(false)
+  const [unscheduledReminders, setUnscheduledReminders] = useState<{ id: string; patientName?: string; targetUrl?: string; minutesElapsed: number }[]>([])
   const { playTone } = useNotificationSound()
   const supabase = createClient()
 
@@ -49,6 +50,28 @@ export function OmnipresentDoctorLiveAlerts() {
     // Ventana de Gracia de 1 Hora y Doble Nivel de Alerta:
     // Revisar si la doctora dio clic en Confirmar Lectura pero pasaron 60 minutos sin que haya agendado
     const checkOneHourGraceTimer = () => {
+      try {
+        const savedRead = localStorage.getItem('audenti_attended_notifications_v2')
+        if (savedRead) {
+          const readMap = JSON.parse(savedRead)
+          const now = Date.now()
+          const pendingReminders: { id: string; patientName?: string; targetUrl?: string; minutesElapsed: number }[] = []
+
+          Object.keys(readMap).forEach(key => {
+            const item = readMap[key]
+            const diffMinutes = Math.floor((now - item.confirmedAt) / 60000)
+            if (diffMinutes >= 15 && !item.scheduled) {
+              pendingReminders.push({
+                id: key,
+                patientName: item.patientName || 'Paciente',
+                targetUrl: item.targetUrl || '/dashboard/chat',
+                minutesElapsed: diffMinutes
+              })
+            }
+          })
+          setUnscheduledReminders(pendingReminders)
+        }
+      } catch {}
       try {
         const savedRead = localStorage.getItem('audenti_attended_notifications_v2')
         if (!savedRead) return
@@ -99,6 +122,7 @@ export function OmnipresentDoctorLiveAlerts() {
 
   // Dismiss y auto-confirmación formal vía /api/alerts/confirm (Supabase confirmed_by_doctor = true & confirmed_at)
   const dismissAlert = async (id: string, targetUrl?: string) => {
+    const targetToast = toasts.find(t => t.id === id);
     // 1. Quitar toast inmediatamente de la UI y del storage persistente
     updateToastsPersistently(prev => prev.filter(item => item.id !== id))
     
@@ -106,7 +130,7 @@ export function OmnipresentDoctorLiveAlerts() {
     try {
       const savedRead = localStorage.getItem('audenti_attended_notifications_v2')
       const readMap = savedRead ? JSON.parse(savedRead) : {}
-      readMap[id] = { confirmedAt: Date.now(), id, targetUrl }
+      readMap[id] = { confirmedAt: Date.now(), id, targetUrl, patientName: targetToast?.patientName || 'Paciente' }
       localStorage.setItem('audenti_attended_notifications_v2', JSON.stringify(readMap))
     } catch {}
 

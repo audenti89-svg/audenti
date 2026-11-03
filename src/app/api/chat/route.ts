@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { sendDoctorWhatsAppAlert, sendPatientWhatsAppMessage } from '@/lib/notifications/whatsapp-doctor';
+import { isInternalUser } from '@/lib/auth/admin-emails';
 
 export const runtime = 'nodejs';
 
@@ -216,12 +217,9 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const patientId = url.searchParams.get('patientId');
 
-    const ADMIN_EMAILS = ['audenti89@gmail.com', 'rricardos76@gmail.com', 'pruevaz2022@gmail.com', 'ricardo@audenti.com'];
-    const userEmail = user.email || '';
-    const isStaff = ADMIN_EMAILS.includes(userEmail) ||
-      user.user_metadata?.role === 'owner' ||
-      user.user_metadata?.role === 'admin' ||
-      user.user_metadata?.role === 'doctor';
+    const userEmail = (user.email || '').toLowerCase().trim();
+    const userRole = (user.user_metadata?.role || user.app_metadata?.role || '').toLowerCase().trim();
+    const isStaff = isInternalUser(userEmail, userRole);
 
     // Si es un paciente, verificar que el patientId solicitado le pertenece
     if (!isStaff && patientId) {
