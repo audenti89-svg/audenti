@@ -1,6 +1,7 @@
 'use client';
 
 import { createClient } from '@/utils/supabase/client';
+import { safeUpsertPatient } from '@/lib/patients/safeUpsertPatient';
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -124,14 +125,23 @@ function LoginForm() {
           }
         }
 
-        if (!isInternal) {
-          await supabase.auth.signOut();
-          setErrorMsg('Acceso denegado: El correo ingresado no cuenta con perfil de personal interno autorizado.');
-          setLoadingEmail(false);
-          return;
+        if (isInternal) {
+          router.push('/dashboard');
+        } else {
+          // Si el usuario autenticado es un paciente, redirigir automáticamente a su portal
+          try {
+            await safeUpsertPatient(supabase, {
+              auth_user_id: data.user.id,
+              user_id: data.user.id,
+              email: data.user.email,
+              full_name: data.user.user_metadata?.full_name || 'Paciente Audenti',
+              onboarding_completed: true
+            });
+          } catch (linkErr) {
+            console.warn('Nota safeUpsertPatient en auth login:', linkErr);
+          }
+          router.push('/portal');
         }
-
-        router.push('/dashboard');
       }
     } catch (err: any) {
       console.error('Error al iniciar sesión con correo:', err);

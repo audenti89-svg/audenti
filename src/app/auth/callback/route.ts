@@ -129,8 +129,8 @@ export async function GET(request: Request) {
       }
     }
 
-    // 2. Validación de acceso exclusivo a personal interno
-    const userEmail = user.email || '';
+    // 2. Validación y enrutamiento inteligente según rol (Audenti 2027)
+    const userEmail = (user.email || '').toLowerCase().trim();
     const userMetaRole = (user.user_metadata?.role || user.app_metadata?.role || user.user_metadata?.doctor_type || '').toLowerCase();
     let isInternal = ADMIN_EMAILS.includes(userEmail) || INTERNAL_ROLES.includes(userMetaRole);
 
@@ -149,31 +149,27 @@ export async function GET(request: Request) {
       }
     }
 
-    // Si el destino es el Portal del Paciente, permitir el acceso seguro
-    const isPortalTarget = next.startsWith('/portal') || next.startsWith('/mi-expediente') || requestUrl.searchParams.get('portal') === 'true';
-
-    if (isPortalTarget) {
-      try {
-        await safeUpsertPatient(supabase as any, {
-          auth_user_id: user.id,
-          user_id: user.id,
-          email: user.email,
-          full_name: user.user_metadata?.full_name || user.user_metadata?.name || 'Paciente Audenti',
-          branch_name: 'Sucursal Balbuena (Matriz)',
-          onboarding_completed: true
-        });
-      } catch (upsertErr) {
-        console.warn('[auth/callback] Error en safeUpsertPatient portal:', upsertErr);
-      }
-
-      return NextResponse.redirect(`${origin}/portal`);
+    // A) Personal Clínico (Doctores, Socios, Pasantes, Directores, Administradores):
+    // Redirigir directamente a la vista operativa /dashboard
+    if (isInternal) {
+      return NextResponse.redirect(`${origin}/dashboard`);
     }
 
-    // Si intenta acceder al dashboard administrativo/médico sin rol interno autorizado, cerrar sesión y rechazar
-    if (!isInternal) {
-      await supabase.auth.signOut();
-      return NextResponse.redirect(`${origin}/auth/login?error=acceso_denegado_personal_interno`);
+    // B) Paciente: Realizar Upsert Seguro y redirigir al Portal del Paciente
+    try {
+      await safeUpsertPatient(supabase as any, {
+        auth_user_id: user.id,
+        user_id: user.id,
+        email: user.email,
+        full_name: user.user_metadata?.full_name || user.user_metadata?.name || 'Paciente Audenti',
+        branch_name: 'Sucursal Balbuena (Matriz)',
+        onboarding_completed: true
+      });
+    } catch (upsertErr) {
+      console.warn('[auth/callback] Error en safeUpsertPatient portal:', upsertErr);
     }
+
+    return NextResponse.redirect(`${origin}/portal`);
   }
 
   return response;

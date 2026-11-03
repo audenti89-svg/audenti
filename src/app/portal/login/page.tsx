@@ -13,7 +13,6 @@ import {
   AlertCircle,
   Sparkles,
   Building2,
-  Stethoscope,
   ArrowRight,
   UserPlus,
   CheckCircle2,
@@ -30,6 +29,40 @@ const BRANCH_OPTIONS = [
   { id: '00000000-0000-0000-0000-000000000001', name: 'Sucursal Balbuena (Matriz)' },
   { id: '00000000-0000-0000-0000-000000000002', name: 'Sucursal Chalma de Guadalupe' }
 ];
+
+const INTERNAL_ROLES = ['owner', 'admin', 'director', 'doctor', 'socio', 'trabajador', 'pasante', 'estudiante'];
+
+// Determina automáticamente el destino post-login según el rol
+async function determineTargetRoute(supabaseClient: any, authUser: any): Promise<string> {
+  const userEmail = (authUser.email || '').toLowerCase().trim();
+  if (userEmail === 'audenti89@gmail.com') {
+    return '/dashboard';
+  }
+
+  const metaRole = (authUser.user_metadata?.role || authUser.app_metadata?.role || '').toLowerCase().trim();
+  if (INTERNAL_ROLES.includes(metaRole)) {
+    return '/dashboard';
+  }
+
+  try {
+    const { data: profile } = await supabaseClient
+      .from('users')
+      .select('role, doctor_type')
+      .eq('id', authUser.id)
+      .maybeSingle();
+
+    if (profile) {
+      const dbRole = (profile.role || profile.doctor_type || '').toLowerCase().trim();
+      if (INTERNAL_ROLES.includes(dbRole)) {
+        return '/dashboard';
+      }
+    }
+  } catch (err) {
+    console.warn('Nota determinación de rol en portal login:', err);
+  }
+
+  return '/portal';
+}
 
 function PatientLoginForm() {
   const router = useRouter();
@@ -141,7 +174,7 @@ function PatientLoginForm() {
     }
   };
 
-  // 2. INICIAR SESIÓN CON CREDENCIALES EXISTENTES
+  // 2. INICIAR SESIÓN CON CREDENCIALES (REDIRECCIÓN AUTOMÁTICA SEGÚN ROL)
   const handlePatientLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginEmailOrPhone.trim() || !loginPassword.trim()) {
@@ -181,23 +214,30 @@ function PatientLoginForm() {
       if (error) throw error;
 
       if (data?.user) {
-        // Enlace inteligente (Upsert sin duplicar registros)
-        try {
-          await safeUpsertPatient(supabase, {
-            auth_user_id: data.user.id,
-            user_id: data.user.id,
-            email: data.user.email,
-            full_name: data.user.user_metadata?.full_name || 'Paciente Audenti',
-            onboarding_completed: true
-          });
-        } catch (linkErr) {
-          console.warn('Nota safeUpsertPatient en login:', linkErr);
-        }
+        // Redirección inteligente según el rol del usuario
+        const targetRoute = await determineTargetRoute(supabase, data.user);
 
-        router.push('/portal');
+        if (targetRoute === '/dashboard') {
+          // Si el usuario es un Odontólogo/Socio/Pasante/Admin, redirigir a la vista operativa
+          router.push('/dashboard');
+        } else {
+          // Si es paciente, ejecutar Upsert seguro y redirigir al portal
+          try {
+            await safeUpsertPatient(supabase, {
+              auth_user_id: data.user.id,
+              user_id: data.user.id,
+              email: data.user.email,
+              full_name: data.user.user_metadata?.full_name || 'Paciente Audenti',
+              onboarding_completed: true
+            });
+          } catch (linkErr) {
+            console.warn('Nota safeUpsertPatient en login:', linkErr);
+          }
+          router.push('/portal');
+        }
       }
     } catch (err: any) {
-      console.error('Error al iniciar sesión de paciente:', err);
+      console.error('Error al iniciar sesión:', err);
       setErrorMsg(err?.message === 'Invalid login credentials'
         ? 'Credenciales incorrectas. Si te diste de alta en clínica pero aún no configuras tu contraseña, haz clic en "Activar Cuenta".'
         : err?.message || 'Error al iniciar sesión en tu portal.');
@@ -283,11 +323,11 @@ function PatientLoginForm() {
         }, 1200);
       } else {
         // En caso de requerir confirmación por correo
-        setSuccessMsg('¡Cuenta registrada exitosamente! Revisa tu bandeja de entrada o inicia sesión con tus nuevas credenciales para ingresar a tu expediente.');
+        setSuccessMsg('¡Cuenta registrada exitosamente! Revisa tu correo o inicia sesión con tu nueva contraseña para ingresar a tu expediente.');
         setLoginEmailOrPhone(cleanEmail);
         setTimeout(() => {
           setMode('login');
-        }, 3000);
+        }, 2500);
       }
     } catch (err: any) {
       console.error('Error al activar cuenta de paciente:', err);
@@ -653,18 +693,12 @@ function PatientLoginForm() {
         </p>
       </div>
 
-      {/* SWITCH AL PORTAL MÉDICO PARA COLABORADORES */}
-      <div className="mt-5 pt-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400">
+      {/* PIE DE PÁGINA LIMPIO (EXCLUSIVO PACIENTES) */}
+      <div className="mt-5 pt-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
         <Link href="/" className="hover:text-amber-400 transition-colors font-medium">
-          ← Inicio
+          ← Volver al Inicio
         </Link>
-        <Link
-          href="/auth/login"
-          className="inline-flex items-center gap-1.5 text-amber-400 hover:text-amber-300 font-bold transition-colors"
-        >
-          <Stethoscope className="w-3.5 h-3.5" />
-          <span>Acceso para Doctores / Personal</span>
-        </Link>
+        <span className="font-semibold text-slate-500">Audenti 2027 • Balbuena &amp; Chalma</span>
       </div>
     </div>
   );
