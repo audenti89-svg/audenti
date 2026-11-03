@@ -1060,11 +1060,17 @@ export function Dental3DViewer({
           MODAL FLOTANTE EN MODO CRISTAL (GLASSMORPHISM) - REQUERIMIENTOS 2 Y 3
           ========================================================================= */}
       {modalOpen && modalData && (
-        <div className="absolute inset-0 z-40 bg-slate-950/75 backdrop-blur-xl flex items-center justify-center p-3 sm:p-5 animate-in fade-in duration-200">
-          <div className="relative w-full max-w-4xl max-h-[94%] overflow-y-auto bg-slate-900/90 backdrop-blur-2xl border-2 border-amber-400/60 shadow-[0_0_60px_rgba(245,158,11,0.25)] rounded-3xl p-5 sm:p-6 text-white space-y-5">
+        <div
+          className="fixed inset-0 z-50 w-screen h-screen bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={handleCloseModal}
+        >
+          <div
+            className="relative w-full max-w-4xl max-h-[92vh] overflow-y-auto bg-slate-900/90 backdrop-blur-2xl border-2 border-amber-400/60 shadow-[0_0_60px_rgba(245,158,11,0.35)] rounded-3xl p-5 sm:p-6 text-white space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Notificación de Guardado / Sincronización en Supabase */}
             {saveSuccessNotification && (
-              <div className="absolute top-4 right-16 z-50 px-4 py-2 rounded-xl bg-emerald-500/90 text-white text-xs font-black shadow-lg flex items-center gap-2 animate-in slide-in-from-top-2 duration-200">
+              <div className="absolute top-4 right-16 z-50 px-4 py-2 rounded-xl bg-emerald-500/95 text-white text-xs font-black shadow-lg flex items-center gap-2 animate-in slide-in-from-top-2 duration-200">
                 <CheckCircle2 className="w-4 h-4" />
                 <span>✓ Sincronizado en Supabase y Expediente</span>
               </div>
@@ -1164,11 +1170,11 @@ export function Dental3DViewer({
                 {/* LAS 5 CARAS ANATÓMICAS CON TARJETAS DETALLADAS (ESTILO IMAGEN 2) */}
                 <div className="space-y-2">
                   {[
-                    { key: 'vestibular' as const, label: 'Vestibular / Buccal', sub: modalData.toothFdi >= 31 && modalData.toothFdi <= 48 ? 'Inferior (Labial)' : 'Superior (Labial)' },
-                    { key: 'oclusal' as const, label: modalData.taxonomy?.isAnterior ? 'Incisal' : 'Oclusal', sub: modalData.taxonomy?.isAnterior ? 'Borde de corte' : 'Superficie masticatoria' },
-                    { key: 'mesial' as const, label: 'Mesial', sub: 'Hacia línea media' },
-                    { key: 'distal' as const, label: 'Distal', sub: 'Hacia posterior' },
-                    { key: 'lingual' as const, label: modalData.toothFdi >= 31 && modalData.toothFdi <= 48 ? 'Lingual' : 'Palatino', sub: modalData.toothFdi >= 31 && modalData.toothFdi <= 48 ? 'Hacia lengua' : 'Hacia paladar' }
+                    { key: 'oclusal' as const, label: modalData.taxonomy?.isAnterior ? 'Incisal / Occlusal' : 'Occlusal', sub: modalData.taxonomy?.isAnterior ? 'Borde de corte incisal' : 'Superficie masticatoria' },
+                    { key: 'mesial' as const, label: 'Mesial', sub: 'Hacia línea media dental' },
+                    { key: 'distal' as const, label: 'Distal', sub: 'Hacia zona posterior' },
+                    { key: 'vestibular' as const, label: 'Buccal / Vestibular', sub: modalData.toothFdi >= 31 && modalData.toothFdi <= 48 ? 'Inferior (Labial)' : 'Superior (Labial)' },
+                    { key: 'lingual' as const, label: modalData.toothFdi >= 31 && modalData.toothFdi <= 48 ? 'Lingual' : 'Lingual / Palatino', sub: modalData.toothFdi >= 31 && modalData.toothFdi <= 48 ? 'Hacia lengua' : 'Hacia paladar' }
                   ].map(face => {
                     const currentCond = modalData.activeSurfaces[face.key]
                     const info = SURFACE_COLORS[currentCond]
