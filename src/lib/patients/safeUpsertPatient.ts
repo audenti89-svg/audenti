@@ -54,6 +54,7 @@ const VALID_PATIENT_COLUMNS = new Set([
   'email',
   'address',
   'status',
+  'role',
   'photo_url',
   'last_appointment_at',
   'total_spent',

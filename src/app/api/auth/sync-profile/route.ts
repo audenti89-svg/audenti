@@ -118,6 +118,11 @@ export async function POST(request: Request) {
             ...(existingAuthUser.user_metadata || {}),
             full_name: fullName || existingAuthUser.user_metadata?.full_name || 'Paciente Audenti',
             phone: cleanPhone || existingAuthUser.user_metadata?.phone,
+            role: isSystemAdminEmail(cleanEmail) ? 'superadmin' : 'patient',
+            doctor_type: isSystemAdminEmail(cleanEmail) ? 'superadmin' : null,
+            branch_id: defaultBranchId,
+            branch_name: defaultBranchName,
+            email_verified: true,
           }
         };
 
@@ -134,8 +139,8 @@ export async function POST(request: Request) {
           email_confirm: true,
           user_metadata: {
             full_name: fullName || 'Paciente Audenti',
-            phone: cleanPhone,
-            role: 'patient',
+            phone: cleanPhone || '5500000000',
+            role: isSystemAdminEmail(cleanEmail) ? 'superadmin' : 'patient',
             branch_id: defaultBranchId,
             branch_name: defaultBranchName,
           }
@@ -201,6 +206,7 @@ export async function POST(request: Request) {
     if (existingPatient) {
       const updateData: Record<string, any> = {
         status: 'active',
+        role: isSystemAdminEmail(cleanEmail) ? 'superadmin' : 'patient',
         updated_at: new Date().toISOString()
       };
       if (targetUserId) updateData.user_id = targetUserId;

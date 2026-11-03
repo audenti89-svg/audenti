@@ -81,15 +81,14 @@ export async function updateSession(request: NextRequest) {
     // Lista de correos administradores / dueños del sistema (Ricardo Sánchez y Dra. Aura Estudillo)
     const isSuperAdmin = isSystemAdminEmail(userEmail);
 
-    // 1. Leer rol prioritariamente desde los Claims del JWT
-    const jwtRole = user.app_metadata?.user_role || user.app_metadata?.role || user.user_metadata?.role;
-
-    let isStaffOrOwner = isSuperAdmin || isInternalUser(userEmail, jwtRole);
+    // 1. Detección unívoca de rol: JWT / Metadata
+    const jwtRole = (user.app_metadata?.user_role || user.app_metadata?.role || user.user_metadata?.role || '').toLowerCase().trim();
     let userRole = jwtRole;
+    let isPatientRole = jwtRole === 'patient';
     let doctorType: string | undefined = undefined;
     let studentExpiresAt: string | undefined = undefined;
 
-    // 2. Consultar perfil en tabla users para permisos granulares (con tolerancia si la tabla falla)
+    // 2. Consultar perfil en tabla users
     try {
       const { data: userProfile } = await supabase
         .from('users')
@@ -98,19 +97,33 @@ export async function updateSession(request: NextRequest) {
         .maybeSingle();
 
       if (userProfile) {
-        userRole = userProfile.role || userRole;
-        doctorType = userProfile.doctor_type;
-        studentExpiresAt = userProfile.student_expires_at;
-
-        isStaffOrOwner =
-          isSuperAdmin ||
-          isInternalUser(userEmail, userProfile.role) ||
-          isInternalUser(userEmail, userProfile.doctor_type);
+        const dbRole = (userProfile.role || '').toLowerCase().trim();
+        if (dbRole === 'patient') {
+          isPatientRole = true;
+          userRole = 'patient';
+        } else if (!isPatientRole && dbRole) {
+          userRole = dbRole;
+        }
       }
     } catch {}
 
-    // REGLA CLAVE: Validación estricta de personal clínico vs pacientes
-    const isAdmin = isSuperAdmin || isStaffOrOwner;
+    // 3. Consultar tabla patients si aún no confirmamos que es paciente
+    if (!isPatientRole && !isSuperAdmin) {
+      try {
+        const { data: pRec } = await supabase
+          .from('patients')
+          .select('role')
+          .or(`user_id.eq.${user.id},email.eq.${userEmail}`)
+          .maybeSingle();
+        if (pRec?.role?.toLowerCase().trim() === 'patient' || pRec) {
+          isPatientRole = true;
+          userRole = 'patient';
+        }
+      } catch {}
+    }
+
+    // Regla de oro: si es paciente y NO es superadmin (Dra. Aura), NUNCA es admin ni staff
+    const isAdmin = !isPatientRole && (isSuperAdmin || isInternalUser(userEmail, userRole));
 
     // ─────────────────────────────────────────────────────────────
     // SEPARACIÓN ESTRICTA: SI ES PACIENTE

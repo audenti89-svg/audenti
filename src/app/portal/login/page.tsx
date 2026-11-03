@@ -218,7 +218,7 @@ function PatientLoginForm() {
           .maybeSingle();
 
         if (pRecord?.email) {
-          loginEmail = pRecord.email;
+          loginEmail = pRecord.email.trim().toLowerCase();
         } else {
           throw new Error('No encontramos un paciente registrado con ese número de teléfono.');
         }
