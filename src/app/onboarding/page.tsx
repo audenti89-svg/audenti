@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
+import { safeUpsertPatient } from '@/lib/patients/safeUpsertPatient';
 import { ShieldCheck, UserCheck, HeartPulse, PhoneCall, AlertTriangle, QrCode, Sparkles } from 'lucide-react';
 
 const BRANCHES = [
@@ -130,30 +131,10 @@ function OnboardingContent() {
 
       if (defaultBranch?.id) patientPayload.branch_id = defaultBranch.id;
 
-      const { error: patientErr } = await supabase
-        .from('patients')
-        .upsert(patientPayload, { onConflict: 'id' });
-
-      if (patientErr) {
-        console.warn('Upsert directo en patients:', patientErr);
-        // Fallback conservando la sede seleccionada
-        const fallbackPayload: any = {
-          id: user.id,
-          full_name: formData.full_name.trim(),
-          phone: formData.phone.trim(),
-          email: user.email,
-          tenant_id: formData.tenant_id,
-          branch_name: formData.tenant_id === '00000000-0000-0000-0000-000000000002' ? 'Sucursal Chalma de Guadalupe' : 'Sucursal Valbuena (Matriz)',
-          emergency_contact_name: formData.emergency_contact_name.trim(),
-          emergency_contact_phone: formData.emergency_contact_phone.trim(),
-          acquisition_channel: normalizedChannel,
-          referrer_name: formData.referred_by?.trim() || null,
-          qr_code_id: formData.qr_code_id?.trim() || null,
-          onboarding_completed: true,
-        };
-        const { error: fallbackErr } = await supabase.from('patients').upsert(fallbackPayload, { onConflict: 'id' });
-        if (fallbackErr) throw fallbackErr;
-      }
+      // Registro Inteligente: Valida en Supabase si el correo o usuario ya existe.
+      // Si existe, realiza un UPDATE seguro sin duplicar; si no existe, ejecuta un INSERT limpio.
+      const upsertResult = await safeUpsertPatient(supabase, patientPayload);
+      const actualPatientId = upsertResult.id || user.id;
 
       // Incrementar contador de referidos del embajador si se vinculó
       if (patientPayload.referrer_id) {

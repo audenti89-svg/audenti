@@ -12,6 +12,7 @@ import {
   getPersistedAppointments,
   savePersistedAppointments
 } from '@/lib/supabase/appointments-storage'
+import { safeUpsertPatient } from '@/lib/patients/safeUpsertPatient'
 
 export interface PersistentAppointment {
   id: string
@@ -117,33 +118,13 @@ export async function createAppointmentAction(input: CreateAppointmentInput) {
       const supabase = await createClient()
 
       let patientId: string | undefined
-      if (patient_phone) {
-        const { data: existingPatient } = await supabase
-          .from('patients')
-          .select('id, full_name')
-          .eq('phone', patient_phone)
-          .maybeSingle()
-
-        if (existingPatient) {
-          patientId = existingPatient.id
-          if (patient_name && patient_name !== existingPatient.full_name && !patient_name.includes('Paciente Web')) {
-            await supabase
-              .from('patients')
-              .update({ full_name: patient_name })
-              .eq('id', existingPatient.id)
-          }
-        } else {
-          const { data: newPat } = await supabase
-            .from('patients')
-            .insert({
-              full_name: patient_name,
-              phone: patient_phone,
-              onboarding_completed: false
-            })
-            .select('id')
-            .maybeSingle()
-          patientId = newPat?.id
-        }
+      if (patient_phone || patient_name) {
+        const upsertResult = await safeUpsertPatient(supabase, {
+          full_name: patient_name,
+          phone: patient_phone,
+          onboarding_completed: false
+        })
+        patientId = upsertResult.id
       }
 
       if (patientId) {

@@ -26,7 +26,8 @@ import {
   Menu,
   X,
   Coffee,
-  Wine
+  Wine,
+  UserCheck
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { SpotlightCard } from '@/components/ui/spotlight-card'
@@ -453,20 +454,31 @@ export default function LandingPage() {
           </nav>
 
           <div className="flex items-center gap-2 shrink-0">
-            {/* Botón Acceso Clínico (Visible en sm y superiores) */}
-            <button
-              onClick={() => openAuth('login')}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-slate-700 hover:border-amber-400 bg-slate-900 text-xs font-bold text-slate-200 transition-all shadow-2xs cursor-pointer whitespace-nowrap"
+            {/* Botón 1: Iniciar Sesión Médica (100% Visible) */}
+            <Link
+              href="/auth/login"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-700 hover:border-amber-400 bg-slate-900/90 text-xs font-bold text-slate-100 hover:text-white transition-all shadow-sm cursor-pointer whitespace-nowrap"
+              title="Iniciar Sesión Médica"
             >
               <Lock className="w-3.5 h-3.5 text-amber-400" />
-              <span>Acceso Clínico</span>
-            </button>
+              <span>Iniciar Sesión</span>
+            </Link>
+
+            {/* Botón 2: Portal Paciente (100% Visible) */}
+            <Link
+              href="/portal/login"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-all shadow-md shadow-amber-500/20 cursor-pointer whitespace-nowrap"
+              title="Portal de Pacientes: Citas, Recetas y Odontograma"
+            >
+              <UserCheck className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Portal Paciente</span>
+            </Link>
 
             {/* Botón Principal Agendar Cita */}
             <a href="#reservar">
-              <ShimmerButton variant="primary" className="py-1.5 px-4 text-xs font-black font-hanken">
+              <ShimmerButton variant="primary" className="py-1.5 px-3.5 text-xs font-black font-hanken">
                 <Calendar className="w-3.5 h-3.5 text-slate-950" />
-                <span>Agendar</span>
+                <span className="hidden sm:inline">Agendar</span>
               </ShimmerButton>
             </a>
 
@@ -483,20 +495,31 @@ export default function LandingPage() {
 
         {/* Drawer móvil */}
         {mobileMenuOpen && (
-          <div className="md:hidden pt-4 pb-3 border-t border-slate-200 mt-3 space-y-2 text-center text-xs font-bold uppercase tracking-wider text-slate-700 animate-in fade-in duration-150">
-            <a href="#hero" onClick={() => setMobileMenuOpen(false)} className="block py-2">Estudio</a>
-            <a href="#about" onClick={() => setMobileMenuOpen(false)} className="block py-2">Nosotros</a>
-            <a href="#tratamientos" onClick={() => setMobileMenuOpen(false)} className="block py-2">Tratamientos</a>
-            <a href="#equipo" onClick={() => setMobileMenuOpen(false)} className="block py-2">Especialistas</a>
-            <a href="#contacto" onClick={() => setMobileMenuOpen(false)} className="block py-2">Ubicación</a>
-            <div className="pt-2 border-t border-slate-100">
-              <button
-                onClick={() => openAuth('login')}
-                className="w-full py-2.5 rounded-xl bg-amber-400 text-slate-950 font-bold inline-flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+          <div className="md:hidden pt-4 pb-3 border-t border-slate-800 mt-3 space-y-2 text-center text-xs font-bold uppercase tracking-wider text-slate-300 bg-slate-950/95 backdrop-blur-2xl rounded-2xl p-4 border border-amber-500/20 shadow-2xl animate-in fade-in duration-150">
+            <a href="#hero" onClick={() => setMobileMenuOpen(false)} className="block py-2 hover:text-amber-400 transition-colors">Estudio</a>
+            <a href="#about" onClick={() => setMobileMenuOpen(false)} className="block py-2 hover:text-amber-400 transition-colors">Nosotros</a>
+            <a href="#tratamientos" onClick={() => setMobileMenuOpen(false)} className="block py-2 hover:text-amber-400 transition-colors">Tratamientos</a>
+            <a href="#equipo" onClick={() => setMobileMenuOpen(false)} className="block py-2 hover:text-amber-400 transition-colors">Especialistas</a>
+            <a href="#contacto" onClick={() => setMobileMenuOpen(false)} className="block py-2 hover:text-amber-400 transition-colors">Ubicación</a>
+            
+            <div className="pt-3 border-t border-slate-800 space-y-2">
+              <Link
+                href="/auth/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full py-2.5 rounded-xl bg-slate-900 border border-amber-500/40 text-amber-300 font-bold inline-flex items-center justify-center gap-2 shadow-xs cursor-pointer"
               >
-                <Lock className="w-4 h-4" />
-                Acceso Clínico Especialistas
-              </button>
+                <Lock className="w-4 h-4 text-amber-400" />
+                Iniciar Sesión (Doctores / Personal)
+              </Link>
+
+              <Link
+                href="/portal/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full py-2.5 rounded-xl bg-amber-400 text-slate-950 font-black inline-flex items-center justify-center gap-2 shadow-md shadow-amber-500/20 cursor-pointer"
+              >
+                <UserCheck className="w-4 h-4" />
+                Portal del Paciente (Citas &amp; Recetas)
+              </Link>
             </div>
           </div>
         )}

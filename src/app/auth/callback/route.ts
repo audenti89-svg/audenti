@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { safeUpsertPatient } from '@/lib/patients/safeUpsertPatient';
 
 // ────────────────────────────────────────────────────────────
 // Helper: decodificar estado de atribución del parámetro state
@@ -152,28 +153,17 @@ export async function GET(request: Request) {
     const isPortalTarget = next.startsWith('/portal') || next.startsWith('/mi-expediente') || requestUrl.searchParams.get('portal') === 'true';
 
     if (isPortalTarget) {
-      const { data: patientProfile } = await supabase
-        .from('patients')
-        .select('id, full_name, email, user_id, auth_user_id')
-        .or(`auth_user_id.eq.${user.id},user_id.eq.${user.id},email.eq.${user.email}`)
-        .maybeSingle();
-
-      if (patientProfile) {
-        if (!patientProfile.auth_user_id || !patientProfile.user_id) {
-          await supabase.from('patients').update({
-            auth_user_id: user.id,
-            user_id: user.id,
-          }).eq('id', patientProfile.id);
-        }
-      } else {
-        await supabase.from('patients').upsert({
+      try {
+        await safeUpsertPatient(supabase as any, {
           auth_user_id: user.id,
           user_id: user.id,
           email: user.email,
           full_name: user.user_metadata?.full_name || user.user_metadata?.name || 'Paciente Audenti',
           branch_name: 'Sucursal Balbuena (Matriz)',
           onboarding_completed: true
-        }, { onConflict: 'auth_user_id' });
+        });
+      } catch (upsertErr) {
+        console.warn('[auth/callback] Error en safeUpsertPatient portal:', upsertErr);
       }
 
       return NextResponse.redirect(`${origin}/portal`);

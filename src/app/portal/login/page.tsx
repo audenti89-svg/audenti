@@ -1,6 +1,7 @@
 'use client';
 
 import { createClient } from '@/utils/supabase/client';
+import { safeUpsertPatient } from '@/lib/patients/safeUpsertPatient';
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -87,18 +88,17 @@ function PatientLoginForm() {
       if (error) throw error;
 
       if (data?.user) {
-        // Enlazar paciente en caso de ser necesario
-        const { data: p } = await supabase
-          .from('patients')
-          .select('id')
-          .or(`auth_user_id.eq.${data.user.id},user_id.eq.${data.user.id},email.eq.${data.user.email}`)
-          .maybeSingle();
-
-        if (p) {
-          await supabase.from('patients').update({
+        // Registro / Enlace Inteligente (Sin duplicar si el correo ya existe)
+        try {
+          await safeUpsertPatient(supabase, {
             auth_user_id: data.user.id,
-            user_id: data.user.id
-          }).eq('id', p.id);
+            user_id: data.user.id,
+            email: data.user.email,
+            full_name: data.user.user_metadata?.full_name || 'Paciente Audenti',
+            onboarding_completed: true
+          });
+        } catch (linkErr) {
+          console.warn('Nota safeUpsertPatient en portal login:', linkErr);
         }
 
         router.push('/portal');

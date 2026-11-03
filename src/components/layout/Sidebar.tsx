@@ -94,7 +94,7 @@ function NavGroup({ title, items, unconfirmedCount }: { title: string; items: Na
 }
 
 import { AudentiLogo } from '@/components/ui/AudentiLogo'
-import { X, UserPlus, GraduationCap } from 'lucide-react'
+import { X, UserPlus, GraduationCap, Lock, UserCheck, LogOut, ArrowRight, ExternalLink } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { InviteDoctorModal } from '@/components/admin/InviteDoctorModal'
 import { QuickStudentPassModal } from '@/components/admin/QuickStudentPassModal'
@@ -249,16 +249,47 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           {!isTrabajador && !isEstudiante && (
             <NavGroup title="Sistema" items={systemNav} unconfirmedCount={unconfirmedCount} />
           )}
+
+          {/* ACCESOS Y AUTENTICACIÓN (100% VISIBLE EN BARRA LATERAL) */}
+          <div className="pt-3 border-t border-white/10 space-y-1.5">
+            <span className="px-3 text-[10px] font-bold uppercase tracking-wider text-amber-400 block mb-1">
+              Accesos &amp; Sesión
+            </span>
+
+            <Link
+              href="/auth/login"
+              className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-amber-300 bg-amber-400/10 hover:bg-amber-400 hover:text-slate-950 border border-amber-400/30 transition-all cursor-pointer shadow-xs group"
+              title="Iniciar sesión o cambiar de cuenta médica"
+            >
+              <div className="flex items-center gap-2.5">
+                <Lock className="w-4 h-4 shrink-0 text-amber-400 group-hover:text-slate-950 transition-colors" />
+                <span>Iniciar Sesión Médica</span>
+              </div>
+              <ArrowRight className="w-3.5 h-3.5 text-amber-400 group-hover:text-slate-950 transition-colors" />
+            </Link>
+
+            <Link
+              href="/portal/login"
+              className="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-slate-200 hover:bg-white/10 hover:text-white transition-all cursor-pointer"
+              title="Portal de consultas para pacientes"
+            >
+              <div className="flex items-center gap-2.5">
+                <UserCheck className="w-4 h-4 shrink-0 text-emerald-400" />
+                <span>Portal del Paciente</span>
+              </div>
+              <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+            </Link>
+          </div>
         </div>
 
-        {/* User Footer */}
-        <Link
-          href="/dashboard/perfil"
-          className="p-4 border-t border-white/10 bg-black/20 hover:bg-white/5 transition flex items-center justify-between cursor-pointer"
-          title="Editar Perfil"
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <div className={`w-9 h-9 rounded-full flex items-center justify-center font-black text-xs shrink-0 shadow-xs ${
+        {/* User Footer & Quick Sign Out */}
+        <div className="p-3 border-t border-white/10 bg-black/30 flex items-center justify-between gap-2">
+          <Link
+            href="/dashboard/perfil"
+            className="flex items-center gap-2.5 min-w-0 flex-1 hover:opacity-90 transition cursor-pointer"
+            title="Editar Perfil"
+          >
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs shrink-0 shadow-xs ${
               isSocio
                 ? 'bg-amber-400 text-slate-950'
                 : isEstudiante
@@ -283,9 +314,20 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 {roleBadgeLabel}
               </span>
             </div>
-          </div>
-          <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
-        </Link>
+          </Link>
+
+          <button
+            type="button"
+            onClick={async () => {
+              await supabase.auth.signOut()
+              window.location.href = '/auth/login'
+            }}
+            className="p-2 rounded-xl bg-slate-900/80 hover:bg-rose-950/60 border border-slate-700 hover:border-rose-500/40 text-slate-400 hover:text-rose-300 transition-colors cursor-pointer shrink-0"
+            title="Cerrar Sesión Activa"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
+        </div>
       </aside>
 
       {/* Modal de Invitación a Odontólogos */}

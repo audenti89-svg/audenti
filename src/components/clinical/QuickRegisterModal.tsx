@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { useBranchStore, BranchId, BRANCHES_DATA } from '@/stores/branchStore'
+import { safeUpsertPatient } from '@/lib/patients/safeUpsertPatient'
 
 // Lista de sucursales disponibles para la selección del paciente con UUIDs de tenant:
 export const BRANCHES = [
@@ -138,35 +139,16 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
         patientData.email = formData.email.trim()
       }
 
-      // Inserción en Supabase
-      let { data, error } = await supabase
-        .from('patients')
-        .insert([patientData])
-        .select()
-        .single()
+      // Registro Inteligente: Valida en Supabase si ya existe por correo o teléfono.
+      // Si existe, realiza un UPDATE seguro sin duplicar; si no existe, ejecuta un INSERT limpio.
+      const upsertResult = await safeUpsertPatient(supabase, patientData)
+      const data = upsertResult.data
 
-      if (!error && patientData.referrer_id) {
+      if (patientData.referrer_id) {
         try {
           await supabase.rpc('increment_referral_count', { referrer: patientData.referrer_id })
         } catch {}
       }
-
-      // Si falla por restricción de clave foránea en tenant_id inexistente, obtener el tenant existente de la BD
-      if (error && (error.code === '23503' || error.message?.includes('foreign key'))) {
-        const { data: realTenant } = await supabase.from('tenants').select('id').limit(1).maybeSingle()
-        if (realTenant?.id) {
-          patientData.tenant_id = realTenant.id
-          const retry = await supabase
-            .from('patients')
-            .insert([patientData])
-            .select()
-            .single()
-          data = retry.data
-          error = retry.error
-        }
-      }
-
-      if (error) throw error
 
       if (typeof window !== 'undefined') {
         // Reducción de payload: solo despachar el identificador único para minimizar datos en memoria/eventos

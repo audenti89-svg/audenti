@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { AudentiLogo } from '@/components/ui/AudentiLogo';
+import { safeUpsertPatient } from '@/lib/patients/safeUpsertPatient';
 import {
   X,
   Mail,
@@ -98,6 +99,20 @@ export function AuthModal({
 
         if (error) throw error;
 
+        if (data.user) {
+          try {
+            await safeUpsertPatient(supabase, {
+              auth_user_id: data.user.id,
+              user_id: data.user.id,
+              email: email.trim(),
+              full_name: fullName.trim(),
+              onboarding_completed: false
+            });
+          } catch (upsertErr) {
+            console.warn('Upsert inicial en registro:', upsertErr);
+          }
+        }
+
         if (data.session) {
           // Sesión inmediata sin confirmación de email requerida
           onClose();
@@ -133,13 +148,13 @@ export function AuthModal({
         className="fixed inset-0 bg-slate-950/60 backdrop-blur-md transition-opacity duration-300 animate-in fade-in"
       />
 
-      {/* 2. Tarjeta Flotante con Acabado Translúcido y Animación Fluida */}
-      <div className="relative w-full max-w-md bg-white/95 backdrop-blur-2xl rounded-3xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] border border-slate-200/90 p-6 sm:p-8 text-slate-900 z-10 transition-all duration-300 animate-in zoom-in-95 fade-in slide-in-from-bottom-4">
+      {/* 2. Tarjeta Flotante con Acabado Cristal Oscuro y Bordes Ámbar */}
+      <div className="relative w-full max-w-md bg-slate-950/95 backdrop-blur-2xl rounded-3xl shadow-[0_0_60px_rgba(245,158,11,0.15)] border-2 border-amber-500/40 p-6 sm:p-8 text-white z-10 transition-all duration-300 animate-in zoom-in-95 fade-in slide-in-from-bottom-4">
         {/* Botón de Cierre */}
         <button
           onClick={onClose}
           type="button"
-          className="absolute top-5 right-5 p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100/80 transition-colors"
+          className="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-900 transition-colors cursor-pointer"
           aria-label="Cerrar modal"
         >
           <X className="w-5 h-5" />
@@ -151,22 +166,49 @@ export function AuthModal({
             <AudentiLogo size={48} variant="icon" />
           </div>
           <div className="flex items-center justify-center gap-1.5 mb-1">
-            <h2 className="text-xl font-black text-[#202D4C] tracking-tight">
+            <h2 className="text-xl font-black text-white tracking-tight">
               Audenti — DentalCloud Pro
             </h2>
-            <Sparkles className="w-4 h-4 text-[#E3A033]" />
+            <Sparkles className="w-4 h-4 text-amber-400" />
           </div>
-          <p className="text-xs font-semibold text-slate-500">
+          <p className="text-xs font-semibold text-amber-300">
             Dra. Aura Estudillo • Céd. Prof. 8492019
           </p>
-          <div className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200/60">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+          <div className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-emerald-300 bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-500/30">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
             Acceso Médico Clínico Protegido
           </div>
         </div>
 
+        {/* Accesos Rápidos a Portales Oficiales */}
+        <div className="grid grid-cols-2 gap-2 mb-5">
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              router.push('/auth/login');
+            }}
+            className="py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white text-[11px] font-bold border border-slate-700 hover:border-amber-400/40 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            <Lock className="w-3.5 h-3.5 text-amber-400" />
+            <span>Doctores / Staff</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              router.push('/portal/login');
+            }}
+            className="py-2 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-[11px] font-black transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-amber-500/20 cursor-pointer"
+          >
+            <User className="w-3.5 h-3.5" />
+            <span>Portal Paciente</span>
+          </button>
+        </div>
+
         {/* Selector Dual Minimalista: Iniciar Sesión / Crear Cuenta */}
-        <div className="flex p-1 bg-slate-100 rounded-2xl mb-6 text-xs font-bold border border-slate-200/60">
+        <div className="flex p-1 bg-slate-900 rounded-2xl mb-5 text-xs font-bold border border-slate-800">
           <button
             type="button"
             onClick={() => {
@@ -174,10 +216,10 @@ export function AuthModal({
               setErrorMessage('');
               setSuccessMessage('');
             }}
-            className={`flex-1 py-2 rounded-xl transition-all ${
+            className={`flex-1 py-2 rounded-xl transition-all cursor-pointer ${
               mode === 'login'
-                ? 'bg-white text-[#202D4C] shadow-sm'
-                : 'text-slate-500 hover:text-slate-900'
+                ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
+                : 'text-slate-400 hover:text-white'
             }`}
           >
             Iniciar Sesión
@@ -189,10 +231,10 @@ export function AuthModal({
               setErrorMessage('');
               setSuccessMessage('');
             }}
-            className={`flex-1 py-2 rounded-xl transition-all ${
+            className={`flex-1 py-2 rounded-xl transition-all cursor-pointer ${
               mode === 'register'
-                ? 'bg-white text-[#202D4C] shadow-sm'
-                : 'text-slate-500 hover:text-slate-900'
+                ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
+                : 'text-slate-400 hover:text-white'
             }`}
           >
             Crear Cuenta
@@ -201,15 +243,15 @@ export function AuthModal({
 
         {/* Notificaciones de Error o Éxito */}
         {errorMessage && (
-          <div className="mb-4 p-3 rounded-2xl bg-rose-50 border border-rose-200/80 text-xs font-medium text-rose-700 flex items-start gap-2 animate-in fade-in">
-            <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+          <div className="mb-4 p-3 rounded-2xl bg-rose-950/70 border border-rose-500/50 text-xs font-medium text-rose-300 flex items-start gap-2 animate-in fade-in">
+            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
             <span>{errorMessage}</span>
           </div>
         )}
 
         {successMessage && (
-          <div className="mb-4 p-3 rounded-2xl bg-emerald-50 border border-emerald-200/80 text-xs font-medium text-emerald-800 flex items-start gap-2 animate-in fade-in">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+          <div className="mb-4 p-3 rounded-2xl bg-emerald-950/70 border border-emerald-500/50 text-xs font-medium text-emerald-300 flex items-start gap-2 animate-in fade-in">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
             <span>{successMessage}</span>
           </div>
         )}
@@ -219,7 +261,7 @@ export function AuthModal({
           type="button"
           onClick={handleGoogleAuth}
           disabled={loadingGoogle || loadingEmail}
-          className="w-full py-3 px-4 rounded-2xl bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs border border-slate-300 shadow-sm hover:shadow transition-all flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-60 cursor-pointer"
+          className="w-full py-3 px-4 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs border border-slate-700 hover:border-slate-600 shadow-sm transition-all flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-60 cursor-pointer"
         >
           <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
             <path
@@ -247,59 +289,59 @@ export function AuthModal({
         </button>
 
         {/* Separador */}
-        <div className="relative my-5">
+        <div className="relative my-4">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-slate-200" />
+            <div className="w-full border-t border-slate-800" />
           </div>
-          <div className="relative flex justify-center text-[10px] uppercase font-bold text-slate-400">
-            <span className="bg-white/95 px-3">o con correo electrónico</span>
+          <div className="relative flex justify-center text-[10px] uppercase font-bold text-slate-500">
+            <span className="bg-slate-950 px-3">o con correo electrónico</span>
           </div>
         </div>
 
         {/* Formulario Alternativo de Correo Electrónico y Contraseña */}
-        <form onSubmit={handleEmailAuth} className="space-y-3.5">
+        <form onSubmit={handleEmailAuth} className="space-y-3">
           {mode === 'register' && (
             <div>
-              <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">
+              <label className="block text-[11px] font-bold uppercase text-slate-300 mb-1">
                 Nombre Completo
               </label>
               <div className="relative">
-                <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
                 <input
                   type="text"
                   required
                   placeholder="Ej. Roberto Gómez"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#202D4C] focus:bg-white transition-all"
+                  className="w-full pl-10 pr-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs font-medium text-white placeholder-slate-500 focus:outline-hidden focus:border-amber-400 transition-all"
                 />
               </div>
             </div>
           )}
 
           <div>
-            <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">
+            <label className="block text-[11px] font-bold uppercase text-slate-300 mb-1">
               Correo Electrónico
             </label>
             <div className="relative">
-              <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+              <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
               <input
                 type="email"
                 required
                 placeholder="ejemplo@correo.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#202D4C] focus:bg-white transition-all"
+                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs font-medium text-white placeholder-slate-500 focus:outline-hidden focus:border-amber-400 transition-all"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">
+            <label className="block text-[11px] font-bold uppercase text-slate-300 mb-1">
               Contraseña
             </label>
             <div className="relative">
-              <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+              <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
               <input
                 type="password"
                 required
@@ -307,7 +349,7 @@ export function AuthModal({
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#202D4C] focus:bg-white transition-all"
+                className="w-full pl-10 pr-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs font-medium text-white placeholder-slate-500 focus:outline-hidden focus:border-amber-400 transition-all"
               />
             </div>
           </div>
@@ -315,11 +357,11 @@ export function AuthModal({
           <button
             type="submit"
             disabled={loadingEmail || loadingGoogle}
-            className="w-full mt-2 py-3 px-4 bg-[#202D4C] hover:bg-[#162139] text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-60 cursor-pointer"
+            className="w-full mt-2 py-3 px-4 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl shadow-lg shadow-amber-500/20 transition-all flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-60 cursor-pointer"
           >
             {loadingEmail ? (
               <>
-                <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span className="w-3.5 h-3.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
                 <span>Procesando...</span>
               </>
             ) : (
@@ -334,7 +376,7 @@ export function AuthModal({
         </form>
 
         {/* Footer legal */}
-        <div className="mt-5 pt-3.5 border-t border-slate-100 text-center text-[11px] text-slate-400">
+        <div className="mt-5 pt-3.5 border-t border-slate-800 text-center text-[10px] text-slate-400">
           Protección de datos conforme a NOM-004-SSA3-2012 del Expediente Clínico.
         </div>
       </div>

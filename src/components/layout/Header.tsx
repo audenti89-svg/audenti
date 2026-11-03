@@ -19,7 +19,9 @@ import {
   X,
   ArrowRight,
   ShieldAlert,
-  GraduationCap
+  GraduationCap,
+  Lock,
+  UserCheck
 } from 'lucide-react'
 import { useBranchStore, BranchId, BRANCHES_DATA } from '@/stores/branchStore'
 import { useNotificationSound } from '@/hooks/useNotificationSound'
@@ -256,28 +258,28 @@ export function Header({ onMenuToggle }: HeaderProps) {
   }
 
   return (
-    <header className="fixed top-0 left-0 lg:left-72 right-0 h-16 sm:h-20 bg-white/95 backdrop-blur-md border-b border-slate-200/80 z-30 flex items-center justify-between px-3 sm:px-6 lg:px-8 shadow-xs">
+    <header className="fixed top-0 left-0 lg:left-72 right-0 h-16 sm:h-20 bg-slate-950/95 backdrop-blur-xl border-b border-amber-500/20 z-30 flex items-center justify-between px-3 sm:px-6 lg:px-8 shadow-xl text-white">
       {/* Botón hamburguesa en móvil + Selector de Sucursal Reactivo */}
       <div className="flex items-center gap-2 sm:gap-3">
         {onMenuToggle && (
           <button
             type="button"
             onClick={onMenuToggle}
-            className="lg:hidden p-2 rounded-xl text-slate-700 hover:bg-slate-100 transition-colors"
+            className="lg:hidden p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-900 transition-colors cursor-pointer"
             aria-label="Abrir Menú Lateral"
           >
             <Menu className="w-5 h-5" />
           </button>
         )}
-        <div className="relative flex items-center bg-slate-50 px-2 sm:px-3 py-1.5 rounded-xl border border-slate-200 hover:border-amber-400 transition-colors shadow-2xs max-w-[160px] sm:max-w-xs md:max-w-none">
-          <Building2 className="w-4 h-4 text-amber-600 mr-1.5 shrink-0" />
+        <div className="relative flex items-center bg-slate-900/90 px-2 sm:px-3 py-1.5 rounded-xl border border-slate-800 hover:border-amber-400/50 transition-colors shadow-sm max-w-[160px] sm:max-w-xs md:max-w-none">
+          <Building2 className="w-4 h-4 text-amber-400 mr-1.5 shrink-0" />
           <select
             value={currentBranchId}
             onChange={handleBranchChange}
-            className="bg-transparent text-xs font-bold text-slate-900 pr-6 appearance-none focus:outline-none cursor-pointer truncate"
+            className="bg-transparent text-xs font-bold text-slate-100 pr-6 appearance-none focus:outline-hidden cursor-pointer truncate"
           >
-            <option value="balbuena">Sucursal Balbuena (Matriz) — Dra. Aura Estudillo</option>
-            <option value="guadalupe-chalma">Sucursal Chalma de Guadalupe — Dra. Aura Estudillo</option>
+            <option value="balbuena" className="bg-slate-950 text-white">Sucursal Balbuena (Matriz) — Dra. Aura Estudillo</option>
+            <option value="guadalupe-chalma" className="bg-slate-950 text-white">Sucursal Chalma de Guadalupe — Dra. Aura Estudillo</option>
           </select>
           <ChevronDown className="w-3.5 h-3.5 absolute right-2 pointer-events-none text-slate-400" />
         </div>
@@ -285,11 +287,11 @@ export function Header({ onMenuToggle }: HeaderProps) {
         {/* Badge Dinámico de Estado de la Sucursal */}
         <div className={`hidden xl:inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold shrink-0 whitespace-nowrap transition-all ${
           currentBranch.isUpcoming
-            ? 'bg-purple-50 text-purple-900 border-purple-200'
-            : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+            ? 'bg-purple-950/70 text-purple-300 border-purple-500/40'
+            : 'bg-emerald-950/70 text-emerald-300 border-emerald-500/40'
         }`}>
           <span className={`w-2 h-2 rounded-full shrink-0 ${
-            currentBranch.isUpcoming ? 'bg-purple-500 animate-pulse' : 'bg-emerald-500 animate-pulse'
+            currentBranch.isUpcoming ? 'bg-purple-400 animate-pulse' : 'bg-emerald-400 animate-pulse'
           }`} />
           <span className="text-[11px] font-bold whitespace-nowrap">{currentBranch.statusBadge}</span>
         </div>
@@ -298,8 +300,27 @@ export function Header({ onMenuToggle }: HeaderProps) {
       {/* Espacio flexible central */}
       <div className="flex-1" />
 
-      {/* Controles de Perfil y Notificaciones */}
-      <div className="flex items-center gap-1.5 sm:gap-2.5">
+      {/* Controles de Acceso, Notificaciones y Perfil */}
+      <div className="flex items-center gap-2 sm:gap-2.5">
+        {/* BOTÓN 1: INICIAR SESIÓN (100% VISIBLE EN HEADER) */}
+        <Link
+          href="/auth/login"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-all shadow-md shadow-amber-500/20 cursor-pointer shrink-0"
+          title="Iniciar Sesión Médica / Personal"
+        >
+          <Lock className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Iniciar Sesión</span>
+        </Link>
+
+        {/* BOTÓN 2: PORTAL PACIENTE (100% VISIBLE EN HEADER) */}
+        <Link
+          href="/portal/login"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-amber-300 hover:text-amber-200 border border-amber-500/40 text-xs font-bold transition-all shadow-sm cursor-pointer shrink-0"
+          title="Acceso exclusivo al Portal del Paciente"
+        >
+          <UserCheck className="w-3.5 h-3.5 text-amber-400" />
+          <span className="hidden md:inline">Portal Paciente</span>
+        </Link>
         <div className="hidden sm:flex relative items-center bg-slate-100/70 px-2.5 py-1.5 rounded-xl border border-slate-200/50">
           <ShieldCheck className="w-3.5 h-3.5 text-slate-600 mr-1.5 shrink-0" />
           <select className="bg-transparent text-[11px] font-bold text-slate-700 pr-4 appearance-none focus:outline-none cursor-pointer">
@@ -374,7 +395,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
           </button>
 
           {showNotifications && (
-            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-slate-950/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-amber-500/30 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200 text-white">
               {/* Header del Dropdown */}
               <div className="p-3.5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
                 <div className="flex items-center gap-2">
@@ -404,11 +425,11 @@ export function Header({ onMenuToggle }: HeaderProps) {
               </div>
 
               {/* Lista de Notificaciones */}
-              <div className="max-h-80 overflow-y-auto divide-y divide-slate-100">
+              <div className="max-h-80 overflow-y-auto divide-y divide-slate-800/80">
                 {notifications.length === 0 ? (
                   <div className="p-6 text-center text-slate-400 text-xs">
-                    <CheckCircle className="w-7 h-7 mx-auto mb-2 text-emerald-500/80" />
-                    <p className="font-semibold text-slate-700">Bandeja despejada</p>
+                    <CheckCircle className="w-7 h-7 mx-auto mb-2 text-emerald-400/80" />
+                    <p className="font-semibold text-slate-200">Bandeja despejada</p>
                     <p className="text-[11px] text-slate-400 mt-0.5">No hay alertas ni citas pendientes en este momento.</p>
                   </div>
                 ) : (
@@ -417,22 +438,22 @@ export function Header({ onMenuToggle }: HeaderProps) {
                       key={item.id}
                       href={item.link || '/dashboard'}
                       onClick={() => setShowNotifications(false)}
-                      className={`p-3.5 block transition-colors hover:bg-slate-50 cursor-pointer ${
-                        item.type === 'emergency' ? 'bg-rose-50/40' : ''
+                      className={`p-3.5 block transition-colors hover:bg-slate-900/80 cursor-pointer ${
+                        item.type === 'emergency' ? 'bg-rose-950/30' : ''
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <span className={`text-[11px] font-bold ${
-                          item.type === 'emergency' ? 'text-rose-700' : 'text-slate-900'
+                          item.type === 'emergency' ? 'text-rose-400' : 'text-slate-100'
                         }`}>
                           {item.title}
                         </span>
                         <span className="text-[10px] font-mono text-slate-400 shrink-0 flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
+                          <Clock className="w-3 h-3 text-amber-400" />
                           {item.time}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-600 mt-1 line-clamp-2 leading-relaxed">
+                      <p className="text-xs text-slate-300 mt-1 line-clamp-2 leading-relaxed">
                         {item.message}
                       </p>
                     </Link>
@@ -441,11 +462,11 @@ export function Header({ onMenuToggle }: HeaderProps) {
               </div>
 
               {/* Footer del Dropdown */}
-              <div className="p-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px]">
+              <div className="p-2.5 bg-slate-900 border-t border-slate-800 flex items-center justify-between text-[11px]">
                 <Link
                   href="/dashboard/agenda"
                   onClick={() => setShowNotifications(false)}
-                  className="text-amber-700 hover:text-amber-800 font-bold flex items-center gap-1 transition"
+                  className="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 transition"
                 >
                   <span>Ver toda la agenda</span>
                   <ArrowRight className="w-3 h-3" />
@@ -456,7 +477,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
                     fetchLiveNotifications()
                     playTone('message')
                   }}
-                  className="text-slate-400 hover:text-slate-600 font-medium transition cursor-pointer"
+                  className="text-slate-400 hover:text-slate-200 font-medium transition cursor-pointer"
                 >
                   Actualizar
                 </button>
