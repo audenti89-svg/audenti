@@ -40,6 +40,7 @@ import PatientOdontogram from '@/components/PatientOdontogram';
 import { PatientCalendarSchedule } from '@/components/patient/PatientCalendarSchedule';
 import { PATIENT_VISIBILITY_CONFIG } from '@/config/role-visibility';
 import { UnifiedCommunicationWidget } from '@/components/chat/UnifiedCommunicationWidget';
+import { InformedConsentSignModal } from '@/components/clinical/InformedConsentSignModal';
 import { isSystemAdminEmail } from '@/lib/auth/admin-emails';
 
 // ── SUCURSALES OFICIALES AUDENTI (CANÓNICAS) ──
@@ -148,6 +149,7 @@ export function PatientPortalView({
     }
   };
   const [selectedPrescription, setSelectedPrescription] = useState<DigitalPrescription | null>(null);
+  const [isConsentModalOpen, setIsConsentModalOpen] = useState(false);
   const [confirmingAppt, setConfirmingAppt] = useState(false);
   const [confirmationNotice, setConfirmationNotice] = useState<string>('');
   const [diagnosisMap, setDiagnosisMap] = useState<Record<number, ToothDiagnosis>>({});
@@ -852,13 +854,27 @@ export function PatientPortalView({
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => setSelectedPrescription(rx)}
-                      className="w-full py-2.5 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-amber-500/15"
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                      Ver Receta / Imprimir PDF
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setSelectedPrescription(rx)}
+                        className="flex-1 py-2.5 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-amber-500/15"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        Ver / Imprimir PDF
+                      </button>
+
+                      <a
+                        href={`https://wa.me/${branchInfo.phoneClean}?text=${encodeURIComponent(
+                          `Hola Dra. Aura Estudillo, soy ${patientName}. Deseo consultar o recibir mi receta oficial ${rx.folio}.`
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 transition-colors cursor-pointer"
+                        title="Recibir por WhatsApp"
+                      >
+                        <MessageCircle className="w-4 h-4 text-emerald-400" />
+                      </a>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -983,6 +999,38 @@ export function PatientPortalView({
                 Tus datos personales y registros clínicos están resguardados bajo estricto secreto médico y cifrado de extremo a extremo, en cumplimiento con la norma oficial <strong>NOM-004-SSA3-2012</strong>.
               </span>
             </div>
+
+            {/* Módulo de Consentimiento Informado Quirúrgico (NOM-004-SSA3) */}
+            <div className="bg-slate-950/90 border border-amber-500/40 rounded-3xl p-6 shadow-xl space-y-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-400 shrink-0">
+                    <FileCheck2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-white uppercase tracking-wider">
+                      Consentimientos Informados y Firma Digital
+                    </h4>
+                    <p className="text-xs text-slate-400">
+                      Biometría táctil y certificación SHA-256 (NOM-004-SSA3-2012)
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsConsentModalOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-all shadow-md shadow-amber-500/20 flex items-center gap-2 cursor-pointer shrink-0"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>Firmar Consentimiento Quirúrgico</span>
+                </button>
+              </div>
+
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Antes de cualquier intervención quirúrgica (extracciones, endodoncias, implantes o cirugía de terceros molares), puedes firmar y ratificar tu consentimiento informado directamente en pantalla. Cada firma genera un hash criptográfico único que queda registrado permanentemente en tu expediente.
+              </p>
+            </div>
           </div>
         )}
 
@@ -997,6 +1045,16 @@ export function PatientPortalView({
           }}
         />
       </main>
+
+      {/* ── MODAL DE FIRMA DIGITAL BIOMÉTRICA DE CONSENTIMIENTO INFORMADO (NOM-004-SSA3) ── */}
+      <InformedConsentSignModal
+        isOpen={isConsentModalOpen}
+        onClose={() => setIsConsentModalOpen(false)}
+        patientId={patient?.id || user?.id}
+        patientName={patientName}
+        patientPhone={patient?.phone}
+        branchName={branchInfo.name}
+      />
 
       {/* ── MODAL DE RECETA MÉDICA OFICIAL DESCARGABLE / IMPRIMIBLE (NOM-004-SSA3) ── */}
       {selectedPrescription && (

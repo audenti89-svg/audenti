@@ -75,6 +75,7 @@ export interface PatientDirectoryItem {
   consultationReason?: string
   address?: string
   emergencyContact?: string
+  branch?: string
 }
 
 export function ChatInterface() {
@@ -195,6 +196,22 @@ export function ChatInterface() {
         }
       } catch {}
 
+      // Correlación de mensajes de prospectos hacia pacientes registrados con el mismo teléfono
+      registeredList.forEach(p => {
+        const cleanP = (p.phone || '').replace(/\D/g, '').slice(-10)
+        if (cleanP && cleanP.length >= 7) {
+          const prospectKey = `prospect_${cleanP}`
+          if (mappedMessages[prospectKey] && mappedMessages[prospectKey].length > 0) {
+            if (!mappedMessages[p.id]) mappedMessages[p.id] = []
+            mappedMessages[prospectKey].forEach(m => {
+              if (!mappedMessages[p.id].some(ex => ex.id === m.id || ex.content === m.content)) {
+                mappedMessages[p.id].push(m)
+              }
+            })
+          }
+        }
+      })
+
       // D. Construir el Directorio de Pacientes (TODOS los pacientes registrados + prospectos con mensajes)
       const directoryList: PatientDirectoryItem[] = []
       const processedIds = new Set<string>()
@@ -212,6 +229,10 @@ export function ChatInterface() {
         if (lastMsg?.channel_type) chType = lastMsg.channel_type
         else if (lastMsg?.metadata?.channel_type) chType = lastMsg.metadata.channel_type
 
+        const branchDisplay = p.branch_name && (p.branch_name.toLowerCase().includes('chalma') || p.branch_name.toLowerCase().includes('guadalupe'))
+          ? 'Sucursal Chalma de Guadalupe — Dra. Aura Estudillo'
+          : 'Sucursal Balbuena (Matriz) — Dra. Aura Estudillo'
+
         directoryList.push({
           id: p.id,
           name: p.full_name || 'Paciente Registrado',
@@ -223,7 +244,8 @@ export function ChatInterface() {
           lastTime: lastMsg?.time || (p.created_at ? new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date(p.created_at)) : 'Hoy'),
           isUrgent,
           consultationReason: lastMsg?.metadata?.consultationReason,
-          emergencyContact: p.emergency_contact_name ? `${p.emergency_contact_name} (${p.emergency_contact_phone || ''})` : undefined
+          emergencyContact: p.emergency_contact_name ? `${p.emergency_contact_name} (${p.emergency_contact_phone || ''})` : undefined,
+          branch: branchDisplay
         })
       })
 
@@ -256,7 +278,8 @@ export function ChatInterface() {
             lastMessage: msgText,
             lastTime: lastMsg?.time || 'Reciente',
             isUrgent,
-            consultationReason: lastMsg?.metadata?.consultationReason
+            consultationReason: lastMsg?.metadata?.consultationReason,
+            branch: 'Sucursal Balbuena (Matriz) — Dra. Aura Estudillo'
           })
         }
       })
@@ -311,12 +334,22 @@ export function ChatInterface() {
           .select('*')
           .order('created_at', { ascending: true })
 
+        const targetPat = patients.find(p => p.id === patientId)
+        const cleanPhone = (targetPat?.phone || (patientId.startsWith('prospect_') ? patientId.replace('prospect_', '') : '')).replace(/\D/g, '').slice(-10)
+        const patName = targetPat?.name || ''
+
+        const orClauses = [`metadata->>patientId.eq.${patientId}`]
         if (!patientId.startsWith('prospect_')) {
-          query.or(`patient_id.eq.${patientId},metadata->>patientId.eq.${patientId}`)
-        } else {
-          const rawPhone = patientId.replace('prospect_', '').slice(-10)
-          query.or(`metadata->>patientId.eq.${patientId},metadata->>phone.ilike.%${rawPhone}%`)
+          orClauses.push(`patient_id.eq.${patientId}`)
         }
+        if (cleanPhone && cleanPhone.length >= 7) {
+          orClauses.push(`metadata->>phone.ilike.%${cleanPhone}%`)
+        }
+        if (patName && patName.length >= 3 && patName !== 'Contacto Desconocido' && patName !== 'Paciente Registrado') {
+          orClauses.push(`metadata->>patientName.ilike.%${patName}%`)
+        }
+
+        query.or(orClauses.join(','))
 
         const { data: dbRows } = await query
 
@@ -1343,7 +1376,7 @@ export function ChatInterface() {
                 <div className="space-y-2 text-xs">
                   <div>
                     <span className="text-slate-400 block text-[10px]">Teléfono Principal:</span>
-                    <span className="font-mono font-bold text-slate-800">{activePatient.phone}</span>
+                    <span className="font-mono font-bold text-slate-900">{activePatient.phone || 'Sin registrar'}</span>
                   </div>
                   {activePatient.emergencyContact && (
                     <div>
@@ -1353,7 +1386,7 @@ export function ChatInterface() {
                   )}
                   <div>
                     <span className="text-slate-400 block text-[10px]">Sede de Atención:</span>
-                    <span className="font-medium text-slate-700">Sucursal Valbuena (Matriz)</span>
+                    <span className="font-bold text-slate-900">{activePatient.branch || 'Sucursal Balbuena (Matriz) — Dra. Aura Estudillo'}</span>
                   </div>
                 </div>
               </div>

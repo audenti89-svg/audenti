@@ -406,6 +406,11 @@ export default function CalendarPage() {
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             Sincronizado Supabase Realtime
           </span>
+
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 text-blue-900 border border-blue-200 text-[11px] font-bold">
+            <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+            Google Workspace (audenti89@gmail.com)
+          </span>
         </div>
 
         {/* Selector de Vistas Top-Right & Alertas Sonoras */}

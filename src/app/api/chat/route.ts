@@ -235,20 +235,41 @@ export async function GET(request: Request) {
     }
 
     let dbMessages: any[] = [];
+    let patientPhone = '';
+    let patientName = '';
+
     if (patientId) {
       try {
+        // Consultar teléfono del paciente si es UUID para correlacionar prospectos/llamadas
+        if (!patientId.startsWith('prospect_')) {
+          const { data: pData } = await supabase
+            .from('patients')
+            .select('phone, full_name')
+            .eq('id', patientId)
+            .maybeSingle();
+          if (pData?.phone) patientPhone = pData.phone.replace(/\D/g, '').slice(-10);
+          if (pData?.full_name) patientName = pData.full_name.trim();
+        } else {
+          patientPhone = patientId.replace('prospect_', '').slice(-10);
+        }
+
         const query = supabase
           .from('chat_messages')
           .select('*')
           .order('created_at', { ascending: true });
 
-        // Si es UUID de paciente registrado, filtrar por patient_id o por metadata
+        const orClauses: string[] = [`metadata->>patientId.eq.${patientId}`];
         if (!patientId.startsWith('prospect_')) {
-          query.or(`patient_id.eq.${patientId},metadata->>patientId.eq.${patientId}`);
-        } else {
-          const rawPhone = patientId.replace('prospect_', '').slice(-10);
-          query.or(`metadata->>patientId.eq.${patientId},metadata->>phone.ilike.%${rawPhone}%`);
+          orClauses.push(`patient_id.eq.${patientId}`);
         }
+        if (patientPhone && patientPhone.length >= 7) {
+          orClauses.push(`metadata->>phone.ilike.%${patientPhone}%`);
+        }
+        if (patientName && patientName.length >= 3) {
+          orClauses.push(`metadata->>patientName.ilike.%${patientName}%`);
+        }
+
+        query.or(orClauses.join(','));
 
         const { data: rows } = await query;
         if (rows && rows.length > 0) {
@@ -279,8 +300,11 @@ export async function GET(request: Request) {
         const text = await file.text();
         if (text && text.trim()) {
           allChats = JSON.parse(text);
-          if (patientId && allChats[patientId]) {
-            storageMessages = allChats[patientId];
+          if (patientId) {
+            if (allChats[patientId]) storageMessages.push(...allChats[patientId]);
+            if (patientPhone && allChats[`prospect_${patientPhone}`]) {
+              storageMessages.push(...allChats[`prospect_${patientPhone}`]);
+            }
           }
         }
       }

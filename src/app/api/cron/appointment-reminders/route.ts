@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPersistedAppointments, savePersistedAppointments } from '@/lib/supabase/appointments-storage';
-import { sendPatientWhatsAppMessage } from '@/lib/notifications/whatsapp-doctor';
+import { MetaWhatsAppCloudApi } from '@/lib/whatsapp/meta-cloud-api';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -48,17 +48,15 @@ async function handleAppointmentReminders(request: Request) {
 
       // ── RECORDATORIO 1 DÍA ANTES (Entre 20 y 26 horas antes) ──
       if (diffHours >= 20 && diffHours <= 26 && !appt.reminder_1_day_sent) {
-        const msg = `🦷 *AUDENTI RECORDATORIO DE CITA (1 DÍA ANTES)*\n\n` +
-          `Hola *${patientName}*, te recordamos tu cita odontológica programada para mañana *${dateStr}* a las *${timeStr} hrs* en *${branchName}*.\n\n` +
-          `Dra. Aura Estudillo te espera puntualmente. Por favor confirma tu asistencia con un clic aquí:\n` +
-          `👉 ${confirmUrl}\n\n` +
-          `_Audenti Cloud Pro • Odontología de Alta Especialidad_`;
-
         if (phone) {
-          await sendPatientWhatsAppMessage({
+          await MetaWhatsAppCloudApi.sendAppointmentReminder({
             patientPhone: phone,
-            message: msg,
-            patientName
+            patientName,
+            dateStr,
+            timeStr,
+            branchName,
+            confirmUrl,
+            reminderType: '24h'
           });
         }
 
@@ -70,17 +68,15 @@ async function handleAppointmentReminders(request: Request) {
 
       // ── RECORDATORIO 1 HORA ANTES (Entre 45 y 75 minutos antes) ──
       if (diffHours > 0.7 && diffHours <= 1.3 && !appt.reminder_1_hour_sent) {
-        const msg = `⏰ *AUDENTI RECORDATORIO DE CITA (EN 1 HORA)*\n\n` +
-          `Hola *${patientName}*, tu consulta médica es hoy en 1 hora (*${timeStr} hrs*) en *${branchName}*.\n\n` +
-          `Nuestro equipo médico tiene listo tu sillón clínico. Confirma tu llegada aquí:\n` +
-          `👉 ${confirmUrl}\n\n` +
-          `_Nos vemos en clínica._`;
-
         if (phone) {
-          await sendPatientWhatsAppMessage({
+          await MetaWhatsAppCloudApi.sendAppointmentReminder({
             patientPhone: phone,
-            message: msg,
-            patientName
+            patientName,
+            dateStr,
+            timeStr,
+            branchName,
+            confirmUrl,
+            reminderType: '1h'
           });
         }
 

@@ -404,9 +404,9 @@ export default function PacientesPage() {
             </div>
           ) : (
             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[72vh] overflow-y-auto relative">
                 <table className="w-full text-left border-collapse">
-                  <thead className="bg-slate-50 border-b border-slate-200/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  <thead className="sticky top-0 z-10 bg-slate-100/95 backdrop-blur-md border-b border-slate-200/80 text-[11px] font-bold uppercase tracking-wider text-slate-600 shadow-xs">
                     <tr>
                       <th className="px-6 py-3.5">Paciente</th>
                       <th className="px-6 py-3.5">Edad / Modo</th>

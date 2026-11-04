@@ -52,6 +52,7 @@ import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
 import { QuickRegisterModal } from '@/components/clinical/QuickRegisterModal'
 import { PatientDirectActionWidget } from '@/components/clinical/PatientDirectActionWidget'
+import { InformedConsentSignModal } from '@/components/clinical/InformedConsentSignModal'
 import {
   exportToWord,
   exportToExcel,
@@ -63,6 +64,7 @@ export default function ExpedientePage() {
   const supabase = createClient()
   const [patients, setPatients] = useState<any[]>([])
   const [selectedPatient, setSelectedPatient] = useState<any>(null)
+  const [isConsentModalOpen, setIsConsentModalOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [isRegisterOpen, setIsRegisterOpen] = useState(false)
   
@@ -803,6 +805,16 @@ export default function ExpedientePage() {
           >
             <Database className="w-3.5 h-3.5" />
             <span>{downloadingExport === 'backup' ? 'Exportando...' : 'Backup (.sql)'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsConsentModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black transition-all shadow-lg shadow-emerald-500/20 cursor-pointer"
+            title="Firmar consentimiento informado quirúrgico digital (NOM-004-SSA3)"
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Consentimiento Digital</span>
           </button>
 
           <Link
@@ -1566,6 +1578,17 @@ export default function ExpedientePage() {
             </form>
           </div>
         </div>
+      )}
+
+      {selectedPatient && (
+        <InformedConsentSignModal
+          isOpen={isConsentModalOpen}
+          onClose={() => setIsConsentModalOpen(false)}
+          patientId={selectedPatient.id}
+          patientName={selectedPatient.full_name}
+          patientPhone={selectedPatient.phone}
+          branchName={selectedPatient.branch_name || 'Sucursal Balbuena'}
+        />
       )}
     </div>
   )

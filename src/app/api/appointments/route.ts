@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getPersistedAppointments, savePersistedAppointments } from '@/lib/supabase/appointments-storage';
 import { isInternalUser } from '@/lib/auth/admin-emails';
+import { GoogleCalendarService } from '@/lib/google/calendar-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -150,6 +151,23 @@ export async function POST(request: Request) {
         payload: newAppt
       });
     } catch {}
+
+    // Sincronización automática con Google Calendar (Dra. Aura Estudillo)
+    try {
+      const gcalStartTime = `${newAppt.appointment_date}T${newAppt.appointment_time}:00`;
+      await GoogleCalendarService.syncAppointment({
+        id: newAppt.id,
+        folio: newAppt.folio,
+        patient_name: newAppt.patient_name,
+        patient_phone: newAppt.patient_phone,
+        treatment: newAppt.treatment,
+        start_time: gcalStartTime,
+        branch: newAppt.branch,
+        notes: newAppt.notes
+      });
+    } catch (gcalErr) {
+      console.warn('[Google Calendar Sync Note]:', gcalErr);
+    }
 
     return NextResponse.json({ success: true, appointment: newAppt });
   } catch (err: any) {

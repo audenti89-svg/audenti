@@ -258,50 +258,48 @@ export function Header({ onMenuToggle }: HeaderProps) {
   }
 
   return (
-    <header className="fixed top-0 left-0 lg:left-72 right-0 h-16 sm:h-20 bg-slate-950/95 backdrop-blur-xl border-b border-amber-500/20 z-30 flex items-center justify-between px-2.5 sm:px-6 lg:px-8 shadow-xl text-white">
-      {/* Botón hamburguesa en móvil + Selector de Sucursal Reactivo */}
-      <div className="flex items-center gap-1.5 sm:gap-3 min-w-0">
-        {onMenuToggle && (
-          <button
-            type="button"
-            onClick={onMenuToggle}
-            className="lg:hidden p-1.5 sm:p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-900 transition-colors cursor-pointer shrink-0"
-            aria-label="Abrir Menú Lateral"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-        )}
-        <div className="relative flex items-center bg-slate-900/90 px-2 sm:px-3 py-1.5 rounded-xl border border-slate-800 hover:border-amber-400/50 transition-colors shadow-sm max-w-[130px] xs:max-w-[160px] sm:max-w-xs md:max-w-none shrink">
-          <Building2 className="w-4 h-4 text-amber-400 mr-1.5 shrink-0" />
-          <select
-            value={currentBranchId}
-            onChange={handleBranchChange}
-            className="bg-transparent text-xs font-bold text-slate-100 pr-5 sm:pr-6 appearance-none focus:outline-hidden cursor-pointer truncate"
-          >
-            <option value="balbuena" className="bg-slate-950 text-white">Sucursal Balbuena (Matriz) — Dra. Aura Estudillo</option>
-            <option value="guadalupe-chalma" className="bg-slate-950 text-white">Sucursal Chalma de Guadalupe — Dra. Aura Estudillo</option>
-          </select>
-          <ChevronDown className="w-3.5 h-3.5 absolute right-1.5 sm:right-2 pointer-events-none text-slate-400" />
+    <header className="sticky top-0 z-30 w-full bg-slate-950/95 backdrop-blur-xl border-b border-amber-500/20 shadow-xl text-white transition-all">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-3 sm:px-6 lg:px-8 py-2.5 min-h-[4rem]">
+        {/* Botón hamburguesa en móvil + Selector de Sucursal Reactivo */}
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-3 min-w-0">
+          {onMenuToggle && (
+            <button
+              type="button"
+              onClick={onMenuToggle}
+              className="lg:hidden p-1.5 sm:p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-900 transition-colors cursor-pointer shrink-0"
+              aria-label="Abrir Menú Lateral"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          )}
+          <div className="relative flex items-center bg-slate-900/90 px-2 sm:px-3 py-1.5 rounded-xl border border-slate-800 hover:border-amber-400/50 transition-colors shadow-sm max-w-[150px] xs:max-w-[180px] sm:max-w-xs md:max-w-none shrink">
+            <Building2 className="w-4 h-4 text-amber-400 mr-1.5 shrink-0" />
+            <select
+              value={currentBranchId}
+              onChange={handleBranchChange}
+              className="bg-transparent text-xs font-bold text-slate-100 pr-5 sm:pr-6 appearance-none focus:outline-hidden cursor-pointer truncate"
+            >
+              <option value="balbuena" className="bg-slate-950 text-white">Sucursal Balbuena (Matriz) — Dra. Aura Estudillo</option>
+              <option value="guadalupe-chalma" className="bg-slate-950 text-white">Sucursal Chalma de Guadalupe — Dra. Aura Estudillo</option>
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 absolute right-1.5 sm:right-2 pointer-events-none text-slate-400" />
+          </div>
+
+          {/* Badge Dinámico de Estado de la Sucursal */}
+          <div className={`hidden xl:inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold shrink-0 whitespace-nowrap transition-all ${
+            currentBranch.isUpcoming
+              ? 'bg-purple-950/70 text-purple-300 border-purple-500/40'
+              : 'bg-emerald-950/70 text-emerald-300 border-emerald-500/40'
+          }`}>
+            <span className={`w-2 h-2 rounded-full shrink-0 ${
+              currentBranch.isUpcoming ? 'bg-purple-400 animate-pulse' : 'bg-emerald-400 animate-pulse'
+            }`} />
+            <span className="text-[11px] font-bold whitespace-nowrap">{currentBranch.statusBadge}</span>
+          </div>
         </div>
 
-        {/* Badge Dinámico de Estado de la Sucursal */}
-        <div className={`hidden xl:inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold shrink-0 whitespace-nowrap transition-all ${
-          currentBranch.isUpcoming
-            ? 'bg-purple-950/70 text-purple-300 border-purple-500/40'
-            : 'bg-emerald-950/70 text-emerald-300 border-emerald-500/40'
-        }`}>
-          <span className={`w-2 h-2 rounded-full shrink-0 ${
-            currentBranch.isUpcoming ? 'bg-purple-400 animate-pulse' : 'bg-emerald-400 animate-pulse'
-          }`} />
-          <span className="text-[11px] font-bold whitespace-nowrap">{currentBranch.statusBadge}</span>
-        </div>
-      </div>
-
-      {/* Espacio flexible central */}
-      <div className="flex-1" />
-
-      {/* Controles de Acceso, Notificaciones y Perfil */}
-      <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+        {/* Controles de Acceso, Notificaciones y Perfil */}
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2.5 shrink-0 ml-auto">
         {/* BOTÓN 1: INICIAR SESIÓN (100% VISIBLE EN HEADER) */}
         <Link
           href="/auth/login"
@@ -500,6 +498,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
         >
           <User className="w-4 h-4" />
         </Link>
+      </div>
       </div>
 
       {/* Modal Flotante de Admisión Fast-Track */}
