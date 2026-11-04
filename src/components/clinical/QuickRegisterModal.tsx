@@ -168,19 +168,20 @@ export function QuickRegisterModal({ isOpen, onClose, onSuccess, onPatientCreate
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-hidden">
       {/* Backdrop */}
       <div
         onClick={onClose}
         className="fixed inset-0 bg-slate-950/60 backdrop-blur-md transition-opacity animate-in fade-in"
       />
 
-      {/* Modal flotante */}
-      <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200/90 p-6 sm:p-8 text-slate-900 z-10 animate-in zoom-in-95 fade-in">
+      {/* Modal flotante responsivo con desplazamiento vertical interno */}
+      <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-200/90 max-h-[85vh] overflow-y-auto px-6 py-4 sm:px-8 sm:py-6 text-slate-900 z-10 animate-in zoom-in-95 fade-in">
         <button
           onClick={onClose}
           type="button"
-          className="absolute top-5 right-5 p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+          className="sticky top-0 float-right -mr-2 -mt-1 p-2 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors z-20 bg-white/90 backdrop-blur-xs cursor-pointer shadow-xs"
+          aria-label="Cerrar modal"
         >
           <X className="w-5 h-5" />
         </button>

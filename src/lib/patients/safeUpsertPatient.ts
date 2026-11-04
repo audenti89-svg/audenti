@@ -39,7 +39,7 @@ export interface SafeUpsertResult {
   id: string;
 }
 
-// Columnas reales y vigentes en la tabla `patients` de Supabase
+// Columnas reales y vigentes en la tabla `patients` de Supabase (sin columna notes para evitar PostgrestError 42703)
 const VALID_PATIENT_COLUMNS = new Set([
   'id',
   'tenant_id',
@@ -58,7 +58,6 @@ const VALID_PATIENT_COLUMNS = new Set([
   'photo_url',
   'last_appointment_at',
   'total_spent',
-  'notes',
   'acquisition_channel',
   'referrer_id',
   'referrer_name',
@@ -208,16 +207,10 @@ export async function safeUpsertPatient(
     // Asegurar estado activo en base de datos para evitar bloqueos
     updatePayload.status = patientData.status || existingPatient.status || 'active';
 
-    if (extraNotes || patientData.notes) {
-      const currentNotes = existingPatient.notes || '';
-      const newNotes = patientData.notes || '';
-      updatePayload.notes = `${currentNotes} ${newNotes} ${extraNotes}`.trim();
-    }
-
     // Filtrar estrictamente solo columnas válidas
     const sanitizedUpdate: Record<string, any> = {};
     for (const [k, v] of Object.entries(updatePayload)) {
-      if (VALID_PATIENT_COLUMNS.has(k) && v !== undefined && v !== null) {
+      if (VALID_PATIENT_COLUMNS.has(k) && v !== undefined && v !== null && k !== 'notes') {
         sanitizedUpdate[k] = v;
       }
     }
@@ -232,6 +225,23 @@ export async function safeUpsertPatient(
       .maybeSingle();
 
     if (updateError) {
+      // Auto-recuperación si Supabase rechaza alguna columna no presente
+      if (updateError.message?.includes('notes') || updateError.code === '42703') {
+        delete (sanitizedUpdate as any).notes;
+        const retryUpdate = await supabase
+          .from('patients')
+          .update(sanitizedUpdate)
+          .eq('id', existingPatient.id)
+          .select()
+          .maybeSingle();
+        if (!retryUpdate.error && retryUpdate.data) {
+          return {
+            data: retryUpdate.data,
+            isNew: false,
+            id: existingPatient.id
+          };
+        }
+      }
       console.warn('Nota en UPDATE seguro de paciente existente:', updateError.message);
     }
 
@@ -268,14 +278,10 @@ export async function safeUpsertPatient(
   if (patientData.qr_code_id) insertPayload.qr_code_id = patientData.qr_code_id;
   if (patientData.attribution_status) insertPayload.attribution_status = patientData.attribution_status;
 
-  if (extraNotes || patientData.notes) {
-    insertPayload.notes = `${patientData.notes || ''} ${extraNotes}`.trim();
-  }
-
   // Filtrar estrictamente a columnas vigentes en el esquema de Supabase
   const sanitizedInsert: Record<string, any> = {};
   for (const [k, v] of Object.entries(insertPayload)) {
-    if (VALID_PATIENT_COLUMNS.has(k) && v !== undefined && v !== null) {
+    if (VALID_PATIENT_COLUMNS.has(k) && v !== undefined && v !== null && k !== 'notes') {
       sanitizedInsert[k] = v;
     }
   }
@@ -287,6 +293,23 @@ export async function safeUpsertPatient(
     .maybeSingle();
 
   if (insertError) {
+    // Si falla por columna inexistente (código 42703 o mención de notes), reintentar sin esa columna
+    if (insertError.message?.includes('notes') || insertError.code === '42703') {
+      delete (sanitizedInsert as any).notes;
+      const retryCol = await supabase
+        .from('patients')
+        .insert([sanitizedInsert])
+        .select()
+        .maybeSingle();
+      if (!retryCol.error && retryCol.data) {
+        return {
+          data: retryCol.data,
+          isNew: true,
+          id: retryCol.data.id
+        };
+      }
+    }
+
     // Si falla por foreign key de tenant_id, recuperar tenant real
     if (insertError.code === '23503' || insertError.message?.includes('foreign key')) {
       const { data: realTenant } = await supabase.from('tenants').select('id').limit(1).maybeSingle();

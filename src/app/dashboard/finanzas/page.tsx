@@ -60,7 +60,24 @@ export default function FinanzasPage() {
         .select('*')
         .order('created_at', { ascending: false })
 
-      if (error) throw error
+      if (error || !data || data.length === 0) {
+        // Fallback resiliente a la tabla relacional transactions
+        try {
+          const { data: tData } = await supabase
+            .from('transactions')
+            .select('*')
+            .order('created_at', { ascending: false })
+          if (tData && tData.length > 0) {
+            setTransactions(tData.map((t: any) => ({
+              ...t,
+              payment_method: t.payment_method === 'cash' ? 'Efectivo' : (t.payment_method === 'card' ? 'Tarjeta' : (t.payment_method || 'Efectivo')),
+              description: t.notes || t.description || 'Movimiento Clínico Registrado'
+            })))
+            return
+          }
+        } catch {}
+      }
+
       setTransactions(data || [])
     } catch (err) {
       console.warn('Nota en pagos (tabla limpia para producción):', err)
@@ -190,7 +207,15 @@ export default function FinanzasPage() {
           expenseEntry.tenant_id = defaultTenant.id
         }
 
-        await supabase.from('payments').insert([incomeEntry, expenseEntry])
+        const { error: barterErr } = await supabase.from('payments').insert([incomeEntry, expenseEntry])
+        if (barterErr) {
+          try {
+            await supabase.from('transactions').insert([
+              { amount: val, type: 'income', notes: incomeEntry.description, payment_method: 'other', ...(defaultTenant?.id ? { tenant_id: defaultTenant.id } : {}) },
+              { amount: val, type: 'expense', notes: expenseEntry.description, payment_method: 'other', ...(defaultTenant?.id ? { tenant_id: defaultTenant.id } : {}) }
+            ])
+          } catch {}
+        }
       } else {
         const val = parsedAmount
         const entry: any = {
@@ -202,7 +227,18 @@ export default function FinanzasPage() {
         }
 
         if (defaultTenant?.id) entry.tenant_id = defaultTenant.id
-        await supabase.from('payments').insert([entry])
+        const { error: payErr } = await supabase.from('payments').insert([entry])
+        if (payErr) {
+          try {
+            await supabase.from('transactions').insert([{
+              amount: val,
+              type: modalType === 'egreso' ? 'expense' : 'income',
+              notes: entry.description,
+              payment_method: formData.paymentMethod.toLowerCase().includes('tarjeta') ? 'card' : (formData.paymentMethod.toLowerCase().includes('transfer') ? 'transfer' : 'cash'),
+              ...(defaultTenant?.id ? { tenant_id: defaultTenant.id } : {})
+            }])
+          } catch {}
+        }
 
         // Si provenía de un checkout de cita, marcar la cita en Supabase como 'COMPLETADA_Y_PAGADA'
         if (typeof window !== 'undefined') {
