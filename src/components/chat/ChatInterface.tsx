@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { formatWhatsAppUrl } from '@/lib/whatsapp-link'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -46,6 +46,9 @@ export interface ChatMessageItem {
   isOwn: boolean
   isPrivateNote?: boolean
   metadata?: {
+    timestamp?: string
+    created_at?: string
+    patientId?: string
     channel_type?: 'voice_call' | 'whatsapp' | 'web_chat'
     durationSeconds?: number
     consultationReason?: string
@@ -59,6 +62,7 @@ export interface ChatMessageItem {
     isRegistered?: boolean
     classification?: string
     trafficLight?: 'green' | 'yellow' | 'red'
+    [key: string]: any
   }
 }
 
@@ -134,8 +138,27 @@ export function ChatInterface() {
         console.warn('[Chat Patients Load Note]:', err?.message)
       }
 
-      // B. Cargar mensajes de la base de datos relacional (chat_messages)
+      // B. Mapeo de Teléfonos Normalizados hacia Pacientes Registrados
+      const phoneToPatientMap: Record<string, any> = {}
+      registeredList.forEach(p => {
+        const cleanP = (p.phone || '').replace(/\D/g, '').slice(-10)
+        if (cleanP && cleanP.length >= 7) {
+          phoneToPatientMap[cleanP] = p
+        }
+      })
+
+      // C. Cargar mensajes de la base de datos relacional (chat_messages)
       const mappedMessages: Record<string, ChatMessageItem[]> = {}
+
+      const appendMessageToKey = (key: string, msg: ChatMessageItem) => {
+        if (!key) return
+        if (!mappedMessages[key]) mappedMessages[key] = []
+        const exists = mappedMessages[key].some(m => m.id === msg.id || (m.content === msg.content && m.time === msg.time))
+        if (!exists) {
+          mappedMessages[key].push(msg)
+        }
+      }
+
       try {
         const { data: dbChatRows } = await supabase
           .from('chat_messages')
@@ -144,25 +167,40 @@ export function ChatInterface() {
 
         if (dbChatRows && dbChatRows.length > 0) {
           dbChatRows.forEach((r: any) => {
-            const patId = r.patient_id || r.metadata?.patientId || (r.metadata?.phone ? `prospect_${r.metadata.phone.replace(/\D/g, '')}` : 'prospect_general')
-            if (!mappedMessages[patId]) mappedMessages[patId] = []
-            mappedMessages[patId].push({
+            const rawPhone = (r.metadata?.phone || '').replace(/\D/g, '').slice(-10)
+            const cleanTargetId = r.patient_id || r.metadata?.patientId
+            const correlatedPat = (rawPhone && phoneToPatientMap[rawPhone]) ? phoneToPatientMap[rawPhone] : null
+
+            const msgItem: ChatMessageItem = {
               id: r.id,
               senderName: r.sender_name || (r.sender_role === 'ai' ? 'Asistente de Voz (Aura AI)' : (r.sender_role === 'doctor' ? 'Dra. Aura Estudillo' : 'Paciente')),
               senderRole: r.sender_role || 'patient',
               channel_type: r.channel_type || 'web_chat',
               content: r.content || '',
-              time: r.created_at ? new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date(r.created_at)) : 'Hoy',
+              time: r.created_at ? new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(r.created_at)) : 'Hoy',
               isOwn: r.sender_role === 'doctor',
               metadata: r.metadata
-            })
+            }
+
+            if (cleanTargetId) {
+              appendMessageToKey(cleanTargetId, msgItem)
+            }
+            if (correlatedPat && correlatedPat.id !== cleanTargetId) {
+              appendMessageToKey(correlatedPat.id, msgItem)
+            }
+            if (rawPhone) {
+              appendMessageToKey(`prospect_${rawPhone}`, msgItem)
+            }
+            if (!cleanTargetId && !correlatedPat && !rawPhone) {
+              appendMessageToKey('prospect_general', msgItem)
+            }
           })
         }
       } catch (dbErr: any) {
         console.warn('[Chat DB Direct Check Note]:', dbErr?.message)
       }
 
-      // C. Cargar Storage chat_omnichannel.json como fallback / sincronía adicional
+      // D. Cargar Storage chat_omnichannel.json como fallback / sincronía adicional
       try {
         const { data: file } = await supabase.storage
           .from('audenti_database')
@@ -174,21 +212,28 @@ export function ChatInterface() {
             const stored = JSON.parse(text)
             Object.keys(stored).forEach(contactId => {
               const chatArray = stored[contactId] || []
-              if (!mappedMessages[contactId]) mappedMessages[contactId] = []
+              const cleanContactPhone = contactId.replace(/\D/g, '').slice(-10)
+              const correlatedPat = (cleanContactPhone && phoneToPatientMap[cleanContactPhone]) ? phoneToPatientMap[cleanContactPhone] : null
+
               chatArray.forEach((m: any) => {
-                const exists = mappedMessages[contactId].some(existing => existing.id === m.id || (existing.content === m.content && existing.time === (m.timestamp || m.time)))
-                if (!exists) {
-                  mappedMessages[contactId].push({
-                    id: m.id || String(Math.random()),
-                    senderName: m.senderName || (m.isDoctor ? 'Dra. Aura Estudillo' : 'Paciente'),
-                    senderRole: m.senderRole || (m.isDoctor ? 'doctor' : 'patient'),
-                    channel_type: m.channel_type || m.metadata?.channel_type || (m.content?.includes('Llamada de Voz') ? 'voice_call' : 'web_chat'),
-                    content: m.content || '',
-                    time: m.timestamp || m.time || 'Reciente',
-                    isOwn: Boolean(m.isDoctor),
-                    isPrivateNote: Boolean(m.isPrivateNote),
-                    metadata: m.metadata
-                  })
+                const msgItem: ChatMessageItem = {
+                  id: m.id || String(Math.random()),
+                  senderName: m.senderName || (m.isDoctor ? 'Dra. Aura Estudillo' : 'Paciente'),
+                  senderRole: m.senderRole || (m.isDoctor ? 'doctor' : 'patient'),
+                  channel_type: m.channel_type || m.metadata?.channel_type || (m.content?.includes('Llamada de Voz') ? 'voice_call' : 'web_chat'),
+                  content: m.content || '',
+                  time: m.timestamp || m.time || 'Reciente',
+                  isOwn: Boolean(m.isDoctor),
+                  isPrivateNote: Boolean(m.isPrivateNote),
+                  metadata: m.metadata
+                }
+
+                appendMessageToKey(contactId, msgItem)
+                if (correlatedPat) {
+                  appendMessageToKey(correlatedPat.id, msgItem)
+                }
+                if (cleanContactPhone) {
+                  appendMessageToKey(`prospect_${cleanContactPhone}`, msgItem)
                 }
               })
             })
@@ -196,32 +241,29 @@ export function ChatInterface() {
         }
       } catch {}
 
-      // Correlación de mensajes de prospectos hacia pacientes registrados con el mismo teléfono
-      registeredList.forEach(p => {
-        const cleanP = (p.phone || '').replace(/\D/g, '').slice(-10)
-        if (cleanP && cleanP.length >= 7) {
-          const prospectKey = `prospect_${cleanP}`
-          if (mappedMessages[prospectKey] && mappedMessages[prospectKey].length > 0) {
-            if (!mappedMessages[p.id]) mappedMessages[p.id] = []
-            mappedMessages[prospectKey].forEach(m => {
-              if (!mappedMessages[p.id].some(ex => ex.id === m.id || ex.content === m.content)) {
-                mappedMessages[p.id].push(m)
-              }
-            })
-          }
-        }
-      })
-
-      // D. Construir el Directorio de Pacientes (TODOS los pacientes registrados + prospectos con mensajes)
+      // E. Construir el Directorio de Pacientes (100% libre de duplicados por teléfono e ID)
       const directoryList: PatientDirectoryItem[] = []
       const processedIds = new Set<string>()
+      const processedPhones = new Set<string>()
 
       // 1. Añadir primero a todos los pacientes registrados en la base de datos
       registeredList.forEach(p => {
         processedIds.add(p.id)
-        const chatArray = mappedMessages[p.id] || []
-        const lastMsg = chatArray.length > 0 ? chatArray[chatArray.length - 1] : null
+        const cleanP = (p.phone || '').replace(/\D/g, '').slice(-10)
+        if (cleanP && cleanP.length >= 7) {
+          processedPhones.add(cleanP)
+          processedIds.add(`prospect_${cleanP}`)
+          processedIds.add(`prospect_52${cleanP}`)
+        }
 
+        const chatArray = mappedMessages[p.id] || (cleanP ? mappedMessages[`prospect_${cleanP}`] : []) || []
+        chatArray.sort((a, b) => {
+          const tA = new Date(a.metadata?.timestamp || a.time).getTime() || 0
+          const tB = new Date(b.metadata?.timestamp || b.time).getTime() || 0
+          return tA - tB
+        })
+
+        const lastMsg = chatArray.length > 0 ? chatArray[chatArray.length - 1] : null
         const msgText = lastMsg ? lastMsg.content : 'Paciente registrado • Listo para chatear'
         const isUrgent = lastMsg ? (/(?:dolor|duele|muela|urgente|emergencia|sangr|inflamad)/i.test(msgText) || lastMsg.metadata?.urgencyLevel === 'Urgente') : false
 
@@ -236,7 +278,7 @@ export function ChatInterface() {
         directoryList.push({
           id: p.id,
           name: p.full_name || 'Paciente Registrado',
-          phone: p.phone || 'Sin teléfono',
+          phone: p.phone || (cleanP ? `55 ${cleanP.slice(2, 6)} ${cleanP.slice(6)}` : 'Sin teléfono'),
           folio: `EXP-${p.id.slice(0, 8).toUpperCase()}`,
           isRegistered: true,
           channel_type: chType,
@@ -249,39 +291,58 @@ export function ChatInterface() {
         })
       })
 
-      // 2. Añadir prospectos o contactos que tienen mensajes pero no están en la tabla patients
+      // 2. Añadir prospectos o contactos que tienen mensajes pero no están en la tabla patients (sin duplicar teléfonos)
       Object.keys(mappedMessages).forEach(contactId => {
-        if (!processedIds.has(contactId)) {
-          processedIds.add(contactId)
-          const chatArray = mappedMessages[contactId] || []
-          const lastMsg = chatArray[chatArray.length - 1]
-          const rawName = lastMsg?.metadata?.patientName || lastMsg?.senderName || 'Contacto'
-          const cleanName = rawName.replace(/\s*\(Prospecto\)/gi, '').trim()
-          const phone = lastMsg?.metadata?.phone || (contactId.startsWith('prospect_') ? contactId.replace('prospect_', '') : '')
-          const folio = `PROS-${contactId.slice(-6).toUpperCase()}`
-          const msgText = lastMsg?.content || 'Sin mensajes'
-          const isUrgent = /(?:dolor|duele|muela|urgente|emergencia|sangr|inflamad)/i.test(msgText) || lastMsg?.metadata?.urgencyLevel === 'Urgente'
+        if (processedIds.has(contactId)) return
 
-          let chType: 'voice_call' | 'whatsapp' | 'web_chat' = 'web_chat'
-          if (lastMsg?.channel_type) chType = lastMsg.channel_type
-          else if (lastMsg?.metadata?.channel_type) chType = lastMsg.metadata.channel_type
-          else if (msgText.includes('Llamada de Voz')) chType = 'voice_call'
-          else if ((lastMsg?.metadata as any)?.channel === 'whatsapp') chType = 'whatsapp'
+        const chatArray = mappedMessages[contactId] || []
+        if (chatArray.length === 0) return
 
-          directoryList.push({
-            id: contactId,
-            name: cleanName || 'Contacto Desconocido',
-            phone: phone || 'Sin teléfono',
-            folio,
-            isRegistered: false,
-            channel_type: chType,
-            lastMessage: msgText,
-            lastTime: lastMsg?.time || 'Reciente',
-            isUrgent,
-            consultationReason: lastMsg?.metadata?.consultationReason,
-            branch: 'Sucursal Balbuena (Matriz) — Dra. Aura Estudillo'
-          })
+        chatArray.sort((a, b) => {
+          const tA = new Date(a.metadata?.timestamp || a.time).getTime() || 0
+          const tB = new Date(b.metadata?.timestamp || b.time).getTime() || 0
+          return tA - tB
+        })
+
+        const lastMsg = chatArray[chatArray.length - 1]
+        const rawName = lastMsg?.metadata?.patientName || lastMsg?.senderName || 'Contacto'
+        const cleanName = rawName.replace(/\s*\(Prospecto\)/gi, '').trim()
+        const rawPhone = lastMsg?.metadata?.phone || (contactId.startsWith('prospect_') ? contactId.replace('prospect_', '') : '')
+        const cleanPhone10 = rawPhone.replace(/\D/g, '').slice(-10)
+
+        // Si este número ya pertenece a un paciente registrado o a otro prospecto procesado, consolidar y no duplicar
+        if (cleanPhone10 && cleanPhone10.length >= 7) {
+          if (processedPhones.has(cleanPhone10)) {
+            return
+          }
+          processedPhones.add(cleanPhone10)
         }
+
+        processedIds.add(contactId)
+
+        const folio = cleanPhone10 ? `PROS-${cleanPhone10.slice(-6)}` : `PROS-${contactId.slice(-6).toUpperCase()}`
+        const msgText = lastMsg?.content || 'Sin mensajes'
+        const isUrgent = /(?:dolor|duele|muela|urgente|emergencia|sangr|inflamad)/i.test(msgText) || lastMsg?.metadata?.urgencyLevel === 'Urgente'
+
+        let chType: 'voice_call' | 'whatsapp' | 'web_chat' = 'web_chat'
+        if (lastMsg?.channel_type) chType = lastMsg.channel_type
+        else if (lastMsg?.metadata?.channel_type) chType = lastMsg.metadata.channel_type
+        else if (msgText.includes('Llamada de Voz')) chType = 'voice_call'
+        else if ((lastMsg?.metadata as any)?.channel === 'whatsapp') chType = 'whatsapp'
+
+        directoryList.push({
+          id: contactId,
+          name: cleanName || 'Contacto Desconocido',
+          phone: rawPhone ? (cleanPhone10.length === 10 ? `55 ${cleanPhone10.slice(2, 6)} ${cleanPhone10.slice(6)}` : rawPhone) : 'Sin teléfono',
+          folio,
+          isRegistered: false,
+          channel_type: chType,
+          lastMessage: msgText,
+          lastTime: lastMsg?.time || 'Reciente',
+          isUrgent,
+          consultationReason: lastMsg?.metadata?.consultationReason,
+          branch: 'Sucursal Balbuena (Matriz) — Dra. Aura Estudillo'
+        })
       })
 
       setMessages(mappedMessages)
@@ -367,20 +428,42 @@ export function ChatInterface() {
         }
       } catch {}
 
-      // 3. Fusionar evitando duplicados
+      // 3. Fusionar evitando duplicados y ordenando cronológicamente
       if (apiMsgs.length > 0 || dbMsgs.length > 0) {
         setMessages(prev => {
           const current = prev[patientId] || []
           const combined = [...current]
           const existingIds = new Set(combined.map(m => m.id))
+          const existingSigs = new Set(combined.map(m => `${m.channel_type || ''}_${(m.content || '').trim()}`))
 
           for (const item of [...apiMsgs, ...dbMsgs]) {
-            if (!existingIds.has(item.id)) {
+            const sig = `${item.channel_type || ''}_${(item.content || '').trim()}`
+            if (!existingIds.has(item.id) && !existingSigs.has(sig)) {
               existingIds.add(item.id)
+              existingSigs.add(sig)
               combined.push(item)
             }
           }
-          return { ...prev, [patientId]: combined }
+
+          combined.sort((a, b) => {
+            const tA = new Date(a.metadata?.timestamp || a.time).getTime() || 0
+            const tB = new Date(b.metadata?.timestamp || b.time).getTime() || 0
+            return tA - tB
+          })
+
+          const targetPat = patients.find(p => p.id === patientId)
+          const cleanPhone = (targetPat?.phone || (patientId.startsWith('prospect_') ? patientId.replace('prospect_', '') : '')).replace(/\D/g, '').slice(-10)
+
+          const updated: Record<string, ChatMessageItem[]> = {
+            ...prev,
+            [patientId]: combined
+          }
+
+          if (cleanPhone && cleanPhone.length >= 7) {
+            updated[`prospect_${cleanPhone}`] = combined
+          }
+
+          return updated
         })
       }
     } catch (err: any) {
@@ -412,7 +495,12 @@ export function ChatInterface() {
       // Verificar si solicitó cita y si ya existe registrada en la agenda de Supabase
       const checkAppointmentStatus = async () => {
         try {
-          const currentMsgs = messages[selectedPatientId] || []
+          const pat = patients.find(p => p.id === selectedPatientId)
+          const cleanPhone = (pat?.phone || (selectedPatientId.startsWith('prospect_') ? selectedPatientId.replace('prospect_', '') : '')).replace(/\D/g, '').slice(-10)
+          const currentMsgs = [
+            ...(messages[selectedPatientId] || []),
+            ...(cleanPhone ? (messages[`prospect_${cleanPhone}`] || []) : [])
+          ]
           const hasRequestedAppt = currentMsgs.some(m => {
             const txt = (m.content || '').toLowerCase()
             const reason = (m.metadata?.consultationReason || '').toLowerCase()
@@ -431,7 +519,6 @@ export function ChatInterface() {
           }
 
           // Consultar tabla appointments para este paciente
-          const cleanPhone = (selectedPatientId.startsWith('prospect_') ? selectedPatientId.replace('prospect_', '') : '').slice(-10)
           let apptQuery = supabase
             .from('appointments')
             .select('id, status')
@@ -806,7 +893,54 @@ export function ChatInterface() {
 
   // Paciente Activo Seleccionado
   const activePatient = patients.find(p => p.id === selectedPatientId) || patients[0] || null
-  const currentChatMessages = (selectedPatientId ? messages[selectedPatientId] : null) || []
+  const currentChatMessages = useMemo(() => {
+    if (!selectedPatientId && !activePatient) return []
+    const targetId = selectedPatientId || activePatient?.id || ''
+    const cleanPhone = (activePatient?.phone || targetId.replace('prospect_', '')).replace(/\D/g, '').slice(-10)
+
+    const candidates: ChatMessageItem[] = []
+    const addedIds = new Set<string>()
+    const addedSignatures = new Set<string>()
+
+    const collectFromKey = (key: string) => {
+      if (!key) return
+      const arr = messages[key]
+      if (Array.isArray(arr)) {
+        for (const item of arr) {
+          if (!item) continue
+          const sig = `${item.channel_type || ''}_${(item.content || '').trim()}`
+          if (!addedIds.has(item.id) && !addedSignatures.has(sig)) {
+            addedIds.add(item.id)
+            addedSignatures.add(sig)
+            candidates.push(item)
+          }
+        }
+      }
+    }
+
+    // 1. Mensajes por clave directa del ID (UUID o prospect_id)
+    collectFromKey(targetId)
+
+    // 2. Mensajes por claves alternativas asociadas al teléfono
+    if (cleanPhone && cleanPhone.length >= 7) {
+      collectFromKey(`prospect_${cleanPhone}`)
+      collectFromKey(cleanPhone)
+      Object.keys(messages).forEach(k => {
+        if (k !== targetId && k.includes(cleanPhone)) {
+          collectFromKey(k)
+        }
+      })
+    }
+
+    // 3. Ordenar cronológicamente de forma estricta
+    candidates.sort((a, b) => {
+      const tA = new Date(a.metadata?.timestamp || a.time).getTime() || 0
+      const tB = new Date(b.metadata?.timestamp || b.time).getTime() || 0
+      return tA - tB
+    })
+
+    return candidates
+  }, [selectedPatientId, activePatient, messages])
 
   // Filtrado de la bandeja
   const filteredPatients = patients.filter(p => {
@@ -1376,7 +1510,13 @@ export function ChatInterface() {
                 <div className="space-y-2 text-xs">
                   <div>
                     <span className="text-slate-400 block text-[10px]">Teléfono Principal:</span>
-                    <span className="font-mono font-bold text-slate-900">{activePatient.phone || 'Sin registrar'}</span>
+                    <span className="font-mono font-bold text-slate-900">
+                      {activePatient.phone && activePatient.phone !== 'Sin teléfono'
+                        ? activePatient.phone
+                        : (activePatient.id.startsWith('prospect_')
+                            ? `55 ${activePatient.id.replace('prospect_', '').slice(-8, -4)} ${activePatient.id.replace('prospect_', '').slice(-4)}`
+                            : 'Sin registrar')}
+                    </span>
                   </div>
                   {activePatient.emergencyContact && (
                     <div>
@@ -1386,7 +1526,10 @@ export function ChatInterface() {
                   )}
                   <div>
                     <span className="text-slate-400 block text-[10px]">Sede de Atención:</span>
-                    <span className="font-bold text-slate-900">{activePatient.branch || 'Sucursal Balbuena (Matriz) — Dra. Aura Estudillo'}</span>
+                    <span className="font-bold text-slate-900 flex items-center gap-1.5 pt-0.5">
+                      <MapPin className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                      <span>{activePatient.branch || 'Sucursal Balbuena (Matriz) — Dra. Aura Estudillo'}</span>
+                    </span>
                   </div>
                 </div>
               </div>

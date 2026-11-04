@@ -305,13 +305,20 @@ export async function GET(request: Request) {
             if (patientPhone && allChats[`prospect_${patientPhone}`]) {
               storageMessages.push(...allChats[`prospect_${patientPhone}`]);
             }
+            if (patientPhone && patientPhone.length >= 7) {
+              Object.keys(allChats).forEach(k => {
+                if (k !== patientId && k !== `prospect_${patientPhone}` && k.includes(patientPhone)) {
+                  storageMessages.push(...allChats[k]);
+                }
+              });
+            }
           }
         }
       }
     } catch {}
 
     if (patientId) {
-      // Fusionar DB y Storage deduplicando por ID o contenido
+      // Fusionar DB y Storage deduplicando por ID o firma de contenido y tiempo
       const combined: any[] = [...storageMessages];
       const seenIds = new Set(combined.map(m => m.id));
       const seenContent = new Set(combined.map(m => `${m.content}_${m.time || m.timestamp}`));
@@ -324,6 +331,13 @@ export async function GET(request: Request) {
           combined.push(dbm);
         }
       }
+
+      // Ordenar cronológicamente por marca de tiempo exacta
+      combined.sort((a, b) => {
+        const tA = new Date(a.metadata?.timestamp || a.created_at || a.time || a.timestamp).getTime() || 0;
+        const tB = new Date(b.metadata?.timestamp || b.created_at || b.time || b.timestamp).getTime() || 0;
+        return tA - tB;
+      });
 
       return NextResponse.json({ success: true, messages: combined });
     }
