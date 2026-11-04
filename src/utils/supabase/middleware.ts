@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { ImmuneSystem } from '@/lib/security/immune-system';
 import { isSystemAdminEmail, isInternalUser } from '@/lib/auth/admin-emails';
+import { isRouteBlockedForRole } from '@/config/role-visibility';
 
 export async function updateSession(request: NextRequest) {
   // ── ESCUDO INMUNOLÓGICO Y ANTI-HACKEO (CIBERSEGURIDAD IA) ──
@@ -65,6 +66,9 @@ export async function updateSession(request: NextRequest) {
 
   // 1. Si no hay sesión e intenta acceder a rutas protegidas:
   if (!user) {
+    if (redirectUrl.pathname.startsWith('/api/admin')) {
+      return NextResponse.json({ error: 'No autenticado: Se requiere sesión activa de administrador.' }, { status: 401 });
+    }
     if (isDashboardRoute || isOnboardingRoute || isAdminRoute || isPatientsRoute) {
       redirectUrl.pathname = '/auth/login';
       return NextResponse.redirect(redirectUrl);
@@ -129,9 +133,20 @@ export async function updateSession(request: NextRequest) {
     // SEPARACIÓN ESTRICTA: SI ES PACIENTE
     // ─────────────────────────────────────────────────────────────
     if (!isAdmin) {
-      // 1. Si intenta acceder al dashboard interno, agenda general, finanzas o /portal antiguo:
+      // 0. Si el paciente intenta acceder a cualquier endpoint de administración:
+      if (redirectUrl.pathname.startsWith('/api/admin')) {
+        return NextResponse.json({ error: 'Acceso denegado: El rol patient no tiene privilegios administrativos.' }, { status: 403 });
+      }
+
+      // 1. Si intenta acceder al dashboard interno, agenda general, finanzas o rutas bloqueadas:
       // Redirigir ÚNICAMENTE a /portal-paciente
-      if (isDashboardRoute || isAdminRoute || isPatientsRoute || redirectUrl.pathname === '/portal') {
+      if (
+        isRouteBlockedForRole('patient', redirectUrl.pathname) ||
+        isDashboardRoute ||
+        isAdminRoute ||
+        isPatientsRoute ||
+        redirectUrl.pathname === '/portal'
+      ) {
         redirectUrl.pathname = '/portal-paciente';
         return NextResponse.redirect(redirectUrl);
       }

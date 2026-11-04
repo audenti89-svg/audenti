@@ -196,6 +196,20 @@ export async function PATCH(request: Request) {
 
     await savePersistedAppointments(updated);
 
+    // Sincronizar en tabla relacional appointments de Supabase
+    try {
+      await supabase
+        .from('appointments')
+        .update({
+          status: 'confirmed',
+          attendance_confirmed: true,
+          attendance_confirmed_at: new Date().toISOString()
+        })
+        .or(`id.eq.${id},folio.eq.${id}`);
+    } catch (dbErr) {
+      console.warn('Nota sincronizando tabla appointments en Supabase:', dbErr);
+    }
+
     // Notificar en realtime
     try {
       await supabase.channel('calendar_page_realtime').send({
