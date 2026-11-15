@@ -647,10 +647,14 @@ export function ChatInterface() {
           })
 
           setPatients(prev => {
-            const cleanPhone = (r.metadata?.phone || targetId.replace('prospect_', '')).replace(/\D/g, '').slice(-10)
+            const rPhoneDigits = (r.metadata?.phone || '').replace(/\D/g, '')
+            const rIdDigits = (targetId || '').replace('prospect_', '').replace(/\D/g, '')
+            const cleanPhone = (rPhoneDigits.length >= 7 ? rPhoneDigits : rIdDigits).slice(-10)
             const idx = prev.findIndex(p => {
               if (p.id === targetId) return true
-              const pClean = (p.phone || p.id.replace('prospect_', '')).replace(/\D/g, '').slice(-10)
+              const pPhoneDigits = (p.phone || '').replace(/\D/g, '')
+              const pIdDigits = (p.id || '').replace('prospect_', '').replace(/\D/g, '')
+              const pClean = (pPhoneDigits.length >= 7 ? pPhoneDigits : pIdDigits).slice(-10)
               if (cleanPhone && pClean && cleanPhone.length >= 7 && pClean.length >= 7 && cleanPhone === pClean) return true
               return false
             })
@@ -746,10 +750,14 @@ export function ChatInterface() {
 
         // Actualizar o insertar paciente en el directorio
         setPatients(prev => {
-          const cleanPhone = (payload.phone || targetId.replace('prospect_', '')).replace(/\D/g, '').slice(-10)
+          const bPhoneDigits = (payload.phone || '').replace(/\D/g, '')
+          const bIdDigits = (targetId || '').replace('prospect_', '').replace(/\D/g, '')
+          const cleanPhone = (bPhoneDigits.length >= 7 ? bPhoneDigits : bIdDigits).slice(-10)
           const index = prev.findIndex(p => {
             if (p.id === targetId) return true
-            const pClean = (p.phone || p.id.replace('prospect_', '')).replace(/\D/g, '').slice(-10)
+            const pPhoneDigits = (p.phone || '').replace(/\D/g, '')
+            const pIdDigits = (p.id || '').replace('prospect_', '').replace(/\D/g, '')
+            const pClean = (pPhoneDigits.length >= 7 ? pPhoneDigits : pIdDigits).slice(-10)
             if (cleanPhone && pClean && cleanPhone.length >= 7 && pClean.length >= 7 && cleanPhone === pClean) return true
             return false
           })
@@ -1006,7 +1014,9 @@ export function ChatInterface() {
       seenIds.add(p.id)
 
       // Deduplicación por teléfono normalizado a 10 dígitos
-      const cleanP = (p.phone || p.id.replace('prospect_', '')).replace(/\D/g, '').slice(-10)
+      const phoneDigits = (p.phone || '').replace(/\D/g, '')
+      const idDigits = (p.id || '').replace('prospect_', '').replace(/\D/g, '')
+      const cleanP = (phoneDigits.length >= 7 ? phoneDigits : idDigits).slice(-10)
       if (cleanP && cleanP.length >= 7) {
         if (seenPhones.has(cleanP)) return false
         seenPhones.add(cleanP)

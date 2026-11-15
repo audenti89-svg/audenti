@@ -110,10 +110,10 @@ export function WhatsAppQRModal({ isOpen, onClose, onConnected }: WhatsAppQRModa
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
-      <div className="bg-white rounded-3xl max-w-md w-full mx-auto border border-slate-200/90 shadow-2xl overflow-hidden flex flex-col my-auto max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-950/75 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+      <div className="bg-white rounded-3xl max-w-md w-full mx-auto p-6 border border-slate-200/90 shadow-2xl flex flex-col my-auto max-h-[90vh] space-y-4 overflow-hidden">
         {/* Encabezado */}
-        <div className="p-5 bg-gradient-to-r from-emerald-600 via-teal-600 to-slate-900 text-white flex items-center justify-between">
+        <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-slate-900 text-white flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shrink-0">
               <QrCode className="w-5 h-5 text-emerald-300" />
@@ -140,7 +140,7 @@ export function WhatsAppQRModal({ isOpen, onClose, onConnected }: WhatsAppQRModa
         </div>
 
         {/* Contenido Central */}
-        <div className="p-6 space-y-4 overflow-y-auto">
+        <div className="space-y-4 overflow-y-auto flex-1 pr-1">
           {/* Tarjeta de Estado Actual */}
           {connected ? (
             <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between gap-3">
@@ -245,7 +245,7 @@ export function WhatsAppQRModal({ isOpen, onClose, onConnected }: WhatsAppQRModa
         </div>
 
         {/* Pie de Modal */}
-        <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2">
+        <div className="pt-3 border-t border-slate-200 flex items-center justify-between gap-2 shrink-0">
           <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-semibold truncate">
             <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
             <span className="truncate">Encriptación punto a punto activa</span>
