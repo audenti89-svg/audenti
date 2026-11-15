@@ -455,25 +455,25 @@ export default function LandingPage() {
           </nav>
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            {/* Botón 1: Registrarme / Activar Cuenta (Pacientes) */}
+            {/* Botón 1: Iniciar Sesión Médica (Dra. Aura Estudillo y Personal Clínico) */}
             <Link
-              href="/portal/login?mode=activate"
-              className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-full border border-amber-500/40 hover:border-amber-400 bg-slate-900/90 text-xs font-bold text-amber-300 hover:text-amber-200 transition-all shadow-sm cursor-pointer whitespace-nowrap shrink-0"
-              title="Registrarme o activar cuenta de paciente"
+              href="/auth/login"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-700 hover:border-amber-400/50 bg-slate-900/90 text-xs font-bold text-slate-200 hover:text-white transition-all shadow-sm cursor-pointer whitespace-nowrap shrink-0"
+              title="Acceso oficial para la Dra. Aura Estudillo y personal clínico"
             >
-              <UserPlus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span className="hidden xs:inline">Registrarme</span>
+              <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="hidden sm:inline">Iniciar Sesión Médica</span>
+              <span className="sm:hidden">Médica</span>
             </Link>
 
-            {/* Botón 2: Portal Paciente (100% Visible) */}
+            {/* Botón 2: Portal del Paciente */}
             <Link
               href="/portal/login"
-              className="inline-flex items-center gap-1 px-2.5 sm:px-3.5 py-1.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-all shadow-md shadow-amber-500/20 cursor-pointer whitespace-nowrap shrink-0"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-all shadow-md shadow-amber-500/20 cursor-pointer whitespace-nowrap shrink-0"
               title="Portal de Pacientes: Citas, Recetas y Odontograma"
             >
               <UserCheck className="w-3.5 h-3.5 shrink-0" />
-              <span>Portal</span>
-              <span className="hidden sm:inline">Paciente</span>
+              <span>Portal del Paciente</span>
             </Link>
 
             {/* Botón Principal Agendar Cita */}
@@ -506,21 +506,21 @@ export default function LandingPage() {
             
             <div className="pt-3 border-t border-slate-800 space-y-2">
               <Link
+                href="/auth/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 font-bold inline-flex items-center justify-center gap-2 shadow-xs cursor-pointer hover:border-amber-400/50 hover:text-white"
+              >
+                <Lock className="w-4 h-4 text-amber-400" />
+                Iniciar Sesión Médica
+              </Link>
+
+              <Link
                 href="/portal/login"
                 onClick={() => setMobileMenuOpen(false)}
                 className="w-full py-2.5 rounded-xl bg-amber-400 text-slate-950 font-black inline-flex items-center justify-center gap-2 shadow-md shadow-amber-500/20 cursor-pointer"
               >
                 <UserCheck className="w-4 h-4" />
-                Portal del Paciente (Iniciar Sesión)
-              </Link>
-
-              <Link
-                href="/portal/login?mode=activate"
-                onClick={() => setMobileMenuOpen(false)}
-                className="w-full py-2.5 rounded-xl bg-slate-900 border border-amber-500/40 text-amber-300 font-bold inline-flex items-center justify-center gap-2 shadow-xs cursor-pointer"
-              >
-                <UserPlus className="w-4 h-4 text-amber-400" />
-                Registrarme / Activar Cuenta
+                Portal del Paciente
               </Link>
             </div>
           </div>

@@ -110,12 +110,12 @@ export function WhatsAppQRModal({ isOpen, onClose, onConnected }: WhatsAppQRModa
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+      <div className="bg-white rounded-3xl max-w-md w-full mx-auto border border-slate-200/90 shadow-2xl overflow-hidden flex flex-col my-auto max-h-[90vh]">
         {/* Encabezado */}
-        <div className="p-6 bg-gradient-to-r from-emerald-600 via-teal-600 to-slate-900 text-white flex items-center justify-between">
+        <div className="p-5 bg-gradient-to-r from-emerald-600 via-teal-600 to-slate-900 text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20">
+            <div className="w-10 h-10 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 shrink-0">
               <QrCode className="w-5 h-5 text-emerald-300" />
             </div>
             <div>
@@ -123,28 +123,29 @@ export function WhatsAppQRModal({ isOpen, onClose, onConnected }: WhatsAppQRModa
                 <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-400 text-slate-950">
                   OpenWA &amp; WAHA Live
                 </span>
-                <span className="text-[11px] text-emerald-100">WhatsApp Business</span>
+                <span className="text-[11px] text-emerald-100 hidden sm:inline">WhatsApp Business</span>
               </div>
-              <h2 className="text-base font-black tracking-tight mt-0.5">
-                Vincular WhatsApp Oficial de la Doctora
+              <h2 className="text-sm sm:text-base font-black tracking-tight mt-0.5">
+                Vincular WhatsApp Oficial
               </h2>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+            className="p-1.5 sm:p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            title="Cerrar modal"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Contenido Central */}
-        <div className="p-6 space-y-5">
+        <div className="p-6 space-y-4 overflow-y-auto">
           {/* Tarjeta de Estado Actual */}
           {connected ? (
-            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between">
+            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
                   <CheckCircle2 className="w-6 h-6" />
                 </div>
                 <div>
@@ -152,7 +153,7 @@ export function WhatsAppQRModal({ isOpen, onClose, onConnected }: WhatsAppQRModa
                     WhatsApp Business Activo &amp; Conectado
                   </span>
                   <p className="text-[11px] text-emerald-700">
-                    Número vinculado: <strong className="font-mono">+52 55 2242 7769</strong> (Dra. Aura Estudillo)
+                    Número: <strong className="font-mono">+52 55 2242 7769</strong> (Dra. Aura)
                   </p>
                 </div>
               </div>
@@ -160,7 +161,7 @@ export function WhatsAppQRModal({ isOpen, onClose, onConnected }: WhatsAppQRModa
                 onClick={handleDisconnect}
                 disabled={loading}
                 title="Desconectar sesión"
-                className="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-700 bg-white hover:bg-rose-50 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="px-3 py-1.5 rounded-xl border border-rose-200 text-rose-700 bg-white hover:bg-rose-50 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 <span>Desvincular</span>
@@ -174,20 +175,20 @@ export function WhatsAppQRModal({ isOpen, onClose, onConnected }: WhatsAppQRModa
               </div>
 
               {/* Contenedor del Código QR */}
-              <div className="flex justify-center p-4 bg-slate-50 border border-slate-200 rounded-3xl w-fit mx-auto shadow-inner relative group">
+              <div className="flex justify-center p-3 bg-slate-50 border border-slate-200 rounded-2xl w-fit mx-auto shadow-inner relative group">
                 {loading && !qrCode ? (
-                  <div className="w-56 h-56 flex flex-col items-center justify-center gap-2">
+                  <div className="w-48 h-48 flex flex-col items-center justify-center gap-2">
                     <RefreshCw className="w-8 h-8 text-emerald-600 animate-spin" />
                     <span className="text-xs font-bold text-slate-500">Generando sesión QR...</span>
                   </div>
                 ) : qrCode ? (
-                  <div className="p-3 bg-white rounded-2xl shadow-sm border border-slate-100">
+                  <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-100">
                     {qrCode.startsWith('data:image') ? (
-                      <img src={qrCode} alt="Código QR WhatsApp" className="w-52 h-52 object-contain" />
+                      <img src={qrCode} alt="Código QR WhatsApp" className="w-44 h-44 object-contain" />
                     ) : (
                       <QRCodeSVG
                         value={qrCode}
-                        size={210}
+                        size={180}
                         level="M"
                         includeMargin={false}
                         fgColor="#0F172A"
@@ -196,10 +197,10 @@ export function WhatsAppQRModal({ isOpen, onClose, onConnected }: WhatsAppQRModa
                   </div>
                 ) : (
                   // Fallback para vincular el número de WhatsApp oficial directamente
-                  <div className="w-56 h-56 p-4 flex flex-col items-center justify-center text-center space-y-3 bg-white rounded-2xl border border-slate-200">
+                  <div className="w-48 h-48 p-3 flex flex-col items-center justify-center text-center space-y-2 bg-white rounded-xl border border-slate-200">
                     <QRCodeSVG
                       value={`https://wa.me/525522427769?text=${encodeURIComponent('Hola Dra. Aura Estudillo, confirmo vinculación con Audenti CRM')}`}
-                      size={140}
+                      size={130}
                       level="M"
                       includeMargin={false}
                       fgColor="#0F172A"
@@ -214,7 +215,7 @@ export function WhatsAppQRModal({ isOpen, onClose, onConnected }: WhatsAppQRModa
                 type="button"
                 onClick={fetchQR}
                 disabled={loading}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-bold transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-bold transition-all cursor-pointer"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-emerald-600' : ''}`} />
                 <span>Actualizar Código QR</span>
@@ -223,15 +224,15 @@ export function WhatsAppQRModal({ isOpen, onClose, onConnected }: WhatsAppQRModa
           )}
 
           {/* Instrucciones Clínicas Paso a Paso */}
-          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-2.5">
+          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-2">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 block">
               Pasos para la Dra. Aura Estudillo:
             </span>
-            <ol className="text-xs text-slate-600 space-y-2 list-decimal list-inside leading-relaxed font-medium">
-              <li>Abre <strong>WhatsApp Business</strong> en tu teléfono celular.</li>
-              <li>Toca <strong>Menú (⋮)</strong> en Android o <strong>Configuración (⚙️)</strong> en iPhone.</li>
-              <li>Selecciona <strong>Dispositivos vinculados</strong> y luego <strong>Vincular un dispositivo</strong>.</li>
-              <li>Apunta la cámara de tu teléfono hacia el código QR en esta pantalla.</li>
+            <ol className="text-xs text-slate-600 space-y-1.5 list-decimal list-inside leading-relaxed font-medium">
+              <li>Abre <strong>WhatsApp Business</strong> en tu celular.</li>
+              <li>Toca <strong>Menú (⋮)</strong> o <strong>Configuración (⚙️)</strong>.</li>
+              <li>Toca <strong>Dispositivos vinculados</strong> &gt; <strong>Vincular dispositivo</strong>.</li>
+              <li>Apunta tu cámara hacia el código QR de arriba.</li>
             </ol>
           </div>
 
@@ -244,14 +245,14 @@ export function WhatsAppQRModal({ isOpen, onClose, onConnected }: WhatsAppQRModa
         </div>
 
         {/* Pie de Modal */}
-        <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-semibold">
-            <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>Encriptación de extremo a extremo garantizada</span>
+        <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-semibold truncate">
+            <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span className="truncate">Encriptación punto a punto activa</span>
           </div>
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors cursor-pointer shrink-0"
           >
             Cerrar
           </button>

@@ -187,10 +187,10 @@ export function AuthModal({
               onClose();
               router.push('/auth/login');
             }}
-            className="py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white text-[11px] font-bold border border-slate-700 hover:border-amber-400/40 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+            className="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white text-[11px] font-bold border border-slate-700 hover:border-amber-400/40 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
           >
             <Lock className="w-3.5 h-3.5 text-amber-400" />
-            <span>Doctores / Staff</span>
+            <span>Iniciar Sesión Médica</span>
           </button>
 
           <button
@@ -199,10 +199,10 @@ export function AuthModal({
               onClose();
               router.push('/portal/login');
             }}
-            className="py-2 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-[11px] font-black transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-amber-500/20 cursor-pointer"
+            className="py-2.5 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-[11px] font-black transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-amber-500/20 cursor-pointer"
           >
             <User className="w-3.5 h-3.5" />
-            <span>Portal Paciente</span>
+            <span>Portal del Paciente</span>
           </button>
         </div>
 

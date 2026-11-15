@@ -297,22 +297,15 @@ function LoginForm() {
           <span className="text-[10px] font-semibold text-slate-400">Balbuena &amp; Chalma</span>
         </div>
         <p className="text-[11px] text-slate-300 leading-snug">
-          Consulta tu odontograma, citas y recetas, o activa tu cuenta si ya te diste de alta en recepción.
+          Consulta tu odontograma, historial de citas, recetas médicas oficiales y confirmación de asistencia.
         </p>
-        <div className="pt-1 flex items-center gap-2">
+        <div className="pt-2">
           <Link
             href="/portal/login"
-            className="flex-1 py-2 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-colors text-center shadow-sm flex items-center justify-center gap-1"
+            className="w-full py-2.5 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-colors text-center shadow-md shadow-amber-500/20 flex items-center justify-center gap-2"
           >
-            <UserCheck className="w-3.5 h-3.5" />
-            <span>Iniciar Sesión</span>
-          </Link>
-          <Link
-            href="/portal/login?mode=activate"
-            className="flex-1 py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 hover:text-amber-200 border border-amber-500/40 font-bold text-xs transition-colors text-center shadow-sm flex items-center justify-center gap-1"
-          >
-            <UserPlus className="w-3.5 h-3.5" />
-            <span>Activar Cuenta →</span>
+            <UserCheck className="w-4 h-4" />
+            <span>Portal del Paciente →</span>
           </Link>
         </div>
       </div>

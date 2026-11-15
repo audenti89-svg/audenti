@@ -241,20 +241,41 @@ export function ChatInterface() {
         }
       } catch {}
 
-      // E. Construir el Directorio de Pacientes (100% libre de duplicados por teléfono e ID)
+      // E. Construir el Directorio de Pacientes (100% libre de duplicados por teléfono, ID y nombre)
       const directoryList: PatientDirectoryItem[] = []
       const processedIds = new Set<string>()
       const processedPhones = new Set<string>()
+      const processedNames = new Set<string>()
 
-      // 1. Añadir primero a todos los pacientes registrados en la base de datos
+      // 1. Añadir primero a todos los pacientes registrados en la base de datos (deduplicando por ID, teléfono y nombre completo)
       registeredList.forEach(p => {
-        processedIds.add(p.id)
+        if (!p || !p.id) return
+        if (processedIds.has(p.id)) return
+
         const cleanP = (p.phone || '').replace(/\D/g, '').slice(-10)
+        const normalizedName = (p.full_name || '').toLowerCase().trim()
+
+        // Si ya procesamos a un paciente con este mismo número de 10 dígitos, consolidar
         if (cleanP && cleanP.length >= 7) {
+          if (processedPhones.has(cleanP)) {
+            processedIds.add(p.id)
+            return
+          }
           processedPhones.add(cleanP)
           processedIds.add(`prospect_${cleanP}`)
           processedIds.add(`prospect_52${cleanP}`)
         }
+
+        // Si ya procesamos a un paciente con el mismo nombre específico, consolidar
+        if (normalizedName && normalizedName.length >= 5 && normalizedName !== 'paciente registrado') {
+          if (processedNames.has(normalizedName)) {
+            processedIds.add(p.id)
+            return
+          }
+          processedNames.add(normalizedName)
+        }
+
+        processedIds.add(p.id)
 
         const chatArray = mappedMessages[p.id] || (cleanP ? mappedMessages[`prospect_${cleanP}`] : []) || []
         chatArray.sort((a, b) => {
@@ -291,7 +312,7 @@ export function ChatInterface() {
         })
       })
 
-      // 2. Añadir prospectos o contactos que tienen mensajes pero no están en la tabla patients (sin duplicar teléfonos)
+      // 2. Añadir prospectos o contactos que tienen mensajes pero no están en la tabla patients (sin duplicar teléfonos ni nombres)
       Object.keys(mappedMessages).forEach(contactId => {
         if (processedIds.has(contactId)) return
 
@@ -309,6 +330,7 @@ export function ChatInterface() {
         const cleanName = rawName.replace(/\s*\(Prospecto\)/gi, '').trim()
         const rawPhone = lastMsg?.metadata?.phone || (contactId.startsWith('prospect_') ? contactId.replace('prospect_', '') : '')
         const cleanPhone10 = rawPhone.replace(/\D/g, '').slice(-10)
+        const normalizedName = cleanName.toLowerCase().trim()
 
         // Si este número ya pertenece a un paciente registrado o a otro prospecto procesado, consolidar y no duplicar
         if (cleanPhone10 && cleanPhone10.length >= 7) {
@@ -316,6 +338,14 @@ export function ChatInterface() {
             return
           }
           processedPhones.add(cleanPhone10)
+        }
+
+        // Si ya existe un contacto o paciente con este nombre, consolidar
+        if (normalizedName && normalizedName.length >= 5 && normalizedName !== 'contacto' && normalizedName !== 'contacto desconocido' && normalizedName !== 'paciente registrado') {
+          if (processedNames.has(normalizedName)) {
+            return
+          }
+          processedNames.add(normalizedName)
         }
 
         processedIds.add(contactId)
@@ -617,7 +647,13 @@ export function ChatInterface() {
           })
 
           setPatients(prev => {
-            const idx = prev.findIndex(p => p.id === targetId)
+            const cleanPhone = (r.metadata?.phone || targetId.replace('prospect_', '')).replace(/\D/g, '').slice(-10)
+            const idx = prev.findIndex(p => {
+              if (p.id === targetId) return true
+              const pClean = (p.phone || p.id.replace('prospect_', '')).replace(/\D/g, '').slice(-10)
+              if (cleanPhone && pClean && cleanPhone.length >= 7 && pClean.length >= 7 && cleanPhone === pClean) return true
+              return false
+            })
             const isUrgent = /(?:dolor|duele|muela|urgente|emergencia|sangr|inflamad)/i.test(r.content || '')
             if (idx >= 0) {
               const updated = [...prev]
@@ -710,7 +746,13 @@ export function ChatInterface() {
 
         // Actualizar o insertar paciente en el directorio
         setPatients(prev => {
-          const index = prev.findIndex(p => p.id === targetId)
+          const cleanPhone = (payload.phone || targetId.replace('prospect_', '')).replace(/\D/g, '').slice(-10)
+          const index = prev.findIndex(p => {
+            if (p.id === targetId) return true
+            const pClean = (p.phone || p.id.replace('prospect_', '')).replace(/\D/g, '').slice(-10)
+            if (cleanPhone && pClean && cleanPhone.length >= 7 && pClean.length >= 7 && cleanPhone === pClean) return true
+            return false
+          })
           const isUrgent = payload.urgencyLevel === 'Urgente' || /(?:dolor|duele|muela|urgente)/i.test(payload.content)
           if (index >= 0) {
             const updated = [...prev]
@@ -942,19 +984,44 @@ export function ChatInterface() {
     return candidates
   }, [selectedPatientId, activePatient, messages])
 
-  // Filtrado de la bandeja
-  const filteredPatients = patients.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          p.phone.includes(searchTerm) ||
-                          p.folio.toLowerCase().includes(searchTerm.toLowerCase())
-    if (!matchesSearch) return false
+  // Filtrado y deduplicación estricta de la bandeja lateral
+  const filteredPatients = useMemo(() => {
+    const seenIds = new Set<string>()
+    const seenPhones = new Set<string>()
+    const seenNames = new Set<string>()
 
-    if (activeFilter === 'voice_call') return p.channel_type === 'voice_call'
-    if (activeFilter === 'whatsapp') return p.channel_type === 'whatsapp'
-    if (activeFilter === 'web_chat') return p.channel_type === 'web_chat'
-    if (activeFilter === 'urgent') return p.isUrgent
-    return true
-  })
+    return patients.filter(p => {
+      const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            p.phone.includes(searchTerm) ||
+                            p.folio.toLowerCase().includes(searchTerm.toLowerCase())
+      if (!matchesSearch) return false
+
+      if (activeFilter === 'voice_call' && p.channel_type !== 'voice_call') return false
+      if (activeFilter === 'whatsapp' && p.channel_type !== 'whatsapp') return false
+      if (activeFilter === 'web_chat' && p.channel_type !== 'web_chat') return false
+      if (activeFilter === 'urgent' && !p.isUrgent) return false
+
+      // Deduplicación estricta por ID único
+      if (seenIds.has(p.id)) return false
+      seenIds.add(p.id)
+
+      // Deduplicación por teléfono normalizado a 10 dígitos
+      const cleanP = (p.phone || p.id.replace('prospect_', '')).replace(/\D/g, '').slice(-10)
+      if (cleanP && cleanP.length >= 7) {
+        if (seenPhones.has(cleanP)) return false
+        seenPhones.add(cleanP)
+      }
+
+      // Deduplicación por nombre representativo (evitar duplicados nominales)
+      const cleanName = p.name.toLowerCase().trim()
+      if (cleanName && cleanName.length >= 6 && cleanName !== 'contacto' && cleanName !== 'contacto desconocido' && cleanName !== 'paciente registrado') {
+        if (seenNames.has(cleanName)) return false
+        seenNames.add(cleanName)
+      }
+
+      return true
+    })
+  }, [patients, searchTerm, activeFilter])
 
   return (
     <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden flex flex-col h-[780px]">

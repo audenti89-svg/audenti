@@ -398,54 +398,11 @@ function PatientLoginForm() {
       </span>
 
       <h1 className="text-2xl font-black text-white tracking-tight mt-1 mb-1">
-        {mode === 'login' ? 'Acceso a tu Expediente' : 'Activar Cuenta de Paciente'}
+        Acceso a tu Expediente
       </h1>
       <p className="text-xs text-slate-400 mb-5 font-medium">
         Dra. Aura Estudillo • Sucursal Balbuena &amp; Sucursal Chalma de Guadalupe
       </p>
-
-      {/* SELECTOR SEGMENTADO (TABS 100% VISIBLES: INICIAR SESIÓN / ACTIVAR CUENTA) */}
-      <div className="grid grid-cols-2 p-1 bg-slate-900 border border-slate-800 rounded-2xl mb-5">
-        <button
-          type="button"
-          onClick={() => {
-            setMode('login');
-            setErrorMsg('');
-            setIsEmailAlreadyRegistered(false);
-            setSuccessMsg('');
-          }}
-          className={`py-2 px-3 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-            mode === 'login'
-              ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-500/20'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-          }`}
-        >
-          <Lock className="w-3.5 h-3.5" />
-          <span>Iniciar Sesión</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setMode('activate');
-            setErrorMsg('');
-            setIsEmailAlreadyRegistered(false);
-            setSuccessMsg('');
-            if (loginEmailOrPhone.includes('@') && !actEmail) {
-              setActEmail(loginEmailOrPhone.trim().toLowerCase());
-              handleCheckEmailInClinic(loginEmailOrPhone.trim().toLowerCase());
-            }
-          }}
-          className={`py-2 px-3 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-            mode === 'activate'
-              ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-500/20'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-          }`}
-        >
-          <UserPlus className="w-3.5 h-3.5" />
-          <span>Activar Cuenta</span>
-        </button>
-      </div>
 
       {/* MENSAJES DE ESTADO (ERROR / ÉXITO) */}
       {errorMsg && (
@@ -786,8 +743,19 @@ function PatientLoginForm() {
         </p>
       </div>
 
+      {/* ACCESO EXCLUSIVO PERSONAL CLÍNICO */}
+      <div className="mt-4 pt-3 border-t border-slate-800 text-center">
+        <Link
+          href="/auth/login"
+          className="inline-flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 font-bold transition-colors"
+        >
+          <Lock className="w-3.5 h-3.5" />
+          <span>Acceso para Personal Médico y Doctores (Iniciar Sesión Médica) →</span>
+        </Link>
+      </div>
+
       {/* PIE DE PÁGINA LIMPIO (EXCLUSIVO PACIENTES) */}
-      <div className="mt-5 pt-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+      <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
         <Link href="/" className="hover:text-amber-400 transition-colors font-medium">
           ← Volver al Inicio
         </Link>
