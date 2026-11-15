@@ -96,69 +96,128 @@ export function isOutsideBusinessHoursInMexico(date?: Date | string | number): b
 export type IntentionCategory = 'Información' | 'Consulta' | 'Urgencia Médica'
 export type TriageTrafficLight = 'green' | 'yellow' | 'red'
 
-/**
- * Matriz Estricta de Semaforización y Triage de Intención Médica (Audenti CRM):
- * REGLA DE ORO: La intención médica del paciente predomina sobre la hora de contacto.
- * 
- * 🟢 VERDE (Consulta / Cita): Si el usuario solicita agendar/programar una cita de valoración,
- *   limpieza, revisión o tratamiento (incluso si llama un sábado o domingo fuera de horario).
- * 
- * 🟡 AMARILLO (Información): Preguntas generales sobre precios, ubicación o servicios
- *   sin dolor ni urgencia.
- * 
- * 🔴 ROJO (Urgencia): ÚNICAMENTE si el paciente reporta dolor agudo, trauma, sangrado,
- *   inflamación, absceso o accidente dental.
- */
-export function evaluateIntentionAndUrgency(
-  text: string,
-  timestamp?: Date | string | number
-): {
+export type ClinicalDentalCategory =
+  | 'URGENCIA_AGUDA'
+  | 'REHABILITACION'
+  | 'ENDODONCIA'
+  | 'ORTODONCIA'
+  | 'PERIODONCIA'
+  | 'PREVENTIVA_GENERAL'
+  | 'INFORMACION_SERVICIOS'
+
+export interface ClinicalTriageEvaluation {
   intention: IntentionCategory
   trafficLight: TriageTrafficLight
   urgencyLevel: 'Urgente' | 'No Urgente'
   isOutsideHours: boolean
   suggestedReason: string
-} {
+  clinicalCategory?: ClinicalDentalCategory
+  requestedSchedule?: string | null
+}
+
+/**
+ * Matriz Estricta de Semaforización y Triage de Intención Médica ECC (Audenti CRM):
+ * REGLA DE ORO: La intención médica y patología del paciente predomina sobre la hora de contacto.
+ * 
+ * 🔴 ROJO (Urgencia Médica): Dolor agudo/pulsátil, traumatismo, avulsión, absceso, flemón, celulitis,
+ *   alveolitis, pericoronaritis aguda o hemorragia activa.
+ * 
+ * 🟢 VERDE (Consulta / Cita): Solicitud de valoración o cita programada de rehabilitación, ortodoncia,
+ *   endodoncia, periodoncia o preventiva.
+ * 
+ * 🟡 AMARILLO (Información): Preguntas generales de ubicación, preparación o dudas no urgentes.
+ */
+export function evaluateIntentionAndUrgency(
+  text: string,
+  timestamp?: Date | string | number
+): ClinicalTriageEvaluation {
   const lower = (text || '').toLowerCase()
   const isOutside = isOutsideBusinessHoursInMexico(timestamp)
 
-  // Patrones estrictos de dolor agudo, traumatismo, sangrado o inflamación (ROJO)
-  const hasAcutePainOrTrauma = /(?:dolor\s*(?:agudo|fuerte|insoportable|intenso)?|duele\s*(?:mucho|fuerte|horrible)?|muela\s*picada|no\s*aguanto|aguanto|sangr|sangrado|inflamaci|inflamad|hinchad|absceso|pus|flem[oó]n|golpe|trauma|fractur|quebr|rompi|ca[ií]da|accidente|emergencia|urgente|urgencia)/i.test(lower)
+  // 1. Detección de Horario Solicitado (Extracción estructurada)
+  let requestedSchedule: string | null = null
+  const scheduleMatch = lower.match(/(?:(?:el\s+)?(?:lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo|hoy|mañana|pasado\s*mañana)|(?:a\s+las?\s+\d{1,2}(?::\d{2})?\s*(?:am|pm|hrs?|horas?)?)|(?:\d{1,2}(?::\d{2})?\s*(?:am|pm|hrs?|horas?))|(?:por\s+la\s+(?:tarde|mañana|noche)))/i)
+  if (scheduleMatch) {
+    requestedSchedule = scheduleMatch[0].trim()
+  }
 
-  // Patrones de solicitud de cita o tratamiento médico (VERDE)
-  const asksAppointmentOrTreatment = /(?:cita|agendar|programar|horario|disponib|turno|apartar|reservar|consulta|valoraci[oó]n|revisi[oó]n|limpieza|profilaxis|blanqueamiento|resina|ortodoncia|brackets|alineador|implante|corona|endodoncia|extracci[oó]n|pr[oó]tesis)/i.test(lower)
+  // 2. Patologías Odontológicas Agudas de Urgencia (ROJO)
+  const isTraumaOrAvulsion = /(?:trauma|golpe|accidente|ca[ií]da|fractur|quebr|rompi|astill|avulsi[oó]n|diente\s*(?:ca[ií]do|volado|arrancado)|diente\s*flojo|luxaci[oó]n|sangr|hemorragi)/i.test(lower)
+  const isInfectionOrAbscess = /(?:pulpitis|absceso|flem[oó]n|celulitis|fistul|supura|pus|hinchad|inflamad|tumefacci[oó]n|alveolitis)/i.test(lower)
+  const isWisdomPericoronitis = /(?:pericoronaritis|muela\s*del\s*juicio|tercer\s*molar|trismus|no\s*puedo\s*abrir\s*la\s*boca)/i.test(lower)
+  const isAcutePain = /(?:dolor\s*(?:agudo|fuerte|insoportable|intenso|puls[aá]til|punzante|no\s*aguanto|terrible)|duele\s*(?:mucho|fuerte|horrible|demasiado)|no\s*aguanto|no\s*puedo\s*dormir|muela\s*picada|urgente|urgencia|emergencia)/i.test(lower)
 
-  // 1. 🔴 ROJO: Urgencia Médica (ÚNICAMENTE si el paciente reporta dolor, trauma, sangrado o inflamación)
+  const hasAcutePainOrTrauma = isTraumaOrAvulsion || isInfectionOrAbscess || isWisdomPericoronitis || isAcutePain
+
+  // 1. 🔴 ROJO: Urgencia Médica
   if (hasAcutePainOrTrauma) {
+    let reason = 'Urgencia Médica: Dolor Agudo / Patología Dental'
+    if (isTraumaOrAvulsion) reason = 'Urgencia Odontológica: Traumatismo Dental / Avulsión / Hemorragia'
+    else if (isInfectionOrAbscess) reason = 'Urgencia Odontológica: Absceso Periapical / Flemón / Infección Aguda'
+    else if (isWisdomPericoronitis) reason = 'Urgencia Odontológica: Pericoronaritis / Muela del Juicio'
+    else if (isAcutePain) reason = 'Urgencia Odontológica: Dolor Pulpar Agudo / Pulpitis Irreversible'
+
     return {
       intention: 'Urgencia Médica',
       trafficLight: 'red',
       urgencyLevel: 'Urgente',
       isOutsideHours: isOutside,
-      suggestedReason: 'Urgencia Médica: Dolor Agudo / Traumatismo Dental'
+      suggestedReason: reason,
+      clinicalCategory: 'URGENCIA_AGUDA',
+      requestedSchedule
     }
   }
 
-  // 2. 🟢 VERDE: Consulta / Cita (Solicitud de cita de valoración, limpieza, revisión o tratamiento)
-  // La intención predomina: incluso si llama fuera de horario, es una cita de consulta regular (No Urgente)
-  if (asksAppointmentOrTreatment) {
+  // 3. Especialidades Odontológicas Programadas (VERDE)
+  const isEndodontics = /(?:endodoncia|conductos?|tratamiento\s*de\s*conducto|nervio|biopulpectom[ií]a)/i.test(lower)
+  const isOrthodontics = /(?:ortodoncia|brackets|alineador|invisalign|chuecos|mordida|frenos)/i.test(lower)
+  const isRehabOrProsthesis = /(?:corona|puente|pr[oó]tesis|implante|incrustaci[oó]n|zirconio|disilicato|rehabilitaci[oó]n)/i.test(lower)
+  const isPeriodontics = /(?:periodon|gingivitis|enc[ií]as|raspado|curetaje|profilaxis\s*profunda)/i.test(lower)
+  const isPreventiveOrCosmetic = /(?:limpieza|profilaxis|blanqueamiento|resina|sarro|est[eé]tica|sellador)/i.test(lower)
+  const isGeneralAppointment = /(?:cita|agendar|programar|horario|disponib|turno|apartar|reservar|consulta|valoraci[oó]n|revisi[oó]n|chequeo)/i.test(lower)
+
+  if (isEndodontics || isOrthodontics || isRehabOrProsthesis || isPeriodontics || isPreventiveOrCosmetic || isGeneralAppointment) {
+    let reason = isOutside
+      ? 'Solicitud de Cita / Valoración Dental (Registro Fuera de Horario)'
+      : 'Programación de Cita / Consulta Odontológica'
+    let cat: ClinicalDentalCategory = 'PREVENTIVA_GENERAL'
+
+    if (isEndodontics) {
+      reason = 'Consulta Especializada: Endodoncia / Terapia de Conductos'
+      cat = 'ENDODONCIA'
+    } else if (isOrthodontics) {
+      reason = 'Consulta Especializada: Ortodoncia / Alineación Dental'
+      cat = 'ORTODONCIA'
+    } else if (isRehabOrProsthesis) {
+      reason = 'Consulta Especializada: Rehabilitación Oral / Prótesis / Coronas'
+      cat = 'REHABILITACION'
+    } else if (isPeriodontics) {
+      reason = 'Consulta Especializada: Periodoncia / Tratamiento Gingival'
+      cat = 'PERIODONCIA'
+    } else if (isPreventiveOrCosmetic) {
+      reason = 'Consulta Odontológica: Prevención / Limpieza Ultrasónica / Resinas'
+      cat = 'PREVENTIVA_GENERAL'
+    }
+
     return {
       intention: 'Consulta',
       trafficLight: 'green',
       urgencyLevel: 'No Urgente',
       isOutsideHours: isOutside,
-      suggestedReason: isOutside
-        ? 'Solicitud de Cita / Valoración Dental (Registro Fuera de Horario)'
-        : 'Programación de Cita / Consulta Odontológica'
+      suggestedReason: reason,
+      clinicalCategory: cat,
+      requestedSchedule
     }
   }
 
-  // 3. 🟡 AMARILLO: Información (Preguntas generales de precios, ubicación o servicios sin dolor ni urgencia)
+  // 4. 🟡 AMARILLO: Información
   return {
     intention: 'Información',
     trafficLight: 'yellow',
     urgencyLevel: 'No Urgente',
     isOutsideHours: isOutside,
-    suggestedReason: 'Informes de Precios, Ubicación o Servicios'
+    suggestedReason: 'Informes de Servicios, Ubicación o Cuidados Dentales',
+    clinicalCategory: 'INFORMACION_SERVICIOS',
+    requestedSchedule
   }
 }

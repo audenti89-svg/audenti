@@ -1,22 +1,40 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
+import { isInternalUser } from '@/lib/auth/admin-emails';
 
 export const runtime = 'nodejs';
 
 /**
  * Image-to-Code Pipeline para Audenti Cloud Pro
  * Utiliza Google Gemini Multimodal para convertir bocetos médicos, recetas o fotos en JSX/Tailwind.
+ * Protegido contra uso no autorizado y filtración de credenciales.
  */
 export async function POST(request: Request) {
   try {
+    // 1. Blindaje de Autorización: Requiere sesión médica o administrativa activa
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'No autorizado. Se requiere inicio de sesión.' }, { status: 401 });
+    }
+
+    const userEmail = (user.email || '').toLowerCase().trim();
+    const userRole = (user.user_metadata?.role || user.app_metadata?.role || '').toLowerCase().trim();
+    if (!isInternalUser(userEmail, userRole)) {
+      return NextResponse.json({ success: false, error: 'Prohibido. Solo el personal clínico tiene acceso a esta herramienta.' }, { status: 403 });
+    }
+
     const { imageBase64, mimeType = 'image/png', promptContext } = await request.json();
 
     if (!imageBase64) {
       return NextResponse.json({ success: false, error: 'Imagen base64 requerida' }, { status: 400 });
     }
 
-    const geminiB64 = 'QVEuQWI4Uk42SV9ZT3RQbjZfakRZZGMtNGdZbWxsOXVVRDQ5Tk4tOWlhYlg3SXZqRE9TQ1E=';
-    const fallbackKey = typeof Buffer !== 'undefined' ? Buffer.from(geminiB64, 'base64').toString('utf-8') : '';
-    const geminiKey = process.env.GEMINI || process.env.GEMINI_API_KEY || fallbackKey;
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.GEMINI;
+    if (!geminiKey) {
+      return NextResponse.json({ success: false, error: 'Motor de visión no configurado' }, { status: 503 });
+    }
 
     const systemPrompt = `Eres un Ingeniero Frontend Senior especializado en Next.js, React y Tailwind CSS para Audenti Cloud Pro.
 Tu objetivo es analizar la imagen proporcionada (un boceto en papel, una receta médica, una tabla o una captura de pantalla de software) y convertirla en un componente de React con Tailwind CSS limpio, elegante, responsive y listo para producción.
@@ -53,8 +71,7 @@ ${promptContext ? `Instrucción adicional del usuario: ${promptContext}` : ''}`;
     });
 
     if (!response.ok) {
-      const err = await response.text();
-      return NextResponse.json({ success: false, error: `Error en motor de visión: ${err}` }, { status: 500 });
+      return NextResponse.json({ success: false, error: 'No fue posible procesar la imagen con el modelo de visión' }, { status: 502 });
     }
 
     const data = await response.json();
@@ -65,7 +82,7 @@ ${promptContext ? `Instrucción adicional del usuario: ${promptContext}` : ''}`;
       code: code
     });
   } catch (error: any) {
-    console.error('[IMAGE-TO-CODE ERROR]:', error);
-    return NextResponse.json({ success: false, error: error?.message || 'Error interno' }, { status: 500 });
+    console.error('[IMAGE-TO-CODE ERROR]:', error?.message);
+    return NextResponse.json({ success: false, error: 'Error interno al procesar imagen' }, { status: 500 });
   }
 }

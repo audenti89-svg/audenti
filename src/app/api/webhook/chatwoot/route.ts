@@ -3,6 +3,7 @@ import { executeAIAgent } from '@/lib/ai/router';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendDoctorWhatsAppAlert } from '@/lib/notifications/whatsapp-doctor';
 import { evaluateIntentionAndUrgency } from '@/utils/timezone';
+import { writeAheadLog, upsertChatMessageWithRetry } from '@/lib/persistence/omnichannel-wal';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -48,6 +49,10 @@ export async function POST(request: Request) {
     }
 
     const payload: ChatwootWebhookPayload = await request.json();
+
+    // 1. Respaldo Local Inmediato (Write-Ahead Log)
+    writeAheadLog('chatwoot_webhook', payload);
+
     const event = payload.event;
 
     // Solo procesar mensajes entrantes de clientes o prospectos
@@ -74,7 +79,6 @@ export async function POST(request: Request) {
 
     try {
       if (senderPhone) {
-        // Buscar por teléfono en la tabla 'patients'
         const cleanPhone = senderPhone.replace(/\D/g, '').slice(-10);
         const { data: found } = await supabase
           .from('patients')
@@ -93,14 +97,12 @@ export async function POST(request: Request) {
     }
 
     // 2. Extracción Obligatoria de Metadatos de Prospecto Nuevo / Consulta
-    // 👤 Nombre Completo
     let prospectName = senderName;
     const nameMatch = messageContent.match(/(?:me llamo|mi nombre es|soy)\s+([a-zA-ZáéíóúÁÉÍÓÚñÑ]{2,25}(?:\s+[a-zA-ZáéíóúÁÉÍÓÚñÑ]{2,25})?)/i);
     if (nameMatch && nameMatch[1]) {
       prospectName = nameMatch[1].trim();
     }
 
-    // 📱 Número de Teléfono
     let prospectPhone = senderPhone;
     if (!prospectPhone) {
       const phoneMatch = messageContent.match(/\b\d{10}\b/) || messageContent.match(/\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b/);
@@ -109,7 +111,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // 🎯 Evaluación Inteligente de Intención, Horario de México y Urgencia
+    // Evaluación Inteligente de Intención, Horario de México y Urgencia
     const evaluation = evaluateIntentionAndUrgency(messageContent, new Date());
     let consultationReason = evaluation.suggestedReason;
     const lowerContent = messageContent.toLowerCase();
@@ -126,12 +128,11 @@ export async function POST(request: Request) {
       consultationReason = 'Restauración / Resina Estética';
     }
 
-    // 🚨 Nivel de Urgencia (Urgente vs. No Urgente) conforme a Regla de Oro (Predominio de Intención Médica)
     const trafficLight = evaluation.trafficLight;
     const isUrgent = trafficLight === 'red';
     const urgencyLevel: 'Urgente' | 'No Urgente' = isUrgent ? 'Urgente' : 'No Urgente';
 
-    // Si el usuario no existe en Supabase, registrar al prospecto en la base de datos de pacientes si tiene teléfono
+    // Si el usuario no existe en Supabase, registrar al prospecto si tiene teléfono
     if (!isRegistered && prospectPhone) {
       try {
         const cleanPhone = prospectPhone.replace(/\D/g, '').slice(-10);
@@ -155,7 +156,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // 3. Ejecutar Triaje Inteligente con Aura IA (Captain AI)
+    // 3. Ejecutar Triaje Inteligente con Aura IA
     let aiTriageResponse = '';
     try {
       const aiResult = await executeAIAgent({
@@ -163,29 +164,41 @@ export async function POST(request: Request) {
         prompt: messageContent,
         contextData: {
           patientName: isRegistered ? patientRecord.full_name : prospectName,
-          patientPhone: prospectPhone,
+          phone: prospectPhone,
           channel: channelType,
-          isRegistered,
           consultationReason,
-          urgencyLevel,
-          folio: folio || 'PROSPECTO-NUEVO',
-          clinicName: 'Audenti Odontología (Dra. Aura Estudillo)'
+          urgencyLevel
         }
       });
-
       aiTriageResponse = typeof aiResult.result === 'string'
         ? aiResult.result
-        : (aiResult.result?.result || aiResult.result?.content || JSON.stringify(aiResult.result));
+        : (aiResult.result?.result || aiResult.result?.content || 'Un momento, estamos procesando tu mensaje con la Dra. Aura Estudillo.');
     } catch (aiErr: any) {
-      aiTriageResponse = isUrgent
-        ? `${prospectName}, he activado la alerta de urgencia prioritaria en la pantalla de la Dra. Aura Estudillo. Tus datos y tu caso ya están en su panel para que evalúe recibirte de inmediato.`
-        : '¡Hola! En Audenti estamos a tu disposición. La Dra. Aura Estudillo y nuestro equipo han recibido tu mensaje y te responderán a la brevedad.';
+      console.warn('[Chatwoot AI Agent Note]:', aiErr?.message);
+      aiTriageResponse = 'Hola, hemos recibido tu mensaje. La Dra. Aura Estudillo lo está revisando para contactarte a la brevedad.';
     }
 
-    // 4. Persistir en chat_omnichannel.json de Supabase Storage para reflejar en /dashboard/chat
-    const targetPatientId = patientRecord?.id || `prospect_${prospectPhone.replace(/\D/g, '') || conversationId || Date.now()}`;
-    const nowFormatted = new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date());
-    const resolvedChannelType = channelType?.toLowerCase().includes('whatsapp') ? 'whatsapp' : 'web_chat';
+    // 4. Sincronizar en chat_omnichannel.json de Supabase Storage e inserción idempotente en chat_messages
+    const targetPatientId = isRegistered
+      ? patientRecord.id
+      : (patientRecord?.id || `prospect_${prospectPhone.replace(/\D/g, '') || conversationId || Date.now()}`);
+
+    const nowFormatted = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const resolvedChannelType = channelType === 'whatsapp' ? 'whatsapp' : 'web_chat';
+
+    const cwInSid = `cw_in_${payload.id || Date.now()}`;
+    const cwOutSid = `cw_out_${payload.id || Date.now() + 1}`;
+
+    // Doble escritura idempotente en chat_messages con call_sid
+    await upsertChatMessageWithRetry(supabase, {
+      call_sid: cwInSid,
+      content: `[Chatwoot ${prospectName}]: ${messageContent}`
+    });
+
+    await upsertChatMessageWithRetry(supabase, {
+      call_sid: cwOutSid,
+      content: `[Chatwoot Aura IA]: ${aiTriageResponse}`
+    });
 
     try {
       let allChats: Record<string, any[]> = {};
@@ -196,7 +209,7 @@ export async function POST(request: Request) {
       }
 
       const clientMsg = {
-        id: `cw-msg-${payload.id || Date.now()}`,
+        id: cwInSid,
         senderName: isRegistered ? patientRecord.full_name : `${prospectName} (Prospecto)`,
         senderRole: 'patient',
         channel_type: resolvedChannelType,
@@ -217,7 +230,7 @@ export async function POST(request: Request) {
       };
 
       const aiReplyMsg = {
-        id: `cw-ai-${Date.now()}`,
+        id: cwOutSid,
         senderName: 'Aura IA (Triaje Automático)',
         senderRole: 'ai',
         channel_type: resolvedChannelType,
@@ -227,6 +240,10 @@ export async function POST(request: Request) {
       };
 
       allChats[targetPatientId] = [...(allChats[targetPatientId] || []), clientMsg, aiReplyMsg];
+      if (prospectPhone) {
+        const cleanP = prospectPhone.replace(/\D/g, '').slice(-10);
+        if (cleanP) allChats[`prospect_${cleanP}`] = allChats[targetPatientId];
+      }
 
       await supabase.storage.from('audenti_database').upload(
         'chat_omnichannel.json',
@@ -237,7 +254,7 @@ export async function POST(request: Request) {
       console.warn('[Chatwoot Storage Note]:', storageErr?.message);
     }
 
-    // 5. Emitir eventos Realtime para el Dashboard de la Doctora y el Badge del Menú Lateral
+    // 5. Emitir eventos Realtime para el Dashboard de la Doctora
     await supabase.channel('chat_omnichannel_sync').send({
       type: 'broadcast',
       event: 'incoming_patient_message',
@@ -248,9 +265,12 @@ export async function POST(request: Request) {
         timestamp: nowFormatted,
         isRegistered,
         folio: folio || 'PROSPECTO-NUEVO',
+        channel_type: resolvedChannelType,
         phone: prospectPhone,
         consultationReason,
-        urgencyLevel
+        urgencyLevel,
+        trafficLight,
+        classification: isRegistered ? '🟢 PACIENTE REGISTRADO' : '🟠 PROSPECTO NUEVO'
       }
     });
 
@@ -259,21 +279,21 @@ export async function POST(request: Request) {
       event: 'doctor_notification',
       payload: {
         id: `notif-cw-${Date.now()}`,
-        title: isRegistered ? `🟢 PACIENTE REGISTRADO: ${patientRecord.full_name}` : `🟠 PROSPECTO NUEVO: ${prospectName}`,
-        message: `${consultationReason} [${urgencyLevel.toUpperCase()}] • "${messageContent}"`,
-        type: isUrgent ? 'emergency' : 'general',
+        title: isRegistered ? `💬 PACIENTE REGISTRADO (${folio}): ${patientRecord.full_name}` : `💬 🟠 PROSPECTO NUEVO (${urgencyLevel.toUpperCase()}): ${prospectName}`,
+        message: `${consultationReason} • "${messageContent.slice(0, 80)}"`,
+        type: isUrgent ? 'urgent' : 'general',
         patient_name: isRegistered ? patientRecord.full_name : prospectName,
         phone: prospectPhone,
         consultationReason,
         urgencyLevel,
-        channel_type: resolvedChannelType,
+        trafficLight,
         targetPatientId,
         url: `/dashboard/chat?patientId=${encodeURIComponent(targetPatientId)}`,
         time: nowFormatted
       }
     });
 
-    // 6. Notificación Dual a WhatsApp (Aviso a la Dra. Aura para monitoreo en ruta)
+    // 6. Notificación Dual a WhatsApp (Aviso a la Dra. Aura)
     await sendDoctorWhatsAppAlert({
       title: isRegistered ? `🟢 MENSAJE DE PACIENTE REGISTRADO (${folio})` : `🟠 NUEVO PROSPECTO EN CHATWOOT (${urgencyLevel.toUpperCase()})`,
       patientName: isRegistered ? `${patientRecord.full_name} (${folio})` : `${prospectName} [${prospectPhone || 'Web'}]`,
@@ -290,7 +310,7 @@ export async function POST(request: Request) {
     }, { status: 200 });
 
   } catch (error: any) {
-    console.error('[Chatwoot Webhook Error]:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('[Chatwoot Webhook Error]:', error?.message);
+    return NextResponse.json({ success: false, error: 'Error procesando webhook de Chatwoot' }, { status: 500 });
   }
 }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { executeAIAgent } from '@/lib/ai/router';
 import { sendExternalMessage } from '@/lib/messaging/external-client';
+import { writeAheadLog, upsertChatMessageWithRetry } from '@/lib/persistence/omnichannel-wal';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,17 +37,19 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+
+    // 1. Respaldo Local Inmediato (Write-Ahead Log)
+    writeAheadLog('messaging_webhook', body);
+
     const supabase = createAdminClient();
 
-    // 1. Normalizar estructura de datos del webhook entrante
-    // Soporta Zernio, WhatsApp Cloud API, Evolution API / Baileys y webhooks genéricos
     let senderPhone = '';
     let messageText = '';
-    let senderName = 'Paciente WhatsApp';
+    let senderName = 'Paciente';
     let channel = 'whatsapp';
-    let externalEventId = body.id || body.message_id || `evt-${Date.now()}`;
+    let externalEventId = `msg_${Date.now()}`;
 
-    // A. Formato Pasarela OpenWA (Open-WhatsApp Gateway / NestJS)
+    // A. Formato Pasarela OpenWA (NestJS OpenWA Gateway)
     if (
       body.event === 'message.received' ||
       body.event === 'message' ||
@@ -122,8 +125,8 @@ export async function POST(request: Request) {
         registeredPatientName = patient.full_name || senderName;
         isRegistered = true;
       }
-    } catch (patErr) {
-      console.warn('[Webhook Messaging] Error buscando paciente:', patErr);
+    } catch (patErr: any) {
+      console.warn('[Webhook Messaging] Error buscando paciente:', patErr?.message);
     }
 
     const conversationKey = targetPatientId || `prospect_${rawDigits}`;
@@ -133,30 +136,14 @@ export async function POST(request: Request) {
       hour12: true,
     }).format(new Date());
 
-    // 3. PERSISTENCIA INQUEBRANTABLE EN SUPABASE POSTGRESQL (chat_messages)
-    try {
-      await supabase.from('chat_messages').insert({
-        patient_id: targetPatientId,
-        sender_role: 'patient',
-        sender_name: registeredPatientName,
-        content: messageText,
-        channel_type: channel,
-        metadata: {
-          phone: senderPhone,
-          cleanPhone,
-          channel_type: channel,
-          isRegistered,
-          externalEventId,
-          direction: 'inbound',
-          rawPayload: body,
-        },
-        created_at: new Date().toISOString(),
-      });
-    } catch (insertErr: any) {
-      console.error('[Webhook Messaging] Error guardando mensaje entrante en chat_messages:', insertErr?.message);
-    }
+    // 3. PERSISTENCIA IDEMPOTENTE CON REINTENTOS EN SUPABASE POSTGRESQL (chat_messages)
+    const msgSid = `ext_${cleanPhone}_${Date.now()}`;
+    await upsertChatMessageWithRetry(supabase, {
+      call_sid: msgSid,
+      content: `[Mensaje Entrante ${registeredPatientName}]: ${messageText}`
+    });
 
-    // 4. Redundancia en Storage chat_omnichannel.json para sincronía instantánea con ChatInterface
+    // 4. PERSISTENCIA EN STORAGE RESILIENTE (chat_omnichannel.json)
     try {
       let allChats: Record<string, any[]> = {};
       const { data: file } = await supabase.storage.from('audenti_database').download('chat_omnichannel.json');
@@ -164,27 +151,40 @@ export async function POST(request: Request) {
         const text = await file.text();
         if (text && text.trim()) allChats = JSON.parse(text);
       }
-      const history = allChats[conversationKey] || [];
-      history.push({
-        id: `in-${Date.now()}`,
-        channel_type: channel,
+
+      const currentList = allChats[conversationKey] || [];
+      const newEntry = {
+        id: msgSid,
         senderName: registeredPatientName,
         senderRole: 'patient',
-        isDoctor: false,
-        timestamp: timestampFormatted,
+        channel_type: channel,
         content: messageText,
-      });
-      allChats[conversationKey] = history;
+        time: timestampFormatted,
+        isOwn: false,
+        metadata: {
+          phone: senderPhone,
+          cleanPhone,
+          isRegistered,
+          provider: 'messaging_webhook',
+          externalId: externalEventId,
+        },
+      };
+
+      allChats[conversationKey] = [...currentList, newEntry];
+      if (cleanPhone) {
+        allChats[`prospect_${cleanPhone}`] = allChats[conversationKey];
+      }
+
       await supabase.storage.from('audenti_database').upload(
         'chat_omnichannel.json',
         JSON.stringify(allChats, null, 2),
         { upsert: true, contentType: 'application/json' }
       );
-    } catch (storageErr) {
-      console.warn('[Webhook Messaging] Error actualizando storage:', storageErr);
+    } catch (storageErr: any) {
+      console.warn('[Webhook Messaging Storage Note]:', storageErr?.message);
     }
 
-    // 5. Emitir Broadcasts Realtime a la consola clínica de la Dra. Aura
+    // 5. EMISIÓN EN TIEMPO REAL (Supabase Realtime Broadcast)
     try {
       await supabase.channel('chat_omnichannel_sync').send({
         type: 'broadcast',
@@ -197,6 +197,7 @@ export async function POST(request: Request) {
           channel_type: channel,
           content: messageText,
           timestamp: timestampFormatted,
+          isRegistered,
         },
       });
 
@@ -204,25 +205,27 @@ export async function POST(request: Request) {
         type: 'broadcast',
         event: 'doctor_notification',
         payload: {
-          id: `notif-${Date.now()}`,
-          title: `💬 Mensaje WhatsApp: ${registeredPatientName}`,
-          message: messageText,
+          id: `notif-msg-${Date.now()}`,
+          title: `💬 Mensaje entrante de ${registeredPatientName}`,
+          message: messageText.slice(0, 100),
           type: 'general',
           patient_name: registeredPatientName,
+          phone: senderPhone,
           time: timestampFormatted,
         },
       });
-    } catch {}
+    } catch (realtimeErr: any) {
+      console.warn('[Webhook Messaging Realtime Note]:', realtimeErr?.message);
+    }
 
-    // 6. Procesamiento con Agentes de Aura IA (Concierge / Scheduling / Clinical)
+    // 6. Invocación de Aura IA (Dominio patient_chat) para autogestión de respuesta
     const aiResponse = await executeAIAgent({
       domain: 'patient_chat',
       prompt: messageText,
       contextData: {
-        patientName: registeredPatientName,
         patientPhone: senderPhone,
+        patientName: registeredPatientName,
         channel,
-        patientId: targetPatientId,
         clinicName: 'Audenti Odontología (Dra. Aura Estudillo)',
       },
     });
@@ -231,7 +234,7 @@ export async function POST(request: Request) {
       ? aiResponse.result
       : (aiResponse.result?.result || aiResponse.result?.content || JSON.stringify(aiResponse.result));
 
-    // 7. Despacho automatizado de la respuesta de Aura IA vía API Externa (Zernio / WhatsApp)
+    // 7. Despacho automatizado de la respuesta de Aura IA vía API Externa
     if (replyText) {
       await sendExternalMessage({
         to: senderPhone,
@@ -256,10 +259,10 @@ export async function POST(request: Request) {
     }, { status: 200 });
 
   } catch (error: any) {
-    console.error('[Webhook Messaging Error]:', error);
+    console.error('[Webhook Messaging Error]:', error?.message);
     return NextResponse.json({
       success: false,
-      error: error?.message || 'Error interno en receptor de mensajería.',
+      error: 'Error interno en receptor de mensajería.',
     }, { status: 500 });
   }
 }

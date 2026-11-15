@@ -3,13 +3,14 @@ import path from 'path';
 
 export interface OmnichannelBackupRecord {
   timestamp: string;
-  type: 'call_transcription' | 'chat_message' | 'webhook_whatsapp' | string;
+  type: 'call_transcription' | 'chat_message' | 'webhook_whatsapp' | 'chatwoot_webhook' | 'messaging_webhook' | string;
   payload: any;
 }
 
 /**
- * 1. RESPALDO LOCAL INMEDIATO (Write-Ahead Log):
+ * 1. RESPALDO LOCAL INMEDIATO (Write-Ahead Log - WAL):
  * Guarda el payload completo en storage/backups/omnichannel_backup.jsonl con timestamp ISO antes de tocar Supabase.
+ * Diseñado con protección total contra excepciones para garantizar que jamás interrumpa la respuesta HTTP.
  */
 export function writeAheadLog(type: string, payload: any): void {
   try {
@@ -25,7 +26,12 @@ export function writeAheadLog(type: string, payload: any): void {
       payload
     };
 
-    fs.appendFileSync(backupFilePath, JSON.stringify(record) + '\n', 'utf8');
+    // Escritura rápida y segura
+    fs.appendFile(backupFilePath, JSON.stringify(record) + '\n', 'utf8', (err) => {
+      if (err) {
+        console.warn('[WAL Async Notice] Escritura en segundo plano diferida:', err.message);
+      }
+    });
   } catch (walErr: any) {
     console.error('[WAL Error] No se pudo escribir en omnichannel_backup.jsonl:', walErr?.message);
   }

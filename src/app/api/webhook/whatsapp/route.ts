@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { executeAIAgent } from '@/lib/ai/router';
 import { prisma } from '@/lib/prisma';
+import { writeAheadLog, upsertChatMessageWithRetry } from '@/lib/persistence/omnichannel-wal';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,6 +26,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+
+    // 1. Respaldo Local Inmediato (Write-Ahead Log)
+    writeAheadLog('webhook_whatsapp', body);
 
     // 1. Formato WhatsApp Cloud API (Meta Developers)
     const entry = body.entry?.[0];
@@ -79,7 +83,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, status: 'no_processable_message' }, { status: 200 });
     }
 
-    // Invocamos nuestro Enrutador Central usando el dominio 'patient_chat' (GPT-4o mini)
+    // Invocamos nuestro Enrutador Central usando el dominio 'patient_chat'
     const aiResponse = await executeAIAgent({
       domain: 'patient_chat',
       prompt: patientMessage,
@@ -93,8 +97,6 @@ export async function POST(request: Request) {
     const replyText = typeof aiResponse.result === 'string'
       ? aiResponse.result
       : (aiResponse.result?.result || aiResponse.result?.content || JSON.stringify(aiResponse.result));
-
-    console.log(`[WhatsApp CXM] Respuesta generada para ${patientPhone}:`, replyText);
 
     // Opcional: Persistir en Prisma si está configurado
     try {
@@ -140,7 +142,7 @@ export async function POST(request: Request) {
         }
       });
     } catch (dbErr: any) {
-      console.warn('[WhatsApp Webhook Prisma Note]:', dbErr.message);
+      console.warn('[WhatsApp Webhook Prisma Note]:', dbErr?.message);
     }
 
     // Persistencia Directa en Supabase PostgreSQL (chat_messages & chat_omnichannel.json)
@@ -167,35 +169,18 @@ export async function POST(request: Request) {
 
       const nowFormatted = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true });
 
-      // Inserción del mensaje entrante del paciente
-      await supabase.from('chat_messages').insert({
-        patient_id: isRegistered ? targetPatientId : null,
-        sender_role: 'patient',
-        sender_name: patientName,
-        content: patientMessage,
-        channel_type: 'whatsapp',
-        metadata: {
-          channel_type: 'whatsapp',
-          phone: patientPhone,
-          isRegistered,
-          patientName
-        },
-        created_at: new Date().toISOString()
+      // Inserción idempotente con reintentos para mensaje entrante y respuesta de IA
+      const inSid = `wa_in_${cleanPhone}_${Date.now()}`;
+      const outSid = `wa_out_${cleanPhone}_${Date.now() + 1}`;
+
+      await upsertChatMessageWithRetry(supabase, {
+        call_sid: inSid,
+        content: `[WhatsApp Paciente]: ${patientMessage}`
       });
 
-      // Inserción de la respuesta de Aura IA
-      await supabase.from('chat_messages').insert({
-        patient_id: isRegistered ? targetPatientId : null,
-        sender_role: 'ai',
-        sender_name: 'Aura AI',
-        content: replyText,
-        channel_type: 'whatsapp',
-        metadata: {
-          channel_type: 'whatsapp',
-          phone: patientPhone,
-          isRegistered
-        },
-        created_at: new Date().toISOString()
+      await upsertChatMessageWithRetry(supabase, {
+        call_sid: outSid,
+        content: `[WhatsApp Aura IA]: ${replyText}`
       });
 
       // Redundancia en Storage chat_omnichannel.json
@@ -208,7 +193,7 @@ export async function POST(request: Request) {
         }
         const patientHistory = allChats[targetPatientId] || [];
         patientHistory.push({
-          id: `msg-in-${Date.now()}`,
+          id: inSid,
           channel_type: 'whatsapp',
           senderName: patientName,
           senderRole: 'patient',
@@ -217,7 +202,7 @@ export async function POST(request: Request) {
           content: patientMessage
         });
         patientHistory.push({
-          id: `msg-out-${Date.now() + 1}`,
+          id: outSid,
           channel_type: 'whatsapp',
           senderName: 'Aura AI',
           senderRole: 'ai',
@@ -226,6 +211,9 @@ export async function POST(request: Request) {
           content: replyText
         });
         allChats[targetPatientId] = patientHistory;
+        if (cleanPhone) {
+          allChats[`prospect_${cleanPhone}`] = patientHistory;
+        }
         await supabase.storage.from('audenti_database').upload(
           'chat_omnichannel.json',
           JSON.stringify(allChats, null, 2),
@@ -273,7 +261,7 @@ export async function POST(request: Request) {
           })
         });
       } catch (sendErr: any) {
-        console.error('[WhatsApp QR Send Error]:', sendErr.message);
+        console.error('[WhatsApp QR Send Error]:', sendErr?.message);
       }
     }
 
@@ -285,7 +273,7 @@ export async function POST(request: Request) {
     }, { status: 200 });
 
   } catch (error: any) {
-    console.error('[WhatsApp Webhook Error]:', error.message);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    console.error('[WhatsApp Webhook Error]:', error?.message);
+    return NextResponse.json({ success: false, error: 'Error procesando webhook de WhatsApp' }, { status: 500 });
   }
 }
