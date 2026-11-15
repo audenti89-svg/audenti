@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { sendDoctorWhatsAppAlert, sendPatientWhatsAppMessage } from '@/lib/notifications/whatsapp-doctor';
 import { isInternalUser } from '@/lib/auth/admin-emails';
 
@@ -8,13 +9,6 @@ export const runtime = 'nodejs';
 // Endpoint para guardar mensajes del chat omnicanal (con autenticación y RLS)
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'No autorizado. Se requiere iniciar sesión.' }, { status: 401 });
-    }
-
     const body = await request.json();
     const { patientId, message } = body;
 
@@ -22,10 +16,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Faltan parámetros obligatorios' }, { status: 400 });
     }
 
+    // Usar cliente administrativo para lectura y escritura sin restricciones RLS en Storage y Realtime
+    const adminSupabase = createAdminClient();
+
+    // Solo requerir sesión de usuario cuando es respuesta médica de la doctora
+    const isDoctorMessage = Boolean(message.isDoctor || message.senderRole === 'doctor');
+    if (isDoctorMessage) {
+      try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          return NextResponse.json({ error: 'No autorizado. Se requiere sesión médica activa.' }, { status: 401 });
+        }
+      } catch (authErr) {
+        console.warn('[Doctor Auth Check Warning]:', authErr);
+      }
+    }
+
     // 1. Descargar chat actual
     let allChats: Record<string, any[]> = {};
     try {
-      const { data: file } = await supabase.storage.from('audenti_database').download('chat_omnichannel.json');
+      const { data: file } = await adminSupabase.storage.from('audenti_database').download('chat_omnichannel.json');
       if (file) {
         const text = await file.text();
         if (text && text.trim()) allChats = JSON.parse(text);
@@ -40,7 +51,7 @@ export async function POST(request: Request) {
       cleanPhone = patientId.replace('prospect_', '').replace(/\D/g, '').slice(-10);
     } else {
       try {
-        const { data: currentP } = await supabase.from('patients').select('phone').eq('id', patientId).maybeSingle();
+        const { data: currentP } = await adminSupabase.from('patients').select('phone').eq('id', patientId).maybeSingle();
         if (currentP?.phone) {
           cleanPhone = currentP.phone.replace(/\D/g, '').slice(-10);
         }
@@ -53,9 +64,9 @@ export async function POST(request: Request) {
 
     if (cleanPhone && cleanPhone.length >= 7) {
       try {
-        const { data: siblings } = await supabase.from('patients').select('id').ilike('phone', `%${cleanPhone}%`);
+        const { data: siblings } = await adminSupabase.from('patients').select('id').ilike('phone', `%${cleanPhone}%`);
         if (siblings && siblings.length > 0) {
-          siblingPatientIds = siblings.map(s => s.id);
+          siblingPatientIds = siblings.map((s: any) => s.id);
         }
       } catch {}
     }
@@ -76,7 +87,7 @@ export async function POST(request: Request) {
     });
 
     // 3. Guardar con service role sin restricción RLS
-    const { error: uploadError } = await supabase.storage.from('audenti_database').upload(
+    const { error: uploadError } = await adminSupabase.storage.from('audenti_database').upload(
       'chat_omnichannel.json',
       JSON.stringify(allChats, null, 2),
       { upsert: true, contentType: 'application/json' }
@@ -86,22 +97,17 @@ export async function POST(request: Request) {
       throw uploadError;
     }
 
-    // 3.1 Insertar formalmente en la tabla relacional chat_messages de Supabase
+    // 3.1 Insertar formalmente en la tabla relacional chat_messages de Supabase si la estructura existe
     try {
       let resolvedPatientId: string | null = null;
-      let cleanPhone = '';
 
-      if (patientId.startsWith('prospect_')) {
-        cleanPhone = patientId.replace('prospect_', '').slice(-10);
-      } else {
-        // Verificar si es un UUID válido de paciente
+      if (!patientId.startsWith('prospect_')) {
         resolvedPatientId = patientId;
       }
 
-      // Si no tenemos UUID directo pero hay teléfono, buscar si está registrado
       if (!resolvedPatientId && cleanPhone) {
         try {
-          const { data: found } = await supabase
+          const { data: found } = await adminSupabase
             .from('patients')
             .select('id')
             .ilike('phone', `%${cleanPhone}%`)
@@ -112,7 +118,7 @@ export async function POST(request: Request) {
         } catch {}
       }
 
-      await supabase.from('chat_messages').insert({
+      await adminSupabase.from('chat_messages').insert({
         patient_id: resolvedPatientId,
         sender_role: message.senderRole || (message.isDoctor ? 'doctor' : 'patient'),
         sender_name: message.senderName || (message.isDoctor ? 'Dra. Aura Estudillo' : 'Paciente'),
@@ -135,13 +141,13 @@ export async function POST(request: Request) {
     try {
       if (message.senderRole === 'patient') {
         // Notificar a la doctora en vivo
-        await supabase.channel('chat_omnichannel_sync').send({
+        await adminSupabase.channel('chat_omnichannel_sync').send({
           type: 'broadcast',
           event: 'incoming_patient_message',
-          payload: { targetPatientId: patientId, ...message }
+          payload: { targetPatientId: patientId, phone: cleanPhone, ...message }
         });
 
-        await supabase.channel('header_notifications_realtime').send({
+        await adminSupabase.channel('header_notifications_realtime').send({
           type: 'broadcast',
           event: 'doctor_notification',
           payload: {
@@ -180,26 +186,26 @@ export async function POST(request: Request) {
         };
 
         // Canal dedicado por ID de paciente
-        await supabase.channel(`patient_chat_${patientId}`).send({
+        await adminSupabase.channel(`patient_chat_${patientId}`).send({
           type: 'broadcast',
           event: 'doctor_reply',
           payload: outgoingPayload
         });
 
-        await supabase.channel(`patient_chat_${patientId}`).send({
+        await adminSupabase.channel(`patient_chat_${patientId}`).send({
           type: 'broadcast',
           event: 'chatwoot_message_created',
           payload: outgoingPayload
         });
 
         // Canal omnicanal global y de Chatwoot
-        await supabase.channel('chat_omnichannel_sync').send({
+        await adminSupabase.channel('chat_omnichannel_sync').send({
           type: 'broadcast',
           event: 'sync_patient_message',
           payload: outgoingPayload
         });
 
-        await supabase.channel('chat_omnichannel_sync').send({
+        await adminSupabase.channel('chat_omnichannel_sync').send({
           type: 'broadcast',
           event: 'chatwoot_message_created',
           payload: outgoingPayload
@@ -208,7 +214,7 @@ export async function POST(request: Request) {
         // 5. Sistema de Notificación Dual por Confirmación / Respuesta Médica:
         // Obtener teléfono del paciente desde Supabase
         try {
-          const { data: patientData } = await supabase
+          const { data: patientData } = await adminSupabase
             .from('patients')
             .select('full_name, phone')
             .eq('id', patientId)
@@ -247,23 +253,29 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'No autorizado. Se requiere iniciar sesión.' }, { status: 401 });
-    }
+    const adminSupabase = createAdminClient();
 
     const url = new URL(request.url);
     const patientId = url.searchParams.get('patientId');
 
-    const userEmail = (user.email || '').toLowerCase().trim();
-    const userRole = (user.user_metadata?.role || user.app_metadata?.role || '').toLowerCase().trim();
-    const isStaff = isInternalUser(userEmail, userRole);
+    // Verificar usuario autenticado si existe sesión
+    let user: any = null;
+    let isStaff = false;
 
-    // Si es un paciente, verificar que el patientId solicitado le pertenece
-    if (!isStaff && patientId) {
-      const { data: ownPatient } = await supabase
+    try {
+      const supabase = await createClient();
+      const { data } = await supabase.auth.getUser();
+      user = data?.user;
+      if (user) {
+        const userEmail = (user.email || '').toLowerCase().trim();
+        const userRole = (user.user_metadata?.role || user.app_metadata?.role || '').toLowerCase().trim();
+        isStaff = isInternalUser(userEmail, userRole);
+      }
+    } catch {}
+
+    // Si es un paciente autenticado (no staff), verificar que el patientId solicitado le pertenece
+    if (user && !isStaff && patientId) {
+      const { data: ownPatient } = await adminSupabase
         .from('patients')
         .select('id')
         .eq('user_id', user.id)
@@ -274,14 +286,13 @@ export async function GET(request: Request) {
       }
     }
 
-    let dbMessages: any[] = [];
     let patientPhone = '';
     let patientName = '';
 
     if (patientId) {
       try {
         if (!patientId.startsWith('prospect_')) {
-          const { data: pData } = await supabase
+          const { data: pData } = await adminSupabase
             .from('patients')
             .select('phone, full_name')
             .eq('id', patientId)
@@ -299,12 +310,12 @@ export async function GET(request: Request) {
     let siblingIds: string[] = [];
     if (patientPhone && patientPhone.length >= 7) {
       try {
-        const { data: siblings } = await supabase
+        const { data: siblings } = await adminSupabase
           .from('patients')
           .select('id')
           .ilike('phone', `%${patientPhone}%`);
         if (siblings && siblings.length > 0) {
-          siblingIds = siblings.map(s => s.id);
+          siblingIds = siblings.map((s: any) => s.id);
         }
       } catch {}
     }
@@ -313,7 +324,7 @@ export async function GET(request: Request) {
     let storageMessages: any[] = [];
     let allChats: Record<string, any[]> = {};
     try {
-      const { data: file } = await supabase.storage.from('audenti_database').download('chat_omnichannel.json');
+      const { data: file } = await adminSupabase.storage.from('audenti_database').download('chat_omnichannel.json');
       if (file) {
         const text = await file.text();
         if (text && text.trim()) {

@@ -110,6 +110,7 @@ export function ChatInterface() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const selectedPatientIdRef = useRef<string>(selectedPatientId)
   const registeredPatientsRef = useRef<any[]>([])
+  const registeredMapRef = useRef<Record<string, any>>({})
 
   useEffect(() => {
     selectedPatientIdRef.current = selectedPatientId
@@ -135,6 +136,7 @@ export function ChatInterface() {
           dbPatients.forEach(p => {
             registeredMap[p.id] = p
           })
+          registeredMapRef.current = registeredMap
         }
       } catch (err: any) {
         console.warn('[Chat Patients Load Note]:', err?.message)
@@ -754,9 +756,15 @@ export function ChatInterface() {
         const targetId = payload.targetPatientId || payload.patientId || `prospect_${Date.now()}`
         const nowTime = payload.timestamp || 'Ahora'
 
+        // Resolver paciente registrado y teléfono limpio a 10 dígitos
+        const regPat = registeredPatientsRef.current.find(p => p.id === targetId) || registeredMapRef.current[targetId]
+        const resolvedPhone = (payload.phone || regPat?.phone || (targetId.startsWith('prospect_') ? targetId.replace('prospect_', '') : '')).replace(/\D/g, '').slice(-10)
+        const resolvedName = regPat?.full_name || payload.senderName?.replace(/\(.*?prospecto.*?\)/gi, '').trim() || 'Paciente'
+        const isRegistered = Boolean(regPat || payload.isRegistered)
+
         const incomingMsg: ChatMessageItem = {
           id: payload.id || `msg-${Date.now()}`,
-          senderName: payload.senderName || 'Paciente',
+          senderName: resolvedName,
           senderRole: 'patient',
           channel_type: payload.channel_type || 'web_chat',
           content: payload.content,
@@ -765,26 +773,34 @@ export function ChatInterface() {
           metadata: {
             consultationReason: payload.consultationReason,
             urgencyLevel: payload.urgencyLevel,
-            phone: payload.phone
+            phone: resolvedPhone || payload.phone
           }
         }
 
-        setMessages(prev => ({
-          ...prev,
-          [targetId]: [...(prev[targetId] || []), incomingMsg]
-        }))
+        // Anexar mensaje bajo targetId, prospect_phone y todos los hermanos que comparten el teléfono
+        setMessages(prev => {
+          const updated: Record<string, ChatMessageItem[]> = {
+            ...prev,
+            [targetId]: [...(prev[targetId] || []), incomingMsg]
+          }
+          if (resolvedPhone && resolvedPhone.length >= 7) {
+            updated[`prospect_${resolvedPhone}`] = [...(prev[`prospect_${resolvedPhone}`] || []), incomingMsg]
+            registeredPatientsRef.current.forEach(p => {
+              const pClean = (p.phone || '').replace(/\D/g, '').slice(-10)
+              if (pClean === resolvedPhone && p.id !== targetId) {
+                updated[p.id] = [...(prev[p.id] || []), incomingMsg]
+              }
+            })
+          }
+          return updated
+        })
 
-        // Actualizar o insertar paciente en el directorio
+        // Actualizar o insertar paciente en el directorio consolidando por ID o por teléfono
         setPatients(prev => {
-          const bPhoneDigits = (payload.phone || '').replace(/\D/g, '')
-          const bIdDigits = (targetId || '').replace('prospect_', '').replace(/\D/g, '')
-          const cleanPhone = (bPhoneDigits.length >= 7 ? bPhoneDigits : bIdDigits).slice(-10)
           const index = prev.findIndex(p => {
             if (p.id === targetId) return true
-            const pPhoneDigits = (p.phone || '').replace(/\D/g, '')
-            const pIdDigits = (p.id || '').replace('prospect_', '').replace(/\D/g, '')
-            const pClean = (pPhoneDigits.length >= 7 ? pPhoneDigits : pIdDigits).slice(-10)
-            if (cleanPhone && pClean && cleanPhone.length >= 7 && pClean.length >= 7 && cleanPhone === pClean) return true
+            const pClean = (p.phone || p.id.replace('prospect_', '')).replace(/\D/g, '').slice(-10)
+            if (resolvedPhone && pClean && resolvedPhone.length >= 7 && pClean.length >= 7 && resolvedPhone === pClean) return true
             return false
           })
           const isUrgent = payload.urgencyLevel === 'Urgente' || /(?:dolor|duele|muela|urgente)/i.test(payload.content)
@@ -800,10 +816,10 @@ export function ChatInterface() {
           } else {
             const newPat: PatientDirectoryItem = {
               id: targetId,
-              name: payload.senderName?.replace(/\(.*?prospecto.*?\)/gi, '').trim() || 'Nuevo Contacto',
-              phone: payload.phone || 'Sin número',
-              folio: payload.folio || (payload.isRegistered ? 'EXP-PACIENTE' : 'PROS-NUEVO'),
-              isRegistered: Boolean(payload.isRegistered),
+              name: resolvedName,
+              phone: resolvedPhone ? (resolvedPhone.length === 10 ? `55 ${resolvedPhone.slice(2, 6)} ${resolvedPhone.slice(6)}` : resolvedPhone) : 'Sin número',
+              folio: regPat ? `EXP-${regPat.id.slice(0, 8).toUpperCase()}` : (targetId.startsWith('prospect_') ? `PROS-${targetId.slice(-6).toUpperCase()}` : 'PROS-NUEVO'),
+              isRegistered,
               channel_type: payload.channel_type || 'web_chat',
               lastMessage: payload.content,
               lastTime: nowTime,
@@ -823,6 +839,10 @@ export function ChatInterface() {
         const targetId = payload.targetPatientId || payload.patientId || 'prospect_voice'
         const nowTime = payload.timestamp || 'Ahora'
 
+        const regPat = registeredPatientsRef.current.find(p => p.id === targetId) || registeredMapRef.current[targetId]
+        const resolvedPhone = (payload.phone || regPat?.phone || (targetId.startsWith('prospect_') ? targetId.replace('prospect_', '') : '')).replace(/\D/g, '').slice(-10)
+        const resolvedName = regPat?.full_name || payload.patientName || 'Paciente'
+
         if (payload.status === 'active') {
           playTone('arrival')
           const callStartMsg: ChatMessageItem = {
@@ -830,14 +850,26 @@ export function ChatInterface() {
             senderName: 'Asistente de Voz (Aura AI)',
             senderRole: 'ai',
             channel_type: 'voice_call',
-            content: `📞 [Llamada de Voz Iniciada]: El paciente ${payload.patientName || 'Paciente'} se encuentra en llamada de voz con Aura IA.`,
+            content: `📞 [Llamada de Voz Iniciada]: El paciente ${resolvedName} se encuentra en llamada de voz con Aura IA.`,
             time: nowTime,
             isOwn: false
           }
-          setMessages(prev => ({
-            ...prev,
-            [targetId]: [...(prev[targetId] || []), callStartMsg]
-          }))
+          setMessages(prev => {
+            const updated: Record<string, ChatMessageItem[]> = {
+              ...prev,
+              [targetId]: [...(prev[targetId] || []), callStartMsg]
+            }
+            if (resolvedPhone && resolvedPhone.length >= 7) {
+              updated[`prospect_${resolvedPhone}`] = [...(prev[`prospect_${resolvedPhone}`] || []), callStartMsg]
+              registeredPatientsRef.current.forEach(p => {
+                const pClean = (p.phone || '').replace(/\D/g, '').slice(-10)
+                if (pClean === resolvedPhone && p.id !== targetId) {
+                  updated[p.id] = [...(prev[p.id] || []), callStartMsg]
+                }
+              })
+            }
+            return updated
+          })
           setUnreadPatients(prev => new Set(prev).add(targetId))
         } else if (payload.status === 'ended') {
           playTone('arrival')
@@ -846,7 +878,7 @@ export function ChatInterface() {
             senderName: 'Asistente de Voz (Aura AI)',
             senderRole: 'ai',
             channel_type: 'voice_call',
-            content: payload.summary || `Llamada finalizada con ${payload.patientName || 'Paciente'}`,
+            content: payload.summary || `Llamada finalizada con ${resolvedName}`,
             time: nowTime,
             isOwn: false,
             metadata: {
@@ -857,18 +889,35 @@ export function ChatInterface() {
               transcription: payload.transcription,
               dialogue: payload.dialogue,
               summary: payload.summary,
-              patientName: payload.patientName,
-              phone: payload.phone
+              patientName: resolvedName,
+              phone: resolvedPhone || payload.phone
             }
           }
 
-          setMessages(prev => ({
-            ...prev,
-            [targetId]: [...(prev[targetId] || []), voiceCard]
-          }))
+          setMessages(prev => {
+            const updated: Record<string, ChatMessageItem[]> = {
+              ...prev,
+              [targetId]: [...(prev[targetId] || []), voiceCard]
+            }
+            if (resolvedPhone && resolvedPhone.length >= 7) {
+              updated[`prospect_${resolvedPhone}`] = [...(prev[`prospect_${resolvedPhone}`] || []), voiceCard]
+              registeredPatientsRef.current.forEach(p => {
+                const pClean = (p.phone || '').replace(/\D/g, '').slice(-10)
+                if (pClean === resolvedPhone && p.id !== targetId) {
+                  updated[p.id] = [...(prev[p.id] || []), voiceCard]
+                }
+              })
+            }
+            return updated
+          })
 
           setPatients(prev => {
-            const index = prev.findIndex(p => p.id === targetId)
+            const index = prev.findIndex(p => {
+              if (p.id === targetId) return true
+              const pClean = (p.phone || p.id.replace('prospect_', '')).replace(/\D/g, '').slice(-10)
+              if (resolvedPhone && pClean && resolvedPhone.length >= 7 && pClean.length >= 7 && resolvedPhone === pClean) return true
+              return false
+            })
             if (index >= 0) {
               const updated = [...prev]
               updated[index] = {
