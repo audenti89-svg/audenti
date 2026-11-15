@@ -2,11 +2,16 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendDoctorWhatsAppAlert } from '@/lib/notifications/whatsapp-doctor';
 import { evaluateIntentionAndUrgency, formatTimeInMexico, getNowInMexico } from '@/utils/timezone';
+import { writeAheadLog, upsertChatMessageWithRetry } from '@/lib/persistence/omnichannel-wal';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 interface CallTranscriptionPayload {
+  call_sid?: string;
+  callSid?: string;
+  CallSid?: string;
+  sid?: string;
   patientId?: string;
   patient_name?: string;
   patientName?: string;
@@ -38,7 +43,16 @@ export async function POST(request: Request) {
     }
 
     const body: CallTranscriptionPayload = await request.json();
+
+    // 1. RESPALDO LOCAL INMEDIATO (Write-Ahead Log):
+    // Guarda el payload completo en storage/backups/omnichannel_backup.jsonl antes de tocar Supabase
+    writeAheadLog('call_transcription', body);
+
     const {
+      call_sid: rawCallSid,
+      callSid: rawCallSidCamel,
+      CallSid: rawCallSidPascal,
+      sid: rawSid,
       patientId: rawPatientId,
       patient_name: aliasPatientName,
       patientName: originalPatientName,
@@ -137,6 +151,8 @@ export async function POST(request: Request) {
     }
 
     // 2. Construir el registro enriquecido con canal estricto
+    const effectiveCallSid = rawCallSid || rawCallSidCamel || rawCallSidPascal || rawSid || `voice_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
     const voiceRecord = {
       id: `voice-rec-${Date.now()}`,
       channel_type: 'voice_call' as const,
@@ -148,6 +164,7 @@ export async function POST(request: Request) {
       // Metadatos de la transcripción
       metadata: {
         channel_type: 'voice_call',
+        call_sid: effectiveCallSid,
         durationSeconds,
         consultationReason: finalConsultationReason,
         urgencyLevel: finalUrgencyLevel,
@@ -187,19 +204,15 @@ export async function POST(request: Request) {
       console.warn('[Call Transcription Storage Note]:', storageErr?.message);
     }
 
-    // 4. Garantizar inserción en la base de datos de Supabase bajo el ID del paciente
+    // 4. INSERCIÓN IDEMPOTENTE CON REINTENTOS (Exponential Backoff en PostgreSQL con call_sid):
     try {
-      await supabase.from('chat_messages').insert({
-        patient_id: isRegistered ? finalPatientId : null,
-        sender_role: 'ai',
-        sender_name: 'Asistente de Voz (Aura AI)',
+      await upsertChatMessageWithRetry(supabase, {
+        call_sid: effectiveCallSid,
         content: voiceRecord.content,
-        channel_type: 'voice_call',
-        metadata: voiceRecord.metadata,
-        created_at: new Date().toISOString()
+        media_urls: []
       });
     } catch (insertErr: any) {
-      console.warn('[DB chat_messages insert notice]:', insertErr?.message);
+      console.warn('[DB chat_messages upsert notice]:', insertErr?.message);
     }
 
     try {
@@ -303,6 +316,7 @@ export async function POST(request: Request) {
       success: true,
       patientId: finalPatientId,
       recordId: voiceRecord.id,
+      call_sid: effectiveCallSid,
       isRegistered,
       folio
     }, { status: 200 });

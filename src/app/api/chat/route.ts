@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendDoctorWhatsAppAlert, sendPatientWhatsAppMessage } from '@/lib/notifications/whatsapp-doctor';
 import { isInternalUser } from '@/lib/auth/admin-emails';
+import { writeAheadLog, upsertChatMessageWithRetry } from '@/lib/persistence/omnichannel-wal';
 
 export const runtime = 'nodejs';
 
@@ -15,6 +16,10 @@ export async function POST(request: Request) {
     if (!patientId || !message) {
       return NextResponse.json({ error: 'Faltan parámetros obligatorios' }, { status: 400 });
     }
+
+    // 1. RESPALDO LOCAL INMEDIATO (Write-Ahead Log):
+    // Guarda el payload completo en storage/backups/omnichannel_backup.jsonl antes de tocar Supabase
+    writeAheadLog('chat_message', body);
 
     // Usar cliente administrativo para lectura y escritura sin restricciones RLS en Storage y Realtime
     const adminSupabase = createAdminClient();
@@ -128,44 +133,16 @@ export async function POST(request: Request) {
       throw uploadError;
     }
 
-    // 3.1 Insertar formalmente en la tabla relacional chat_messages de Supabase si la estructura existe
+    // 3.1 INSERCIÓN IDEMPOTENTE CON REINTENTOS (Exponential Backoff en chat_messages con call_sid único)
     try {
-      let resolvedPatientId: string | null = null;
-
-      if (!patientId.startsWith('prospect_')) {
-        resolvedPatientId = patientId;
-      }
-
-      if (!resolvedPatientId && cleanPhone) {
-        try {
-          const { data: found } = await adminSupabase
-            .from('patients')
-            .select('id')
-            .ilike('phone', `%${cleanPhone}%`)
-            .maybeSingle();
-          if (found?.id) {
-            resolvedPatientId = found.id;
-          }
-        } catch {}
-      }
-
-      await adminSupabase.from('chat_messages').insert({
-        patient_id: resolvedPatientId,
-        sender_role: message.senderRole || (message.isDoctor ? 'doctor' : 'patient'),
-        sender_name: message.senderName || (message.isDoctor ? 'Dra. Aura Estudillo' : 'Paciente'),
-        content: message.content,
-        channel_type: message.channel_type || 'web_chat',
-        metadata: {
-          patientId,
-          phone: cleanPhone || message.metadata?.phone || '',
-          ...(message.metadata || {}),
-          senderRole: message.senderRole,
-          timestamp: message.timestamp
-        },
-        created_at: new Date().toISOString()
+      const deterministicSid = message.call_sid || message.id || `msg_${patientId}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      await upsertChatMessageWithRetry(adminSupabase, {
+        call_sid: deterministicSid,
+        content: message.content || '',
+        media_urls: message.media_urls || []
       });
     } catch (dbErr: any) {
-      console.warn('[DB chat_messages insert notice]:', dbErr?.message);
+      console.warn('[DB chat_messages upsert notice]:', dbErr?.message);
     }
 
     // 4. Emitir eventos Realtime bidireccionales y Notificación WhatsApp
