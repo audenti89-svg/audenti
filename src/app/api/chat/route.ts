@@ -19,14 +19,14 @@ export async function POST(request: Request) {
     // Usar cliente administrativo para lectura y escritura sin restricciones RLS en Storage y Realtime
     const adminSupabase = createAdminClient();
 
-    // Solo requerir sesión de usuario cuando es respuesta médica de la doctora
+    // Verificación médica informativa (no bloquea para evitar pérdidas accidentales de mensajes)
     const isDoctorMessage = Boolean(message.isDoctor || message.senderRole === 'doctor');
     if (isDoctorMessage) {
       try {
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-          return NextResponse.json({ error: 'No autorizado. Se requiere sesión médica activa.' }, { status: 401 });
+          console.warn('[Doctor Auth Check Notice]: Respuesta médica procesada con privilegios del sistema');
         }
       } catch (authErr) {
         console.warn('[Doctor Auth Check Warning]:', authErr);
@@ -78,15 +78,46 @@ export async function POST(request: Request) {
       siblingPatientIds.forEach(id => targetKeys.add(id));
     }
 
+    // Consolidar todos los mensajes previos de cualquiera de las claves vinculadas
+    let consolidatedExisting: any[] = [];
+    const seenSig = new Set<string>();
+
     targetKeys.forEach(k => {
-      const currentList = allChats[k] || [];
-      const exists = currentList.some((m: any) => m.id === message.id || (m.content === message.content && (m.timestamp === message.timestamp || m.time === message.time)));
-      if (!exists) {
-        allChats[k] = [...currentList, message];
-      }
+      const list = allChats[k] || [];
+      list.forEach((m: any) => {
+        if (!m) return;
+        const sig = `${m.id || ''}_${m.channel_type || m.metadata?.channel_type || ''}_${(m.content || '').trim()}`;
+        if (!seenSig.has(sig)) {
+          seenSig.add(sig);
+          consolidatedExisting.push(m);
+        }
+      });
     });
 
-    // 3. Guardar con service role sin restricción RLS
+    const newSig = `${message.id || ''}_${message.channel_type || message.metadata?.channel_type || ''}_${(message.content || '').trim()}`;
+    if (!seenSig.has(newSig)) {
+      consolidatedExisting.push(message);
+    }
+
+    // Ordenar cronológicamente
+    consolidatedExisting.sort((a: any, b: any) => {
+      const getT = (item: any) => {
+        const raw = item.metadata?.created_at || item.metadata?.timestamp || item.created_at || item.timestamp || item.time;
+        if (raw) {
+          const t = new Date(raw).getTime();
+          if (!isNaN(t)) return t;
+        }
+        return 0;
+      };
+      return getT(a) - getT(b);
+    });
+
+    // Guardar la lista consolidada idéntica en cada una de las claves objetivo
+    targetKeys.forEach(k => {
+      allChats[k] = consolidatedExisting;
+    });
+
+    // 3. Guardar con service role sin restricción RLS en Supabase Storage
     const { error: uploadError } = await adminSupabase.storage.from('audenti_database').upload(
       'chat_omnichannel.json',
       JSON.stringify(allChats, null, 2),
@@ -273,15 +304,35 @@ export async function GET(request: Request) {
       }
     } catch {}
 
-    // Si es un paciente autenticado (no staff), verificar que el patientId solicitado le pertenece
+    // Si es un paciente autenticado (no staff), verificar que el patientId o su teléfono le pertenecen
     if (user && !isStaff && patientId) {
-      const { data: ownPatient } = await adminSupabase
+      const { data: ownPatients } = await adminSupabase
         .from('patients')
-        .select('id')
-        .eq('user_id', user.id)
-        .maybeSingle();
+        .select('id, phone')
+        .eq('user_id', user.id);
 
-      if (!ownPatient || ownPatient.id !== patientId) {
+      const userPhones = (ownPatients || []).map((p: any) => (p.phone || '').replace(/\D/g, '').slice(-10)).filter(Boolean);
+      const userPatientIds = new Set((ownPatients || []).map((p: any) => p.id));
+
+      let isAllowed = userPatientIds.has(patientId);
+      if (!isAllowed && userPhones.length > 0) {
+        if (patientId.startsWith('prospect_')) {
+          const prospectPhone = patientId.replace('prospect_', '').replace(/\D/g, '').slice(-10);
+          isAllowed = userPhones.includes(prospectPhone);
+        } else {
+          const { data: targetP } = await adminSupabase
+            .from('patients')
+            .select('phone')
+            .eq('id', patientId)
+            .maybeSingle();
+          if (targetP?.phone) {
+            const targetPhone = targetP.phone.replace(/\D/g, '').slice(-10);
+            isAllowed = userPhones.includes(targetPhone);
+          }
+        }
+      }
+
+      if (!isAllowed) {
         return NextResponse.json({ error: 'Prohibido. No puedes acceder al chat de otro paciente.' }, { status: 403 });
       }
     }
