@@ -109,6 +109,7 @@ export function ChatInterface() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const selectedPatientIdRef = useRef<string>(selectedPatientId)
+  const registeredPatientsRef = useRef<any[]>([])
 
   useEffect(() => {
     selectedPatientIdRef.current = selectedPatientId
@@ -130,6 +131,7 @@ export function ChatInterface() {
 
         if (dbPatients && dbPatients.length > 0) {
           registeredList = dbPatients
+          registeredPatientsRef.current = dbPatients
           dbPatients.forEach(p => {
             registeredMap[p.id] = p
           })
@@ -200,7 +202,7 @@ export function ChatInterface() {
         console.warn('[Chat DB Direct Check Note]:', dbErr?.message)
       }
 
-      // D. Cargar Storage chat_omnichannel.json como fallback / sincronía adicional
+      // D. Cargar Storage chat_omnichannel.json como fallback / sincronía adicional garantizando consolidación total
       try {
         const { data: file } = await supabase.storage
           .from('audenti_database')
@@ -212,8 +214,14 @@ export function ChatInterface() {
             const stored = JSON.parse(text)
             Object.keys(stored).forEach(contactId => {
               const chatArray = stored[contactId] || []
-              const cleanContactPhone = contactId.replace(/\D/g, '').slice(-10)
-              const correlatedPat = (cleanContactPhone && phoneToPatientMap[cleanContactPhone]) ? phoneToPatientMap[cleanContactPhone] : null
+              if (!Array.isArray(chatArray) || chatArray.length === 0) return
+
+              // Resolver teléfono del contacto desde registeredMap, prefijo prospect_ o metadata del mensaje
+              const regPat = registeredMap[contactId]
+              const regPhone = (regPat?.phone || '').replace(/\D/g, '').slice(-10)
+              const directPhone = contactId.startsWith('prospect_') ? contactId.replace('prospect_', '').replace(/\D/g, '').slice(-10) : ''
+              const msgPhone = chatArray.reduce((acc: string, m: any) => acc || (m.metadata?.phone || '').replace(/\D/g, '').slice(-10), '')
+              const resolvedPhone = regPhone || directPhone || msgPhone
 
               chatArray.forEach((m: any) => {
                 const msgItem: ChatMessageItem = {
@@ -228,12 +236,18 @@ export function ChatInterface() {
                   metadata: m.metadata
                 }
 
+                // Anexar al ID directo
                 appendMessageToKey(contactId, msgItem)
-                if (correlatedPat) {
-                  appendMessageToKey(correlatedPat.id, msgItem)
-                }
-                if (cleanContactPhone) {
-                  appendMessageToKey(`prospect_${cleanContactPhone}`, msgItem)
+
+                // Si se resolvió un teléfono, anexar a prospect_ y a todos los pacientes hermanos registrados
+                if (resolvedPhone && resolvedPhone.length >= 7) {
+                  appendMessageToKey(`prospect_${resolvedPhone}`, msgItem)
+                  registeredList.forEach(p => {
+                    const pClean = (p.phone || '').replace(/\D/g, '').slice(-10)
+                    if (pClean === resolvedPhone) {
+                      appendMessageToKey(p.id, msgItem)
+                    }
+                  })
                 }
               })
             })
@@ -464,21 +478,27 @@ export function ChatInterface() {
           const current = prev[patientId] || []
           const combined = [...current]
           const existingIds = new Set(combined.map(m => m.id))
-          const existingSigs = new Set(combined.map(m => `${m.channel_type || ''}_${(m.content || '').trim()}`))
+          const existingSigs = new Set(combined.map(m => `${m.channel_type || m.metadata?.channel_type || ''}_${(m.content || '').trim()}`))
 
           for (const item of [...apiMsgs, ...dbMsgs]) {
-            const sig = `${item.channel_type || ''}_${(item.content || '').trim()}`
+            const sig = `${item.channel_type || item.metadata?.channel_type || ''}_${(item.content || '').trim()}`
             if (!existingIds.has(item.id) && !existingSigs.has(sig)) {
-              existingIds.add(item.id)
+              if (item.id) existingIds.add(item.id)
               existingSigs.add(sig)
               combined.push(item)
             }
           }
 
           combined.sort((a, b) => {
-            const tA = new Date(a.metadata?.timestamp || a.time).getTime() || 0
-            const tB = new Date(b.metadata?.timestamp || b.time).getTime() || 0
-            return tA - tB
+            const getT = (m: ChatMessageItem) => {
+              const raw = m.metadata?.created_at || m.metadata?.timestamp || m.time
+              if (raw) {
+                const t = new Date(raw).getTime()
+                if (!isNaN(t)) return t
+              }
+              return 0
+            }
+            return getT(a) - getT(b)
           })
 
           const targetPat = patients.find(p => p.id === patientId)
@@ -491,6 +511,12 @@ export function ChatInterface() {
 
           if (cleanPhone && cleanPhone.length >= 7) {
             updated[`prospect_${cleanPhone}`] = combined
+            registeredPatientsRef.current.forEach(p => {
+              const pClean = (p.phone || '').replace(/\D/g, '').slice(-10)
+              if (pClean === cleanPhone) {
+                updated[p.id] = combined
+              }
+            })
           }
 
           return updated
@@ -885,11 +911,27 @@ export function ChatInterface() {
       isPrivateNote
     }
 
-    // Reflejo local inmediato
-    setMessages(prev => ({
-      ...prev,
-      [selectedPatientId]: [...(prev[selectedPatientId] || []), newMsg]
-    }))
+    const targetPat = patients.find(p => p.id === selectedPatientId)
+    const cleanPhone = (targetPat?.phone || (selectedPatientId.startsWith('prospect_') ? selectedPatientId.replace('prospect_', '') : '')).replace(/\D/g, '').slice(-10)
+
+    // Reflejo local inmediato bajo el ID y bajo prospect_ y hermanos
+    setMessages(prev => {
+      const current = prev[selectedPatientId] || []
+      const updated: Record<string, ChatMessageItem[]> = {
+        ...prev,
+        [selectedPatientId]: [...current, newMsg]
+      }
+      if (cleanPhone && cleanPhone.length >= 7) {
+        updated[`prospect_${cleanPhone}`] = [...(prev[`prospect_${cleanPhone}`] || []), newMsg]
+        registeredPatientsRef.current.forEach(p => {
+          const pClean = (p.phone || '').replace(/\D/g, '').slice(-10)
+          if (pClean === cleanPhone) {
+            updated[p.id] = [...(prev[p.id] || []), newMsg]
+          }
+        })
+      }
+      return updated
+    })
 
     setInputMessage('')
     setSendingMessage(true)
@@ -958,9 +1000,9 @@ export function ChatInterface() {
       if (Array.isArray(arr)) {
         for (const item of arr) {
           if (!item) continue
-          const sig = `${item.channel_type || ''}_${(item.content || '').trim()}`
+          const sig = `${item.channel_type || item.metadata?.channel_type || ''}_${(item.content || '').trim()}`
           if (!addedIds.has(item.id) && !addedSignatures.has(sig)) {
-            addedIds.add(item.id)
+            if (item.id) addedIds.add(item.id)
             addedSignatures.add(sig)
             candidates.push(item)
           }
@@ -971,10 +1013,16 @@ export function ChatInterface() {
     // 1. Mensajes por clave directa del ID (UUID o prospect_id)
     collectFromKey(targetId)
 
-    // 2. Mensajes por claves alternativas asociadas al teléfono
+    // 2. Mensajes por claves asociadas al teléfono (prospect_, hermanos registrados y coincidencias)
     if (cleanPhone && cleanPhone.length >= 7) {
-      collectFromKey(`prospect_${cleanPhone}`)
+      collectFromKey(`prospect_${cleanPhone}Target`.replace('Target', ''))
       collectFromKey(cleanPhone)
+      registeredPatientsRef.current.forEach(p => {
+        const pClean = (p.phone || '').replace(/\D/g, '').slice(-10)
+        if (pClean === cleanPhone) {
+          collectFromKey(p.id)
+        }
+      })
       Object.keys(messages).forEach(k => {
         if (k !== targetId && k.includes(cleanPhone)) {
           collectFromKey(k)
@@ -982,11 +1030,17 @@ export function ChatInterface() {
       })
     }
 
-    // 3. Ordenar cronológicamente de forma estricta
+    // 3. Ordenar cronológicamente
     candidates.sort((a, b) => {
-      const tA = new Date(a.metadata?.timestamp || a.time).getTime() || 0
-      const tB = new Date(b.metadata?.timestamp || b.time).getTime() || 0
-      return tA - tB
+      const getT = (m: ChatMessageItem) => {
+        const raw = m.metadata?.created_at || m.metadata?.timestamp || m.time
+        if (raw) {
+          const t = new Date(raw).getTime()
+          if (!isNaN(t)) return t
+        }
+        return 0
+      }
+      return getT(a) - getT(b)
     })
 
     return candidates

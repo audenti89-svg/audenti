@@ -32,8 +32,48 @@ export async function POST(request: Request) {
       }
     } catch {}
 
-    // 2. Anexar nuevo mensaje
-    allChats[patientId] = [...(allChats[patientId] || []), message];
+    // 2. Resolver teléfono y pacientes hermanos con el mismo teléfono para consolidación total
+    let cleanPhone = '';
+    let siblingPatientIds: string[] = [];
+
+    if (patientId.startsWith('prospect_')) {
+      cleanPhone = patientId.replace('prospect_', '').replace(/\D/g, '').slice(-10);
+    } else {
+      try {
+        const { data: currentP } = await supabase.from('patients').select('phone').eq('id', patientId).maybeSingle();
+        if (currentP?.phone) {
+          cleanPhone = currentP.phone.replace(/\D/g, '').slice(-10);
+        }
+      } catch {}
+    }
+
+    if (!cleanPhone && message.metadata?.phone) {
+      cleanPhone = String(message.metadata.phone).replace(/\D/g, '').slice(-10);
+    }
+
+    if (cleanPhone && cleanPhone.length >= 7) {
+      try {
+        const { data: siblings } = await supabase.from('patients').select('id').ilike('phone', `%${cleanPhone}%`);
+        if (siblings && siblings.length > 0) {
+          siblingPatientIds = siblings.map(s => s.id);
+        }
+      } catch {}
+    }
+
+    // Guardar bajo el ID del paciente, bajo el prospect_phone y bajo todos los hermanos que comparten el teléfono
+    const targetKeys = new Set<string>([patientId]);
+    if (cleanPhone && cleanPhone.length >= 7) {
+      targetKeys.add(`prospect_${cleanPhone}`);
+      siblingPatientIds.forEach(id => targetKeys.add(id));
+    }
+
+    targetKeys.forEach(k => {
+      const currentList = allChats[k] || [];
+      const exists = currentList.some((m: any) => m.id === message.id || (m.content === message.content && (m.timestamp === message.timestamp || m.time === message.time)));
+      if (!exists) {
+        allChats[k] = [...currentList, message];
+      }
+    });
 
     // 3. Guardar con service role sin restricción RLS
     const { error: uploadError } = await supabase.storage.from('audenti_database').upload(
@@ -240,7 +280,6 @@ export async function GET(request: Request) {
 
     if (patientId) {
       try {
-        // Consultar teléfono del paciente si es UUID para correlacionar prospectos/llamadas
         if (!patientId.startsWith('prospect_')) {
           const { data: pData } = await supabase
             .from('patients')
@@ -250,48 +289,27 @@ export async function GET(request: Request) {
           if (pData?.phone) patientPhone = pData.phone.replace(/\D/g, '').slice(-10);
           if (pData?.full_name) patientName = pData.full_name.trim();
         } else {
-          patientPhone = patientId.replace('prospect_', '').slice(-10);
-        }
-
-        const query = supabase
-          .from('chat_messages')
-          .select('*')
-          .order('created_at', { ascending: true });
-
-        const orClauses: string[] = [`metadata->>patientId.eq.${patientId}`];
-        if (!patientId.startsWith('prospect_')) {
-          orClauses.push(`patient_id.eq.${patientId}`);
-        }
-        if (patientPhone && patientPhone.length >= 7) {
-          orClauses.push(`metadata->>phone.ilike.%${patientPhone}%`);
-        }
-        if (patientName && patientName.length >= 3) {
-          orClauses.push(`metadata->>patientName.ilike.%${patientName}%`);
-        }
-
-        query.or(orClauses.join(','));
-
-        const { data: rows } = await query;
-        if (rows && rows.length > 0) {
-          dbMessages = rows.map(r => ({
-            id: r.id,
-            senderName: r.sender_name || (r.sender_role === 'ai' ? 'Asistente de Voz (Aura AI)' : (r.sender_role === 'doctor' ? 'Dra. Aura Estudillo' : 'Paciente')),
-            senderRole: r.sender_role,
-            channel_type: r.channel_type || 'web_chat',
-            content: r.content,
-            timestamp: r.created_at ? new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date(r.created_at)) : 'Hoy',
-            time: r.created_at ? new Intl.DateTimeFormat('es-MX', { hour: '2-digit', minute: '2-digit' }).format(new Date(r.created_at)) : 'Hoy',
-            isDoctor: r.sender_role === 'doctor',
-            isOwn: r.sender_role === 'doctor',
-            metadata: r.metadata
-          }));
+          patientPhone = patientId.replace('prospect_', '').replace(/\D/g, '').slice(-10);
         }
       } catch (dbErr: any) {
-        console.warn('[DB chat_messages query note]:', dbErr?.message);
+        console.warn('[DB patient phone lookup note]:', dbErr?.message);
       }
     }
 
-    // Cargar también de Storage para asegurar que nunca falte ningún mensaje
+    let siblingIds: string[] = [];
+    if (patientPhone && patientPhone.length >= 7) {
+      try {
+        const { data: siblings } = await supabase
+          .from('patients')
+          .select('id')
+          .ilike('phone', `%${patientPhone}%`);
+        if (siblings && siblings.length > 0) {
+          siblingIds = siblings.map(s => s.id);
+        }
+      } catch {}
+    }
+
+    // Cargar también de Storage chat_omnichannel.json garantizando historial completo
     let storageMessages: any[] = [];
     let allChats: Record<string, any[]> = {};
     try {
@@ -301,14 +319,27 @@ export async function GET(request: Request) {
         if (text && text.trim()) {
           allChats = JSON.parse(text);
           if (patientId) {
-            if (allChats[patientId]) storageMessages.push(...allChats[patientId]);
-            if (patientPhone && allChats[`prospect_${patientPhone}`]) {
-              storageMessages.push(...allChats[`prospect_${patientPhone}`]);
-            }
+            const addFromKey = (k: string) => {
+              if (allChats[k] && Array.isArray(allChats[k])) {
+                storageMessages.push(...allChats[k]);
+              }
+            };
+
+            addFromKey(patientId);
             if (patientPhone && patientPhone.length >= 7) {
+              addFromKey(`prospect_${patientPhone}`);
+              siblingIds.forEach(id => addFromKey(id));
+
+              // Buscar en cualquier clave que contenga el teléfono o mensajes con el teléfono
               Object.keys(allChats).forEach(k => {
-                if (k !== patientId && k !== `prospect_${patientPhone}` && k.includes(patientPhone)) {
-                  storageMessages.push(...allChats[k]);
+                if (k !== patientId && !siblingIds.includes(k) && k !== `prospect_${patientPhone}`) {
+                  const arr = allChats[k];
+                  if (Array.isArray(arr) && arr.some((m: any) => {
+                    const mPhone = (m.metadata?.phone || '').replace(/\D/g, '').slice(-10);
+                    return mPhone === patientPhone;
+                  })) {
+                    storageMessages.push(...arr);
+                  }
                 }
               });
             }
@@ -318,25 +349,32 @@ export async function GET(request: Request) {
     } catch {}
 
     if (patientId) {
-      // Fusionar DB y Storage deduplicando por ID o firma de contenido y tiempo
-      const combined: any[] = [...storageMessages];
-      const seenIds = new Set(combined.map(m => m.id));
-      const seenContent = new Set(combined.map(m => `${m.content}_${m.time || m.timestamp}`));
+      // Deduplicar mensajes de forma estricta por ID o firma de contenido y tipo
+      const combined: any[] = [];
+      const seenIds = new Set<string>();
+      const seenSignatures = new Set<string>();
 
-      for (const dbm of dbMessages) {
-        const signature = `${dbm.content}_${dbm.time || dbm.timestamp}`;
-        if (!seenIds.has(dbm.id) && !seenContent.has(signature)) {
-          seenIds.add(dbm.id);
-          seenContent.add(signature);
-          combined.push(dbm);
+      for (const m of storageMessages) {
+        if (!m) continue;
+        const sig = `${m.channel_type || m.metadata?.channel_type || ''}_${(m.content || '').trim()}`;
+        if (!seenIds.has(m.id) && !seenSignatures.has(sig)) {
+          if (m.id) seenIds.add(m.id);
+          seenSignatures.add(sig);
+          combined.push(m);
         }
       }
 
-      // Ordenar cronológicamente por marca de tiempo exacta
+      // Ordenar cronológicamente por marca de tiempo
       combined.sort((a, b) => {
-        const tA = new Date(a.metadata?.timestamp || a.created_at || a.time || a.timestamp).getTime() || 0;
-        const tB = new Date(b.metadata?.timestamp || b.created_at || b.time || b.timestamp).getTime() || 0;
-        return tA - tB;
+        const getT = (item: any) => {
+          const raw = item.metadata?.created_at || item.metadata?.timestamp || item.created_at || item.timestamp || item.time;
+          if (raw) {
+            const t = new Date(raw).getTime();
+            if (!isNaN(t)) return t;
+          }
+          return 0;
+        };
+        return getT(a) - getT(b);
       });
 
       return NextResponse.json({ success: true, messages: combined });
