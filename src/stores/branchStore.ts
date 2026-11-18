@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type BranchId = 'balbuena' | 'guadalupe-chalma'
+export type BranchId = 'all' | 'balbuena' | 'guadalupe-chalma'
 
 export interface BranchInfo {
   id: BranchId
@@ -14,6 +14,15 @@ export interface BranchInfo {
 }
 
 export const BRANCHES_DATA: Record<BranchId, BranchInfo> = {
+  all: {
+    id: 'all',
+    name: 'Todas las Sedes (Consolidado)',
+    code: 'DCL-ALL-00',
+    address: 'Sucursal Balbuena & Sucursal Chalma de Guadalupe',
+    doctorInCharge: 'Dra. Aura Estudillo (Dirección General)',
+    phone: '+52 55 2242 7769',
+    statusBadge: 'Red Integral • Todas las Sedes',
+  },
   balbuena: {
     id: 'balbuena',
     name: 'Sucursal Balbuena (Matriz)',
@@ -40,8 +49,28 @@ interface BranchStore {
   getCurrentBranch: () => BranchInfo
 }
 
-export const useBranchStore = create<BranchStore>((set, get) => ({
-  currentBranchId: 'balbuena',
-  setBranchId: (id) => set({ currentBranchId: id }),
-  getCurrentBranch: () => BRANCHES_DATA[get().currentBranchId] || BRANCHES_DATA.balbuena,
-}))
+export const useBranchStore = create<BranchStore>((set, get) => {
+  let initialBranch: BranchId = 'all'
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem('audenti_active_branch') as BranchId
+      if (saved && (saved === 'all' || saved === 'balbuena' || saved === 'guadalupe-chalma')) {
+        initialBranch = saved
+      }
+    } catch {}
+  }
+
+  return {
+    currentBranchId: initialBranch,
+    setBranchId: (id) => {
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('audenti_active_branch', id)
+          window.dispatchEvent(new CustomEvent('audenti_branch_changed', { detail: { branchId: id } }))
+        } catch {}
+      }
+      set({ currentBranchId: id })
+    },
+    getCurrentBranch: () => BRANCHES_DATA[get().currentBranchId] || BRANCHES_DATA.all,
+  }
+})

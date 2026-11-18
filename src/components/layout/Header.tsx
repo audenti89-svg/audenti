@@ -289,8 +289,9 @@ export function Header({ onMenuToggle }: HeaderProps) {
               onChange={handleBranchChange}
               className="bg-transparent text-xs font-bold text-slate-100 pr-5 sm:pr-6 appearance-none focus:outline-hidden cursor-pointer truncate"
             >
-              <option value="balbuena" className="bg-slate-950 text-white">Sucursal Balbuena (Matriz) — Dra. Aura Estudillo</option>
-              <option value="guadalupe-chalma" className="bg-slate-950 text-white">Sucursal Chalma de Guadalupe — Dra. Aura Estudillo</option>
+              <option value="all" className="bg-slate-950 text-amber-300 font-bold">🌐 Todas las Sedes (Consolidado)</option>
+              <option value="balbuena" className="bg-slate-950 text-white">🏥 Sucursal Balbuena (Matriz) — Dra. Aura</option>
+              <option value="guadalupe-chalma" className="bg-slate-950 text-white">🏥 Sucursal Chalma de Guadalupe — Dra. Aura</option>
             </select>
             <ChevronDown className="w-3.5 h-3.5 absolute right-1.5 sm:right-2 pointer-events-none text-slate-400" />
           </div>
