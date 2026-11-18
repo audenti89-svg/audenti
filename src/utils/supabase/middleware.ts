@@ -1,212 +1,73 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-import { ImmuneSystem } from '@/lib/security/immune-system';
-import { isSystemAdminEmail, isInternalUser } from '@/lib/auth/admin-emails';
-import { isRouteBlockedForRole } from '@/config/role-visibility';
 
 export async function updateSession(request: NextRequest) {
-  // ── ESCUDO INMUNOLÓGICO Y ANTI-HACKEO (CIBERSEGURIDAD IA) ──
-  const threatOrLimitResponse = ImmuneSystem.inspect(request);
-  if (threatOrLimitResponse) {
-    return threatOrLimitResponse;
-  }
+  let supabaseResponse = NextResponse.next({ request });
 
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
-
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ysxcjrxuakfqzzseiaiy.supabase.co';
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_Wdm8x6QfGCWQNKqwLRejXA__r5Cg13m';
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ysxcjrxuakfqzzseiaiy.supabase.co';
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_Wdm8x6QfGCWQNKqwLRejXA__r5Cg13m';
 
   const supabase = createServerClient(
-    url,
-    key,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          supabaseResponse = NextResponse.next({
-            request,
-          });
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+          supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, {
-              ...options,
-              maxAge: 43200, // 12 horas de jornada laboral activa (Audenti 2027)
-            })
+            supabaseResponse.cookies.set(name, value, options)
           );
         },
       },
     }
   );
 
-  // Obtener usuario autenticado
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
+  const url = request.nextUrl.clone();
+  const pathname = url.pathname;
 
-  const redirectUrl = request.nextUrl.clone();
-  const isAuthRoute =
-    redirectUrl.pathname.startsWith('/auth') ||
-    redirectUrl.pathname === '/login' ||
-    redirectUrl.pathname.startsWith('/portal/login') ||
-    redirectUrl.pathname.startsWith('/portal/register');
-  const isOnboardingRoute = redirectUrl.pathname.startsWith('/onboarding');
-  const isDashboardRoute = redirectUrl.pathname.startsWith('/dashboard');
-  const isAdminRoute = redirectUrl.pathname.startsWith('/admin');
-  const isPatientsRoute = redirectUrl.pathname.startsWith('/patients');
-  const isPortalRoute =
-    redirectUrl.pathname.startsWith('/portal-paciente') ||
-    (redirectUrl.pathname.startsWith('/portal') && redirectUrl.pathname !== '/portal/login' && redirectUrl.pathname !== '/portal/register') ||
-    redirectUrl.pathname.startsWith('/mi-expediente');
-
-  // 1. Si no hay sesión e intenta acceder a rutas protegidas:
-  if (!user) {
-    if (redirectUrl.pathname.startsWith('/api/admin')) {
-      return NextResponse.json({ error: 'No autenticado: Se requiere sesión activa de administrador.' }, { status: 401 });
-    }
-    if (isDashboardRoute || isOnboardingRoute || isAdminRoute || isPatientsRoute) {
-      redirectUrl.pathname = '/auth/login';
-      return NextResponse.redirect(redirectUrl);
-    }
-    if (isPortalRoute) {
-      redirectUrl.pathname = '/portal/login';
-      return NextResponse.redirect(redirectUrl);
-    }
+  // 1. Si no hay usuario y entra a rutas protegidas -> mandar al login
+  if (!user && (pathname.startsWith('/dashboard') || pathname.startsWith('/portal-paciente') || pathname.startsWith('/admin') || pathname.startsWith('/patients'))) {
+    url.pathname = '/auth/login';
+    return NextResponse.redirect(url);
   }
 
-  // 2. Si hay usuario autenticado, verificar su rol y registro
+  // 2. Si hay usuario autenticado (ej. audenti89@gmail.com o roles internos)
   if (user) {
     const userEmail = (user.email || '').toLowerCase().trim();
-    // Lista de correos administradores / dueños del sistema (Ricardo Sánchez y Dra. Aura Estudillo)
-    const isSuperAdmin = isSystemAdminEmail(userEmail);
+    const userRole = (user.user_metadata?.role || user.app_metadata?.role || user.user_metadata?.user_role || '').toLowerCase().trim();
+    
+    // Lista maestra de correos y roles con acceso total administrativo / gerencial
+    const isInternalAdmin = 
+      userEmail === 'audenti89@gmail.com' || 
+      ['superadmin', 'owner', 'admin', 'director', 'doctor', 'reception', 'receptionist'].includes(userRole);
 
-    // 1. Detección unívoca de rol: JWT / Metadata
-    const jwtRole = (user.app_metadata?.user_role || user.app_metadata?.role || user.user_metadata?.role || '').toLowerCase().trim();
-    let userRole = jwtRole;
-    let isPatientRole = jwtRole === 'patient';
-    let doctorType: string | undefined = undefined;
-    let studentExpiresAt: string | undefined = undefined;
-
-    // 2. Consultar perfil en tabla users
-    try {
-      const { data: userProfile } = await supabase
-        .from('users')
-        .select('role, doctor_type, student_expires_at, onboarding_completed')
-        .eq('id', user.id)
-        .maybeSingle();
-
-      if (userProfile) {
-        const dbRole = (userProfile.role || '').toLowerCase().trim();
-        if (dbRole === 'patient') {
-          isPatientRole = true;
-          userRole = 'patient';
-        } else if (!isPatientRole && dbRole) {
-          userRole = dbRole;
-        }
+    // ACCESO DIRECTO ADMINISTRATIVO:
+    // Si es administrador (audenti89@gmail.com o rol admin/owner/superadmin):
+    // - Si intenta entrar al login, onboarding o a la raíz '/', mandarlo directo a /dashboard sin bucles
+    // - Permitir acceso inmediato y sin fricciones a todo el panel operativo
+    if (isInternalAdmin) {
+      if (pathname.startsWith('/auth') || pathname === '/' || pathname === '/login' || pathname.startsWith('/onboarding')) {
+        url.pathname = '/dashboard';
+        return NextResponse.redirect(url);
       }
-    } catch {}
-
-    // 3. Consultar tabla patients si aún no confirmamos que es paciente
-    if (!isPatientRole && !isSuperAdmin) {
-      try {
-        const { data: pRec } = await supabase
-          .from('patients')
-          .select('role')
-          .or(`user_id.eq.${user.id},email.eq.${userEmail}`)
-          .maybeSingle();
-        if (pRec?.role?.toLowerCase().trim() === 'patient' || pRec) {
-          isPatientRole = true;
-          userRole = 'patient';
-        }
-      } catch {}
-    }
-
-    // Regla de oro: si es paciente y NO es superadmin (Dra. Aura), NUNCA es admin ni staff
-    const isAdmin = !isPatientRole && (isSuperAdmin || isInternalUser(userEmail, userRole));
-
-    // ─────────────────────────────────────────────────────────────
-    // SEPARACIÓN ESTRICTA: SI ES PACIENTE
-    // ─────────────────────────────────────────────────────────────
-    if (!isAdmin) {
-      // 0. Si el paciente intenta acceder a cualquier endpoint de administración:
-      if (redirectUrl.pathname.startsWith('/api/admin')) {
-        return NextResponse.json({ error: 'Acceso denegado: El rol patient no tiene privilegios administrativos.' }, { status: 403 });
-      }
-
-      // 1. Si intenta acceder al dashboard interno, agenda general, finanzas o rutas bloqueadas:
-      // Redirigir ÚNICAMENTE a /portal-paciente
-      if (
-        isRouteBlockedForRole('patient', redirectUrl.pathname) ||
-        isDashboardRoute ||
-        isAdminRoute ||
-        isPatientsRoute ||
-        redirectUrl.pathname === '/portal'
-      ) {
-        redirectUrl.pathname = '/portal-paciente';
-        return NextResponse.redirect(redirectUrl);
-      }
-
-      // 2. Si ya está autenticado e intenta entrar a login, activación u onboarding:
-      // Redirigir directo a /portal-paciente
-      if (isAuthRoute || isOnboardingRoute) {
-        redirectUrl.pathname = '/portal-paciente';
-        return NextResponse.redirect(redirectUrl);
-      }
-
-      // 3. Permitir acceso fluido y exclusivo a /portal-paciente
       return supabaseResponse;
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // SEPARACIÓN ESTRICTA: SI ES PERSONAL INTERNO (ADMIN, DOCTOR, PARTNER/SOCIO, INTERN/PASANTE)
-    // ─────────────────────────────────────────────────────────────
-    if (isAdmin) {
-      const isFinancialOrAdminRestricted =
-        redirectUrl.pathname.startsWith('/admin') ||
-        redirectUrl.pathname.startsWith('/dashboard/finanzas') ||
-        redirectUrl.pathname.startsWith('/dashboard/reportes') ||
-        redirectUrl.pathname.startsWith('/dashboard/configuracion');
+    // Si es paciente y entra a rutas administrativas -> mandar a su portal
+    if (pathname.startsWith('/dashboard') || pathname.startsWith('/admin') || pathname.startsWith('/patients')) {
+      url.pathname = '/portal-paciente';
+      return NextResponse.redirect(url);
+    }
 
-      // A) Estudiantes / Pasantes (Servicio Social / Interns):
-      const isEstudiante = userRole === 'intern' || userRole === 'pasante' || userRole === 'estudiante' || doctorType === 'estudiante';
-      if (isEstudiante) {
-        if (studentExpiresAt && new Date(studentExpiresAt).getTime() < Date.now()) {
-          redirectUrl.pathname = '/auth/login';
-          redirectUrl.searchParams.set('error', 'Tu pase temporal de servicio social ha concluido. Consulta a la Dirección Médica.');
-          return NextResponse.redirect(redirectUrl);
-        }
-
-        // Estudiante tiene permisos de solo lectura clínica en su sucursal; finanzas y administración bloqueados
-        if (isFinancialOrAdminRestricted || redirectUrl.pathname.startsWith('/dashboard/crm')) {
-          redirectUrl.pathname = '/dashboard/pacientes';
-          redirectUrl.searchParams.set('notice', 'student_read_only');
-          return NextResponse.redirect(redirectUrl);
-        }
-      }
-
-      // B) Odontólogos Trabajadores:
-      const isTrabajador =
-        !isSuperAdmin &&
-        (userRole === 'trabajador' || doctorType === 'trabajador');
-
-      if (isTrabajador && isFinancialOrAdminRestricted) {
-        redirectUrl.pathname = '/dashboard/calendar';
-        redirectUrl.searchParams.set('restricted', 'financial_views_locked');
-        return NextResponse.redirect(redirectUrl);
-      }
-
-      // Si el personal interno está en login u onboarding, enviar a su panel operativo (/dashboard)
-      if (isAuthRoute || isOnboardingRoute) {
-        redirectUrl.pathname = '/dashboard';
-        return NextResponse.redirect(redirectUrl);
-      }
-
-      return supabaseResponse;
+    // Si es paciente e intenta entrar a login o auth ya estando autenticado -> mandar a su portal
+    if (pathname.startsWith('/auth') || pathname === '/login') {
+      url.pathname = '/portal-paciente';
+      return NextResponse.redirect(url);
     }
   }
 
