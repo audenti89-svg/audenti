@@ -38,6 +38,14 @@ export async function GET(request: Request) {
 
   let response = NextResponse.redirect(`${origin}${next}`);
 
+  const sendRedirect = (destination: string) => {
+    const finalResponse = NextResponse.redirect(destination);
+    response.cookies.getAll().forEach((cookie) => {
+      finalResponse.cookies.set(cookie.name, cookie.value, cookie);
+    });
+    return finalResponse;
+  };
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ysxcjrxuakfqzzseiaiy.supabase.co',
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_Wdm8x6QfGCWQNKqwLRejXA__r5Cg13m',
@@ -120,7 +128,7 @@ export async function GET(request: Request) {
             is_active: true
           }, { onConflict: 'id' });
 
-          return NextResponse.redirect(`${origin}/dashboard`);
+          return sendRedirect(`${origin}/dashboard`);
         }
       } catch (invErr) {
         console.warn('[auth/callback] Error procesando invitación de odontólogo:', invErr);
@@ -150,9 +158,9 @@ export async function GET(request: Request) {
     }
 
     // A) Personal Clínico (Doctores, Socios, Pasantes, Directores, Administradores):
-    // Redirigir directamente a la vista operativa /dashboard
+    // Redirigir directamente a la vista operativa /dashboard con cookies preservadas
     if (isInternal) {
-      return NextResponse.redirect(`${origin}/dashboard`);
+      return sendRedirect(`${origin}/dashboard`);
     }
 
     // B) Paciente: Realizar Upsert Seguro y redirigir al Portal del Paciente
@@ -173,7 +181,7 @@ export async function GET(request: Request) {
       console.warn('[auth/callback] Error en safeUpsertPatient portal:', upsertErr);
     }
 
-    return NextResponse.redirect(`${origin}/portal-paciente`);
+    return sendRedirect(`${origin}/portal-paciente`);
   }
 
   return response;
