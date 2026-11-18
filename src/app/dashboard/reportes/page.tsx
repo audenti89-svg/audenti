@@ -53,7 +53,7 @@ interface PatientLTV {
   id: string
   fullName: string
   phone: string
-  tier: 'VIP Diamante' | 'VIP Platino' | 'VIP Oro' | 'Paciente Frecuente'
+  tier: 'VIP Diamante' | 'VIP Platino' | 'VIP Oro' | 'Paciente Frecuente' | 'Paciente Registrado'
   totalSpent: number
   proceduresCount: number
   averageTicket: number
@@ -90,14 +90,14 @@ export default function ReportesPage() {
   const [selectedPeriod, setSelectedPeriod] = useState('month')
   const [searchTerm, setSearchTerm] = useState('')
 
-  // Datos del Negocio
+  // Datos del Negocio (Inicializados en Limpio 100% Real)
   const [metrics, setMetrics] = useState({
-    monthlyIncome: 148500,
-    servicesCount: 42,
-    doctorsCommission: 10692,
-    avgTicket: 3535,
-    topService: 'Fase Quirúrgica: Implante Oseointegrado Titanio',
-    activePatients: 3
+    monthlyIncome: 0,
+    servicesCount: 0,
+    doctorsCommission: 0,
+    avgTicket: 0,
+    topService: 'Sin procedimientos registrados aún',
+    activePatients: 0
   })
 
   const [servicesData, setServicesData] = useState<ServicePerformance[]>([])
@@ -105,15 +105,15 @@ export default function ReportesPage() {
   const [attributionStats, setAttributionStats] = useState<AttributionStat[]>([])
   const [topReferrers, setTopReferrers] = useState<TopReferrer[]>([])
 
-  // Carga de Datos desde Supabase & Storage
+  // Carga de Datos Reales desde Supabase & Storage (Cero Mock)
   const loadReportsData = async () => {
     setLoading(true)
     try {
-      // 1. Obtener pacientes
+      // 1. Obtener pacientes reales
       const { data: dbPatients } = await supabase.from('patients').select('*')
       const patientList = dbPatients || []
 
-      // 2. Obtener citas y servicios
+      // 2. Obtener citas y servicios reales
       let appList: any[] = []
       try {
         const res = await fetch('/api/appointments')
@@ -130,184 +130,140 @@ export default function ReportesPage() {
         if (dbApps) appList = dbApps
       }
 
-      // 3. Obtener pagos o transacciones
+      // 3. Obtener pagos o transacciones reales
       let paymentsList: any[] = []
       try {
         const { data: pay } = await supabase.from('payments').select('*')
         if (pay && pay.length > 0) paymentsList = pay
       } catch {}
 
-      // Catálogo Base de Servicios Clínicos con Ponderaciones Reales
-      const baseServices: ServicePerformance[] = [
-        {
-          name: 'Fase Quirúrgica: Implante Oseointegrado Titanio',
-          specialty: 'Implantes',
-          category: 'top',
-          unitPrice: 14500,
-          count: 5,
-          totalRevenue: 72500,
-          percentage: 48.8,
-          growth: '+24%'
-        },
-        {
-          name: 'Crown / Corona de Zirconia Atornillada',
-          specialty: 'Implantes / Prótesis',
-          category: 'top',
-          unitPrice: 7500,
-          count: 4,
-          totalRevenue: 30000,
-          percentage: 20.2,
-          growth: '+15%'
-        },
-        {
-          name: 'Root Canal / Endodoncia Molar Rotatorio',
-          specialty: 'Endodoncia',
-          category: 'top',
-          unitPrice: 4200,
-          count: 4,
-          totalRevenue: 16800,
-          percentage: 11.3,
-          growth: '+8%'
-        },
-        {
-          name: 'Composite / Resina Estética Compleja (MOD)',
-          specialty: 'Operatoria',
-          category: 'medium',
-          unitPrice: 1400,
-          count: 8,
-          totalRevenue: 11200,
-          percentage: 7.5,
-          growth: '+5%'
-        },
-        {
-          name: 'Extraction / Cirugía de Tercer Molar Incluido',
-          specialty: 'Cirugía',
-          category: 'medium',
-          unitPrice: 3200,
-          count: 3,
-          totalRevenue: 9600,
-          percentage: 6.5,
-          growth: '+2%'
-        },
-        {
-          name: 'Composite / Resina Estética 1 Cara (Oclusal)',
-          specialty: 'Operatoria',
-          category: 'medium',
-          unitPrice: 850,
-          count: 6,
-          totalRevenue: 5100,
-          percentage: 3.4,
-          growth: '-1%'
-        },
-        {
-          name: 'Sellador de Fosetas y Fisuras Preventivo',
-          specialty: 'Prevención',
-          category: 'bottom',
-          unitPrice: 450,
-          count: 4,
-          totalRevenue: 1800,
-          percentage: 1.2,
-          growth: '-4%'
-        },
-        {
-          name: 'Limpieza con Profilaxis y Ultrasonido',
-          specialty: 'Periodoncia',
-          category: 'bottom',
-          unitPrice: 750,
-          count: 2,
-          totalRevenue: 1500,
-          percentage: 1.0,
-          growth: '-2%'
-        }
+      // Catálogo Oficial de 19 Servicios (Costos 2 - Dra. Aura Estudillo)
+      const officialCatalog: Array<{ name: string; specialty: string; unitPrice: number; category: 'top' | 'medium' | 'bottom' }> = [
+        { name: 'Consulta Odontológica General', specialty: 'Diagnóstico', unitPrice: 300, category: 'top' },
+        { name: 'Profilaxis con Ultrasonido', specialty: 'Prevención', unitPrice: 500, category: 'top' },
+        { name: 'Resina Estética Fotocurable', specialty: 'Operatoria', unitPrice: 500, category: 'top' },
+        { name: 'Endodoncia Dientes Posteriores', specialty: 'Endodoncia', unitPrice: 1800, category: 'top' },
+        { name: 'Endodoncia Dientes Anteriores', specialty: 'Endodoncia', unitPrice: 1200, category: 'medium' },
+        { name: 'Extracción Terceros Molares', specialty: 'Cirugía', unitPrice: 1500, category: 'medium' },
+        { name: 'Extracción Dental Simple / Compleja', specialty: 'Cirugía', unitPrice: 650, category: 'medium' },
+        { name: 'Corona Metal-Porcelana', specialty: 'Prótesis', unitPrice: 1800, category: 'medium' },
+        { name: 'Corona de Porcelana Pura', specialty: 'Prótesis', unitPrice: 2500, category: 'medium' },
+        { name: 'Dentadura Completa', specialty: 'Prótesis', unitPrice: 5000, category: 'medium' },
+        { name: 'Prótesis Parcial Removible', specialty: 'Prótesis', unitPrice: 4000, category: 'medium' },
+        { name: 'Guarda (Bruxismo)', specialty: 'Férulas', unitPrice: 800, category: 'bottom' },
+        { name: 'Blanqueamiento Dental Profesional', specialty: 'Estética', unitPrice: 2000, category: 'bottom' },
+        { name: 'Protector Bucal Deportivo', specialty: 'Férulas', unitPrice: 1400, category: 'bottom' },
+        { name: 'Profilaxis y Colocación de Flúor (Niños)', specialty: 'Odontopediatría', unitPrice: 300, category: 'bottom' },
+        { name: 'Selladores de Fosetas y Fisuras (por cuadrante)', specialty: 'Odontopediatría', unitPrice: 400, category: 'bottom' },
+        { name: 'Resina Infantil', specialty: 'Odontopediatría', unitPrice: 300, category: 'bottom' },
+        { name: 'Pulpotomía Infantil', specialty: 'Odontopediatría', unitPrice: 500, category: 'bottom' },
+        { name: 'Pulpectomía Infantil', specialty: 'Odontopediatría', unitPrice: 800, category: 'bottom' }
       ]
 
-      const totalCalculated = baseServices.reduce((acc, s) => acc + s.totalRevenue, 0)
-      setServicesData(baseServices)
-
-      // Pacientes de Mayor Valor (LTV)
-      const mockLtv: PatientLTV[] = [
-        {
-          id: '72d77609-2035-477b-a1e3-f6ddc52818b1',
-          fullName: 'Ricardo Sánchez',
-          phone: '55 2242 7769',
-          tier: 'VIP Diamante',
-          totalSpent: 48500,
-          proceduresCount: 6,
-          averageTicket: 8083,
-          lastVisit: '2026-11-02',
-          channel: 'Directo / Dirección',
-          referredBy: 'Embajador Clínico'
-        },
-        {
-          id: '9e88144f-9858-4408-9c2a-bd0894512ce3',
-          fullName: 'Maria de los Angeles Sánchez Rivera',
-          phone: '55 6606 8975',
-          tier: 'VIP Platino',
-          totalSpent: 36200,
-          proceduresCount: 5,
-          averageTicket: 7240,
-          lastVisit: '2026-10-28',
-          channel: 'Recomendación Familiar',
-          referredBy: 'Ricardo Sánchez'
-        },
-        {
-          id: 'eb467b5e-bd15-49c4-9b9e-80e7d592e9ec',
-          fullName: 'Carlos Alberto Rayón Perales',
-          phone: '55 2242 7769',
-          tier: 'VIP Oro',
-          totalSpent: 18400,
-          proceduresCount: 4,
-          averageTicket: 4600,
-          lastVisit: '2026-11-03',
-          channel: 'Referido por Paciente',
-          referredBy: 'Ricardo Sánchez'
+      // Conteo de procedimientos reales ejecutados en appointments
+      const realServices: ServicePerformance[] = officialCatalog.map((item) => {
+        const matches = appList.filter((a) => {
+          const t = (a.treatment || a.treatment_type || '').toLowerCase()
+          return t.includes(item.name.toLowerCase().slice(0, 10))
+        })
+        const count = matches.length
+        const totalRevenue = count * item.unitPrice
+        return {
+          name: item.name,
+          specialty: item.specialty,
+          category: item.category,
+          unitPrice: item.unitPrice,
+          count,
+          totalRevenue,
+          percentage: 0,
+          growth: count > 0 ? '+100%' : '0%'
         }
-      ]
+      })
 
-      // Complementar con pacientes reales si existen
-      if (patientList.length > 0) {
-        patientList.forEach((p) => {
-          if (!mockLtv.some(item => item.id === p.id || item.fullName.toLowerCase() === p.full_name?.toLowerCase())) {
-            mockLtv.push({
-              id: p.id,
-              fullName: p.full_name || 'Paciente',
-              phone: p.phone || 'Sin tel.',
-              tier: 'Paciente Frecuente',
-              totalSpent: 4500,
-              proceduresCount: 2,
-              averageTicket: 2250,
-              lastVisit: '2026-10-15',
-              channel: p.acquisition_channel || 'Directo'
-            })
-          }
+      const totalCalculated = realServices.reduce((acc, s) => acc + s.totalRevenue, 0)
+      if (totalCalculated > 0) {
+        realServices.forEach((s) => {
+          s.percentage = Math.round((s.totalRevenue / totalCalculated) * 1000) / 10
         })
       }
+      setServicesData(realServices)
 
-      setPatientLtvData(mockLtv.sort((a, b) => b.totalSpent - a.totalSpent))
+      // Pacientes Reales de Supabase (LTV Real, Cero Mock)
+      const realLtv: PatientLTV[] = patientList.map((p) => {
+        const pPayments = paymentsList.filter((pay) => pay.patient_id === p.id)
+        const totalSpent = pPayments.reduce((sum, pay) => sum + (Number(pay.amount) || 0), 0)
+        const proceduresCount = pPayments.length || appList.filter((a) => a.patient_id === p.id).length
+        const avg = proceduresCount > 0 ? Math.round(totalSpent / proceduresCount) : 0
 
-      // Estadísticas de Atribución
+        return {
+          id: p.id,
+          fullName: p.full_name || 'Paciente Audenti',
+          phone: p.phone || 'Sin tel.',
+          tier: totalSpent >= 20000 ? 'VIP Diamante' : totalSpent >= 10000 ? 'VIP Platino' : totalSpent >= 5000 ? 'VIP Oro' : 'Paciente Registrado',
+          totalSpent,
+          proceduresCount,
+          averageTicket: avg,
+          lastVisit: p.last_visit_date ? new Date(p.last_visit_date).toLocaleDateString('es-MX') : 'Reciente',
+          channel: p.referral_type || p.acquisition_channel || 'Directo',
+          referredBy: p.referred_by_name || undefined
+        }
+      })
+
+      setPatientLtvData(realLtv.sort((a, b) => b.totalSpent - a.totalSpent))
+
+      // Estadísticas de Atribución Reales
+      const channelCounts: Record<string, number> = {
+        direct: 0,
+        referral: 0,
+        doctor: 0,
+        social: 0
+      }
+
+      patientList.forEach((p) => {
+        const c = (p.referral_type || p.acquisition_channel || '').toLowerCase()
+        if (c.includes('embajador') || c.includes('refer')) channelCounts.referral++
+        else if (c.includes('doctor') || c.includes('interconsulta')) channelCounts.doctor++
+        else if (c.includes('social') || c.includes('instagram') || c.includes('tiktok')) channelCounts.social++
+        else channelCounts.direct++
+      })
+
+      const totalPts = patientList.length || 1
       setAttributionStats([
-        { channel: 'referral', label: 'Referidos por Pacientes VIP', patientsCount: 14, revenue: 64200, percentage: 43.2, color: 'bg-amber-400 text-slate-950' },
-        { channel: 'family', label: 'Núcleo Familiar (Recomendación)', patientsCount: 10, revenue: 42800, percentage: 28.8, color: 'bg-cyan-400 text-slate-950' },
-        { channel: 'instagram', label: 'Instagram Ads / Reels', patientsCount: 8, revenue: 22500, percentage: 15.1, color: 'bg-gradient-to-r from-pink-500 to-purple-600 text-white' },
-        { channel: 'tiktok', label: 'TikTok Clínico (Dra. Aura)', patientsCount: 6, revenue: 12000, percentage: 8.1, color: 'bg-slate-950 text-white border border-slate-700' },
-        { channel: 'direct', label: 'Directo / Paseo Peatonal', patientsCount: 4, revenue: 7000, percentage: 4.7, color: 'bg-slate-800 text-slate-300' }
+        { channel: 'referral', label: 'Referidos por Pacientes / Embajadores', patientsCount: channelCounts.referral, revenue: 0, percentage: Math.round((channelCounts.referral / totalPts) * 100), color: 'bg-amber-400 text-slate-950' },
+        { channel: 'doctor', label: 'Doctores Externos & Interconsultas', patientsCount: channelCounts.doctor, revenue: 0, percentage: Math.round((channelCounts.doctor / totalPts) * 100), color: 'bg-cyan-400 text-slate-950' },
+        { channel: 'social', label: 'Redes Sociales & Web Orgánica', patientsCount: channelCounts.social, revenue: 0, percentage: Math.round((channelCounts.social / totalPts) * 100), color: 'bg-purple-500 text-white' },
+        { channel: 'direct', label: 'Directo en Clínica / Spontaneous', patientsCount: channelCounts.direct, revenue: 0, percentage: Math.round((channelCounts.direct / totalPts) * 100), color: 'bg-slate-800 text-slate-300' }
       ])
 
-      // Top Referidores (Embajadores de la Clínica)
-      setTopReferrers([
-        { name: 'Ricardo Sánchez', phone: '55 2242 7769', referralsCount: 8, attributedRevenue: 54600, tier: 'Embajador Oro' },
-        { name: 'Maria de los Angeles Sánchez Rivera', phone: '55 6606 8975', referralsCount: 4, attributedRevenue: 28400, tier: 'Embajador Plata' },
-        { name: 'Dr. Pasante Audenti', phone: '55 1234 5678', referralsCount: 2, attributedRevenue: 9800, tier: 'Colaborador' }
-      ])
+      // Top Referidores Reales
+      const refMap: Record<string, { name: string; phone: string; count: number }> = {}
+      patientList.forEach((p) => {
+        if (p.referred_by_name) {
+          const name = p.referred_by_name.trim()
+          if (!refMap[name]) refMap[name] = { name, phone: 'En seguimiento', count: 0 }
+          refMap[name].count++
+        }
+      })
+      const realReferrers: TopReferrer[] = Object.values(refMap).map((r) => ({
+        name: r.name,
+        phone: r.phone,
+        referralsCount: r.count,
+        attributedRevenue: 0,
+        tier: r.count >= 3 ? 'Embajador Oro' : 'Embajador Activo'
+      }))
+      setTopReferrers(realReferrers)
+
+      // Métricas Consolidadas Reales
+      const realServicesCount = realServices.reduce((acc, s) => acc + s.count, 0)
+      const topServiceFound = realServices.find((s) => s.count > 0)?.name || 'Sin tratamientos cobrados aún'
 
       setMetrics({
         monthlyIncome: totalCalculated,
-        servicesCount: baseServices.reduce((acc, s) => acc + s.count, 0),
-        doctorsCommission: Math.round(totalCalculated * 0.072),
-        avgTicket: Math.round(totalCalculated / baseServices.reduce((acc, s) => acc + s.count, 0)),
-        topService: baseServices[0]?.name || 'Implante Titanio',
-        activePatients: patientList.length || mockLtv.length
+        servicesCount: realServicesCount,
+        doctorsCommission: Math.round(totalCalculated * 0.08),
+        avgTicket: realServicesCount > 0 ? Math.round(totalCalculated / realServicesCount) : 0,
+        topService: topServiceFound,
+        activePatients: patientList.length
       })
 
     } catch (err) {
@@ -529,14 +485,20 @@ export default function ReportesPage() {
             ${metrics.monthlyIncome.toLocaleString('es-MX')}{' '}
             <span className="text-xs font-bold text-slate-400">MXN</span>
           </p>
-          <span className="text-[11px] text-emerald-400 font-bold flex items-center gap-1">
-            <ArrowUpRight className="w-3.5 h-3.5" /> +18.4% vs mes anterior
-          </span>
+          {metrics.monthlyIncome > 0 ? (
+            <span className="text-[11px] text-emerald-400 font-bold flex items-center gap-1">
+              <ArrowUpRight className="w-3.5 h-3.5" /> Producción facturada
+            </span>
+          ) : (
+            <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Sistema limpio (En espera de cobros)
+            </span>
+          )}
         </div>
 
         <div className="bg-slate-900/80 backdrop-blur-xl p-5 rounded-3xl border border-slate-800 shadow-lg space-y-2 text-white">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Comisiones Médicas (7.2%)</span>
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Comisiones Médicas (8%)</span>
             <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-300 border border-blue-500/40 flex items-center justify-center">
               <UserCheck className="w-4 h-4" />
             </div>
@@ -545,7 +507,9 @@ export default function ReportesPage() {
             ${metrics.doctorsCommission.toLocaleString('es-MX')}{' '}
             <span className="text-xs font-bold text-slate-400">MXN</span>
           </p>
-          <span className="text-[11px] text-slate-400">Distribuido entre especialistas</span>
+          <span className="text-[11px] text-slate-400">
+            {metrics.doctorsCommission > 0 ? 'Distribuido entre especialistas' : '0% comisiones pendientes'}
+          </span>
         </div>
 
         <div className="bg-slate-900/80 backdrop-blur-xl p-5 rounded-3xl border border-slate-800 shadow-lg space-y-2 text-white">
@@ -559,7 +523,9 @@ export default function ReportesPage() {
             ${metrics.avgTicket.toLocaleString('es-MX')}{' '}
             <span className="text-xs font-bold text-slate-400">MXN</span>
           </p>
-          <span className="text-[11px] text-amber-300 font-bold">Alta rentabilidad clínica</span>
+          <span className="text-[11px] text-amber-300 font-bold">
+            {metrics.avgTicket > 0 ? 'Alta rentabilidad clínica' : 'Sin procedimientos facturados'}
+          </span>
         </div>
 
         <div className="bg-slate-900/80 backdrop-blur-xl p-5 rounded-3xl border border-slate-800 shadow-lg space-y-2 text-white">
@@ -572,7 +538,9 @@ export default function ReportesPage() {
           <p className="text-2xl font-black text-white font-mono">
             {metrics.servicesCount} <span className="text-xs font-normal text-slate-400">procedimientos</span>
           </p>
-          <span className="text-[11px] text-slate-400">{metrics.activePatients} pacientes activos</span>
+          <span className="text-[11px] text-slate-400">
+            {metrics.activePatients} {metrics.activePatients === 1 ? 'paciente registrado' : 'pacientes registrados'}
+          </span>
         </div>
       </div>
 
@@ -670,29 +638,41 @@ export default function ReportesPage() {
 
               {/* Barras de Progreso Visuales */}
               <div className="space-y-3.5 pt-2">
-                {topServices.map((service, idx) => (
-                  <div key={idx} className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-slate-200 truncate max-w-[65%]">
-                        {idx + 1}. {service.name}
-                      </span>
-                      <div className="flex items-center gap-2 font-mono">
-                        <span className="text-slate-400 text-[11px]">{service.count} realizados</span>
-                        <span className="text-emerald-400 font-black">${service.totalRevenue.toLocaleString('es-MX')} MXN</span>
-                        <span className="text-[10px] text-amber-300 font-bold bg-amber-400/10 px-1.5 py-0.5 rounded">
-                          {service.percentage}%
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
-                      <div
-                        className="h-full bg-gradient-to-r from-cyan-500 via-amber-400 to-emerald-400 rounded-full transition-all duration-500"
-                        style={{ width: `${service.percentage}%` }}
-                      />
+                {topServices.filter(s => s.count > 0).length === 0 ? (
+                  <div className="py-10 text-center space-y-3 bg-slate-950/40 rounded-2xl border border-dashed border-slate-800">
+                    <CheckCircle2 className="w-8 h-8 text-amber-400 mx-auto" />
+                    <div>
+                      <p className="text-sm font-bold text-white">Base de Datos de Servicios Lista &amp; Limpia</p>
+                      <p className="text-xs text-slate-400 max-w-md mx-auto mt-1">
+                        Aún no hay procedimientos clínicos con cobro registrado en este periodo. La aportación económica y porcentual se graficará en tiempo real conforme la Dra. Aura Estudillo registre tratamientos en el expediente.
+                      </p>
                     </div>
                   </div>
-                ))}
+                ) : (
+                  topServices.filter(s => s.count > 0).map((service, idx) => (
+                    <div key={idx} className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-slate-200 truncate max-w-[65%]">
+                          {idx + 1}. {service.name}
+                        </span>
+                        <div className="flex items-center gap-2 font-mono">
+                          <span className="text-slate-400 text-[11px]">{service.count} realizados</span>
+                          <span className="text-emerald-400 font-black">${service.totalRevenue.toLocaleString('es-MX')} MXN</span>
+                          <span className="text-[10px] text-amber-300 font-bold bg-amber-400/10 px-1.5 py-0.5 rounded">
+                            {service.percentage}%
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                        <div
+                          className="h-full bg-gradient-to-r from-cyan-500 via-amber-400 to-emerald-400 rounded-full transition-all duration-500"
+                          style={{ width: `${service.percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
@@ -708,18 +688,25 @@ export default function ReportesPage() {
                 </p>
 
                 <div className="space-y-3 mt-4">
-                  {bottomServices.map((service, idx) => (
-                    <div key={idx} className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
-                      <div className="flex items-center justify-between text-xs font-bold text-white">
-                        <span>{service.name}</span>
-                        <span className="text-amber-400 font-mono">${service.unitPrice} MXN</span>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px] text-slate-400">
-                        <span>{service.specialty}</span>
-                        <span>{service.count} sesiones ({service.percentage}%)</span>
-                      </div>
+                  {bottomServices.filter(s => s.count > 0).length === 0 ? (
+                    <div className="p-4 text-center rounded-2xl bg-slate-950/40 border border-dashed border-slate-800">
+                      <p className="text-xs text-slate-400">Sin procedimientos preventivos cobrados en el periodo.</p>
+                      <p className="text-[11px] text-slate-500 mt-1">Los registros iniciarán en cero hasta que la Dra. Aura capture atenciones.</p>
                     </div>
-                  ))}
+                  ) : (
+                    bottomServices.filter(s => s.count > 0).map((service, idx) => (
+                      <div key={idx} className="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
+                        <div className="flex items-center justify-between text-xs font-bold text-white">
+                          <span>{service.name}</span>
+                          <span className="text-amber-400 font-mono">${service.unitPrice} MXN</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-slate-400">
+                          <span>{service.specialty}</span>
+                          <span>{service.count} sesiones ({service.percentage}%)</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 
@@ -844,7 +831,16 @@ export default function ReportesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
-                  {patientLtvData.map((patient, idx) => (
+                  {patientLtvData.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-slate-400">
+                        <Users className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                        <p className="text-sm font-bold text-slate-300">Sin pacientes registrados en la base de datos</p>
+                        <p className="text-xs text-slate-500 mt-0.5">El valor histórico (LTV) se calculará conforme se registren pacientes y consultas.</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    patientLtvData.map((patient, idx) => (
                     <tr key={patient.id} className="hover:bg-slate-800/40 transition-colors">
                       <td className="py-3 px-3 text-center font-black">
                         <span className={`w-6 h-6 rounded-lg inline-flex items-center justify-center text-xs ${
@@ -908,7 +904,7 @@ export default function ReportesPage() {
                         </Link>
                       </td>
                     </tr>
-                  ))}
+                  )))}
                 </tbody>
               </table>
             </div>
@@ -975,7 +971,13 @@ export default function ReportesPage() {
               </div>
 
               <div className="space-y-3 pt-2">
-                {topReferrers.map((ref, idx) => (
+                {topReferrers.length === 0 ? (
+                  <div className="py-8 text-center bg-slate-950/40 rounded-2xl border border-dashed border-slate-800">
+                    <p className="text-xs text-slate-400">Sin pacientes referidores registrados aún.</p>
+                    <p className="text-[11px] text-slate-500 mt-1">Se computarán automáticamente desde los expedientes al registrar nuevos pacientes.</p>
+                  </div>
+                ) : (
+                  topReferrers.map((ref, idx) => (
                   <div key={idx} className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 font-black text-sm flex items-center justify-center">
@@ -1001,7 +1003,7 @@ export default function ReportesPage() {
                       </span>
                     </div>
                   </div>
-                ))}
+                )))}
               </div>
 
               <div className="p-3 bg-cyan-950/40 rounded-2xl border border-cyan-500/30 text-xs text-cyan-200 mt-4">

@@ -32,7 +32,9 @@ import {
   Check,
   MessageCircle,
   QrCode,
-  User
+  User,
+  Bell,
+  CalendarCheck
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -234,6 +236,9 @@ export function PatientPortalView({
           }
           setAppointments(realAppts);
 
+          // Disparo de verificación y recordatorios automáticos de citas (24h y 1h)
+          fetch('/api/cron/appointment-reminders?key=internal_cron_trigger').catch(() => {});
+
           // 2. Cargar odontograma y bitácora clínica real desde chat_messages / api
           try {
             const { data: clinicalRecords } = await supabase
@@ -374,15 +379,43 @@ export function PatientPortalView({
     return BRANCH_DETAILS['00000000-0000-0000-0000-000000000002'];
   }, [patient, branchDisplay]);
 
+  // Utilidad para extraer timestamp de la cita de forma confiable
+  const parseApptTime = (a: any): number => {
+    if (!a) return 0;
+    if (a.start_time) {
+      const t = new Date(a.start_time).getTime();
+      if (!isNaN(t)) return t;
+    }
+    if (a.appointment_date) {
+      const timeStr = a.appointment_time || '16:00';
+      const [h, m] = timeStr.split(':').map((n: string) => parseInt(n, 10) || 0);
+      const t = new Date(`${a.appointment_date}T${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:00`).getTime();
+      if (!isNaN(t)) return t;
+    }
+    return 0;
+  };
+
   // Citas Próximas y Pasadas (Estrictamente reales)
   const { upcomingAppointment, upcomingList, pastList } = useMemo(() => {
     if (!appointments || appointments.length === 0) {
       return { upcomingAppointment: null, upcomingList: [], pastList: [] };
     }
 
-    const now = new Date();
-    const upcoming = appointments.filter(a => new Date(a.start_time) >= now && a.status !== 'cancelled');
-    const past = appointments.filter(a => new Date(a.start_time) < now || a.status === 'completed');
+    const now = Date.now();
+    // Considerar próximas aquellas que no han concluido (hasta 1 hora después del inicio)
+    const upcoming = appointments
+      .filter(a => {
+        const t = parseApptTime(a);
+        return t >= (now - 1000 * 60 * 60) && a.status !== 'cancelled';
+      })
+      .sort((a, b) => parseApptTime(a) - parseApptTime(b));
+
+    const past = appointments
+      .filter(a => {
+        const t = parseApptTime(a);
+        return t < (now - 1000 * 60 * 60) || a.status === 'completed';
+      })
+      .sort((a, b) => parseApptTime(b) - parseApptTime(a));
 
     return {
       upcomingAppointment: upcoming.length > 0 ? upcoming[0] : null,
@@ -390,6 +423,102 @@ export function PatientPortalView({
       pastList: past
     };
   }, [appointments]);
+
+  // Cálculo dinámico de tiempos, cuenta regresiva y estado de recordatorios (24h y 1h)
+  const appointmentCountdown = useMemo(() => {
+    if (!upcomingAppointment) return null;
+    const time = parseApptTime(upcomingAppointment);
+    if (!time) return null;
+
+    const diffMs = time - Date.now();
+    const diffHours = diffMs / (1000 * 60 * 60);
+    const diffDays = Math.floor(diffHours / 24);
+    const remainingHours = Math.floor(diffHours % 24);
+    const remainingMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    let countdownText = '';
+    if (diffHours < 0) {
+      countdownText = '¡En curso ahora en consultorio!';
+    } else if (diffHours < 1) {
+      countdownText = `¡En ${Math.max(1, remainingMinutes)} minutos!`;
+    } else if (diffDays === 0) {
+      countdownText = `Hoy en ${remainingHours}h y ${remainingMinutes}m`;
+    } else {
+      countdownText = `En ${diffDays} día(s) y ${remainingHours}h`;
+    }
+
+    const is1hAlert = diffHours > 0 && diffHours <= 1.5;
+    const is24hAlert = diffHours > 1.5 && diffHours <= 26;
+    const isConfirmed = upcomingAppointment.status === 'confirmed' || upcomingAppointment.status === 'Confirmada';
+
+    const reminder24hStatus = upcomingAppointment.reminder_1_day_sent || diffHours <= 24
+      ? 'Enviado / Activo'
+      : 'Programado para 24h antes';
+
+    const reminder1hStatus = upcomingAppointment.reminder_1_hour_sent || diffHours <= 1.5
+      ? 'Enviado / Activo'
+      : 'Programado para 1h antes';
+
+    const formattedDate = new Date(time).toLocaleDateString('es-MX', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    const formattedTime = new Date(time).toLocaleTimeString('es-MX', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    return {
+      time,
+      diffHours,
+      diffDays,
+      remainingHours,
+      remainingMinutes,
+      countdownText,
+      is1hAlert,
+      is24hAlert,
+      isConfirmed,
+      reminder24hStatus,
+      reminder1hStatus,
+      formattedDate,
+      formattedTime
+    };
+  }, [upcomingAppointment]);
+
+  // Confirmar asistencia directamente desde el portal
+  const handleConfirmAttendance = async (apptId: string) => {
+    try {
+      setConfirmingAppt(true);
+      await supabase
+        .from('appointments')
+        .update({ status: 'confirmed' })
+        .eq('id', apptId);
+
+      setAppointments(prev =>
+        prev.map(a => (String(a.id || a.folio) === String(apptId) ? { ...a, status: 'confirmed' } : a))
+      );
+      setConfirmationNotice('✅ ¡Tu asistencia ha sido confirmada con éxito! La Dra. Aura Estudillo te espera con tu sillón clínico preparado.');
+      setTimeout(() => setConfirmationNotice(''), 7000);
+    } catch (err) {
+      console.warn('Error confirmando asistencia:', err);
+    } finally {
+      setConfirmingAppt(false);
+    }
+  };
+
+  // Enlace directo a Google Calendar con recordatorio 24h y 1h
+  const googleCalendarUrl = useMemo(() => {
+    if (!upcomingAppointment || !appointmentCountdown?.time) return '';
+    const startIso = new Date(appointmentCountdown.time).toISOString().replace(/-|:|\.\d\d\d/g, '');
+    const endIso = new Date(appointmentCountdown.time + 60 * 60 * 1000).toISOString().replace(/-|:|\.\d\d\d/g, '');
+    const title = encodeURIComponent('Cita Dental • Dra. Aura Estudillo (Audenti Cloud Pro)');
+    const details = encodeURIComponent(`Cita con la Dra. Aura Estudillo en ${branchInfo.name}. Por favor acude 10 minutos antes. Teléfono de contacto: ${branchInfo.phone}`);
+    const location = encodeURIComponent(`${branchInfo.name}, ${branchInfo.address}`);
+    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startIso}/${endIso}&details=${details}&location=${location}`;
+  }, [upcomingAppointment, appointmentCountdown, branchInfo]);
 
   // Diagnóstico del diente seleccionado en el odontograma (Dinámico y Real)
   const activeToothDiagnosis = useMemo(() => {
@@ -558,26 +687,38 @@ export function PatientPortalView({
           </div>
         </div>
 
-        {/* ── 4. BANNER DESTACADO DE PRÓXIMA CITA MÉDICA & WHATSAPP ── */}
+        {/* ── 4. BANNER DESTACADO DE PRÓXIMA CITA MÉDICA & NOTIFICACIONES ── */}
         <div className="bg-gradient-to-r from-blue-950/80 via-slate-950 to-indigo-950/80 border border-blue-500/40 rounded-3xl p-6 sm:p-7 shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 backdrop-blur-xl">
           <div className="space-y-2">
-            <span className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-blue-400 font-black">
-              <Calendar className="w-4 h-4 text-blue-400" /> Próxima Cita Médica Programada
-            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-blue-400 font-black">
+                <Calendar className="w-4 h-4 text-blue-400" /> Próxima Cita Médica
+              </span>
+              {appointmentCountdown?.is1hAlert && (
+                <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-black uppercase flex items-center gap-1 animate-pulse">
+                  <AlertTriangle className="w-3 h-3 text-rose-400" /> ¡En menos de 1 hora!
+                </span>
+              )}
+              {appointmentCountdown?.is24hAlert && (
+                <span className="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-black uppercase flex items-center gap-1">
+                  <Bell className="w-3 h-3 text-amber-400" /> Recordatorio 24h activo
+                </span>
+              )}
+              {appointmentCountdown?.countdownText && (
+                <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-bold">
+                  ⏱️ {appointmentCountdown.countdownText}
+                </span>
+              )}
+            </div>
+
             <h2 className="text-xl sm:text-2xl font-black text-white">
-              {upcomingAppointment ? (
-                new Date(upcomingAppointment.start_time).toLocaleDateString('es-MX', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })
+              {upcomingAppointment && appointmentCountdown ? (
+                `${appointmentCountdown.formattedDate} • ${appointmentCountdown.formattedTime} hrs`
               ) : (
                 'Sin citas próximas programadas'
               )}
             </h2>
+
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-300">
               <span className="flex items-center gap-1.5">
                 <Building2 className="w-3.5 h-3.5 text-amber-400" />
@@ -588,20 +729,46 @@ export function PatientPortalView({
                 <Stethoscope className="w-3.5 h-3.5 text-blue-400" />
                 Dra. Aura Estudillo (Céd. 8492019)
               </span>
+              {upcomingAppointment && (
+                <>
+                  <span className="text-slate-500">•</span>
+                  <span className="flex items-center gap-1 text-amber-300 font-bold">
+                    <Bell className="w-3.5 h-3.5 text-amber-400" />
+                    Avisos: 24h y 1h sincronizados
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
             {upcomingAppointment && (
-              <a
-                href={`https://wa.me/${branchInfo.phoneClean}?text=${encodeURIComponent(`Hola Dra. Aura Estudillo, soy el paciente ${patientName}. Deseo confirmar mi asistencia a la cita en ${branchInfo.name}.`)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black px-4 py-3 rounded-2xl text-xs shadow-lg shadow-emerald-500/20 transition-all cursor-pointer flex-1 sm:flex-initial"
-              >
-                <MessageCircle className="w-4 h-4" />
-                Confirmar por WhatsApp
-              </a>
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleConfirmAttendance(upcomingAppointment.id || upcomingAppointment.folio)}
+                  disabled={confirmingAppt || appointmentCountdown?.isConfirmed}
+                  className={`inline-flex items-center justify-center gap-2 font-black px-4 py-3 rounded-2xl text-xs shadow-lg transition-all cursor-pointer flex-1 sm:flex-initial ${
+                    appointmentCountdown?.isConfirmed
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 cursor-default'
+                      : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20'
+                  }`}
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  {appointmentCountdown?.isConfirmed ? 'Asistencia Confirmada' : (confirmingAppt ? 'Confirmando...' : 'Confirmar Asistencia')}
+                </button>
+
+                <a
+                  href={`https://wa.me/${branchInfo.phoneClean}?text=${encodeURIComponent(`Hola Dra. Aura Estudillo, soy el paciente ${patientName}. Deseo confirmar los detalles de mi cita en ${branchInfo.name}.`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-bold px-3.5 py-3 rounded-2xl text-xs border border-slate-700 transition-all cursor-pointer"
+                  title="Contactar a la clínica por WhatsApp"
+                >
+                  <MessageCircle className="w-4 h-4 text-emerald-400" />
+                  WhatsApp
+                </a>
+              </>
             )}
 
             <button
@@ -618,6 +785,18 @@ export function PatientPortalView({
             </button>
           </div>
         </div>
+
+        {confirmationNotice && (
+          <div className="p-4 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 text-xs font-bold flex items-center justify-between gap-3 animate-fade-in">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{confirmationNotice}</span>
+            </div>
+            <button onClick={() => setConfirmationNotice('')} className="text-slate-400 hover:text-white">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* ── 5. PESTAÑAS DE NAVEGACIÓN RÁPIDA DENTRO DEL PORTAL ── */}
         <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto scrollbar-thin scrollbar-thumb-amber-500/30">
@@ -913,6 +1092,200 @@ export function PatientPortalView({
         {/* ── SECCIÓN 5: MI PERFIL Y SUCURSAL ASIGNADA ── */}
         {activeTab === 'perfil' && (
           <div className="space-y-6">
+            {/* ── PANEL PERMANENTE: PRÓXIMA CITA CLÍNICA & SISTEMA DE RECORDATORIOS (24H Y 1H) ── */}
+            {upcomingAppointment && appointmentCountdown ? (
+              <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950/80 border-2 border-amber-500/40 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 relative overflow-hidden backdrop-blur-xl">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-800 pb-5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-400 shrink-0 shadow-inner">
+                      <CalendarCheck className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40">
+                          {upcomingAppointment.folio ? `Folio: ${upcomingAppointment.folio}` : 'Cita Activa'}
+                        </span>
+                        <span className="text-xs text-slate-400 font-mono">
+                          {branchInfo.name}
+                        </span>
+                      </div>
+                      <h3 className="text-lg font-black text-white mt-1">
+                        Tu Próxima Cita Odontológica
+                      </h3>
+                    </div>
+                  </div>
+
+                  {appointmentCountdown.is1hAlert ? (
+                    <span className="px-3.5 py-1.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 text-xs font-black uppercase flex items-center gap-1.5 animate-pulse">
+                      <AlertTriangle className="w-4 h-4 text-rose-400" />
+                      ¡ALERTA 1H: CITA EN MENOS DE 1 HORA!
+                    </span>
+                  ) : appointmentCountdown.is24hAlert ? (
+                    <span className="px-3.5 py-1.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-xs font-black uppercase flex items-center gap-1.5">
+                      <Bell className="w-4 h-4 text-amber-400 animate-bounce" />
+                      RECORDATORIO 24H ACTIVO
+                    </span>
+                  ) : (
+                    <span className="px-3.5 py-1.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 text-xs font-bold flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-blue-400" />
+                      {appointmentCountdown.countdownText}
+                    </span>
+                  )}
+                </div>
+
+                {/* Grid con detalles de la cita */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
+                    <span className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5 text-amber-400" /> Fecha y Horario
+                    </span>
+                    <p className="text-white font-black text-sm capitalize">
+                      {appointmentCountdown.formattedDate}
+                    </p>
+                    <p className="text-amber-400 font-mono font-bold text-base">
+                      {appointmentCountdown.formattedTime} hrs
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
+                    <span className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1">
+                      <Building2 className="w-3.5 h-3.5 text-amber-400" /> Sede de Atención
+                    </span>
+                    <p className="text-white font-bold text-sm">
+                      {branchInfo.name}
+                    </p>
+                    <p className="text-slate-300 text-xs line-clamp-1">
+                      {branchInfo.address}
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
+                    <span className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1">
+                      <Stethoscope className="w-3.5 h-3.5 text-blue-400" /> Especialista
+                    </span>
+                    <p className="text-white font-bold text-sm">
+                      Dra. Aura Estudillo
+                    </p>
+                    <p className="text-slate-400 text-xs">
+                      Cédula Profesional 8492019
+                    </p>
+                  </div>
+                </div>
+
+                {/* Protocolo Automático de Recordatorios (24h y 1h) */}
+                <div className="p-5 rounded-2xl bg-slate-950/70 border border-slate-800 space-y-4">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-amber-300 flex items-center gap-2">
+                    <Bell className="w-4 h-4 text-amber-400" />
+                    Protocolo Activo de Recordatorios Automatizados (Avisos 24h &amp; 1h)
+                  </h4>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-white flex items-center gap-1.5">
+                          <Bell className="w-3.5 h-3.5 text-amber-400" /> Notificación 24 Horas Antes
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                          appointmentCountdown.reminder24hStatus === 'Enviado / Activo'
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                            : 'bg-slate-800 text-slate-400'
+                        }`}>
+                          {appointmentCountdown.reminder24hStatus}
+                        </span>
+                      </div>
+                      <p className="text-slate-400 text-[11px] leading-relaxed">
+                        Se despacha vía WhatsApp oficial para confirmar tu asistencia y preparar tu expediente con 1 día de anticipación.
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-white flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-cyan-400" /> Alerta Preventiva 1 Hora Antes
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                          appointmentCountdown.reminder1hStatus === 'Enviado / Activo'
+                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                            : 'bg-slate-800 text-slate-400'
+                        }`}>
+                          {appointmentCountdown.reminder1hStatus}
+                        </span>
+                      </div>
+                      <p className="text-slate-400 text-[11px] leading-relaxed">
+                        Aviso final para que salgas con tiempo hacia el consultorio y evitar demoras en tu atención odontológica.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Botones de Acción */}
+                <div className="flex flex-wrap items-center gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleConfirmAttendance(upcomingAppointment.id || upcomingAppointment.folio)}
+                    disabled={confirmingAppt || appointmentCountdown.isConfirmed}
+                    className={`inline-flex items-center justify-center gap-2 font-black px-5 py-3 rounded-2xl text-xs shadow-lg transition-all cursor-pointer ${
+                      appointmentCountdown.isConfirmed
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 cursor-default'
+                        : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/25'
+                    }`}
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    {appointmentCountdown.isConfirmed ? 'Asistencia Confirmada' : (confirmingAppt ? 'Confirmando...' : 'Confirmar Mi Asistencia')}
+                  </button>
+
+                  {googleCalendarUrl && (
+                    <a
+                      href={googleCalendarUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-bold px-4 py-3 rounded-2xl text-xs border border-slate-700 transition-all cursor-pointer shadow-md"
+                    >
+                      <Calendar className="w-4 h-4 text-cyan-400" />
+                      Añadir a Google Calendar
+                    </a>
+                  )}
+
+                  <a
+                    href={`https://wa.me/${branchInfo.phoneClean}?text=${encodeURIComponent(
+                      `Hola Dra. Aura Estudillo, soy ${patientName}. Deseo confirmar los detalles de mi cita programada para el ${appointmentCountdown.formattedDate} a las ${appointmentCountdown.formattedTime} en ${branchInfo.name}.`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-bold px-4 py-3 rounded-2xl text-xs transition-all cursor-pointer"
+                  >
+                    <MessageCircle className="w-4 h-4 text-emerald-400" />
+                    Enviar WhatsApp a la Clínica
+                  </a>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-slate-950/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 shrink-0">
+                    <CalendarCheck className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-white">Sin Citas Pendientes en tu Expediente</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Tu expediente clínico se encuentra activo. La Dra. Aura Estudillo recomienda una revisión semestral preventiva.
+                    </p>
+                  </div>
+                </div>
+
+                <a
+                  href={`https://wa.me/${branchInfo.phoneClean}?text=${encodeURIComponent(
+                    `Hola Dra. Aura Estudillo, soy el paciente ${patientName}. Deseo agendar una cita odontológica en la sede ${branchInfo.name}.`
+                  )}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-all shadow-md shadow-amber-500/20 shrink-0"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  Solicitar Nueva Cita
+                </a>
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Tarjeta de Información Personal */}
               <div className="bg-slate-950/90 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
