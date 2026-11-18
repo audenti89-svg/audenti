@@ -42,23 +42,27 @@ export interface BudgetProcedure {
   total: number
 }
 
-// Catálogo Oficial de Procedimientos de Audenti
+// Catálogo Oficial de Procedimientos de Audenti (Costos 2.html - Dra. Aura Estudillo)
 const CLINIC_CATALOG: { code: string; name: string; price: number }[] = [
-  { code: 'VAL-00', name: 'Valoración Inicial & Diagnóstico Integral', price: 500 },
-  { code: 'PRO-01', name: 'Profilaxis & Limpieza Ultrasónica con Cavitrón', price: 900 },
-  { code: 'RES-01', name: 'Resina Estética Nanohíbrida 1 Superficie', price: 1100 },
-  { code: 'RES-02', name: 'Resina Estética Compleja 2 o más Superficies', price: 1600 },
-  { code: 'RES-04', name: 'Reconstrucción de Muñón con Poste de Fibra de Vidrio', price: 1600 },
-  { code: 'END-01', name: 'Endodoncia Unirradicular Rotatoria', price: 2800 },
-  { code: 'END-02', name: 'Endodoncia Birradicular Rotatoria', price: 3400 },
-  { code: 'END-03', name: 'Endodoncia Multirradicular (Molares)', price: 3800 },
-  { code: 'CIR-01', name: 'Extracción Simple de Pieza Dental', price: 1200 },
-  { code: 'CIR-03', name: 'Cirugía de Tercer Molar (Muela del Juicio Impactada)', price: 3500 },
-  { code: 'BLA-01', name: 'Blanqueamiento Dental Láser Led en Consultorio', price: 3200 },
-  { code: 'COR-01', name: 'Corona de Metal-Porcelana', price: 3900 },
-  { code: 'COR-02', name: 'Corona de Zirconio Monolítico Translúcido CAD/CAM', price: 5200 },
-  { code: 'IMP-01', name: 'Implante Dental Titanio Grado Médico', price: 14000 },
-  { code: 'ORT-01', name: 'Tratamiento de Ortodoncia Autoligado (Enganche)', price: 4500 }
+  { code: 'TX-01', name: 'Consulta Odontológica General', price: 300 },
+  { code: 'TX-02', name: 'Profilaxis con Ultrasonido', price: 500 },
+  { code: 'TX-03', name: 'Resina Estética Fotocurable ($400 - $600)', price: 500 },
+  { code: 'TX-04', name: 'Endodoncia Dientes Posteriores', price: 1800 },
+  { code: 'TX-05', name: 'Endodoncia Dientes Anteriores', price: 1200 },
+  { code: 'TX-06', name: 'Extracción Terceros Molares ($1,000 - $2,000)', price: 1500 },
+  { code: 'TX-07', name: 'Extracción Dental ($500 - $800)', price: 650 },
+  { code: 'TX-08', name: 'Corona Metal-Porcelana', price: 1800 },
+  { code: 'TX-09', name: 'Corona Porcelana', price: 2500 },
+  { code: 'TX-10', name: 'Dentadura Completa', price: 5000 },
+  { code: 'TX-11', name: 'Prótesis Parcial Removible', price: 4000 },
+  { code: 'TX-12', name: 'Guarda (Bruxismo)', price: 800 },
+  { code: 'TX-13', name: 'Blanqueamiento Dental Profesional', price: 2000 },
+  { code: 'TX-14', name: 'Protector Bucal Deportivo ($1,000 - $1,800)', price: 1400 },
+  { code: 'PED-01', name: 'Profilaxis y Colocación de Flúor (Niños)', price: 300 },
+  { code: 'PED-02', name: 'Selladores de Fosetas y Fisuras (por cuadrante)', price: 400 },
+  { code: 'PED-03', name: 'Resina Infantil', price: 300 },
+  { code: 'PED-04', name: 'Pulpotomía Infantil', price: 500 },
+  { code: 'PED-05', name: 'Pulpectomía Infantil', price: 800 }
 ]
 
 const PRESET_PRESCRIPTIONS: Record<string, PrescriptionItem[]> = {

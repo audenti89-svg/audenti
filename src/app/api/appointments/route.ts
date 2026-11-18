@@ -117,10 +117,28 @@ export async function POST(request: Request) {
       }
     }
 
+    // Resolver patient_id si no viene en el body
+    let resolvedPatientId = body.patient_id || null;
+    if (!resolvedPatientId && (patient_phone || patient_name)) {
+      try {
+        const cleanPhone = (patient_phone || '').replace(/\D/g, '').slice(-10);
+        const { data: pMatch } = await supabase
+          .from('patients')
+          .select('id')
+          .or(`phone.ilike.%${cleanPhone}%,full_name.ilike.%${patient_name}%`)
+          .limit(1)
+          .maybeSingle();
+        if (pMatch?.id) {
+          resolvedPatientId = pMatch.id;
+        }
+      } catch {}
+    }
+
     const folio = body.folio || body.id || `AUD-${Math.floor(1000 + Math.random() * 9000)}`;
     const newAppt = {
       id: folio,
       folio,
+      patient_id: resolvedPatientId,
       patient_name,
       patient_phone: patient_phone || '5522427769',
       appointment_date: appointment_date || new Date().toISOString().split('T')[0],
@@ -137,6 +155,25 @@ export async function POST(request: Request) {
     const current = await getPersistedAppointments();
     const updated = [newAppt, ...current.filter((a: any) => a.id !== newAppt.id && a.folio !== newAppt.folio)];
     await savePersistedAppointments(updated);
+
+    // Sincronizar en tabla relacional appointments de Supabase para visibilidad del paciente
+    try {
+      await supabase.from('appointments').upsert({
+        id: folio,
+        patient_id: resolvedPatientId,
+        patient_name,
+        phone: newAppt.patient_phone,
+        appointment_date: newAppt.appointment_date,
+        start_time: `${newAppt.appointment_date}T${newAppt.appointment_time}:00`,
+        treatment_type: treatment,
+        branch,
+        status,
+        attendance_confirmed: false,
+        notes: newAppt.notes
+      }, { onConflict: 'id' });
+    } catch (dbErr) {
+      console.warn('Nota guardando en appointments Supabase:', dbErr);
+    }
 
     // Intentar emitir broadcast en Realtime
     try {

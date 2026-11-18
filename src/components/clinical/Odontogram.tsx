@@ -78,42 +78,38 @@ export interface ToothState {
   specialty?: DentalSpecialty
 }
 
-// Catálogo de Tratamientos Específicos por Especialidad
+// Catálogo de Tratamientos Oficiales (Costos 2.html - Dra. Aura Estudillo)
 export const TREATMENT_CATALOG: Record<DentalSpecialty, Array<{ name: string; cost: number; condition: ToothWholeCondition }>> = {
   operatoria: [
-    { name: 'Composite / Resina Estética 1 Cara (Oclusal/Vestibular)', cost: 850, condition: 'sano' },
-    { name: 'Composite / Resina Estética 2 Caras (MO / DO)', cost: 1100, condition: 'sano' },
-    { name: 'Composite / Resina Estética Compleja 3+ Caras (MOD)', cost: 1400, condition: 'sano' },
-    { name: 'Crown / Incrustación Estética Cerámica / E-Max', cost: 3500, condition: 'corona' },
-    { name: 'Sellador de Fosetas y Fisuras Preventivo', cost: 450, condition: 'sano' },
+    { name: 'Resina Estética Fotocurable ($400 - $600)', cost: 500, condition: 'sano' },
+    { name: 'Blanqueamiento Dental', cost: 2000, condition: 'sano' },
+    { name: 'Selladores de Fosetas y Fisuras (por cuadrante)', cost: 400, condition: 'sano' },
+    { name: 'Resina Infantil (Dientes Temporales)', cost: 300, condition: 'sano' },
   ],
   endodoncia: [
-    { name: 'Root Canal / Endodoncia Unirradicular', cost: 2800, condition: 'endodoncia' },
-    { name: 'Root Canal / Endodoncia Birradicular', cost: 3400, condition: 'endodoncia' },
-    { name: 'Root Canal / Endodoncia Molar Rotatorio', cost: 4200, condition: 'endodoncia' },
-    { name: 'Poste de Fibra de Vidrio + Reconstrucción', cost: 1950, condition: 'endodoncia' },
-    { name: 'Retratamiento Endodóntico Complejo', cost: 4800, condition: 'endodoncia' },
+    { name: 'Endodoncia Dientes Anteriores', cost: 1200, condition: 'endodoncia' },
+    { name: 'Endodoncia Dientes Posteriores', cost: 1800, condition: 'endodoncia' },
+    { name: 'Pulpotomía Infantil', cost: 500, condition: 'endodoncia' },
+    { name: 'Pulpectomía Infantil', cost: 800, condition: 'endodoncia' },
   ],
   cirugia: [
-    { name: 'Extraction / Extracción Simple de Órgano Dentario', cost: 950, condition: 'extraccion_indicada' },
-    { name: 'Extraction / Cirugía de Tercer Molar Incluido / Retenido', cost: 3200, condition: 'extraccion_indicada' },
-    { name: 'Alveoloplastía & Regularización Ósea', cost: 1800, condition: 'extraccion_indicada' },
+    { name: 'Extracción Dental ($500 - $800)', cost: 650, condition: 'extraccion_indicada' },
+    { name: 'Extracción Terceros Molares ($1,000 - $2,000)', cost: 1500, condition: 'extraccion_indicada' },
   ],
   implantes: [
-    { name: 'Crown / Corona de Zirconia Atornillada sobre Implante', cost: 7500, condition: 'corona' },
-    { name: 'Fase Quirúrgica: Implante Oseointegrado Titanio', cost: 14500, condition: 'implante' },
-    { name: 'Pilar Transepitelial & Tornillo Clínico', cost: 3200, condition: 'implante' },
-    { name: 'Regeneración Ósea Guiada + Membrana PRF', cost: 4500, condition: 'implante' },
+    { name: 'Corona Metal-Porcelana', cost: 1800, condition: 'corona' },
+    { name: 'Corona Porcelana', cost: 2500, condition: 'corona' },
+    { name: 'Dentadura Completa', cost: 5000, condition: 'protesis' },
+    { name: 'Prótesis Parcial Removible', cost: 4000, condition: 'protesis' },
   ],
   ortodoncia: [
-    { name: 'Cementado de Bracket Individual', cost: 600, condition: 'bracket' },
-    { name: 'Colocación de Tubo Molar / Banda', cost: 750, condition: 'bracket' },
-    { name: 'Alineador Transparente (Fase Activa)', cost: 2500, condition: 'bracket' },
-    { name: 'Retenedor Fijo Lingual de Alambre Trenzado', cost: 1800, condition: 'bracket' },
+    { name: 'Guarda (Bruxismo)', cost: 800, condition: 'bracket' },
+    { name: 'Protector Bucal Deportivo ($1,000 - $1,800)', cost: 1400, condition: 'bracket' },
   ],
   periodoncia: [
-    { name: 'Raspado y Alisado Radicular por Cuadrante', cost: 1200, condition: 'sano' },
-    { name: 'Fisioterapia Oral & Profilaxis Ultrasónica Profunda', cost: 800, condition: 'sano' },
+    { name: 'Consulta Odontológica General', cost: 300, condition: 'sano' },
+    { name: 'Profilaxis con Ultrasonido', cost: 500, condition: 'sano' },
+    { name: 'Profilaxis y Colocación de Flúor (Niños)', cost: 300, condition: 'sano' },
   ]
 }
 
@@ -175,42 +171,32 @@ export function Odontogram({
   const [selectedToothNum, setSelectedToothNum] = useState<number>(16)
   const [activeSpecialty, setActiveSpecialty] = useState<DentalSpecialty>('operatoria')
   const [linkedTreatments, setLinkedTreatments] = useState<LinkedTreatment[]>([])
-  const [evolutionHistory, setEvolutionHistory] = useState<ClinicalEvolutionEntry[]>([
-    {
-      id: 'evo-1',
-      toothNumber: 16,
-      date: '2026-10-20 17:30',
-      doctor: 'Dra. Aura Estudillo',
-      procedure: 'Diagnóstico Clínico Inicial y Mapeo 5 Caras',
-      surfaces: 'Oclusal, Mesial',
-      status: 'Diagnóstico',
-      notes: 'Presencia de lesión cariosa oclusal profunda con compromiso hacia cresta mesial.'
-    },
-    {
-      id: 'evo-2',
-      toothNumber: 21,
-      date: '2026-10-22 18:15',
-      doctor: 'Dra. Aura Estudillo',
-      procedure: 'Resina Estética Fotocurable 1 Cara',
-      surfaces: 'Vestibular',
-      status: 'Finalizado',
-      notes: 'Restauración estética directa con aislamiento absoluto satisfactorio.'
-    }
-  ])
+  const [evolutionHistory, setEvolutionHistory] = useState<ClinicalEvolutionEntry[]>([])
   const [savedSuccess, setSavedSuccess] = useState(false)
 
-  // Cargar estado inicial persistido si existe
+  // Cargar estado inicial limpio o persistido por paciente
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('audenti_odontogram_data')
+      if (!patientId) {
+        setTeeth(initTeethRecord())
+        setLinkedTreatments([])
+        setEvolutionHistory([])
+        return
+      }
+      const storageKey = `audenti_odontogram_${patientId}`
+      const stored = localStorage.getItem(storageKey)
       if (stored) {
         const parsed = JSON.parse(stored)
         if (parsed.teeth) setTeeth(parsed.teeth)
         if (parsed.treatments) setLinkedTreatments(parsed.treatments)
         if (parsed.evolution) setEvolutionHistory(parsed.evolution)
+      } else {
+        setTeeth(initTeethRecord())
+        setLinkedTreatments([])
+        setEvolutionHistory([])
       }
     } catch {}
-  }, [])
+  }, [patientId])
 
   // Cargar odontograma específico del paciente desde Supabase si se proporciona patientId
   useEffect(() => {
@@ -315,12 +301,16 @@ export function Odontogram({
   // Guardar Odontograma de forma persistente (LocalStorage + Supabase)
   const handleSaveOdontogram = async () => {
     try {
-      localStorage.setItem('audenti_odontogram_data', JSON.stringify({
+      const payload = {
         teeth,
         treatments: linkedTreatments,
         evolution: evolutionHistory,
         updatedAt: new Date().toISOString()
-      }))
+      }
+      if (patientId) {
+        localStorage.setItem(`audenti_odontogram_${patientId}`, JSON.stringify(payload))
+      }
+      localStorage.setItem('audenti_odontogram_data', JSON.stringify(payload))
 
       if (patientId) {
         await fetch('/api/clinical/odontogram', {

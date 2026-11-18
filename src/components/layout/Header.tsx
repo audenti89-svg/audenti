@@ -21,7 +21,8 @@ import {
   ShieldAlert,
   GraduationCap,
   Lock,
-  UserCheck
+  UserCheck,
+  LogOut
 } from 'lucide-react'
 import { useBranchStore, BranchId, BRANCHES_DATA } from '@/stores/branchStore'
 import { useNotificationSound } from '@/hooks/useNotificationSound'
@@ -54,6 +55,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
   const [activeEmergencyFolio, setActiveEmergencyFolio] = useState<string | null>(null)
   const [emergencyCount, setEmergencyCount] = useState(0)
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
+  const [currentUser, setCurrentUser] = useState<any>(null)
   const notifRef = useRef<HTMLDivElement>(null)
 
   const fetchLiveNotifications = async () => {
@@ -180,6 +182,14 @@ export function Header({ onMenuToggle }: HeaderProps) {
     fetchLiveNotifications()
 
     const supabase = createClient()
+
+    // Sincronizar estado de sesión del médico / usuario
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setCurrentUser(user)
+    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setCurrentUser(session?.user || null)
+    })
     
     // Escucha en header_notifications_realtime
     const headerChannel = supabase
@@ -300,15 +310,30 @@ export function Header({ onMenuToggle }: HeaderProps) {
 
         {/* Controles de Acceso, Notificaciones y Perfil */}
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2.5 shrink-0 ml-auto">
-        {/* BOTÓN 1: INICIAR SESIÓN (100% VISIBLE EN HEADER) */}
-        <Link
-          href="/auth/login"
-          className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-all shadow-md shadow-amber-500/20 cursor-pointer shrink-0"
-          title="Iniciar Sesión Médica / Personal"
-        >
-          <Lock className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Iniciar Sesión</span>
-        </Link>
+        {/* BOTÓN 1: ESTADO DE SESIÓN (Cerrar Sesión si está autenticado / Iniciar Sesión si no) */}
+        {currentUser ? (
+          <button
+            onClick={async () => {
+              const supabase = createClient()
+              await supabase.auth.signOut()
+              window.location.href = '/auth/login'
+            }}
+            className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-rose-950/80 text-rose-300 hover:text-rose-200 border border-rose-500/30 text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0"
+            title={`Conectado como: ${currentUser.email || 'Dra. Aura Estudillo'} — Clic para cerrar sesión`}
+          >
+            <LogOut className="w-3.5 h-3.5 text-rose-400" />
+            <span className="hidden sm:inline">Cerrar Sesión</span>
+          </button>
+        ) : (
+          <Link
+            href="/auth/login"
+            className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-all shadow-md shadow-amber-500/20 cursor-pointer shrink-0"
+            title="Iniciar Sesión Médica / Personal"
+          >
+            <Lock className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Iniciar Sesión</span>
+          </Link>
+        )}
 
         {/* BOTÓN 2: PORTAL PACIENTE (100% VISIBLE EN HEADER) */}
         <Link

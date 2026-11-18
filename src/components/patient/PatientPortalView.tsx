@@ -208,13 +208,31 @@ export function PatientPortalView({
         setPatient(myProfile);
 
         if (myProfile?.id) {
-          // 1. Cargar citas reales del paciente (sin mock)
-          const { data: appts } = await supabase
-            .from('appointments')
-            .select('*')
-            .eq('patient_id', myProfile.id)
-            .order('start_time', { ascending: true });
-          setAppointments(appts || []);
+          // 1. Cargar citas reales del paciente (sin mock, con doble sincronización)
+          let realAppts: any[] = [];
+          try {
+            const { data: appts } = await supabase
+              .from('appointments')
+              .select('*')
+              .or(`patient_id.eq.${myProfile.id},phone.ilike.%${(myProfile.phone || '').replace(/\D/g, '').slice(-10)}%`)
+              .order('start_time', { ascending: true });
+            if (appts && appts.length > 0) {
+              realAppts = appts;
+            }
+          } catch {}
+
+          if (realAppts.length === 0) {
+            try {
+              const res = await fetch('/api/appointments');
+              if (res.ok) {
+                const json = await res.json();
+                if (json.success && Array.isArray(json.appointments)) {
+                  realAppts = json.appointments;
+                }
+              }
+            } catch {}
+          }
+          setAppointments(realAppts);
 
           // 2. Cargar odontograma y bitácora clínica real desde chat_messages / api
           try {

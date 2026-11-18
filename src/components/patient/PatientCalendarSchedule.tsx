@@ -77,8 +77,13 @@ export function PatientCalendarSchedule({
       }
     });
 
-    up.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-    past.sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
+    const getTimestamp = (item: PatientAppointment) => {
+      const raw = item.start_time || (item.appointment_date ? `${item.appointment_date}T${item.appointment_time || '12:00'}:00` : null);
+      return raw ? new Date(raw).getTime() || 0 : 0;
+    };
+
+    up.sort((a, b) => getTimestamp(a) - getTimestamp(b));
+    past.sort((a, b) => getTimestamp(b) - getTimestamp(a));
 
     return { upcomingList: up, pastList: past };
   }, [appointments]);
@@ -87,8 +92,14 @@ export function PatientCalendarSchedule({
   const displayList = useMemo(() => {
     if (selectedDate) {
       return appointments.filter((a) => {
-        const dStr = new Date(a.start_time).toISOString().split('T')[0];
-        return dStr === selectedDate;
+        const raw = a.start_time || (a.appointment_date ? `${a.appointment_date}T${a.appointment_time || '12:00'}:00` : null);
+        if (!raw) return false;
+        try {
+          const dStr = new Date(raw).toISOString().split('T')[0];
+          return dStr === selectedDate;
+        } catch {
+          return false;
+        }
       });
     }
     if (filterView === 'upcoming') return upcomingList;
@@ -130,8 +141,14 @@ export function PatientCalendarSchedule({
       const dateStr = `${yyyy}-${mm}-${dd}`;
 
       const matchingAppts = appointments.filter((a) => {
-        const aDate = new Date(a.start_time).toISOString().split('T')[0];
-        return aDate === dateStr;
+        const raw = a.start_time || (a.appointment_date ? `${a.appointment_date}T${a.appointment_time || '12:00'}:00` : null);
+        if (!raw) return false;
+        try {
+          const aDate = new Date(raw).toISOString().split('T')[0];
+          return aDate === dateStr;
+        } catch {
+          return false;
+        }
       });
 
       currentDays.push({
