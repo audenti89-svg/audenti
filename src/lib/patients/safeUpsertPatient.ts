@@ -39,36 +39,42 @@ export interface SafeUpsertResult {
   id: string;
 }
 
-// Columnas reales y vigentes en la tabla `patients` de Supabase
+// Columnas reales y vigentes verificadas en la tabla `patients` de Supabase
 const VALID_PATIENT_COLUMNS = new Set([
   'id',
   'tenant_id',
   'branch_id',
-  'branch',
+  'primary_branch_id',
   'branch_name',
   'user_id',
   'referral_code',
   'referred_by',
   'full_name',
+  'first_name',
+  'last_name',
   'birth_date',
-  'date_of_birth',
+  'age',
   'gender',
   'phone',
   'email',
-  'address',
   'status',
   'role',
-  'photo_url',
-  'last_appointment_at',
-  'last_visit_date',
   'total_spent',
+  'loyalty_points',
+  'referral_ltv',
+  'last_visit_at',
   'acquisition_channel',
-  'referral_type',
-  'referred_by_id',
-  'referred_by_name',
   'referrer_id',
   'referrer_name',
   'qr_code_id',
+  'qr_code_source',
+  'family_nucleus_id',
+  'emergency_contact_name',
+  'emergency_contact_phone',
+  'allergies_medication',
+  'allergies_food',
+  'medical_conditions',
+  'onboarding_completed',
   'utm_source',
   'utm_medium',
   'utm_campaign',
@@ -76,7 +82,8 @@ const VALID_PATIENT_COLUMNS = new Set([
   'total_referrals',
   'attribution_status',
   'created_at',
-  'updated_at'
+  'updated_at',
+  'notes'
 ]);
 
 /**
@@ -183,7 +190,6 @@ export async function safeUpsertPatient(
     if (patientData.branch_name || patientData.branch) {
       const bName = patientData.branch_name || patientData.branch;
       updatePayload.branch_name = bName;
-      updatePayload.branch = (bName || '').toLowerCase().includes('chalma') ? 'Chalma de Guadalupe' : 'Balbuena';
     }
     if (patientData.tenant_id) {
       updatePayload.tenant_id = patientData.tenant_id;
@@ -192,15 +198,17 @@ export async function safeUpsertPatient(
       updatePayload.gender = patientData.gender;
     }
     if (patientData.birth_date || patientData.date_of_birth) {
-      const bDate = patientData.birth_date || patientData.date_of_birth;
-      updatePayload.birth_date = bDate;
-      updatePayload.date_of_birth = bDate;
-    }
-    if (patientData.address) {
-      updatePayload.address = patientData.address;
+      updatePayload.birth_date = patientData.birth_date || patientData.date_of_birth;
     }
     if (patientData.acquisition_channel) {
-      updatePayload.acquisition_channel = patientData.acquisition_channel;
+      const ch = patientData.acquisition_channel.toLowerCase().trim();
+      updatePayload.acquisition_channel = ch.includes('ref') ? 'referral' : (ch.includes('qr') ? 'qr' : 'directo');
+    }
+    if (patientData.referrer_name) {
+      updatePayload.referrer_name = patientData.referrer_name;
+    }
+    if (patientData.qr_code_source || patientData.qr_code_id) {
+      updatePayload.qr_code_source = patientData.qr_code_source || patientData.qr_code_id;
     }
     if (patientData.referrer_id) {
       updatePayload.referrer_id = patientData.referrer_id;
@@ -267,12 +275,10 @@ export async function safeUpsertPatient(
   const defaultBranchId = patientData.branch_id || '00000000-0000-0000-0000-000000000001';
 
   const defaultBranchName = patientData.branch_name || (defaultBranchId.includes('0002') ? 'Sucursal Chalma de Guadalupe' : 'Sucursal Balbuena (Matriz)');
-  const canonicalBranch = (defaultBranchName || '').toLowerCase().includes('chalma') ? 'Chalma de Guadalupe' : 'Balbuena';
 
   const insertPayload: Record<string, any> = {
     tenant_id: patientData.tenant_id || defaultTenantId,
     branch_id: defaultBranchId,
-    branch: canonicalBranch,
     branch_name: defaultBranchName,
     full_name: patientData.full_name || patientData.name || 'Paciente Audenti',
     email: cleanEmail,
@@ -284,9 +290,17 @@ export async function safeUpsertPatient(
   };
 
   if (patientData.birth_date || patientData.date_of_birth) {
-    const bDate = patientData.birth_date || patientData.date_of_birth;
-    insertPayload.birth_date = bDate;
-    insertPayload.date_of_birth = bDate;
+    insertPayload.birth_date = patientData.birth_date || patientData.date_of_birth;
+  }
+  if (patientData.acquisition_channel) {
+    const ch = patientData.acquisition_channel.toLowerCase().trim();
+    insertPayload.acquisition_channel = ch.includes('ref') ? 'referral' : (ch.includes('qr') ? 'qr' : 'directo');
+  }
+  if (patientData.referrer_name) {
+    insertPayload.referrer_name = patientData.referrer_name;
+  }
+  if (patientData.qr_code_source || patientData.qr_code_id) {
+    insertPayload.qr_code_source = patientData.qr_code_source || patientData.qr_code_id;
   }
   if (patientData.gender) insertPayload.gender = patientData.gender;
   if (patientData.address) insertPayload.address = patientData.address;

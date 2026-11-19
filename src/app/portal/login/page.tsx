@@ -21,7 +21,9 @@ import {
   Lock,
   Eye,
   EyeOff,
-  Calendar
+  Calendar,
+  QrCode,
+  Users
 } from 'lucide-react';
 import { AudentiLogo } from '@/components/ui/AudentiLogo';
 import { isSystemAdminEmail, isInternalUser } from '@/lib/auth/admin-emails';
@@ -90,6 +92,8 @@ function PatientLoginForm() {
   const [actPhone, setActPhone] = useState('');
   const [actBirthDate, setActBirthDate] = useState('');
   const [actBranchId, setActBranchId] = useState(BRANCH_OPTIONS[0].id);
+  const [actChannel, setActChannel] = useState<'referral' | 'qr'>('referral');
+  const [actReferrerName, setActReferrerName] = useState('');
   const [actPassword, setActPassword] = useState('');
   const [actConfirmPassword, setActConfirmPassword] = useState('');
   const [loadingActivate, setLoadingActivate] = useState(false);
@@ -336,6 +340,11 @@ function PatientLoginForm() {
       return;
     }
 
+    if (actChannel === 'referral' && !actReferrerName.trim()) {
+      setErrorMsg('Por favor indica quién te recomendó (nombre del familiar, amigo o doctor).');
+      return;
+    }
+
     if (actPassword.length < 6) {
       setErrorMsg('La contraseña debe tener al menos 6 caracteres.');
       return;
@@ -363,6 +372,9 @@ function PatientLoginForm() {
           birthDate: actBirthDate || null,
           branchId: selectedBranchObj.id,
           branchName: selectedBranchObj.name,
+          acquisitionChannel: actChannel,
+          referrerName: actChannel === 'referral' ? actReferrerName.trim() : 'Código QR en Clínica',
+          qrCodeSource: actChannel === 'qr' ? 'folleto_clinica' : null,
           autoConfirm: true
         })
       });
@@ -690,6 +702,56 @@ function PatientLoginForm() {
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* ¿CÓMO NOS CONOCISTE? (CÓDIGO QR / REFERENCIA - REDES SOCIALES EN PAUSA) */}
+          <div>
+            <label className="block text-[11px] font-black uppercase tracking-wider text-slate-300 mb-1.5">
+              ¿Cómo nos conociste o quién te recomendó? *
+            </label>
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => setActChannel('referral')}
+                className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  actChannel === 'referral'
+                    ? 'bg-amber-400 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20'
+                    : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-slate-600'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Recomendación</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActChannel('qr')}
+                className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                  actChannel === 'qr'
+                    ? 'bg-amber-400 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20'
+                    : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-slate-600'
+                }`}
+              >
+                <QrCode className="w-3.5 h-3.5" />
+                <span>Código QR</span>
+              </button>
+            </div>
+
+            {actChannel === 'referral' && (
+              <div className="mt-2">
+                <label className="block text-[10px] font-bold uppercase text-amber-300 mb-1">
+                  ¿Quién te recomendó? (Nombre de la persona, familiar o doctor) *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Mi hermano Carlos, Dra. María, amigo..."
+                  value={actReferrerName}
+                  onChange={(e) => setActReferrerName(e.target.value)}
+                  className="w-full px-3.5 py-2 bg-slate-900 border border-amber-500/50 focus:border-amber-400 rounded-xl text-xs font-medium text-white placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-amber-400 transition-all"
+                />
+              </div>
+            )}
           </div>
 
           {/* CONTRASEÑA NUEVA */}

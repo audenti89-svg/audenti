@@ -32,6 +32,7 @@ import {
   MessageCircle,
   QrCode,
   User,
+  Users,
   Bell,
   CalendarCheck,
   AlertCircle
@@ -140,7 +141,9 @@ export function PatientPortalView({
     phone: '',
     birthDate: '',
     branchName: 'Sucursal Balbuena',
-    branchId: '00000000-0000-0000-0000-000000000001'
+    branchId: '00000000-0000-0000-0000-000000000001',
+    acquisitionChannel: 'referral' as 'referral' | 'qr',
+    referrerName: ''
   });
 
   useEffect(() => {
@@ -194,15 +197,20 @@ export function PatientPortalView({
 
         setPatient(myProfile);
 
-        // Inicializar formulario de perfil completo y sucursal
+        // Inicializar formulario de perfil completo, sucursal y canal de adquisición
         const rawBranch = myProfile?.branch || myProfile?.branch_name || '';
         const isChalmaBranch = rawBranch.toLowerCase().includes('chalma') || (myProfile?.tenant_id === '00000000-0000-0000-0000-000000000002');
+        const rawChannel = (myProfile?.acquisition_channel || '').toLowerCase();
+        const initChannel: 'referral' | 'qr' = rawChannel.includes('qr') ? 'qr' : 'referral';
+
         setProfileForm({
           fullName: myProfile?.full_name || authUser?.user_metadata?.full_name || '',
           phone: myProfile?.phone || '',
-          birthDate: myProfile?.birth_date ? myProfile.birth_date.split('T')[0] : (myProfile?.date_of_birth ? myProfile.date_of_birth.split('T')[0] : ''),
+          birthDate: myProfile?.birth_date ? myProfile.birth_date.split('T')[0] : '',
           branchName: isChalmaBranch ? 'Sucursal Chalma de Guadalupe' : 'Sucursal Balbuena',
-          branchId: isChalmaBranch ? '00000000-0000-0000-0000-000000000002' : '00000000-0000-0000-0000-000000000001'
+          branchId: isChalmaBranch ? '00000000-0000-0000-0000-000000000002' : '00000000-0000-0000-0000-000000000001',
+          acquisitionChannel: initChannel,
+          referrerName: myProfile?.referrer_name || ''
         });
 
         if (myProfile?.id) {
@@ -346,14 +354,20 @@ export function PatientPortalView({
   const registrationEvaluation = useMemo(() => {
     const hasName = Boolean(patient?.full_name && patient?.full_name.trim() !== 'Paciente Audenti' && patient?.full_name.trim().length >= 3);
     const hasPhone = Boolean(patient?.phone && patient?.phone.replace(/\D/g, '').length >= 10);
-    const hasBirthDate = Boolean(patient?.birth_date || patient?.date_of_birth);
-    const hasExplicitBranch = Boolean(patient?.branch || patient?.branch_name);
+    const hasBirthDate = Boolean(patient?.birth_date);
+    const hasExplicitBranch = Boolean(patient?.branch_name);
+    const hasReferral = Boolean(
+      (patient?.acquisition_channel === 'qr') ||
+      (patient?.acquisition_channel === 'referral' && patient?.referrer_name) ||
+      patient?.referrer_name
+    );
 
     const checks = [
       { key: 'name', label: 'Nombre Completo', done: hasName, missingHint: 'Nombre completo oficial' },
       { key: 'phone', label: 'Teléfono Celular', done: hasPhone, missingHint: 'Celular a 10 dígitos (recordatorios 24h & 1h)' },
       { key: 'branch', label: 'Sucursal Asignada', done: hasExplicitBranch, missingHint: 'Sucursal de atención (Balbuena o Chalma)' },
-      { key: 'birthDate', label: 'Fecha de Nacimiento', done: hasBirthDate, missingHint: 'Fecha de nacimiento (edad clínica)' }
+      { key: 'birthDate', label: 'Fecha de Nacimiento', done: hasBirthDate, missingHint: 'Fecha de nacimiento (edad clínica)' },
+      { key: 'referral', label: '¿Quién te recomendó?', done: hasReferral, missingHint: '¿Quién te recomendó o si vienes por Código QR?' }
     ];
 
     const completedCount = checks.filter(c => c.done).length;
@@ -383,10 +397,14 @@ export function PatientPortalView({
     return age >= 0 ? age : null;
   }, [profileForm.birthDate]);
 
-  // Guardar datos de perfil y sucursal
+  // Guardar datos de perfil, sucursal y recomendación
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    if (profileForm.acquisitionChannel === 'referral' && !profileForm.referrerName.trim()) {
+      alert('Por favor indica quién te recomendó (nombre del familiar, amigo o doctor).');
+      return;
+    }
     setSavingProfile(true);
     setEditSuccessMsg('');
     try {
@@ -400,7 +418,10 @@ export function PatientPortalView({
           phone: profileForm.phone.replace(/\D/g, '').slice(-10),
           birthDate: profileForm.birthDate || null,
           branchName: profileForm.branchName,
-          branchId: profileForm.branchId
+          branchId: profileForm.branchId,
+          acquisitionChannel: profileForm.acquisitionChannel,
+          referrerName: profileForm.acquisitionChannel === 'referral' ? profileForm.referrerName.trim() : 'Código QR en Clínica',
+          qrCodeSource: profileForm.acquisitionChannel === 'qr' ? 'folleto_clinica' : null
         })
       });
 
@@ -417,15 +438,15 @@ export function PatientPortalView({
           full_name: profileForm.fullName.trim(),
           phone: profileForm.phone.replace(/\D/g, '').slice(-10),
           birth_date: profileForm.birthDate,
-          date_of_birth: profileForm.birthDate,
-          branch: profileForm.branchName.includes('Chalma') ? 'Chalma de Guadalupe' : 'Balbuena',
           branch_name: profileForm.branchName,
           tenant_id: profileForm.branchId,
-          branch_id: profileForm.branchId
+          branch_id: profileForm.branchId,
+          acquisition_channel: profileForm.acquisitionChannel,
+          referrer_name: profileForm.acquisitionChannel === 'referral' ? profileForm.referrerName.trim() : 'Código QR en Clínica'
         }));
       }
 
-      setEditSuccessMsg('¡Expediente actualizado y sucursal asignada con éxito!');
+      setEditSuccessMsg('¡Expediente actualizado y guardado con éxito!');
       setTimeout(() => {
         setIsEditProfileOpen(false);
         setEditSuccessMsg('');
@@ -1563,6 +1584,14 @@ export function PatientPortalView({
                       {patient?.emergency_phone || patient?.emergency_contact_phone || 'Sin número'})
                     </strong>
                   </div>
+                  <div className="flex justify-between py-2 border-b border-slate-900">
+                    <span className="text-slate-400">Origen / Recomendación:</span>
+                    <strong className="text-amber-300 font-bold">
+                      {patient?.referrer_name
+                        ? `Recomendado por: ${patient.referrer_name}`
+                        : (patient?.acquisition_channel === 'qr' ? 'Escaneo de Código QR' : 'Visita Directa / Sin dato')}
+                    </strong>
+                  </div>
                   <div className="flex justify-between py-2">
                     <span className="text-slate-400">Estatus del Paciente:</span>
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
@@ -1977,6 +2006,58 @@ export function PatientPortalView({
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-xl text-xs font-medium text-white placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-amber-400 transition-all"
                   />
                 </div>
+              </div>
+
+              {/* ¿Cómo nos conociste o quién te recomendó? (Redes sociales en pausa) */}
+              <div>
+                <label className="block text-[11px] font-black uppercase tracking-wider text-slate-300 mb-1.5">
+                  5. ¿Cómo nos conociste o quién te recomendó? *
+                </label>
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => setProfileForm(prev => ({ ...prev, acquisitionChannel: 'referral' }))}
+                    className={cn(
+                      "py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer",
+                      profileForm.acquisitionChannel === 'referral'
+                        ? "bg-amber-400 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20"
+                        : "bg-slate-900 text-slate-300 border-slate-700 hover:border-slate-600"
+                    )}
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    <span>Recomendación</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setProfileForm(prev => ({ ...prev, acquisitionChannel: 'qr' }))}
+                    className={cn(
+                      "py-2.5 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer",
+                      profileForm.acquisitionChannel === 'qr'
+                        ? "bg-amber-400 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20"
+                        : "bg-slate-900 text-slate-300 border-slate-700 hover:border-slate-600"
+                    )}
+                  >
+                    <QrCode className="w-3.5 h-3.5" />
+                    <span>Código QR</span>
+                  </button>
+                </div>
+
+                {profileForm.acquisitionChannel === 'referral' && (
+                  <div className="mt-2">
+                    <label className="block text-[10px] font-bold uppercase text-amber-300 mb-1">
+                      ¿Quién te recomendó? (Nombre de la persona, familiar o doctor) *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej. Mi tía Rosa, Dr. Pedro Martínez, amigo..."
+                      value={profileForm.referrerName}
+                      onChange={(e) => setProfileForm(prev => ({ ...prev, referrerName: e.target.value }))}
+                      className="w-full px-3.5 py-2.5 bg-slate-900 border border-amber-500/50 focus:border-amber-400 rounded-xl text-xs font-medium text-white placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-amber-400 transition-all"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Botón de Guardar */}

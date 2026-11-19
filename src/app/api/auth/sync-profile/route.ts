@@ -31,13 +31,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ exists: false, error: 'Correo inválido' }, { status: 400 });
     }
 
-    const db = getDbClient();
     const admin = createAdminClient();
 
-    // 1. Buscar en patients por email
-    const { data: patient, error: patientErr } = await db
+    // 1. Buscar en patients por email usando admin
+    const { data: patient, error: patientErr } = await admin
       .from('patients')
-      .select('id, user_id, branch_name, tenant_id, status')
+      .select('id, user_id, branch_name, tenant_id, status, birth_date, acquisition_channel, referrer_name')
       .ilike('email', email)
       .maybeSingle();
 
@@ -59,10 +58,17 @@ export async function GET(request: Request) {
       console.warn('[sync-profile GET] Nota verificando auth.users:', authErr);
     }
 
-    // Retornar exclusivamente indicadores de existencia y vinculación (cero PII de nombres ni teléfonos)
+    // Retornar exclusivamente indicadores de existencia y vinculación
     return NextResponse.json({
       exists: !!patient || authUserExists,
-      patient: patient ? { id: patient.id, tenant_id: patient.tenant_id, branch_name: patient.branch_name } : null,
+      patient: patient ? {
+        id: patient.id,
+        tenant_id: patient.tenant_id,
+        branch_name: patient.branch_name,
+        birth_date: patient.birth_date,
+        acquisition_channel: patient.acquisition_channel,
+        referrer_name: patient.referrer_name
+      } : null,
       hasAuthUser: authUserExists,
       alreadyRegistered: authUserExists,
       isLinked: !!(patient?.user_id && patient.user_id === authUserId)
@@ -85,6 +91,9 @@ export async function POST(request: Request) {
       branchName,
       birthDate,
       dateOfBirth,
+      acquisitionChannel,
+      referrerName,
+      qrCodeSource,
       autoConfirm
     } = body;
 
@@ -96,7 +105,6 @@ export async function POST(request: Request) {
     const birth_date_val = birthDate || dateOfBirth || null;
 
     const admin = createAdminClient();
-    const db = getDbClient();
 
     let targetUserId = userId;
     let existingAuthUser: any = null;
@@ -115,11 +123,17 @@ export async function POST(request: Request) {
     const cleanPhone = phone ? phone.replace(/\D/g, '').slice(-10) : null;
     const defaultBranchId = branchId || '00000000-0000-0000-0000-000000000001';
     const defaultBranchName = branchName || (defaultBranchId.includes('0002') ? 'Sucursal Chalma de Guadalupe' : 'Sucursal Balbuena (Matriz)');
-    const canonicalBranch = (defaultBranchName || '').toLowerCase().includes('chalma') ? 'Chalma de Guadalupe' : 'Balbuena';
+
+    // Normalizar canal de adquisición (solo QR, referral o directo; redes sociales en pausa)
+    let canonicalChannel = 'directo';
+    if (acquisitionChannel) {
+      const ch = acquisitionChannel.toLowerCase().trim();
+      if (ch.includes('ref') || ch.includes('recom')) canonicalChannel = 'referral';
+      else if (ch.includes('qr')) canonicalChannel = 'qr';
+      else canonicalChannel = 'directo';
+    }
 
     // ── BLINDAJE ECC P0: CONTROL ESTRICTO DE MODIFICACIÓN DE CONTRASEÑA ──
-    // Si el usuario ya existe en Supabase Auth, queda TERMINANTEMENTE PROHIBIDO
-    // sobrescribir su contraseña en esta ruta pública.
     if (existingAuthUser) {
       if (password) {
         return NextResponse.json({
@@ -129,7 +143,7 @@ export async function POST(request: Request) {
         }, { status: 409 });
       }
 
-      // Sincronización post-login legítima o confirmación administrativa (sin alterar password)
+      // Sincronización post-login legítima o confirmación administrativa
       if (autoConfirm && targetUserId) {
         try {
           await admin.auth.admin.updateUserById(targetUserId, {
@@ -170,11 +184,11 @@ export async function POST(request: Request) {
       }
     }
 
-    // 3. Sincronizar tabla `patients` usando el cliente DB seguro
+    // 3. Sincronizar tabla `patients` usando admin service-role (omite bloqueos de RLS)
     let existingPatient: any = null;
 
     if (targetUserId) {
-      const { data: byUid } = await db
+      const { data: byUid } = await admin
         .from('patients')
         .select('*')
         .eq('user_id', targetUserId)
@@ -183,7 +197,7 @@ export async function POST(request: Request) {
     }
 
     if (!existingPatient) {
-      const { data: byEmail } = await db
+      const { data: byEmail } = await admin
         .from('patients')
         .select('*')
         .ilike('email', cleanEmail)
@@ -192,7 +206,7 @@ export async function POST(request: Request) {
     }
 
     if (!existingPatient && cleanPhone && cleanPhone.length >= 7) {
-      const { data: byPhone } = await db
+      const { data: byPhone } = await admin
         .from('patients')
         .select('*')
         .ilike('phone', `%${cleanPhone}%`)
@@ -211,87 +225,110 @@ export async function POST(request: Request) {
       };
       if (targetUserId) updateData.user_id = targetUserId;
       if (cleanEmail) updateData.email = cleanEmail;
-      if (fullName && (!existingPatient.full_name || existingPatient.full_name === 'Paciente Audenti')) {
-        updateData.full_name = fullName;
-      }
+      if (fullName) updateData.full_name = fullName;
       if (cleanPhone) updateData.phone = cleanPhone;
-      if (branchId) updateData.branch_id = branchId;
+      if (branchId) {
+        updateData.branch_id = branchId;
+        updateData.tenant_id = branchId;
+      }
       if (branchName) {
         updateData.branch_name = branchName;
-        updateData.branch = canonicalBranch;
-      } else if (!existingPatient.branch) {
-        updateData.branch = canonicalBranch;
       }
       if (birth_date_val) {
         updateData.birth_date = birth_date_val;
-        updateData.date_of_birth = birth_date_val;
+      }
+      if (acquisitionChannel) {
+        updateData.acquisition_channel = canonicalChannel;
+        updateData.attribution_status = 'completed';
+      }
+      if (referrerName !== undefined && referrerName !== null) {
+        updateData.referrer_name = referrerName.trim() || null;
+        if (referrerName.trim()) {
+          updateData.acquisition_channel = 'referral';
+          updateData.attribution_status = 'completed';
+        }
+      }
+      if (qrCodeSource) {
+        updateData.qr_code_source = qrCodeSource.trim();
+        updateData.acquisition_channel = 'qr';
+        updateData.attribution_status = 'completed';
       }
 
-      let { data: updated, error: updErr } = await db
+      const { data: updated, error: updErr } = await admin
         .from('patients')
         .update(updateData)
         .eq('id', existingPatient.id)
-        .select()
+        .select('*')
         .maybeSingle();
 
       if (updErr) {
-        console.warn('[sync-profile POST] Reintentando update sin FK user_id:', updErr.message);
+        console.error('[sync-profile POST] Error en update admin:', updErr);
         if (updErr.code === '23503' && updateData.user_id) {
           const fallbackData = { ...updateData };
           delete fallbackData.user_id;
-          const { data: fallbackUpdated } = await db
+          const { data: fallbackUpdated, error: fbErr } = await admin
             .from('patients')
             .update(fallbackData)
             .eq('id', existingPatient.id)
-            .select()
+            .select('*')
             .maybeSingle();
-          if (fallbackUpdated) updated = fallbackUpdated;
+          if (fbErr) throw new Error(fbErr.message);
+          patientRecord = fallbackUpdated || existingPatient;
+        } else {
+          throw new Error(updErr.message);
         }
+      } else {
+        patientRecord = updated || existingPatient;
       }
-      patientRecord = updated || existingPatient;
     } else {
       const insertData: Record<string, any> = {
         tenant_id: defaultBranchId,
         branch_id: defaultBranchId,
-        branch: canonicalBranch,
         branch_name: defaultBranchName,
         user_id: targetUserId || null,
         full_name: fullName || 'Paciente Audenti',
         email: cleanEmail,
         phone: cleanPhone,
         birth_date: birth_date_val,
-        date_of_birth: birth_date_val,
+        acquisition_channel: canonicalChannel,
+        referrer_name: referrerName?.trim() || null,
+        qr_code_source: qrCodeSource?.trim() || null,
+        attribution_status: (referrerName || qrCodeSource || acquisitionChannel) ? 'completed' : 'pending_review',
         status: 'active',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
 
-      let { data: inserted, error: insErr } = await db
+      const { data: inserted, error: insErr } = await admin
         .from('patients')
         .insert([insertData])
-        .select()
+        .select('*')
         .maybeSingle();
 
       if (insErr) {
-        console.warn('[sync-profile POST] Reintentando insert sin FK user_id:', insErr.message);
+        console.error('[sync-profile POST] Error en insert admin:', insErr);
         if (insErr.code === '23503' && insertData.user_id) {
           const fallbackInsert = { ...insertData };
           delete fallbackInsert.user_id;
-          const { data: fallbackInserted } = await db
+          const { data: fallbackInserted, error: fbInsErr } = await admin
             .from('patients')
             .insert([fallbackInsert])
-            .select()
+            .select('*')
             .maybeSingle();
-          if (fallbackInserted) inserted = fallbackInserted;
+          if (fbInsErr) throw new Error(fbInsErr.message);
+          patientRecord = fallbackInserted || insertData;
+        } else {
+          throw new Error(insErr.message);
         }
+      } else {
+        patientRecord = inserted || insertData;
       }
-      patientRecord = inserted || insertData;
     }
 
-    // 4. Sincronizar tabla `users` (con tolerancia defensiva si la tabla tiene RLS estricto)
+    // 4. Sincronizar tabla `users` con admin
     if (targetUserId) {
       try {
-        await db
+        await admin
           .from('users')
           .upsert({
             id: targetUserId,
