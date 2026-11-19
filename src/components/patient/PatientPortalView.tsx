@@ -27,7 +27,6 @@ import {
   Printer,
   X,
   Stethoscope,
-  Smile,
   Activity,
   Check,
   MessageCircle,
@@ -38,7 +37,6 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-import PatientOdontogram from '@/components/PatientOdontogram';
 import { PatientCalendarSchedule } from '@/components/patient/PatientCalendarSchedule';
 import { PATIENT_VISIBILITY_CONFIG } from '@/config/role-visibility';
 import { UnifiedCommunicationWidget } from '@/components/chat/UnifiedCommunicationWidget';
@@ -48,43 +46,17 @@ import { isSystemAdminEmail } from '@/lib/auth/admin-emails';
 // ── SUCURSALES OFICIALES AUDENTI (CANÓNICAS) ──
 const BRANCH_DETAILS: Record<string, {
   name: string;
-  address: string;
-  mapUrl: string;
-  hours: string;
-  phone: string;
   phoneClean: string;
 }> = {
   '00000000-0000-0000-0000-000000000001': {
-    name: 'Sucursal Balbuena (Matriz)',
-    address: 'Av. del Taller & Retorno 12, Jardín Balbuena, CDMX',
-    mapUrl: 'https://maps.google.com/?q=Av.+del+Taller+y+Retorno+12+Jardin+Balbuena+CDMX',
-    hours: 'Lunes a Sábado: 16:00 - 21:00 hrs (Turno Vespertino) | Domingos según agenda',
-    phone: '+52 55 5764 8810',
+    name: 'Sucursal Balbuena',
     phoneClean: '525557648810'
   },
   '00000000-0000-0000-0000-000000000002': {
     name: 'Sucursal Chalma de Guadalupe',
-    address: 'Av. Guadalupe Victoria 45, Gustavo A. Madero, CDMX',
-    mapUrl: 'https://maps.google.com/?q=Av.+Guadalupe+Victoria+45+Gustavo+A+Madero+CDMX',
-    hours: 'Lunes a Sábado: 16:00 - 21:00 hrs (Turno Vespertino) | Domingos según agenda',
-    phone: '+52 55 5389 1204',
     phoneClean: '525553891204'
   }
 };
-
-// ── DEFINICIÓN DE DIAGNÓSTICOS DE DIENTES PARA EL VISOR ──
-type ToothDiagnosis = {
-  condition: 'healthy' | 'filled' | 'crown' | 'root_canal' | 'missing' | 'cleaning_recommended';
-  label: string;
-  badgeColor: string;
-  fillColor: string;
-  treatmentName: string;
-  appliedDate?: string;
-  notes: string;
-};
-
-// Diagnóstico por defecto limpio
-const EMPTY_DIAGNOSIS_MAP: Record<number, ToothDiagnosis> = {};
 
 // ── BITÁCORA CLÍNICA DE PROCEDIMIENTOS REALIZADOS (SIN PRECIOS) ──
 interface ClinicalTreatmentRecord {
@@ -129,9 +101,9 @@ interface DigitalPrescription {
 const EMPTY_PRESCRIPTIONS: DigitalPrescription[] = [];
 
 export function PatientPortalView({
-  initialTab = 'odontograma'
+  initialTab = 'citas'
 }: {
-  initialTab?: 'odontograma' | 'bitacora' | 'citas' | 'recetas' | 'perfil';
+  initialTab?: 'citas' | 'perfil' | 'recetas' | 'bitacora' | 'odontograma';
 } = {}) {
   const router = useRouter();
   const supabase = createClient();
@@ -140,13 +112,14 @@ export function PatientPortalView({
   const [user, setUser] = useState<any>(null);
   const [patient, setPatient] = useState<any>(null);
   const [appointments, setAppointments] = useState<any[]>([]);
-  const [selectedTooth, setSelectedTooth] = useState<number>(36);
-  const [activeTab, setActiveTab] = useState<'odontograma' | 'bitacora' | 'citas' | 'recetas' | 'perfil'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'citas' | 'perfil' | 'recetas' | 'bitacora'>(
+    initialTab === 'odontograma' ? 'citas' : (initialTab as any)
+  );
 
-  const switchTab = (tab: 'odontograma' | 'bitacora' | 'citas' | 'recetas' | 'perfil') => {
+  const switchTab = (tab: 'citas' | 'perfil' | 'recetas' | 'bitacora') => {
     setActiveTab(tab);
     if (typeof window !== 'undefined' && window.location.pathname.startsWith('/portal-paciente')) {
-      const targetUrl = tab === 'odontograma' || tab === 'bitacora' ? '/portal-paciente' : `/portal-paciente/${tab}`;
+      const targetUrl = tab === 'citas' ? '/portal-paciente' : `/portal-paciente/${tab}`;
       window.history.pushState(null, '', targetUrl);
     }
   };
@@ -154,7 +127,6 @@ export function PatientPortalView({
   const [isConsentModalOpen, setIsConsentModalOpen] = useState(false);
   const [confirmingAppt, setConfirmingAppt] = useState(false);
   const [confirmationNotice, setConfirmationNotice] = useState<string>('');
-  const [diagnosisMap, setDiagnosisMap] = useState<Record<number, ToothDiagnosis>>({});
   const [clinicalTimeline, setClinicalTimeline] = useState<ClinicalTreatmentRecord[]>([]);
   const [prescriptions, setPrescriptions] = useState<DigitalPrescription[]>([]);
 
@@ -249,38 +221,11 @@ export function PatientPortalView({
               .order('created_at', { ascending: false });
 
             if (clinicalRecords && clinicalRecords.length > 0) {
-              const map: Record<number, ToothDiagnosis> = {};
               const timeline: ClinicalTreatmentRecord[] = [];
 
               clinicalRecords.forEach((r: any) => {
                 const meta = r.metadata || {};
                 const toothFdi = Number(meta.toothFdi) || 11;
-                const cond = (meta.condition || 'filled').toLowerCase();
-
-                let badgeColor = 'bg-blue-500/20 text-blue-300 border-blue-500/40';
-                let fillColor = '#3b82f6';
-                if (cond.includes('corona') || cond.includes('crown')) {
-                  badgeColor = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
-                  fillColor = '#f59e0b';
-                } else if (cond.includes('endo') || cond.includes('canal')) {
-                  badgeColor = 'bg-orange-500/20 text-orange-300 border-orange-500/40';
-                  fillColor = '#f97316';
-                } else if (cond.includes('ausente') || cond.includes('missing') || cond.includes('extrac')) {
-                  badgeColor = 'bg-slate-500/20 text-slate-300 border-slate-500/40';
-                  fillColor = '#475569';
-                }
-
-                if (!map[toothFdi]) {
-                  map[toothFdi] = {
-                    condition: cond as any,
-                    label: meta.procedure || 'Tratamiento Certificado',
-                    badgeColor,
-                    fillColor,
-                    treatmentName: meta.procedure || 'Procedimiento Clínico',
-                    appliedDate: new Date(r.created_at).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }),
-                    notes: meta.notes || r.content || 'Procedimiento certificado por la Dirección Médica.'
-                  };
-                }
 
                 timeline.push({
                   id: r.id,
@@ -296,18 +241,12 @@ export function PatientPortalView({
                 });
               });
 
-              setDiagnosisMap(map);
               setClinicalTimeline(timeline);
-              if (clinicalRecords[0]?.metadata?.toothFdi) {
-                setSelectedTooth(Number(clinicalRecords[0].metadata.toothFdi));
-              }
             } else {
-              setDiagnosisMap({});
               setClinicalTimeline([]);
             }
           } catch (clinicalErr) {
             console.warn('Nota cargando bitácora clínica:', clinicalErr);
-            setDiagnosisMap({});
             setClinicalTimeline([]);
           }
 
@@ -515,23 +454,10 @@ export function PatientPortalView({
     const startIso = new Date(appointmentCountdown.time).toISOString().replace(/-|:|\.\d\d\d/g, '');
     const endIso = new Date(appointmentCountdown.time + 60 * 60 * 1000).toISOString().replace(/-|:|\.\d\d\d/g, '');
     const title = encodeURIComponent('Cita Dental • Dra. Aura Estudillo (Audenti Cloud Pro)');
-    const details = encodeURIComponent(`Cita con la Dra. Aura Estudillo en ${branchInfo.name}. Por favor acude 10 minutos antes. Teléfono de contacto: ${branchInfo.phone}`);
-    const location = encodeURIComponent(`${branchInfo.name}, ${branchInfo.address}`);
+    const details = encodeURIComponent(`Cita con la Dra. Aura Estudillo en ${branchInfo.name}. Por favor acude 10 minutos antes.`);
+    const location = encodeURIComponent(branchInfo.name);
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startIso}/${endIso}&details=${details}&location=${location}`;
   }, [upcomingAppointment, appointmentCountdown, branchInfo]);
-
-  // Diagnóstico del diente seleccionado en el odontograma (Dinámico y Real)
-  const activeToothDiagnosis = useMemo(() => {
-    return diagnosisMap[selectedTooth] || {
-      condition: 'healthy',
-      label: 'Pieza Sana',
-      badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
-      fillColor: '#10b981',
-      treatmentName: 'Esmalte y Dentina en Estado Natural Óptimo',
-      appliedDate: 'Sin intervenciones previas',
-      notes: 'Órgano dentario íntegro. No presenta patologías activas ni requerimiento operatorio registrado.'
-    };
-  }, [selectedTooth, diagnosisMap]);
 
   if (loading) {
     return (
@@ -663,27 +589,14 @@ export function PatientPortalView({
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 relative z-10">
-            <div className="bg-slate-900/90 p-3.5 rounded-2xl border border-slate-800 text-xs space-y-1">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Atención Presencial</p>
-              <p className="text-white font-semibold flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                {branchInfo.address}
-              </p>
-              <p className="text-[11px] text-amber-300 font-medium">
-                Tel: {branchInfo.phone}
+          <div className="flex items-center gap-3 relative z-10">
+            <div className="bg-slate-900/90 px-5 py-3.5 rounded-2xl border border-amber-400/30 text-xs space-y-1 shadow-lg">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Sede Clínica Asignada</p>
+              <p className="text-amber-400 font-black text-base flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-amber-400 shrink-0" />
+                {branchInfo.name}
               </p>
             </div>
-            <a
-              href={branchInfo.mapUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-500/15 cursor-pointer shrink-0"
-            >
-              <MapPin className="w-3.5 h-3.5" />
-              Cómo Llegar
-              <ExternalLink className="w-3 h-3 ml-0.5" />
-            </a>
           </div>
         </div>
 
@@ -798,110 +711,159 @@ export function PatientPortalView({
           </div>
         )}
 
-        {/* ── 5. PESTAÑAS DE NAVEGACIÓN RÁPIDA DENTRO DEL PORTAL ── */}
-        <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto scrollbar-thin scrollbar-thumb-amber-500/30">
-          <button
-            onClick={() => switchTab('odontograma')}
-            className={cn(
-              'px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 shrink-0 cursor-pointer',
-              activeTab === 'odontograma'
-                ? 'bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/20'
-                : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
-            )}
-          >
-            <Smile className="w-4 h-4" />
-            Odontograma 3D Personal
-          </button>
-
-          <button
-            onClick={() => switchTab('bitacora')}
-            className={cn(
-              'px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 shrink-0 cursor-pointer',
-              activeTab === 'bitacora'
-                ? 'bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/20'
-                : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
-            )}
-          >
-            <Activity className="w-4 h-4" />
-            Bitácora de Tratamientos Realizados ({clinicalTimeline.length})
-          </button>
-
-          <button
-            onClick={() => switchTab('citas')}
-            className={cn(
-              'px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 shrink-0 cursor-pointer',
-              activeTab === 'citas'
-                ? 'bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/20'
-                : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
-            )}
-          >
-            <Calendar className="w-4 h-4" />
-            Agenda &amp; Citas ({upcomingList.length + pastList.length})
-          </button>
-
-          <button
-            onClick={() => switchTab('recetas')}
-            className={cn(
-              'px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 shrink-0 cursor-pointer',
-              activeTab === 'recetas'
-                ? 'bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/20'
-                : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
-            )}
-          >
-            <FileCheck2 className="w-4 h-4" />
-            Recetas Médicas Digitales ({prescriptions.length})
-          </button>
-
-          <button
-            onClick={() => switchTab('perfil')}
-            className={cn(
-              'px-4 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 shrink-0 cursor-pointer',
-              activeTab === 'perfil'
-                ? 'bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/20'
-                : 'bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800'
-            )}
-          >
-            <Building2 className="w-4 h-4" />
-            Mi Perfil &amp; Sucursal
-          </button>
-        </div>
-
-        {/* ── SECCIÓN 1: ODONTOGRAMA PERSONAL INTERACTIVO 3D ── */}
-        {activeTab === 'odontograma' && (
-          <div className="space-y-6">
-            <PatientOdontogram
-              patientData={{
-                branch_name: branchInfo.name,
-                ...patient
-              }}
-              selectedTooth={selectedTooth}
-              setSelectedTooth={setSelectedTooth}
-              diagnosisMap={diagnosisMap}
-            />
-
-            {/* Tarjeta de Detalle Anatómico de la Pieza Seleccionada */}
-            <div className="p-6 bg-slate-950/90 border border-slate-800 rounded-3xl shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-5 backdrop-blur-xl">
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <span className="text-lg font-black text-white">Pieza #{selectedTooth}</span>
-                  <span className={cn('text-[10px] font-bold px-3 py-1 rounded-full border', activeToothDiagnosis.badgeColor)}>
-                    {activeToothDiagnosis.label}
-                  </span>
-                  {activeToothDiagnosis.appliedDate && (
-                    <span className="text-xs text-slate-400 font-medium">({activeToothDiagnosis.appliedDate})</span>
-                  )}
-                </div>
-                <p className="text-sm text-amber-300 font-bold">{activeToothDiagnosis.treatmentName}</p>
-                <p className="text-xs text-slate-300 max-w-2xl">{activeToothDiagnosis.notes}</p>
-              </div>
-
-              <div className="flex items-center gap-2 text-xs text-slate-400 bg-slate-900/80 px-4 py-2.5 rounded-2xl border border-slate-800 self-stretch md:self-auto justify-center">
-                <Info className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>Validado por Dra. Aura Estudillo (Solo Lectura)</span>
-              </div>
-            </div>
+        {/* ── 5. MENÚ PRINCIPAL ACCESIBLE Y TÁCTIL (DISEÑO MÓVIL PARA ADULTOS MAYORES) ── */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-black uppercase tracking-wider text-slate-300 flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Menú de Opciones
+            </span>
+            <span className="text-[11px] text-amber-400 font-bold">
+              Toca una opción para navegar
+            </span>
           </div>
-        )}
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {/* Botón 1: Citas y Agenda */}
+            <button
+              type="button"
+              onClick={() => switchTab('citas')}
+              className={cn(
+                'p-4 rounded-3xl text-left transition-all flex flex-col justify-between gap-3 border shadow-xl cursor-pointer min-h-[96px]',
+                activeTab === 'citas'
+                  ? 'bg-amber-400 text-slate-950 border-amber-300 ring-4 ring-amber-400/20 shadow-amber-500/20'
+                  : 'bg-slate-900/90 text-white border-slate-800 hover:border-slate-700'
+              )}
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className={cn(
+                  'w-10 h-10 rounded-2xl flex items-center justify-center font-bold',
+                  activeTab === 'citas' ? 'bg-slate-950 text-amber-400' : 'bg-amber-400/10 text-amber-400'
+                )}>
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <span className={cn(
+                  'text-[10px] font-black px-2 py-0.5 rounded-full',
+                  activeTab === 'citas' ? 'bg-slate-950/20 text-slate-950' : 'bg-slate-800 text-slate-400'
+                )}>
+                  {upcomingList.length + pastList.length}
+                </span>
+              </div>
+              <div>
+                <p className={cn('text-sm font-black tracking-tight leading-tight', activeTab === 'citas' ? 'text-slate-950' : 'text-white')}>
+                  Mis Citas
+                </p>
+                <p className={cn('text-[11px] font-medium leading-tight mt-0.5', activeTab === 'citas' ? 'text-slate-800 font-bold' : 'text-slate-400')}>
+                  Calendario y agenda
+                </p>
+              </div>
+            </button>
+
+            {/* Botón 2: Mi Perfil */}
+            <button
+              type="button"
+              onClick={() => switchTab('perfil')}
+              className={cn(
+                'p-4 rounded-3xl text-left transition-all flex flex-col justify-between gap-3 border shadow-xl cursor-pointer min-h-[96px]',
+                activeTab === 'perfil'
+                  ? 'bg-amber-400 text-slate-950 border-amber-300 ring-4 ring-amber-400/20 shadow-amber-500/20'
+                  : 'bg-slate-900/90 text-white border-slate-800 hover:border-slate-700'
+              )}
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className={cn(
+                  'w-10 h-10 rounded-2xl flex items-center justify-center font-bold',
+                  activeTab === 'perfil' ? 'bg-slate-950 text-amber-400' : 'bg-blue-400/10 text-blue-400'
+                )}>
+                  <User className="w-5 h-5" />
+                </div>
+                <span className={cn(
+                  'text-[10px] font-black px-2 py-0.5 rounded-full',
+                  activeTab === 'perfil' ? 'bg-slate-950/20 text-slate-950' : 'bg-slate-800 text-slate-400'
+                )}>
+                  Activo
+                </span>
+              </div>
+              <div>
+                <p className={cn('text-sm font-black tracking-tight leading-tight', activeTab === 'perfil' ? 'text-slate-950' : 'text-white')}>
+                  Mi Perfil
+                </p>
+                <p className={cn('text-[11px] font-medium leading-tight mt-0.5', activeTab === 'perfil' ? 'text-slate-800 font-bold' : 'text-slate-400')}>
+                  Datos y sucursal
+                </p>
+              </div>
+            </button>
+
+            {/* Botón 3: Recetas Médicas */}
+            <button
+              type="button"
+              onClick={() => switchTab('recetas')}
+              className={cn(
+                'p-4 rounded-3xl text-left transition-all flex flex-col justify-between gap-3 border shadow-xl cursor-pointer min-h-[96px]',
+                activeTab === 'recetas'
+                  ? 'bg-amber-400 text-slate-950 border-amber-300 ring-4 ring-amber-400/20 shadow-amber-500/20'
+                  : 'bg-slate-900/90 text-white border-slate-800 hover:border-slate-700'
+              )}
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className={cn(
+                  'w-10 h-10 rounded-2xl flex items-center justify-center font-bold',
+                  activeTab === 'recetas' ? 'bg-slate-950 text-amber-400' : 'bg-emerald-400/10 text-emerald-400'
+                )}>
+                  <FileCheck2 className="w-5 h-5" />
+                </div>
+                <span className={cn(
+                  'text-[10px] font-black px-2 py-0.5 rounded-full',
+                  activeTab === 'recetas' ? 'bg-slate-950/20 text-slate-950' : 'bg-slate-800 text-slate-400'
+                )}>
+                  {prescriptions.length}
+                </span>
+              </div>
+              <div>
+                <p className={cn('text-sm font-black tracking-tight leading-tight', activeTab === 'recetas' ? 'text-slate-950' : 'text-white')}>
+                  Mis Recetas
+                </p>
+                <p className={cn('text-[11px] font-medium leading-tight mt-0.5', activeTab === 'recetas' ? 'text-slate-800 font-bold' : 'text-slate-400')}>
+                  Recetario digital
+                </p>
+              </div>
+            </button>
+
+            {/* Botón 4: Tratamientos Realizados */}
+            <button
+              type="button"
+              onClick={() => switchTab('bitacora')}
+              className={cn(
+                'p-4 rounded-3xl text-left transition-all flex flex-col justify-between gap-3 border shadow-xl cursor-pointer min-h-[96px]',
+                activeTab === 'bitacora'
+                  ? 'bg-amber-400 text-slate-950 border-amber-300 ring-4 ring-amber-400/20 shadow-amber-500/20'
+                  : 'bg-slate-900/90 text-white border-slate-800 hover:border-slate-700'
+              )}
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className={cn(
+                  'w-10 h-10 rounded-2xl flex items-center justify-center font-bold',
+                  activeTab === 'bitacora' ? 'bg-slate-950 text-amber-400' : 'bg-purple-400/10 text-purple-400'
+                )}>
+                  <Activity className="w-5 h-5" />
+                </div>
+                <span className={cn(
+                  'text-[10px] font-black px-2 py-0.5 rounded-full',
+                  activeTab === 'bitacora' ? 'bg-slate-950/20 text-slate-950' : 'bg-slate-800 text-slate-400'
+                )}>
+                  {clinicalTimeline.length}
+                </span>
+              </div>
+              <div>
+                <p className={cn('text-sm font-black tracking-tight leading-tight', activeTab === 'bitacora' ? 'text-slate-950' : 'text-white')}>
+                  Tratamientos
+                </p>
+                <p className={cn('text-[11px] font-medium leading-tight mt-0.5', activeTab === 'bitacora' ? 'text-slate-800 font-bold' : 'text-slate-400')}>
+                  Historial de atención
+                </p>
+              </div>
+            </button>
+          </div>
+        </div>
 
         {/* ── SECCIÓN 2: BITÁCORA CLÍNICA CRONOLÓGICA (OMITIENDO PRECIOS) ── */}
         {activeTab === 'bitacora' && (
@@ -985,24 +947,80 @@ export function PatientPortalView({
           </div>
         )}
 
-        {/* ── SECCIÓN 3: MÓDULO DE CALENDARIO, HISTORIAL Y RECORDATORIOS INTERACTIVOS ── */}
+        {/* ── SECCIÓN 3: MÓDULO DE CALENDARIO Y PERFIL EN PÁGINA PRINCIPAL ── */}
         {activeTab === 'citas' && (
-          <PatientCalendarSchedule
-            appointments={appointments}
-            patientName={patientName}
-            branchName={branchInfo.name}
-            branchPhoneClean={branchInfo.phoneClean}
-            onAppointmentUpdated={async () => {
-              if (patient?.id) {
-                const { data: updatedAppts } = await supabase
-                  .from('appointments')
-                  .select('*')
-                  .eq('patient_id', patient.id)
-                  .order('start_time', { ascending: true });
-                if (updatedAppts) setAppointments(updatedAppts);
-              }
-            }}
-          />
+          <div className="space-y-6">
+            <PatientCalendarSchedule
+              appointments={appointments}
+              patientName={patientName}
+              branchName={branchInfo.name}
+              branchPhoneClean={branchInfo.phoneClean}
+              onAppointmentUpdated={async () => {
+                if (patient?.id) {
+                  const { data: updatedAppts } = await supabase
+                    .from('appointments')
+                    .select('*')
+                    .eq('patient_id', patient.id)
+                    .order('start_time', { ascending: true });
+                  if (updatedAppts) setAppointments(updatedAppts);
+                }
+              }}
+            />
+
+            {/* Resumen de Mi Perfil Clínico Integrado en la Página Principal */}
+            <div className="bg-slate-950/90 border border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xl space-y-5 backdrop-blur-xl">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-800 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-400 shrink-0">
+                    <User className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-white">Mi Perfil y Expediente Clínico</h3>
+                    <p className="text-xs text-slate-400">Datos oficiales registrados bajo normativa NOM-004-SSA3</p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => switchTab('perfil')}
+                  className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 hover:text-white border border-amber-400/30 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <span>Ver Perfil Completo &amp; Consentimiento</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+                <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1">
+                  <span className="text-slate-400 font-bold block uppercase text-[10px]">Paciente</span>
+                  <strong className="text-white font-black text-sm block truncate">{patientName}</strong>
+                  <span className="text-[11px] text-slate-400 block truncate">{user?.email || 'Registrado'}</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-900/60 border border-amber-400/30 space-y-1">
+                  <span className="text-slate-400 font-bold block uppercase text-[10px]">Sede de Atención</span>
+                  <strong className="text-amber-400 font-black text-sm block flex items-center gap-1.5">
+                    <Building2 className="w-4 h-4 text-amber-400 shrink-0" />
+                    {branchInfo.name}
+                  </strong>
+                  <span className="text-[11px] text-slate-400 block">Sede asignada a tu expediente</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1">
+                  <span className="text-slate-400 font-bold block uppercase text-[10px]">Especialista</span>
+                  <strong className="text-white font-black text-sm block">Dra. Aura Estudillo</strong>
+                  <span className="text-[11px] text-amber-300 block">Céd. Prof. 8492019</span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1">
+                  <span className="text-slate-400 font-bold block uppercase text-[10px]">Estatus de Expediente</span>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 mt-1">
+                    <CheckCircle2 className="w-3 h-3" /> Activo &amp; NOM-004-SSA3
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* ── SECCIÓN 4: RECETAS MÉDICAS DIGITALES (NOM-004-SSA3) ── */}
@@ -1154,9 +1172,9 @@ export function PatientPortalView({
                     <p className="text-white font-bold text-sm">
                       {branchInfo.name}
                     </p>
-                    <p className="text-slate-300 text-xs line-clamp-1">
-                      {branchInfo.address}
-                    </p>
+                    <span className="text-[11px] text-amber-300 block">
+                      Sede registrada en expediente
+                    </span>
                   </div>
 
                   <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-1">
@@ -1340,44 +1358,21 @@ export function PatientPortalView({
                   </div>
                 </div>
 
-                <div className="space-y-3 text-xs">
-                  <div>
-                    <span className="text-slate-400 block mb-1">Nombre de la Sede:</span>
-                    <strong className="text-amber-400 text-sm font-black">{branchInfo.name}</strong>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block mb-1">Ubicación Presencial:</span>
-                    <p className="text-slate-200 flex items-start gap-1.5 leading-relaxed">
-                      <MapPin className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                      {branchInfo.address}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block mb-1">Horario Clínico:</span>
-                    <p className="text-slate-300 flex items-center gap-1.5">
-                      <Clock className="w-4 h-4 text-amber-400 shrink-0" />
-                      {branchInfo.hours}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block mb-1">Línea Directa:</span>
-                    <p className="text-emerald-400 font-bold flex items-center gap-1.5">
-                      <Phone className="w-4 h-4 text-emerald-400 shrink-0" />
-                      {branchInfo.phone}
+                <div className="space-y-4 text-xs">
+                  <div className="p-4 rounded-2xl bg-slate-900/80 border border-amber-400/30 space-y-2">
+                    <span className="text-slate-400 block text-[11px] font-bold uppercase">Sede Clínica Registrada</span>
+                    <strong className="text-amber-400 text-base font-black flex items-center gap-2">
+                      <Building2 className="w-5 h-5 text-amber-400 shrink-0" />
+                      {branchInfo.name}
+                    </strong>
+                    <p className="text-slate-300 text-xs leading-relaxed">
+                      Sede oficial para tus consultas y atenciones con la Dra. Aura Estudillo.
                     </p>
                   </div>
 
-                  <div className="pt-2">
-                    <a
-                      href={branchInfo.mapUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-all shadow-md shadow-amber-500/20 cursor-pointer"
-                    >
-                      <MapPin className="w-4 h-4" />
-                      Abrir en Google Maps / Cómo Llegar
-                      <ExternalLink className="w-3.5 h-3.5 ml-1" />
-                    </a>
+                  <div className="p-3.5 rounded-2xl bg-slate-900/50 border border-slate-800 text-slate-400 text-xs flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Expediente clínico protegido bajo protocolo de bioseguridad NOM-004-SSA3.</span>
                   </div>
                 </div>
               </div>

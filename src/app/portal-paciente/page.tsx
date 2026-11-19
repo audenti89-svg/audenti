@@ -14,5 +14,5 @@ import { PatientPortalView } from '@/components/patient/PatientPortalView';
  * - Sucursal Asignada (Balbuena o Chalma)
  */
 export default function PortalPacienteRoute() {
-  return <PatientPortalView initialTab="odontograma" />;
+  return <PatientPortalView initialTab="citas" />;
 }
