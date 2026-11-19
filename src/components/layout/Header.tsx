@@ -120,7 +120,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
       try {
         const { data } = await supabase
           .from('appointments')
-          .select('id, treatment_type, status, start_time, notes, patients(full_name)')
+          .select('id, status, starts_at, notes, patients(full_name)')
           .order('created_at', { ascending: false })
           .limit(4)
 

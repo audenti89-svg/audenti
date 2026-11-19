@@ -53,48 +53,24 @@ export default function PatientFinancesPage({ params }: { params: Promise<{ id: 
   async function fetchFinances() {
     try {
       setLoading(true)
-      // 1. Intentar consultar 'patient_financial_ledger'
-      const { data, error } = await supabase
-        .from('patient_financial_ledger')
-        .select('*')
-        .eq('patient_id', patientId)
-        .order('created_at', { ascending: false })
-
-      if (!error && data) {
-        const mapped: FinancialRecord[] = data.map((d: any) => ({
-          id: d.id,
-          concept: d.concept || 'Tratamiento Odontológico',
-          total_amount: Number(d.total_amount ?? d.amount ?? 0),
-          paid_amount: Number(d.paid_amount ?? 0),
-          balance_due: Number(d.balance_due ?? (Number(d.total_amount ?? d.amount ?? 0) - Number(d.paid_amount ?? 0))),
-          status: d.status || (Number(d.paid_amount ?? 0) >= Number(d.total_amount ?? d.amount ?? 0) ? 'Paid' : 'Pending'),
-          created_at: d.created_at || new Date().toISOString()
-        }))
-        setRecords(mapped)
-        return
+      const res = await fetch(`/api/finances/transactions?patient_id=${patientId}`)
+      if (res.ok) {
+        const json = await res.json()
+        if (json.success && Array.isArray(json.transactions)) {
+          const mapped: FinancialRecord[] = json.transactions.map((t: any) => ({
+            id: t.id,
+            concept: t.notes || 'Tratamiento Odontológico',
+            total_amount: Number(t.amount || 0),
+            paid_amount: t.type === 'income' ? Number(t.amount || 0) : 0,
+            balance_due: t.type === 'income' ? 0 : Number(t.amount || 0),
+            status: t.status === 'completed' ? 'Liquidado' : 'Pendiente',
+            created_at: t.created_at || new Date().toISOString()
+          }))
+          setRecords(mapped)
+          return
+        }
       }
-
-      // 2. Fallback a tabla 'payments' si patient_financial_ledger no existe aún
-      const { data: paymentsData, error: paymentsError } = await supabase
-        .from('payments')
-        .select('*')
-        .eq('patient_id', patientId)
-        .order('created_at', { ascending: false })
-
-      if (!paymentsError && paymentsData) {
-        const mapped: FinancialRecord[] = paymentsData.map((p: any) => ({
-          id: p.id,
-          concept: p.description || p.concept || 'Servicio Odontológico',
-          total_amount: Number(p.amount ?? 0),
-          paid_amount: Number(p.amount ?? 0),
-          balance_due: 0,
-          status: 'Paid',
-          created_at: p.created_at || new Date().toISOString()
-        }))
-        setRecords(mapped)
-      } else {
-        setRecords([])
-      }
+      setRecords([])
     } catch (error) {
       console.error('Error al cargar registros financieros:', error)
       setRecords([])
@@ -111,39 +87,30 @@ export default function PatientFinancesPage({ params }: { params: Promise<{ id: 
     const numericAmount = parseFloat(newAmount)
 
     try {
-      // 1. Intentar inserción en 'patient_financial_ledger'
-      const { error: ledgerError } = await supabase
-        .from('patient_financial_ledger')
-        .insert([
-          {
-            patient_id: patientId,
-            concept: newConcept.trim(),
-            total_amount: numericAmount,
-            paid_amount: 0.00,
-            balance_due: numericAmount,
-            status: 'Pending'
-          }
-        ])
+      const res = await fetch('/api/finances/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patient_id: patientId,
+          patient_name: patientName,
+          amount: numericAmount,
+          type: 'income',
+          payment_method: 'cash',
+          notes: newConcept.trim()
+        })
+      })
 
-      if (ledgerError) {
-        // Fallback a payments si ledger no está migrada
-        console.warn('Fallback a payments:', ledgerError.message)
-        await supabase.from('payments').insert([
-          {
-            patient_id: patientId,
-            description: newConcept.trim(),
-            amount: numericAmount,
-            payment_method: 'Pendiente',
-            status: 'pending'
-          }
-        ])
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}))
+        throw new Error(errJson.error || 'Error al registrar el cobro')
       }
 
       setNewConcept('')
       setNewAmount('')
       await fetchFinances()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error al registrar cargo:', error)
+      alert(error?.message || 'Error al registrar cargo')
     } finally {
       setSubmitting(false)
     }

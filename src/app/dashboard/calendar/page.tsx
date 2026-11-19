@@ -213,20 +213,20 @@ export default function CalendarPage() {
         const supabase = createClient()
         const { data } = await supabase
           .from('appointments')
-          .select('id, treatment_type, status, start_time, notes, patients(full_name)')
-          .order('start_time', { ascending: true })
+          .select('id, status, starts_at, notes, patients(full_name)')
+          .order('starts_at', { ascending: true })
 
         if (data && data.length > 0) {
           const existingIds = new Set(allAppointments.map(a => a.id))
           for (const a of data as any[]) {
             if (!existingIds.has(a.id)) {
-              const d = a.start_time ? new Date(a.start_time) : new Date()
+              const d = a.starts_at ? new Date(a.starts_at) : new Date()
               const dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d)
               const timeStr = d.toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City', hour: '2-digit', minute: '2-digit', hour12: false })
 
               allAppointments.push({
                 id: a.id,
-                title: a.treatment_type || 'Consulta / Valoración Estética Oral',
+                title: a.notes?.split('•')?.[1]?.trim() || 'Consulta Odontológica',
                 patientName: (Array.isArray(a.patients) ? a.patients[0]?.full_name : a.patients?.full_name) || 'Paciente',
                 doctor: 'Dra. Aura Estudillo',
                 chair: 'Gabinete 1 (Principal)',

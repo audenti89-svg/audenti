@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { findDuplicatePatient, mergeAndConsolidatePatient } from './patientDeduplicator';
 
 export interface SafePatientData {
   id?: string;
@@ -103,47 +104,16 @@ export async function safeUpsertPatient(
   // Mapear exactamente a la columna FK `user_id` de la base de datos
   const targetUserId = patientData.user_id || patientData.auth_user_id || null;
 
-  let existingPatient: any = null;
+  // ── MOTOR DE DEDUPLICACIÓN INTELIGENTE (Aura AI) ──
+  // Verifica exhaustivamente por teléfono, email, user_id y similitud heurística de nombre
+  const dupCheck = await findDuplicatePatient(supabase, {
+    user_id: targetUserId,
+    phone: cleanPhone,
+    email: cleanEmail,
+    full_name: patientData.full_name || patientData.name
+  });
 
-  // 1. Prioridad 1: Validar si el correo electrónico ya está registrado en Supabase
-  if (cleanEmail) {
-    const { data: byEmail, error: emailErr } = await supabase
-      .from('patients')
-      .select('*')
-      .ilike('email', cleanEmail)
-      .maybeSingle();
-
-    if (!emailErr && byEmail) {
-      existingPatient = byEmail;
-    }
-  }
-
-  // 2. Prioridad 2: Si no coincidió por email, buscar por columna FK real `user_id`
-  if (!existingPatient && targetUserId) {
-    const { data: byUser, error: userErr } = await supabase
-      .from('patients')
-      .select('*')
-      .eq('user_id', targetUserId)
-      .maybeSingle();
-
-    if (!userErr && byUser) {
-      existingPatient = byUser;
-    }
-  }
-
-  // 3. Prioridad 3: Si no coincidió por email ni user_id, buscar por teléfono
-  if (!existingPatient && cleanPhone && cleanPhone.length >= 7) {
-    const { data: byPhone, error: phoneErr } = await supabase
-      .from('patients')
-      .select('*')
-      .ilike('phone', `%${cleanPhone}%`)
-      .limit(1)
-      .maybeSingle();
-
-    if (!phoneErr && byPhone) {
-      existingPatient = byPhone;
-    }
-  }
+  let existingPatient: any = dupCheck.isDuplicate ? dupCheck.matchedPatient : null;
 
   // Si se envió estado de onboarding o se tiene user_id, sincronizar en la tabla `users` con is_active: true
   if (targetUserId) {

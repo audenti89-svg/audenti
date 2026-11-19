@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isSystemAdminEmail } from '@/lib/auth/admin-emails';
+import { findDuplicatePatient, mergeAndConsolidatePatient } from '@/lib/patients/patientDeduplicator';
 
 /**
  * API DE VINCULACIÓN EXACTA Y ACTIVACIÓN UNIVERSAL AUTH-SUPABASE (Audenti 2027)
@@ -184,36 +185,15 @@ export async function POST(request: Request) {
       }
     }
 
-    // 3. Sincronizar tabla `patients` usando admin service-role (omite bloqueos de RLS)
-    let existingPatient: any = null;
+    // 3. Sincronizar tabla `patients` usando el Motor de Deduplicación Inteligente
+    const dupCheck = await findDuplicatePatient(admin, {
+      user_id: targetUserId,
+      email: cleanEmail,
+      phone: cleanPhone,
+      full_name: fullName
+    });
 
-    if (targetUserId) {
-      const { data: byUid } = await admin
-        .from('patients')
-        .select('*')
-        .eq('user_id', targetUserId)
-        .maybeSingle();
-      if (byUid) existingPatient = byUid;
-    }
-
-    if (!existingPatient) {
-      const { data: byEmail } = await admin
-        .from('patients')
-        .select('*')
-        .ilike('email', cleanEmail)
-        .maybeSingle();
-      if (byEmail) existingPatient = byEmail;
-    }
-
-    if (!existingPatient && cleanPhone && cleanPhone.length >= 7) {
-      const { data: byPhone } = await admin
-        .from('patients')
-        .select('*')
-        .ilike('phone', `%${cleanPhone}%`)
-        .limit(1)
-        .maybeSingle();
-      if (byPhone) existingPatient = byPhone;
-    }
+    let existingPatient: any = dupCheck.isDuplicate ? dupCheck.matchedPatient : null;
 
     let patientRecord: any = null;
 
@@ -279,6 +259,15 @@ export async function POST(request: Request) {
         }
       } else {
         patientRecord = updated || existingPatient;
+        // Purga proactiva de duplicados residuales si existieran con el mismo teléfono
+        try {
+          await mergeAndConsolidatePatient(admin, existingPatient.id, {
+            phone: cleanPhone,
+            email: cleanEmail,
+            full_name: fullName,
+            user_id: targetUserId
+          });
+        } catch {}
       }
     } else {
       const insertData: Record<string, any> = {

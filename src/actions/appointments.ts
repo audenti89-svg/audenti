@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import {
   getNowInMexico,
   formatDateInMexico,
@@ -136,39 +137,20 @@ export async function createAppointmentAction(input: CreateAppointmentInput) {
       const endDateTime = new Date(startDateTime.getTime() + 45 * 60000)
 
       if (patientId) {
-        const dayStart = new Date(`${appDate}T00:00:00-06:00`).toISOString()
-        const dayEnd = new Date(`${appDate}T23:59:59-06:00`).toISOString()
+        const isChalma = appBranch.toLowerCase().includes('chalma') || appBranch.toLowerCase().includes('guadalupe')
+        const adminDb = createAdminClient()
 
-        const { data: existingDbAppt } = await supabase
-          .from('appointments')
-          .select('id, start_time, notes')
-          .eq('patient_id', patientId)
-          .gte('start_time', dayStart)
-          .lte('start_time', dayEnd)
-          .maybeSingle()
-
-        if (existingDbAppt) {
-          const { error: updateErr } = await supabase
-            .from('appointments')
-            .update({
-              treatment_type: appTreatment,
-              status: status === 'confirmed' ? 'confirmed' : 'scheduled',
-              notes: notes ? `${existingDbAppt.notes || ''} | ${notes}` : existingDbAppt.notes
-            })
-            .eq('id', existingDbAppt.id)
-
-          if (!updateErr) supabasePersisted = true
-        } else {
-          const { error: apptError } = await supabase.from('appointments').insert({
-            patient_id: patientId,
-            treatment_type: appTreatment,
-            status: status === 'confirmed' ? 'confirmed' : 'scheduled',
-            start_time: startDateTime.toISOString(),
-            end_time: endDateTime.toISOString(),
-            notes: `Folio: ${newAppointment.folio}. Sede: ${appBranch}. Tel: ${patient_phone}`
-          })
-          if (!apptError) supabasePersisted = true
-        }
+        const { error: apptError } = await adminDb.from('appointments').insert({
+          tenant_id: 'c62fc15b-bf68-4101-881d-fdd9258fce1f',
+          branch_id: isChalma ? '00000000-0000-0000-0000-000000000002' : '00000000-0000-0000-0000-000000000001',
+          patient_id: patientId,
+          doctor_id: '5e8853ee-b813-4a1b-aafd-48b3d20ec1e3',
+          starts_at: startDateTime.toISOString(),
+          ends_at: endDateTime.toISOString(),
+          status: status === 'confirmed' ? 'confirmed' : 'scheduled',
+          notes: `Folio: ${newAppointment.folio} • ${appTreatment} • Sede: ${appBranch} • Tel: ${patient_phone}`
+        })
+        if (!apptError) supabasePersisted = true
       }
     } catch (err: any) {
       console.warn('Nota Supabase Server Action fallback:', err?.message)

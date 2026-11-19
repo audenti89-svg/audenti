@@ -217,24 +217,24 @@ export function PatientPortalView({
           // 1. Cargar citas reales del paciente (sin mock, con doble sincronización)
           let realAppts: any[] = [];
           try {
-            const { data: appts } = await supabase
-              .from('appointments')
-              .select('*')
-              .or(`patient_id.eq.${myProfile.id},phone.ilike.%${(myProfile.phone || '').replace(/\D/g, '').slice(-10)}%`)
-              .order('start_time', { ascending: true });
-            if (appts && appts.length > 0) {
-              realAppts = appts;
+            const res = await fetch('/api/appointments');
+            if (res.ok) {
+              const json = await res.json();
+              if (json.success && Array.isArray(json.appointments)) {
+                realAppts = json.appointments;
+              }
             }
           } catch {}
 
           if (realAppts.length === 0) {
             try {
-              const res = await fetch('/api/appointments');
-              if (res.ok) {
-                const json = await res.json();
-                if (json.success && Array.isArray(json.appointments)) {
-                  realAppts = json.appointments;
-                }
+              const { data: appts } = await supabase
+                .from('appointments')
+                .select('*')
+                .or(`patient_id.eq.${myProfile.id},phone.ilike.%${(myProfile.phone || '').replace(/\D/g, '').slice(-10)}%`)
+                .order('starts_at', { ascending: true });
+              if (appts && appts.length > 0) {
+                realAppts = appts;
               }
             } catch {}
           }
@@ -1186,14 +1186,15 @@ export function PatientPortalView({
               branchName={branchInfo.name}
               branchPhoneClean={branchInfo.phoneClean}
               onAppointmentUpdated={async () => {
-                if (patient?.id) {
-                  const { data: updatedAppts } = await supabase
-                    .from('appointments')
-                    .select('*')
-                    .eq('patient_id', patient.id)
-                    .order('start_time', { ascending: true });
-                  if (updatedAppts) setAppointments(updatedAppts);
-                }
+                try {
+                  const res = await fetch('/api/appointments');
+                  if (res.ok) {
+                    const json = await res.json();
+                    if (json.success && Array.isArray(json.appointments)) {
+                      setAppointments(json.appointments);
+                    }
+                  }
+                } catch {}
               }}
             />
 

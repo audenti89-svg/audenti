@@ -55,30 +55,19 @@ export default function FinanzasPage() {
   const fetchTransactions = async (silent = false) => {
     if (!silent) setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from('payments')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error || !data || data.length === 0) {
-        // Fallback resiliente a la tabla relacional transactions
-        try {
-          const { data: tData } = await supabase
-            .from('transactions')
-            .select('*')
-            .order('created_at', { ascending: false })
-          if (tData && tData.length > 0) {
-            setTransactions(tData.map((t: any) => ({
-              ...t,
-              payment_method: t.payment_method === 'cash' ? 'Efectivo' : (t.payment_method === 'card' ? 'Tarjeta' : (t.payment_method || 'Efectivo')),
-              description: t.notes || t.description || 'Movimiento Clínico Registrado'
-            })))
-            return
-          }
-        } catch {}
+      const res = await fetch('/api/finances/transactions')
+      if (res.ok) {
+        const json = await res.json()
+        if (json.success && Array.isArray(json.transactions)) {
+          setTransactions(json.transactions.map((t: any) => ({
+            ...t,
+            payment_method: t.payment_method === 'cash' ? 'Efectivo' : (t.payment_method === 'card' ? 'Tarjeta' : (t.payment_method === 'transfer' ? 'Transferencia' : (t.payment_method || 'Efectivo'))),
+            description: t.notes || t.description || 'Movimiento Clínico Registrado'
+          })))
+          return
+        }
       }
-
-      setTransactions(data || [])
+      setTransactions([])
     } catch (err) {
       console.warn('Nota en pagos (tabla limpia para producción):', err)
       setTransactions([])
@@ -178,91 +167,72 @@ export default function FinanzasPage() {
     setSavingTransaction(true)
 
     try {
-      const { data: defaultTenant } = await supabase.from('tenants').select('id').limit(1).maybeSingle()
+      let appointmentId: string | null = null
+      let targetPatientId: string | null = null
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search)
+        appointmentId = urlParams.get('appointment_id')
+        targetPatientId = urlParams.get('patient_id')
+      }
 
       if (modalType === 'trueque') {
         const val = parsedAmount
         const counterpart = formData.barterCounterpartName.trim() || formData.patientName.trim() || 'Profesional Aliado'
         const service = formData.barterServiceReceived.trim() || 'Servicios Profesionales Externos'
 
-        // Registro doble de partida contable (Ingreso por Odontología + Egreso por Servicio Recibido)
-        const incomeEntry: any = {
-          amount: val,
-          type: 'barter_in',
-          status: 'Liquidado en Especie',
-          payment_method: 'Trueque / Intercambio Profesional',
-          description: `Ingreso Valuado: ${formData.description || 'Tratamiento Dental'} (Intercambio con ${counterpart} por: ${service})`,
-        }
+        // 1. Ingreso Valuado en Trueque
+        await fetch('/api/finances/transactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: val,
+            type: 'income',
+            payment_method: 'other',
+            notes: `Ingreso Valuado: ${formData.description || 'Tratamiento Dental'} (Intercambio con ${counterpart} por: ${service})`,
+            patient_name: formData.patientName,
+            patient_id: targetPatientId,
+            appointment_id: appointmentId
+          })
+        })
 
-        const expenseEntry: any = {
-          amount: val,
-          type: 'barter_out',
-          status: 'Devengado en Especie',
-          payment_method: 'Trueque / Intercambio Profesional',
-          description: `Gasto Compensado: Servicios de ${service} prestados por ${counterpart} (Compensación 1:1 sin salida de caja líquida)`,
-        }
-
-        if (defaultTenant?.id) {
-          incomeEntry.tenant_id = defaultTenant.id
-          expenseEntry.tenant_id = defaultTenant.id
-        }
-
-        const { error: barterErr } = await supabase.from('payments').insert([incomeEntry, expenseEntry])
-        if (barterErr) {
-          try {
-            await supabase.from('transactions').insert([
-              { amount: val, type: 'income', notes: incomeEntry.description, payment_method: 'other', ...(defaultTenant?.id ? { tenant_id: defaultTenant.id } : {}) },
-              { amount: val, type: 'expense', notes: expenseEntry.description, payment_method: 'other', ...(defaultTenant?.id ? { tenant_id: defaultTenant.id } : {}) }
-            ])
-          } catch {}
-        }
+        // 2. Gasto Compensatorio 1:1 en Trueque
+        await fetch('/api/finances/transactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: val,
+            type: 'expense',
+            payment_method: 'other',
+            notes: `Gasto Compensado: Servicios de ${service} prestados por ${counterpart} (Compensación 1:1 sin salida de caja líquida)`
+          })
+        })
       } else {
         const val = parsedAmount
-        const entry: any = {
-          amount: val,
-          type: modalType === 'egreso' ? 'expense' : 'income',
-          status: 'completed',
-          payment_method: formData.paymentMethod,
-          description: formData.description || (modalType === 'egreso' ? 'Gasto de Insumos / Clínica' : 'Cobro de Consulta / Tratamiento'),
-        }
+        const res = await fetch('/api/finances/transactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount: val,
+            type: modalType === 'egreso' ? 'expense' : 'income',
+            payment_method: formData.paymentMethod,
+            notes: formData.description || (modalType === 'egreso' ? 'Gasto de Insumos / Clínica' : 'Cobro de Consulta / Tratamiento'),
+            patient_name: formData.patientName,
+            patient_id: targetPatientId,
+            appointment_id: appointmentId
+          })
+        })
 
-        if (defaultTenant?.id) entry.tenant_id = defaultTenant.id
-        const { error: payErr } = await supabase.from('payments').insert([entry])
-        if (payErr) {
-          try {
-            await supabase.from('transactions').insert([{
-              amount: val,
-              type: modalType === 'egreso' ? 'expense' : 'income',
-              notes: entry.description,
-              payment_method: formData.paymentMethod.toLowerCase().includes('tarjeta') ? 'card' : (formData.paymentMethod.toLowerCase().includes('transfer') ? 'transfer' : 'cash'),
-              ...(defaultTenant?.id ? { tenant_id: defaultTenant.id } : {})
-            }])
-          } catch {}
-        }
-
-        // Si provenía de un checkout de cita, marcar la cita en Supabase como 'COMPLETADA_Y_PAGADA'
-        if (typeof window !== 'undefined') {
-          const urlParams = new URLSearchParams(window.location.search)
-          const apptId = urlParams.get('appointment_id')
-          if (apptId) {
-            try {
-              await supabase
-                .from('appointments')
-                .update({
-                  status: 'completed',
-                  notes: `[FOLIO: ${apptId}] Cita COMPLETADA_Y_PAGADA. Cobro registrado en caja: $${val} MXN (${formData.paymentMethod}).`
-                })
-                .eq('id', apptId)
-              window.dispatchEvent(new Event('audenti_appointment_refresh'))
-            } catch (appErr) {
-              console.warn('Nota actualizando cita a pagada:', appErr)
-            }
-          }
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}))
+          throw new Error(errData.error || 'Error al guardar la transacción')
         }
       }
 
       setIsModalOpen(false)
-      fetchTransactions()
+      await fetchTransactions()
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('audenti_appointment_refresh'))
+      }
     } catch (err: any) {
       console.error('Error al guardar movimiento financiero:', err)
       alert(err?.message || 'Error al guardar la transacción')

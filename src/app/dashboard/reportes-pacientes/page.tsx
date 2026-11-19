@@ -444,14 +444,19 @@ export default function ReportesPacientesPage() {
 
     try {
       setSavingEdit(true)
+      const isChalma = editBranch.includes('Chalma') || editBranch.includes('Guadalupe')
+      const targetBranchName = isChalma ? 'Sucursal Chalma de Guadalupe' : 'Sucursal Balbuena (Matriz)'
+      const targetBranchId = isChalma ? '00000000-0000-0000-0000-000000000002' : '00000000-0000-0000-0000-000000000001'
+
       const { error } = await supabase
         .from('patients')
         .update({
           birth_date: editBirthDate || null,
-          branch: editBranch,
-          branch_name: editBranch.includes('Chalma') ? 'Sucursal Chalma de Guadalupe' : 'Sucursal Balbuena (Matriz)',
-          referral_type: editReferralType,
-          referred_by_name: editReferredByName.trim() || null
+          branch_id: targetBranchId,
+          branch_name: targetBranchName,
+          acquisition_channel: editReferralType === 'qr' ? 'qr' : (editReferralType ? 'referral' : null),
+          referrer_name: editReferredByName.trim() || null,
+          attribution_status: (editReferralType || editReferredByName.trim()) ? 'completed' : 'pending_review'
         })
         .eq('id', editingPatient.id)
 
@@ -464,9 +469,10 @@ export default function ReportesPacientesPage() {
             ? {
                 ...p,
                 birth_date: editBirthDate || null,
-                branch: editBranch,
-                referral_type: editReferralType,
-                referred_by_name: editReferredByName.trim() || null
+                branch_name: targetBranchName,
+                branch_id: targetBranchId,
+                acquisition_channel: editReferralType === 'qr' ? 'qr' : (editReferralType ? 'referral' : null),
+                referrer_name: editReferredByName.trim() || null
               }
             : p
         )

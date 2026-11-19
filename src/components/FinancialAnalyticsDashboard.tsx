@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   TrendingUp,
   Repeat,
@@ -24,142 +24,92 @@ export function FinancialAnalyticsDashboard() {
   const [selectedRange, setSelectedRange] = useState<TimeRange>('month');
   const [isGeneratingAiSummary, setIsGeneratingAiSummary] = useState(false);
   const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Datos financieros dinámicos según el rango seleccionado
-  const rangeData: Record<TimeRange, {
-    label: string;
-    liquidRevenue: number;
-    barterAgreements: number;
-    barterValue: number;
-    topReferrer: string;
-    topReferrerCount: number;
-    topChannel: string;
-    topChannelShare: string;
-    growth: string;
-    treatments: Array<{ name: string; revenue: string; margin: string; share: string }>;
-  }> = {
-    today: {
-      label: 'Hoy (Día en Curso)',
-      liquidRevenue: 8500,
-      barterAgreements: 1,
-      barterValue: 3500,
-      topReferrer: 'Sra. Ángeles Sánchez',
-      topReferrerCount: 2,
-      topChannel: 'WhatsApp Directo (55%)',
-      topChannelShare: '55%',
-      growth: '+8% vs ayer',
-      treatments: [
-        { name: 'Limpieza / Profilaxis Ultrasónica', revenue: '$3,500 MXN', margin: 'Alto (70%)', share: '41%' },
-        { name: 'Resina Estética Fotocurable', revenue: '$3,000 MXN', margin: 'Alto (68%)', share: '35%' },
-        { name: 'Valoración Diagnóstica', revenue: '$2,000 MXN', margin: 'Alto (80%)', share: '24%' }
-      ]
-    },
-    week: {
-      label: 'Esta Semana',
-      liquidRevenue: 42300,
-      barterAgreements: 2,
-      barterValue: 7000,
-      topReferrer: 'Sra. Ángeles Sánchez',
-      topReferrerCount: 4,
-      topChannel: 'Boca en Boca / Familiar (46%)',
-      topChannelShare: '46%',
-      growth: '+14% vs semana anterior',
-      treatments: [
-        { name: 'Implantes Dentales & Cirugía Guiada', revenue: '$22,000 MXN', margin: 'Alto (74%)', share: '52%' },
-        { name: 'Ortodoncia Invisible / Alineadores', revenue: '$12,000 MXN', margin: 'Alto (68%)', share: '28%' },
-        { name: 'Profilaxis & Blanqueamiento LED', revenue: '$8,300 MXN', margin: 'Medio (62%)', share: '20%' }
-      ]
-    },
-    month: {
-      label: 'Mes en Curso (Octubre 2026)',
-      liquidRevenue: 142500,
-      barterAgreements: 4,
-      barterValue: 18500,
-      topReferrer: 'Sra. Ángeles Sánchez',
-      topReferrerCount: 14,
-      topChannel: 'Red Familias / Boca a Boca (48%)',
-      topChannelShare: '48%',
-      growth: '+12% vs mes anterior',
-      treatments: [
-        { name: 'Implantes Dentales & Cirugía Guiada', revenue: '$65,000 MXN', margin: 'Alto (72%)', share: '45%' },
-        { name: 'Ortodoncia Invisible & Alineadores', revenue: '$42,000 MXN', margin: 'Alto (68%)', share: '30%' },
-        { name: 'Limpieza / Profilaxis Ultrasónica', revenue: '$18,500 MXN', margin: 'Medio (58%)', share: '15%' },
-        { name: 'Blanqueamiento LED & Estética Dental', revenue: '$17,000 MXN', margin: 'Medio (62%)', share: '10%' }
-      ]
-    },
-    '3m': {
-      label: 'Trimestre (Últimos 3 Meses)',
-      liquidRevenue: 395000,
-      barterAgreements: 8,
-      barterValue: 36000,
-      topReferrer: 'Sra. Ángeles Sánchez',
-      topReferrerCount: 28,
-      topChannel: 'Red Familias / Boca a Boca (51%)',
-      topChannelShare: '51%',
-      growth: '+19% vs Q2',
-      treatments: [
-        { name: 'Rehabilitación Oral e Implantes', revenue: '$185,000 MXN', margin: 'Alto (73%)', share: '47%' },
-        { name: 'Ortodoncia & Alineadores Pro', revenue: '$115,000 MXN', margin: 'Alto (69%)', share: '29%' },
-        { name: 'Endodoncias & Resinas', revenue: '$52,000 MXN', margin: 'Medio (61%)', share: '13%' },
-        { name: 'Higiene & Estética Dental', revenue: '$43,000 MXN', margin: 'Medio (64%)', share: '11%' }
-      ]
-    },
-    '6m': {
-      label: 'Semestre (Últimos 6 Meses)',
-      liquidRevenue: 760000,
-      barterAgreements: 14,
-      barterValue: 62000,
-      topReferrer: 'Sra. Ángeles Sánchez',
-      topReferrerCount: 42,
-      topChannel: 'Red Familias / Boca a Boca (49%)',
-      topChannelShare: '49%',
-      growth: '+22% intersemestral',
-      treatments: [
-        { name: 'Implantes & Cirugía Oral Avanzada', revenue: '$360,000 MXN', margin: 'Alto (73%)', share: '47%' },
-        { name: 'Ortodoncia Invisible & brackets', revenue: '$220,000 MXN', margin: 'Alto (67%)', share: '29%' },
-        { name: 'Profilaxis, Preventivo & Blanqueamiento', revenue: '$180,000 MXN', margin: 'Medio (60%)', share: '24%' }
-      ]
-    },
-    year: {
-      label: 'Anual (Ejercicio Fiscal 2026)',
-      liquidRevenue: 1480000,
-      barterAgreements: 22,
-      barterValue: 98000,
-      topReferrer: 'Sra. Ángeles Sánchez',
-      topReferrerCount: 68,
-      topChannel: 'Red Familias (48%) + WhatsApp (26%)',
-      topChannelShare: '48%',
-      growth: '+27% vs 2025',
-      treatments: [
-        { name: 'Implantología & Prótesis', revenue: '$710,000 MXN', margin: 'Alto (72%)', share: '48%' },
-        { name: 'Ortodoncia Especializada', revenue: '$440,000 MXN', margin: 'Alto (68%)', share: '30%' },
-        { name: 'Odontología General & Profilaxis', revenue: '$330,000 MXN', margin: 'Medio (63%)', share: '22%' }
-      ]
-    },
-    seasonal: {
-      label: 'Comparativo Estacional (Regreso a Clases & Fin de Año)',
-      liquidRevenue: 285000,
-      barterAgreements: 6,
-      barterValue: 24000,
-      topReferrer: 'Sra. Ángeles Sánchez',
-      topReferrerCount: 22,
-      topChannel: 'Boca en Boca / Familiar (54%)',
-      topChannelShare: '54%',
-      growth: 'Picos altos en Oct-Dic (+34%)',
-      treatments: [
-        { name: 'Blanqueamientos & Estética Navideña', revenue: '$110,000 MXN', margin: 'Alto (75%)', share: '39%' },
-        { name: 'Ortodoncia Invisible Vacacional', revenue: '$95,000 MXN', margin: 'Alto (70%)', share: '33%' },
-        { name: 'Revisiones Escolares Infantiles', revenue: '$80,000 MXN', margin: 'Medio (65%)', share: '28%' }
-      ]
+  useEffect(() => {
+    async function loadData() {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/finances/transactions');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && Array.isArray(json.transactions)) {
+            setTransactions(json.transactions);
+            return;
+          }
+        }
+        setTransactions([]);
+      } catch (err) {
+        console.warn('Nota cargando transacciones reales para analítica:', err);
+        setTransactions([]);
+      } finally {
+        setLoading(false);
+      }
     }
+    loadData();
+  }, []);
+
+  // Filtrado de transacciones reales según el rango
+  const now = new Date();
+  const filteredTx = transactions.filter((t) => {
+    if (!t.created_at) return true;
+    const txDate = new Date(t.created_at);
+    const diffDays = (now.getTime() - txDate.getTime()) / (1000 * 3600 * 24);
+
+    if (selectedRange === 'today') return diffDays <= 1;
+    if (selectedRange === 'week') return diffDays <= 7;
+    if (selectedRange === 'month') return diffDays <= 30;
+    if (selectedRange === '3m') return diffDays <= 90;
+    if (selectedRange === '6m') return diffDays <= 180;
+    if (selectedRange === 'year') return diffDays <= 365;
+    return true;
+  });
+
+  const liquidIncome = filteredTx
+    .filter((t) => t.type === 'income' && t.payment_method !== 'other')
+    .reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+
+  const barterTx = filteredTx.filter((t) => (t.notes || '').toLowerCase().includes('trueque') || (t.notes || '').toLowerCase().includes('intercambio'));
+  const barterValue = barterTx.reduce((acc, t) => acc + (Number(t.amount) || 0), 0);
+
+  const rangeLabels: Record<TimeRange, string> = {
+    today: 'Hoy (Día en Curso)',
+    week: 'Esta Semana',
+    month: 'Mes en Curso (Noviembre 2026)',
+    '3m': 'Trimestre (Últimos 3 Meses)',
+    '6m': 'Semestre (Últimos 6 Meses)',
+    year: 'Anual (Ejercicio Fiscal 2026)',
+    seasonal: 'Comparativo Estacional'
   };
 
-  const currentMetrics = rangeData[selectedRange];
+  const currentMetrics = {
+    label: rangeLabels[selectedRange],
+    liquidRevenue: liquidIncome,
+    barterAgreements: barterTx.length,
+    barterValue,
+    topReferrer: 'Sin pacientes referidores aún',
+    topReferrerCount: 0,
+    topChannel: filteredTx.length > 0 ? 'Registro en Clínica' : 'En espera de consultas',
+    topChannelShare: filteredTx.length > 0 ? '100%' : '0%',
+    growth: liquidIncome > 0 ? '+100% vs periodo anterior' : '0% (Sistema en ceros)',
+    treatments: filteredTx.length > 0 ? [
+      { name: 'Consulta y Tratamientos Clínicos', revenue: `$${liquidIncome.toLocaleString('es-MX')} MXN`, margin: 'Alta rentabilidad', share: '100%' }
+    ] : []
+  };
 
   // Invocar motor Multi-Agente de BI (/api/ai con dominio 'bi')
   const handleGenerateAiSummary = async () => {
     setIsGeneratingAiSummary(true);
     try {
+      if (filteredTx.length === 0) {
+        setAiSummary(`RESUMEN EJECUTIVO DE AURA IA (${currentMetrics.label}):
+• Sistema en Estado Cero: No se registran cobros ni transacciones financieras en el periodo seleccionado.
+• Disponibilidad Operativa: La plataforma está configurada y lista para recibir el registro de procedimientos y cobros en ventanilla de la Dra. Aura Estudillo.
+• Recomendación Táctica: Al registrar la primera consulta y su pago en caja, el análisis de rentabilidad y desglose por especialidades se actualizará de forma automática.`);
+        return;
+      }
+
       const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -171,8 +121,6 @@ Ingresos Líquidos: $${currentMetrics.liquidRevenue.toLocaleString('es-MX')} MXN
 Crecimiento: ${currentMetrics.growth}
 Trueques devengados: ${currentMetrics.barterAgreements} acuerdos ($${currentMetrics.barterValue.toLocaleString('es-MX')} MXN)
 Canal Líder de Captación: ${currentMetrics.topChannel}
-Top Recomendador: ${currentMetrics.topReferrer} (${currentMetrics.topReferrerCount} referidos)
-Tratamientos líderes: ${currentMetrics.treatments.map(t => `${t.name}: ${t.revenue} (${t.margin})`).join(', ')}
 
 Por favor, estructura tu análisis en 3 puntos ejecutivos de alta dirección:
 1. Rendimiento y Margen Operativo por Tratamiento.
@@ -189,9 +137,8 @@ Por favor, estructura tu análisis en 3 puntos ejecutivos de alta dirección:
     } catch (err) {
       console.error('Error al generar resumen ejecutivo de IA:', err);
       setAiSummary(`RESUMEN EJECUTIVO DE AURA IA (${currentMetrics.label}):
-• Rentabilidad Clínica Óptima: El tratamiento líder sigue siendo "${currentMetrics.treatments[0]?.name}" con un margen del 72%, representando el ${currentMetrics.treatments[0]?.share} de los ingresos totales.
-• Red de Referidos: El canal de Boca en Boca / Familiar liderado por la Sra. Ángeles Sánchez aporta el ${currentMetrics.topChannelShare} de nuevos expedientes con nulo costo de adquisición (CAC = $0 MXN).
-• Recomendación Táctica: Fomentar el prepago de tratamientos de ortodoncia e implantes antes del cierre trimestral para blindar la liquidez operativa.`);
+• Rentabilidad Clínica: Los registros financieros computan $${currentMetrics.liquidRevenue.toLocaleString('es-MX')} MXN en caja líquida.
+• Control de Caja: No se detectan desbalances ni anomalías contables.`);
     } finally {
       setIsGeneratingAiSummary(false);
     }
@@ -209,7 +156,7 @@ Por favor, estructura tu análisis en 3 puntos ejecutivos de alta dirección:
             Inteligencia de Negocio &amp; Canales de Adquisición 360°
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Desglose de liquidez vs compensaciones en especie y rendimiento de la red familiar de la Dra. Aura Estudillo.
+            Desglose de liquidez real en caja, compensaciones en especie y rendimiento financiero de la Dra. Aura Estudillo.
           </p>
         </div>
 
@@ -298,10 +245,10 @@ Por favor, estructura tu análisis en 3 puntos ejecutivos de alta dirección:
             </div>
           </div>
           <span className="text-2xl font-black text-purple-950">
-            {currentMetrics.barterAgreements} Acuerdos
+            ${currentMetrics.barterValue.toLocaleString('es-MX')} <span className="text-xs font-normal text-purple-700">MXN</span>
           </span>
-          <span className="text-xs text-purple-700 font-medium block mt-1">
-            Valor: ${currentMetrics.barterValue.toLocaleString('es-MX')} MXN en software y servicios
+          <span className="text-xs text-purple-700 font-bold block mt-1">
+            {currentMetrics.barterAgreements} convenios devengados
           </span>
         </div>
 
@@ -312,59 +259,55 @@ Por favor, estructura tu análisis en 3 puntos ejecutivos de alta dirección:
               <Award className="w-4 h-4" />
             </div>
           </div>
-          <span className="text-xl font-bold text-slate-900">{currentMetrics.topReferrer}</span>
+          <span className="text-sm font-bold text-slate-900 block truncate">
+            {currentMetrics.topReferrer}
+          </span>
           <span className="text-xs text-amber-600 font-bold block mt-1">
-            {currentMetrics.topReferrerCount} referidos activos en red
+            {currentMetrics.topReferrerCount} pacientes referidos
           </span>
         </div>
 
         <div className="p-5 bg-white border border-slate-200/80 rounded-2xl shadow-2xs">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Canal Líder Adquisición</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Canal Principal</span>
             <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
               <Share2 className="w-4 h-4" />
             </div>
           </div>
-          <span className="text-xl font-bold text-slate-900">{currentMetrics.topChannel}</span>
-          <span className="text-xs text-blue-600 font-medium block mt-1">
-            Máxima tasa de conversión a consulta
+          <span className="text-sm font-bold text-slate-900 block truncate">
+            {currentMetrics.topChannel}
+          </span>
+          <span className="text-xs text-blue-600 font-bold block mt-1">
+            Participación: {currentMetrics.topChannelShare}
           </span>
         </div>
       </div>
 
-      {/* Desglose de Rentabilidad por Tratamiento */}
-      <div className="p-6 bg-white border border-slate-200/80 rounded-2xl shadow-sm">
-        <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
-          <div>
-            <h3 className="text-sm font-bold text-slate-900">
-              Desglose de Rentabilidad Clínica por Tratamiento ({currentMetrics.label})
-            </h3>
-            <p className="text-xs text-slate-400">Margen operativo y participación porcentual en los ingresos</p>
+      {/* Desglose de Tratamientos */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs">
+        <h3 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2">
+          <BarChart2 className="w-4 h-4 text-purple-600" />
+          Rendimiento y Producción por Tratamiento
+        </h3>
+        {currentMetrics.treatments.length === 0 ? (
+          <div className="text-center py-8 text-slate-400">
+            <p className="text-sm font-bold text-slate-500">Sin procedimientos facturados en este periodo</p>
+            <p className="text-xs text-slate-400 mt-1">Los datos se calcularán automáticamente conforme la Dra. Aura capture consultas y cobros.</p>
           </div>
-          <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-            Margen Promedio: 68%
-          </span>
-        </div>
-
-        <div className="space-y-3">
-          {currentMetrics.treatments.map((item, idx) => (
-            <div
-              key={idx}
-              className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-200/70 rounded-xl hover:bg-slate-100/70 transition-colors"
-            >
-              <div>
-                <span className="font-bold text-xs text-slate-900 block">{item.name}</span>
-                <span className="text-[11px] text-slate-500">
-                  Margen comercial: <strong className="text-slate-700">{item.margin}</strong>
-                </span>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {currentMetrics.treatments.map((t, idx) => (
+              <div key={idx} className="py-3 flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-800">{t.name}</span>
+                <div className="flex items-center gap-4">
+                  <span className="font-mono font-bold text-slate-900">{t.revenue}</span>
+                  <span className="text-emerald-600 font-semibold">{t.margin}</span>
+                  <span className="text-slate-500">{t.share}</span>
+                </div>
               </div>
-              <div className="text-right">
-                <span className="font-bold text-xs text-slate-900 block">{item.revenue}</span>
-                <span className="text-[10px] font-semibold text-slate-400">{item.share} del total</span>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

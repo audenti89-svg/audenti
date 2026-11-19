@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getPersistedAppointments, savePersistedAppointments } from '@/lib/supabase/appointments-storage';
 import { isInternalUser } from '@/lib/auth/admin-emails';
 import { GoogleCalendarService } from '@/lib/google/calendar-service';
+import { findDuplicatePatient } from '@/lib/patients/patientDeduplicator';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -117,29 +119,27 @@ export async function POST(request: Request) {
       }
     }
 
-    // Resolver patient_id si no viene en el body
+    // Resolver patient_id con el Motor de Deduplicación Inteligente si no viene en el body
     let resolvedPatientId = body.patient_id || null;
-    if (!resolvedPatientId && (patient_phone || patient_name)) {
-      try {
-        const cleanPhone = (patient_phone || '').replace(/\D/g, '').slice(-10);
-        const { data: pMatch } = await supabase
-          .from('patients')
-          .select('id')
-          .or(`phone.ilike.%${cleanPhone}%,full_name.ilike.%${patient_name}%`)
-          .limit(1)
-          .maybeSingle();
-        if (pMatch?.id) {
-          resolvedPatientId = pMatch.id;
-        }
-      } catch {}
-    }
+    let canonicalPatientName = patient_name;
+    try {
+      const adminClient = createAdminClient();
+      const dup = await findDuplicatePatient(adminClient, {
+        phone: patient_phone,
+        full_name: patient_name
+      });
+      if (dup.isDuplicate && dup.matchedPatient) {
+        resolvedPatientId = dup.matchedPatient.id;
+        canonicalPatientName = dup.matchedPatient.full_name || patient_name;
+      }
+    } catch {}
 
     const folio = body.folio || body.id || `AUD-${Math.floor(1000 + Math.random() * 9000)}`;
     const newAppt = {
       id: folio,
       folio,
       patient_id: resolvedPatientId,
-      patient_name,
+      patient_name: canonicalPatientName,
       patient_phone: patient_phone || '5522427769',
       appointment_date: appointment_date || new Date().toISOString().split('T')[0],
       appointment_time: selectedTime,
@@ -156,23 +156,27 @@ export async function POST(request: Request) {
     const updated = [newAppt, ...current.filter((a: any) => a.id !== newAppt.id && a.folio !== newAppt.folio)];
     await savePersistedAppointments(updated);
 
-    // Sincronizar en tabla relacional appointments de Supabase para visibilidad del paciente
-    try {
-      await supabase.from('appointments').upsert({
-        id: folio,
-        patient_id: resolvedPatientId,
-        patient_name,
-        phone: newAppt.patient_phone,
-        appointment_date: newAppt.appointment_date,
-        start_time: `${newAppt.appointment_date}T${newAppt.appointment_time}:00`,
-        treatment_type: treatment,
-        branch,
-        status,
-        attendance_confirmed: false,
-        notes: newAppt.notes
-      }, { onConflict: 'id' });
-    } catch (dbErr) {
-      console.warn('Nota guardando en appointments Supabase:', dbErr);
+    // Sincronizar en tabla relacional appointments de Supabase
+    if (resolvedPatientId) {
+      try {
+        const adminSupabase = createAdminClient();
+        const startDateTime = new Date(`${newAppt.appointment_date}T${newAppt.appointment_time}:00-06:00`);
+        const endDateTime = new Date(startDateTime.getTime() + 45 * 60000);
+        const isChalma = branch.toLowerCase().includes('chalma') || branch.toLowerCase().includes('guadalupe');
+
+        await adminSupabase.from('appointments').insert({
+          tenant_id: 'c62fc15b-bf68-4101-881d-fdd9258fce1f',
+          branch_id: isChalma ? '00000000-0000-0000-0000-000000000002' : '00000000-0000-0000-0000-000000000001',
+          patient_id: resolvedPatientId,
+          doctor_id: '5e8853ee-b813-4a1b-aafd-48b3d20ec1e3',
+          starts_at: startDateTime.toISOString(),
+          ends_at: endDateTime.toISOString(),
+          status: status === 'confirmed' ? 'confirmed' : 'scheduled',
+          notes: `Folio: ${folio} • ${treatment} • ${notes || 'Cita clínica'} • Tel: ${newAppt.patient_phone}`
+        });
+      } catch (dbErr) {
+        console.warn('Nota guardando en appointments Supabase:', dbErr);
+      }
     }
 
     // Intentar emitir broadcast en Realtime

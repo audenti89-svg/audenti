@@ -60,29 +60,15 @@ export default function BIDashboardPage() {
       let totalRevenue = 0
       let pendingBalance = 0
 
-      // Intentar leer patient_financial_ledger
-      const { data: financialData, error: finErr } = await supabase
-        .from('patient_financial_ledger')
-        .select('paid_amount, balance_due, total_amount')
+      // Consultar transacciones reales
+      const { data: txData } = await supabase
+        .from('transactions')
+        .select('amount, type, status')
 
-      if (!finErr && financialData && financialData.length > 0) {
-        totalRevenue = financialData.reduce((acc, curr) => acc + (Number(curr.paid_amount) || 0), 0)
-        pendingBalance = financialData.reduce((acc, curr) => acc + (Number(curr.balance_due) || 0), 0)
-      } else {
-        // Fallback a tabla payments si patient_financial_ledger está vacía
-        const { data: paymentsData } = await supabase
-          .from('payments')
-          .select('amount, status')
-
-        if (paymentsData && paymentsData.length > 0) {
-          totalRevenue = paymentsData
-            .filter((p) => p.status === 'completed' || p.status === 'Paid')
-            .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0)
-
-          pendingBalance = paymentsData
-            .filter((p) => p.status === 'pending' || p.status === 'Pending')
-            .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0)
-        }
+      if (txData && txData.length > 0) {
+        totalRevenue = txData
+          .filter((t) => t.type === 'income')
+          .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0)
       }
 
       // 3. Insumos con stock bajo

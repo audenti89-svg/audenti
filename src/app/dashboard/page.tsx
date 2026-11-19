@@ -127,14 +127,15 @@ export default function DashboardPage() {
       const inChairAppointment = appList.find((a: any) => a.status === 'in_chair')
       const inWaitingCount = appList.filter((a: any) => a.status === 'in_waiting').length
 
-      // 2. Sumar ingresos reales de pagos
-      const { data: payments, error: payErr } = await supabase
-        .from('payments')
-        .select('amount, status')
+      // 2. Sumar ingresos reales de transacciones de caja
+      const { data: txs, error: txErr } = await supabase
+        .from('transactions')
+        .select('amount, type, status')
+        .eq('type', 'income')
 
-      if (payErr) console.warn('Error en payments fetch:', payErr)
+      if (txErr) console.warn('Error en transactions fetch:', txErr)
 
-      const totalRevenue = (payments || []).reduce((acc: number, curr: any) => acc + (Number(curr.amount) || 0), 0)
+      const totalRevenue = (txs || []).reduce((acc: number, curr: any) => acc + (Number(curr.amount) || 0), 0)
 
       const getPatientName = (p: any) => {
         if (!p) return null

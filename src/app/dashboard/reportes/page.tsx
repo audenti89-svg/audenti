@@ -130,11 +130,11 @@ export default function ReportesPage() {
         if (dbApps) appList = dbApps
       }
 
-      // 3. Obtener pagos o transacciones reales
+      // 3. Obtener transacciones financieras reales de caja
       let paymentsList: any[] = []
       try {
-        const { data: pay } = await supabase.from('payments').select('*')
-        if (pay && pay.length > 0) paymentsList = pay
+        const { data: txs } = await supabase.from('transactions').select('*').eq('type', 'income')
+        if (txs && txs.length > 0) paymentsList = txs
       } catch {}
 
       // Catálogo Oficial de 19 Servicios (Costos 2 - Dra. Aura Estudillo)
