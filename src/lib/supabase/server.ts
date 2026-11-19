@@ -10,6 +10,12 @@ export async function createClient() {
     url,
     key,
     {
+      cookieOptions: {
+        maxAge: 31536000, // 1 año permanente
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
       cookies: {
         getAll() {
           return cookieStore.getAll()
@@ -17,7 +23,13 @@ export async function createClient() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
+              cookieStore.set(name, value, {
+                ...options,
+                maxAge: 31536000, // 1 año permanente hasta cerrar sesión manual
+                sameSite: 'lax',
+                path: '/',
+                secure: process.env.NODE_ENV === 'production',
+              })
             )
           } catch {
             // Ignore - Server Component calling set

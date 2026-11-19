@@ -83,6 +83,8 @@ export async function POST(request: Request) {
       phone,
       branchId,
       branchName,
+      birthDate,
+      dateOfBirth,
       autoConfirm
     } = body;
 
@@ -90,6 +92,8 @@ export async function POST(request: Request) {
     if (!cleanEmail || !cleanEmail.includes('@')) {
       return NextResponse.json({ error: 'Correo electrónico requerido' }, { status: 400 });
     }
+
+    const birth_date_val = birthDate || dateOfBirth || null;
 
     const admin = createAdminClient();
     const db = getDbClient();
@@ -111,6 +115,7 @@ export async function POST(request: Request) {
     const cleanPhone = phone ? phone.replace(/\D/g, '').slice(-10) : null;
     const defaultBranchId = branchId || '00000000-0000-0000-0000-000000000001';
     const defaultBranchName = branchName || (defaultBranchId.includes('0002') ? 'Sucursal Chalma de Guadalupe' : 'Sucursal Balbuena (Matriz)');
+    const canonicalBranch = (defaultBranchName || '').toLowerCase().includes('chalma') ? 'Chalma de Guadalupe' : 'Balbuena';
 
     // ── BLINDAJE ECC P0: CONTROL ESTRICTO DE MODIFICACIÓN DE CONTRASEÑA ──
     // Si el usuario ya existe en Supabase Auth, queda TERMINANTEMENTE PROHIBIDO
@@ -209,9 +214,18 @@ export async function POST(request: Request) {
       if (fullName && (!existingPatient.full_name || existingPatient.full_name === 'Paciente Audenti')) {
         updateData.full_name = fullName;
       }
-      if (cleanPhone && !existingPatient.phone) updateData.phone = cleanPhone;
-      if (branchId && !existingPatient.branch_id) updateData.branch_id = branchId;
-      if (branchName && !existingPatient.branch_name) updateData.branch_name = branchName;
+      if (cleanPhone) updateData.phone = cleanPhone;
+      if (branchId) updateData.branch_id = branchId;
+      if (branchName) {
+        updateData.branch_name = branchName;
+        updateData.branch = canonicalBranch;
+      } else if (!existingPatient.branch) {
+        updateData.branch = canonicalBranch;
+      }
+      if (birth_date_val) {
+        updateData.birth_date = birth_date_val;
+        updateData.date_of_birth = birth_date_val;
+      }
 
       let { data: updated, error: updErr } = await db
         .from('patients')
@@ -239,11 +253,14 @@ export async function POST(request: Request) {
       const insertData: Record<string, any> = {
         tenant_id: defaultBranchId,
         branch_id: defaultBranchId,
+        branch: canonicalBranch,
         branch_name: defaultBranchName,
         user_id: targetUserId || null,
         full_name: fullName || 'Paciente Audenti',
         email: cleanEmail,
         phone: cleanPhone,
+        birth_date: birth_date_val,
+        date_of_birth: birth_date_val,
         status: 'active',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()

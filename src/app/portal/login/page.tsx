@@ -20,7 +20,8 @@ import {
   Phone,
   Lock,
   Eye,
-  EyeOff
+  EyeOff,
+  Calendar
 } from 'lucide-react';
 import { AudentiLogo } from '@/components/ui/AudentiLogo';
 import { isSystemAdminEmail, isInternalUser } from '@/lib/auth/admin-emails';
@@ -87,6 +88,7 @@ function PatientLoginForm() {
   const [actEmail, setActEmail] = useState('');
   const [actFullName, setActFullName] = useState('');
   const [actPhone, setActPhone] = useState('');
+  const [actBirthDate, setActBirthDate] = useState('');
   const [actBranchId, setActBranchId] = useState(BRANCH_OPTIONS[0].id);
   const [actPassword, setActPassword] = useState('');
   const [actConfirmPassword, setActConfirmPassword] = useState('');
@@ -319,6 +321,21 @@ function PatientLoginForm() {
       return;
     }
 
+    if (!actFullName.trim()) {
+      setErrorMsg('Por favor ingresa tu nombre completo para tu expediente clínico.');
+      return;
+    }
+
+    if (!cleanPhone || cleanPhone.length < 10) {
+      setErrorMsg('Por favor ingresa un número de celular válido a 10 dígitos.');
+      return;
+    }
+
+    if (!actBirthDate) {
+      setErrorMsg('Por favor ingresa tu fecha de nacimiento para el cálculo de tu expediente clínico.');
+      return;
+    }
+
     if (actPassword.length < 6) {
       setErrorMsg('La contraseña debe tener al menos 6 caracteres.');
       return;
@@ -343,6 +360,7 @@ function PatientLoginForm() {
           password: actPassword.trim(),
           fullName: actFullName.trim() || existingMatch?.full_name || 'Paciente Audenti',
           phone: cleanPhone || existingMatch?.phone || null,
+          birthDate: actBirthDate || null,
           branchId: selectedBranchObj.id,
           branchName: selectedBranchObj.name,
           autoConfirm: true
@@ -620,17 +638,35 @@ function PatientLoginForm() {
           {/* TELÉFONO DE CONTACTO */}
           <div>
             <label className="block text-[11px] font-black uppercase tracking-wider text-slate-300 mb-1.5">
-              Teléfono Celular (10 dígitos)
+              Teléfono Celular (10 dígitos) *
             </label>
             <div className="relative">
               <Phone className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="tel"
+                required
                 maxLength={10}
                 placeholder="55 1234 5678"
                 value={actPhone}
                 onChange={(e) => setActPhone(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-xl text-xs font-medium text-white placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-amber-400 transition-all"
+              />
+            </div>
+          </div>
+
+          {/* FECHA DE NACIMIENTO */}
+          <div>
+            <label className="block text-[11px] font-black uppercase tracking-wider text-slate-300 mb-1.5">
+              Fecha de Nacimiento *
+            </label>
+            <div className="relative">
+              <Calendar className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="date"
+                required
+                value={actBirthDate}
+                onChange={(e) => setActBirthDate(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-xl text-xs font-medium text-white focus:outline-hidden focus:ring-1 focus:ring-amber-400 transition-all cursor-pointer"
               />
             </div>
           </div>

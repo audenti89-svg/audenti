@@ -50,6 +50,12 @@ export async function GET(request: Request) {
     process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://ysxcjrxuakfqzzseiaiy.supabase.co',
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_Wdm8x6QfGCWQNKqwLRejXA__r5Cg13m',
     {
+      cookieOptions: {
+        maxAge: 31536000, // 1 año permanente
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
       cookies: {
         getAll() {
           const cookieHeader = request.headers.get('cookie') ?? '';
@@ -62,7 +68,10 @@ export async function GET(request: Request) {
           cookiesToSet.forEach(({ name, value, options }) => {
             response.cookies.set(name, value, {
               ...options,
-              maxAge: 43200, // 12 horas de jornada laboral activa
+              maxAge: 31536000, // 1 año de persistencia permanente (permanece activa hasta cerrar sesión manual)
+              sameSite: 'lax',
+              path: '/',
+              secure: process.env.NODE_ENV === 'production',
             });
           });
         },

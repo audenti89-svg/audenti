@@ -33,7 +33,8 @@ import {
   QrCode,
   User,
   Bell,
-  CalendarCheck
+  CalendarCheck,
+  AlertCircle
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -130,6 +131,18 @@ export function PatientPortalView({
   const [clinicalTimeline, setClinicalTimeline] = useState<ClinicalTreatmentRecord[]>([]);
   const [prescriptions, setPrescriptions] = useState<DigitalPrescription[]>([]);
 
+  // Estados de Registro Completo & Asignación de Sucursal
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [editSuccessMsg, setEditSuccessMsg] = useState('');
+  const [profileForm, setProfileForm] = useState({
+    fullName: '',
+    phone: '',
+    birthDate: '',
+    branchName: 'Sucursal Balbuena',
+    branchId: '00000000-0000-0000-0000-000000000001'
+  });
+
   useEffect(() => {
     async function loadPortal() {
       try {
@@ -180,6 +193,17 @@ export function PatientPortalView({
         supabase.from('users').update({ is_active: true, onboarding_completed: true }).eq('id', authUser.id).then(() => {});
 
         setPatient(myProfile);
+
+        // Inicializar formulario de perfil completo y sucursal
+        const rawBranch = myProfile?.branch || myProfile?.branch_name || '';
+        const isChalmaBranch = rawBranch.toLowerCase().includes('chalma') || (myProfile?.tenant_id === '00000000-0000-0000-0000-000000000002');
+        setProfileForm({
+          fullName: myProfile?.full_name || authUser?.user_metadata?.full_name || '',
+          phone: myProfile?.phone || '',
+          birthDate: myProfile?.birth_date ? myProfile.birth_date.split('T')[0] : (myProfile?.date_of_birth ? myProfile.date_of_birth.split('T')[0] : ''),
+          branchName: isChalmaBranch ? 'Sucursal Chalma de Guadalupe' : 'Sucursal Balbuena',
+          branchId: isChalmaBranch ? '00000000-0000-0000-0000-000000000002' : '00000000-0000-0000-0000-000000000001'
+        });
 
         if (myProfile?.id) {
           // 1. Cargar citas reales del paciente (sin mock, con doble sincronización)
@@ -298,7 +322,7 @@ export function PatientPortalView({
   };
 
   // Sucursal asignada al paciente
-  const branchDisplay = patient?.branch_name || patient?.tenant_id || 'Sucursal Balbuena (Matriz)';
+  const branchDisplay = patient?.branch || patient?.branch_name || patient?.tenant_id || 'Sucursal Balbuena';
 
   // Resolver información canónica de sucursal
   const branchInfo = useMemo(() => {
@@ -317,6 +341,101 @@ export function PatientPortalView({
     // Por defecto Chalma de Guadalupe
     return BRANCH_DETAILS['00000000-0000-0000-0000-000000000002'];
   }, [patient, branchDisplay]);
+
+  // ── EVALUACIÓN DE REGISTRO COMPLETO (RECORDATORIO NOM-004-SSA3) ──
+  const registrationEvaluation = useMemo(() => {
+    const hasName = Boolean(patient?.full_name && patient?.full_name.trim() !== 'Paciente Audenti' && patient?.full_name.trim().length >= 3);
+    const hasPhone = Boolean(patient?.phone && patient?.phone.replace(/\D/g, '').length >= 10);
+    const hasBirthDate = Boolean(patient?.birth_date || patient?.date_of_birth);
+    const hasExplicitBranch = Boolean(patient?.branch || patient?.branch_name);
+
+    const checks = [
+      { key: 'name', label: 'Nombre Completo', done: hasName, missingHint: 'Nombre completo oficial' },
+      { key: 'phone', label: 'Teléfono Celular', done: hasPhone, missingHint: 'Celular a 10 dígitos (recordatorios 24h & 1h)' },
+      { key: 'branch', label: 'Sucursal Asignada', done: hasExplicitBranch, missingHint: 'Sucursal de atención (Balbuena o Chalma)' },
+      { key: 'birthDate', label: 'Fecha de Nacimiento', done: hasBirthDate, missingHint: 'Fecha de nacimiento (edad clínica)' }
+    ];
+
+    const completedCount = checks.filter(c => c.done).length;
+    const percentage = Math.round((completedCount / checks.length) * 100);
+    const isComplete = percentage === 100;
+    const missingItems = checks.filter(c => !c.done);
+
+    return {
+      percentage,
+      isComplete,
+      missingItems,
+      checks
+    };
+  }, [patient]);
+
+  // Edad calculada en vivo para el modal
+  const calculatedAge = useMemo(() => {
+    if (!profileForm.birthDate) return null;
+    const bDate = new Date(profileForm.birthDate);
+    if (isNaN(bDate.getTime())) return null;
+    const today = new Date();
+    let age = today.getFullYear() - bDate.getFullYear();
+    const m = today.getMonth() - bDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < bDate.getDate())) {
+      age--;
+    }
+    return age >= 0 ? age : null;
+  }, [profileForm.birthDate]);
+
+  // Guardar datos de perfil y sucursal
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setSavingProfile(true);
+    setEditSuccessMsg('');
+    try {
+      const resp = await fetch('/api/auth/sync-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          email: user.email,
+          fullName: profileForm.fullName.trim(),
+          phone: profileForm.phone.replace(/\D/g, '').slice(-10),
+          birthDate: profileForm.birthDate || null,
+          branchName: profileForm.branchName,
+          branchId: profileForm.branchId
+        })
+      });
+
+      const resData = await resp.json();
+      if (!resp.ok) {
+        throw new Error(resData?.error || 'No se pudo guardar la información en el servidor.');
+      }
+
+      if (resData.patient) {
+        setPatient(resData.patient);
+      } else {
+        setPatient((prev: any) => ({
+          ...prev,
+          full_name: profileForm.fullName.trim(),
+          phone: profileForm.phone.replace(/\D/g, '').slice(-10),
+          birth_date: profileForm.birthDate,
+          date_of_birth: profileForm.birthDate,
+          branch: profileForm.branchName.includes('Chalma') ? 'Chalma de Guadalupe' : 'Balbuena',
+          branch_name: profileForm.branchName,
+          tenant_id: profileForm.branchId,
+          branch_id: profileForm.branchId
+        }));
+      }
+
+      setEditSuccessMsg('¡Expediente actualizado y sucursal asignada con éxito!');
+      setTimeout(() => {
+        setIsEditProfileOpen(false);
+        setEditSuccessMsg('');
+      }, 1200);
+    } catch (err: any) {
+      alert(err?.message || 'Error guardando datos');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
 
   // Utilidad para extraer timestamp de la cita de forma confiable
   const parseApptTime = (a: any): number => {
@@ -596,9 +715,99 @@ export function PatientPortalView({
                 <Building2 className="w-5 h-5 text-amber-400 shrink-0" />
                 {branchInfo.name}
               </p>
+              <button
+                type="button"
+                onClick={() => setIsEditProfileOpen(true)}
+                className="text-[11px] text-amber-300 hover:text-amber-200 underline font-bold flex items-center gap-1 cursor-pointer pt-0.5"
+              >
+                Cambiar / Confirmar sucursal →
+              </button>
             </div>
           </div>
         </div>
+
+        {/* ── RECORDATORIO DE REGISTRO COMPLETO (NOM-004-SSA3) ── */}
+        {!registrationEvaluation.isComplete ? (
+          <div className="bg-gradient-to-r from-amber-950/70 via-slate-950 to-amber-950/40 border-2 border-amber-400/60 rounded-3xl p-6 sm:p-7 shadow-[0_0_40px_rgba(245,158,11,0.2)] space-y-4 backdrop-blur-xl relative overflow-hidden animate-in fade-in duration-300">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-amber-400/20 border border-amber-400/50 flex items-center justify-center text-amber-300 shrink-0 shadow-inner">
+                  <AlertCircle className="w-6 h-6 animate-pulse" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-400 text-slate-950 tracking-wider">
+                      Recordatorio: Expediente Incompleto
+                    </span>
+                    <span className="text-xs text-amber-300 font-bold">
+                      Registro al {registrationEvaluation.percentage}%
+                    </span>
+                  </div>
+                  <h2 className="text-lg sm:text-xl font-black text-white mt-1">
+                    Completa tu Expediente Dental y Confirma tu Sucursal
+                  </h2>
+                  <p className="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
+                    Para que la Dra. Aura Estudillo certifique tus recetas oficiales bajo la norma NOM-004-SSA3, asigne tu expediente a tu sede más cercana y active tus recordatorios automáticos de cita (24h y 1h), completa los datos pendientes:
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsEditProfileOpen(true)}
+                className="w-full md:w-auto px-5 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-400/25 flex items-center justify-center gap-2 cursor-pointer shrink-0 active:scale-95"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Completar Registro Ahora ({registrationEvaluation.percentage}%)</span>
+              </button>
+            </div>
+
+            {/* Barra de Progreso Visual */}
+            <div className="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden border border-slate-800">
+              <div
+                className="bg-gradient-to-r from-amber-500 to-amber-300 h-2.5 rounded-full transition-all duration-700 ease-out"
+                style={{ width: `${registrationEvaluation.percentage}%` }}
+              />
+            </div>
+
+            {/* Chips con datos faltantes */}
+            <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+              <span className="text-slate-400 font-bold text-[11px] uppercase tracking-wider">Falta completar:</span>
+              {registrationEvaluation.missingItems.map(item => (
+                <span
+                  key={item.key}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs font-semibold"
+                >
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  {item.missingHint}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="bg-emerald-950/40 border border-emerald-500/40 rounded-2xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 backdrop-blur-md">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+                <CheckCircle2 className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400">
+                  Expediente Clínico 100% Completo y Certificado (NOM-004-SSA3)
+                </span>
+                <p className="text-xs text-slate-300">
+                  Sucursal asignada: <strong className="text-white">{branchInfo.name}</strong> • Edad clínica y recordatorios activos.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsEditProfileOpen(true)}
+              className="text-xs text-amber-400 hover:text-amber-300 underline font-bold transition-colors cursor-pointer shrink-0"
+            >
+              Actualizar datos / Cambiar sucursal
+            </button>
+          </div>
+        )}
 
         {/* ── 4. BANNER DESTACADO DE PRÓXIMA CITA MÉDICA & NOTIFICACIONES ── */}
         <div className="bg-gradient-to-r from-blue-950/80 via-slate-950 to-indigo-950/80 border border-blue-500/40 rounded-3xl p-6 sm:p-7 shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 backdrop-blur-xl">
@@ -1307,14 +1516,23 @@ export function PatientPortalView({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Tarjeta de Información Personal */}
               <div className="bg-slate-950/90 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-                <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
-                  <div className="w-10 h-10 rounded-2xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-400">
-                    <User className="w-5 h-5" />
+                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-400">
+                      <User className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-white">Datos Personales del Paciente</h3>
+                      <p className="text-xs text-slate-400">Expediente Clínico Oficial (NOM-004-SSA3)</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-base font-black text-white">Datos Personales del Paciente</h3>
-                    <p className="text-xs text-slate-400">Expediente Clínico Oficial (NOM-004-SSA3)</p>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditProfileOpen(true)}
+                    className="px-3 py-1.5 rounded-xl bg-amber-400/15 hover:bg-amber-400/25 border border-amber-400/30 text-amber-300 font-bold text-xs transition-colors cursor-pointer"
+                  >
+                    Editar Datos
+                  </button>
                 </div>
 
                 <div className="space-y-3 text-xs">
@@ -1329,6 +1547,14 @@ export function PatientPortalView({
                   <div className="flex justify-between py-2 border-b border-slate-900">
                     <span className="text-slate-400">Teléfono Móvil:</span>
                     <strong className="text-slate-200">{patient?.phone || 'No registrado'}</strong>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-slate-900">
+                    <span className="text-slate-400">Fecha de Nacimiento:</span>
+                    <strong className="text-amber-300 font-bold">
+                      {patient?.birth_date || patient?.date_of_birth
+                        ? new Date(patient.birth_date || patient.date_of_birth).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })
+                        : 'No registrada (haz clic en Editar Datos)'}
+                    </strong>
                   </div>
                   <div className="flex justify-between py-2 border-b border-slate-900">
                     <span className="text-slate-400">Contacto de Emergencia:</span>
@@ -1348,14 +1574,23 @@ export function PatientPortalView({
 
               {/* Tarjeta de Sucursal de Atención Asignada */}
               <div className="bg-slate-950/90 border border-amber-500/30 rounded-3xl p-6 shadow-xl space-y-4">
-                <div className="flex items-center gap-3 border-b border-amber-500/20 pb-4">
-                  <div className="w-10 h-10 rounded-2xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-400">
-                    <Building2 className="w-5 h-5" />
+                <div className="flex items-center justify-between border-b border-amber-500/20 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-400">
+                      <Building2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-black text-white">Sede de Atención Asignada</h3>
+                      <p className="text-xs text-amber-300">Dirección Médica • Dra. Aura Estudillo</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-base font-black text-white">Sede de Atención Clínica Asignada</h3>
-                    <p className="text-xs text-amber-300">Dirección Médica • Dra. Aura Estudillo</p>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditProfileOpen(true)}
+                    className="px-3 py-1.5 rounded-xl bg-amber-400/15 hover:bg-amber-400/25 border border-amber-400/30 text-amber-300 font-bold text-xs transition-colors cursor-pointer"
+                  >
+                    Cambiar Sede
+                  </button>
                 </div>
 
                 <div className="space-y-4 text-xs">
@@ -1582,6 +1817,180 @@ export function PatientPortalView({
                 Imprimir / Guardar en PDF
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: COMPLETAR REGISTRO Y ASIGNACIÓN DE SUCURSAL (NOM-004-SSA3) ── */}
+      {isEditProfileOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="relative w-full max-w-lg bg-slate-950 border-2 border-amber-500/50 rounded-3xl shadow-[0_0_80px_rgba(245,158,11,0.25)] text-white p-6 sm:p-8 space-y-5 my-8">
+            {/* Botón Cerrar */}
+            <button
+              type="button"
+              onClick={() => setIsEditProfileOpen(false)}
+              className="absolute top-5 right-5 p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white transition-all cursor-pointer"
+              title="Cerrar"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Cabecera del Modal */}
+            <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
+              <div className="w-12 h-12 rounded-2xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-400 shrink-0 shadow-inner">
+                <Building2 className="w-6 h-6" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30">
+                  Expediente NOM-004-SSA3
+                </span>
+                <h3 className="text-lg font-black text-white mt-1">
+                  Completa tu Registro y Sucursal
+                </h3>
+              </div>
+            </div>
+
+            {editSuccessMsg && (
+              <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{editSuccessMsg}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveProfile} className="space-y-4 text-left">
+              {/* Selección Visual de Sucursal */}
+              <div>
+                <label className="block text-[11px] font-black uppercase tracking-wider text-slate-300 mb-2">
+                  1. Selecciona tu Sucursal de Atención Habitual *
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Tarjeta Sucursal Balbuena */}
+                  <div
+                    onClick={() => setProfileForm(prev => ({
+                      ...prev,
+                      branchName: 'Sucursal Balbuena',
+                      branchId: '00000000-0000-0000-0000-000000000001'
+                    }))}
+                    className={cn(
+                      "p-3.5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between gap-2",
+                      profileForm.branchName.includes('Balbuena')
+                        ? "bg-amber-400/15 border-amber-400 text-white shadow-lg shadow-amber-500/10"
+                        : "bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700"
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black uppercase text-amber-300">Sede Matriz</span>
+                      {profileForm.branchName.includes('Balbuena') && (
+                        <CheckCircle2 className="w-4 h-4 text-amber-400" />
+                      )}
+                    </div>
+                    <div>
+                      <strong className="text-white text-sm block">Sucursal Balbuena</strong>
+                      <span className="text-[11px] text-slate-400 block mt-0.5">Venustiano Carranza, CDMX</span>
+                    </div>
+                  </div>
+
+                  {/* Tarjeta Sucursal Chalma de Guadalupe */}
+                  <div
+                    onClick={() => setProfileForm(prev => ({
+                      ...prev,
+                      branchName: 'Sucursal Chalma de Guadalupe',
+                      branchId: '00000000-0000-0000-0000-000000000002'
+                    }))}
+                    className={cn(
+                      "p-3.5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between gap-2",
+                      profileForm.branchName.includes('Chalma')
+                        ? "bg-amber-400/15 border-amber-400 text-white shadow-lg shadow-amber-500/10"
+                        : "bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700"
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black uppercase text-cyan-300">Sede Norte</span>
+                      {profileForm.branchName.includes('Chalma') && (
+                        <CheckCircle2 className="w-4 h-4 text-amber-400" />
+                      )}
+                    </div>
+                    <div>
+                      <strong className="text-white text-sm block">Sucursal Chalma de Guadalupe</strong>
+                      <span className="text-[11px] text-slate-400 block mt-0.5">Gustavo A. Madero, CDMX</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Nombre Completo */}
+              <div>
+                <label className="block text-[11px] font-black uppercase tracking-wider text-slate-300 mb-1.5">
+                  2. Nombre Completo del Paciente *
+                </label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    required
+                    value={profileForm.fullName}
+                    onChange={(e) => setProfileForm(prev => ({ ...prev, fullName: e.target.value }))}
+                    placeholder="Tu nombre y apellidos"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-xl text-xs font-medium text-white placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-amber-400 transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Fecha de Nacimiento y Edad */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-[11px] font-black uppercase tracking-wider text-slate-300">
+                    3. Fecha de Nacimiento *
+                  </label>
+                  {calculatedAge !== null && (
+                    <span className="text-[10px] font-bold text-amber-300 bg-amber-400/15 border border-amber-400/30 px-2 py-0.5 rounded-full">
+                      {calculatedAge} años calculados
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <Calendar className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="date"
+                    required
+                    value={profileForm.birthDate}
+                    onChange={(e) => setProfileForm(prev => ({ ...prev, birthDate: e.target.value }))}
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-xl text-xs font-medium text-white focus:outline-hidden focus:ring-1 focus:ring-amber-400 transition-all cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* Teléfono Celular (10 dígitos) */}
+              <div>
+                <label className="block text-[11px] font-black uppercase tracking-wider text-slate-300 mb-1.5">
+                  4. Teléfono Celular para Recordatorios 24h &amp; 1h *
+                </label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="tel"
+                    required
+                    maxLength={10}
+                    value={profileForm.phone}
+                    onChange={(e) => setProfileForm(prev => ({ ...prev, phone: e.target.value }))}
+                    placeholder="55 1234 5678"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-xl text-xs font-medium text-white placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-amber-400 transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Botón de Guardar */}
+              <div className="pt-2">
+                <button
+                  type="submit"
+                  disabled={savingProfile}
+                  className="w-full py-3 px-4 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl transition-all shadow-lg shadow-amber-400/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>{savingProfile ? 'Guardando y Certificando...' : 'Guardar y Certificar Expediente (100%)'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

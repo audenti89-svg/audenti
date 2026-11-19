@@ -39,15 +39,18 @@ export interface SafeUpsertResult {
   id: string;
 }
 
-// Columnas reales y vigentes en la tabla `patients` de Supabase (sin columna notes para evitar PostgrestError 42703)
+// Columnas reales y vigentes en la tabla `patients` de Supabase
 const VALID_PATIENT_COLUMNS = new Set([
   'id',
   'tenant_id',
   'branch_id',
+  'branch',
+  'branch_name',
   'user_id',
   'referral_code',
   'referred_by',
   'full_name',
+  'birth_date',
   'date_of_birth',
   'gender',
   'phone',
@@ -57,8 +60,12 @@ const VALID_PATIENT_COLUMNS = new Set([
   'role',
   'photo_url',
   'last_appointment_at',
+  'last_visit_date',
   'total_spent',
   'acquisition_channel',
+  'referral_type',
+  'referred_by_id',
+  'referred_by_name',
   'referrer_id',
   'referrer_name',
   'qr_code_id',
@@ -67,7 +74,6 @@ const VALID_PATIENT_COLUMNS = new Set([
   'utm_campaign',
   'utm_content',
   'total_referrals',
-  'branch_name',
   'attribution_status',
   'created_at',
   'updated_at'
@@ -174,8 +180,10 @@ export async function safeUpsertPatient(
     if (patientData.branch_id) {
       updatePayload.branch_id = patientData.branch_id;
     }
-    if (patientData.branch_name) {
-      updatePayload.branch_name = patientData.branch_name;
+    if (patientData.branch_name || patientData.branch) {
+      const bName = patientData.branch_name || patientData.branch;
+      updatePayload.branch_name = bName;
+      updatePayload.branch = (bName || '').toLowerCase().includes('chalma') ? 'Chalma de Guadalupe' : 'Balbuena';
     }
     if (patientData.tenant_id) {
       updatePayload.tenant_id = patientData.tenant_id;
@@ -183,8 +191,10 @@ export async function safeUpsertPatient(
     if (patientData.gender) {
       updatePayload.gender = patientData.gender;
     }
-    if (patientData.date_of_birth) {
-      updatePayload.date_of_birth = patientData.date_of_birth;
+    if (patientData.birth_date || patientData.date_of_birth) {
+      const bDate = patientData.birth_date || patientData.date_of_birth;
+      updatePayload.birth_date = bDate;
+      updatePayload.date_of_birth = bDate;
     }
     if (patientData.address) {
       updatePayload.address = patientData.address;
@@ -256,10 +266,14 @@ export async function safeUpsertPatient(
   const defaultTenantId = '00000000-0000-0000-0000-000000000001';
   const defaultBranchId = patientData.branch_id || '00000000-0000-0000-0000-000000000001';
 
+  const defaultBranchName = patientData.branch_name || (defaultBranchId.includes('0002') ? 'Sucursal Chalma de Guadalupe' : 'Sucursal Balbuena (Matriz)');
+  const canonicalBranch = (defaultBranchName || '').toLowerCase().includes('chalma') ? 'Chalma de Guadalupe' : 'Balbuena';
+
   const insertPayload: Record<string, any> = {
     tenant_id: patientData.tenant_id || defaultTenantId,
     branch_id: defaultBranchId,
-    branch_name: patientData.branch_name || (defaultBranchId.includes('0002') ? 'Sucursal Chalma de Guadalupe' : 'Sucursal Balbuena (Matriz)'),
+    branch: canonicalBranch,
+    branch_name: defaultBranchName,
     full_name: patientData.full_name || patientData.name || 'Paciente Audenti',
     email: cleanEmail,
     phone: cleanPhone,
@@ -269,7 +283,11 @@ export async function safeUpsertPatient(
     updated_at: new Date().toISOString()
   };
 
-  if (patientData.date_of_birth) insertPayload.date_of_birth = patientData.date_of_birth;
+  if (patientData.birth_date || patientData.date_of_birth) {
+    const bDate = patientData.birth_date || patientData.date_of_birth;
+    insertPayload.birth_date = bDate;
+    insertPayload.date_of_birth = bDate;
+  }
   if (patientData.gender) insertPayload.gender = patientData.gender;
   if (patientData.address) insertPayload.address = patientData.address;
   if (patientData.acquisition_channel) insertPayload.acquisition_channel = patientData.acquisition_channel;

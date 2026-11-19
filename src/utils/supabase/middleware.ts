@@ -11,6 +11,12 @@ export async function updateSession(request: NextRequest) {
     supabaseUrl,
     supabaseAnonKey,
     {
+      cookieOptions: {
+        maxAge: 31536000, // 1 año permanente (permanece abierta hasta cerrar sesión manual)
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -19,7 +25,13 @@ export async function updateSession(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
           supabaseResponse = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, {
+              ...options,
+              maxAge: 31536000, // 1 año permanente
+              sameSite: 'lax',
+              path: '/',
+              secure: process.env.NODE_ENV === 'production',
+            })
           );
         },
       },
