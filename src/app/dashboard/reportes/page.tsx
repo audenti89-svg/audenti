@@ -24,7 +24,15 @@ import {
   Sparkles,
   Search,
   CheckCircle2,
-  PieChart
+  PieChart,
+  Copy,
+  Check,
+  Megaphone,
+  Target,
+  ArrowDownRight,
+  TrendingDown,
+  AlertCircle,
+  Zap
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
@@ -83,7 +91,13 @@ export default function ReportesPage() {
   const supabase = createClient()
   const [loading, setLoading] = useState(true)
   const [downloading, setDownloading] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'services' | 'ltv' | 'attribution' | 'overview'>('services')
+  const [activeTab, setActiveTab] = useState<'services' | 'ltv' | 'attribution' | 'overview' | 'marketing'>('services')
+
+  // Estados de IA para Inteligencia de Marketing & Reportes Libres
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [loadingAiReport, setLoadingAiReport] = useState(false)
+  const [aiReportData, setAiReportData] = useState<any | null>(null)
+  const [copiedBrief, setCopiedBrief] = useState(false)
 
   // Filtros
   const [selectedBranch, setSelectedBranch] = useState('all')
@@ -276,6 +290,92 @@ export default function ReportesPage() {
   useEffect(() => {
     loadReportsData()
   }, [])
+
+  useEffect(() => {
+    if (activeTab === 'marketing' && !aiReportData) {
+      handleQueryAiReport()
+    }
+  }, [activeTab])
+
+  // ────────────────────────────────────────────────────────────
+  // Consultas de Inteligencia de Marketing con Aura IA
+  // ────────────────────────────────────────────────────────────
+  const handleQueryAiReport = async (queryText?: string) => {
+    const targetQuery = queryText || aiPrompt
+    setLoadingAiReport(true)
+    try {
+      const res = await fetch('/api/reports/ai-query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: targetQuery,
+          branch: selectedBranch
+        })
+      })
+      if (res.ok) {
+        const json = await res.json()
+        if (json.success && json.report) {
+          setAiReportData(json.report)
+        }
+      }
+    } catch (err) {
+      console.warn('Error al consultar reporte con IA:', err)
+    } finally {
+      setLoadingAiReport(false)
+    }
+  }
+
+  const handleCopyMarketingBrief = () => {
+    if (!aiReportData?.marketingBrief) return
+    const b = aiReportData.marketingBrief
+    const text = `📢 *BRIEF DE CAMPAÑA AUDENTI - PARA PUBLICISTA*
+*Fecha:* ${new Date().toLocaleDateString('es-MX')}
+*Sede:* ${selectedBranch === 'all' ? 'Balbuena y Chalma de Guadalupe' : selectedBranch}
+
+🎯 *Servicios a Impulsar en Campaña:*
+${(b.targetServices || []).map((s: string) => `• ${s}`).join('\n')}
+
+🔍 *Problema / Oportunidad Detectada:*
+${b.problemIdentified || 'N/A'}
+
+👥 *Público Objetivo (Target):*
+${b.targetAudience || 'N/A'}
+
+💡 *Ángulo Publicitario / Copy Sugerido:*
+"${b.recommendedAngle || 'N/A'}"
+
+🎁 *Oferta / Gancho Comercial Sugerido:*
+${b.suggestedOffer || 'N/A'}
+
+📲 *Canales de Difusión Recomendados:*
+${(b.recommendedChannels || []).map((c: string) => `• ${c}`).join('\n')}`
+
+    navigator.clipboard.writeText(text)
+    setCopiedBrief(true)
+    setTimeout(() => setCopiedBrief(false), 2500)
+  }
+
+  const handleExportBriefWord = () => {
+    if (!aiReportData?.marketingBrief) return
+    const b = aiReportData.marketingBrief
+    exportToWord({
+      title: 'AUDENTI CLOUD PRO - BRIEF ESTRATÉGICO PARA PUBLICISTA',
+      subtitle: `Dra. Aura Estudillo • Inteligencia Comercial & Campañas (${new Date().toLocaleDateString('es-MX')})`,
+      doctorName: 'Dra. Aura Estudillo',
+      branch: selectedBranch === 'all' ? 'Balbuena y Chalma' : selectedBranch,
+      treatments: (b.targetServices || []).map((s: string) => ({
+        procedure: s,
+        cost: 0,
+        status: 'Prioridad de Pauta',
+        doctor: 'Dra. Aura Estudillo'
+      })),
+      summary: {
+        totalProcedures: (b.targetServices || []).length,
+        totalCost: 0
+      },
+      notes: `Diagnóstico: ${b.problemIdentified || ''}\nPúblico: ${b.targetAudience || ''}\nCopy: ${b.recommendedAngle || ''}\nOferta: ${b.suggestedOffer || ''}`
+    })
+  }
 
   // ────────────────────────────────────────────────────────────
   // Exportaciones Reales Multiformato
@@ -584,6 +684,27 @@ export default function ReportesPage() {
           >
             <Share2 className="w-4 h-4" />
             <span>3. Atribución (Familiares &amp; Referidos)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('marketing')
+              if (!aiReportData) {
+                handleQueryAiReport('Estacionalidad de servicios, caídas mensuales y brief publicitario')
+              }
+            }}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+              activeTab === 'marketing'
+                ? 'bg-purple-600 text-white font-black shadow-lg shadow-purple-500/25 ring-1 ring-purple-400/50'
+                : 'text-purple-300 hover:text-white hover:bg-purple-950/40 border border-purple-500/30'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-purple-300 animate-pulse" />
+            <span>4. Marketing &amp; Estacionalidad (Aura IA)</span>
+            <span className="ml-1 px-1.5 py-0.5 bg-purple-400 text-slate-950 text-[9px] font-black rounded-md uppercase tracking-wider">
+              IA
+            </span>
           </button>
         </div>
 
@@ -1011,6 +1132,450 @@ export default function ReportesPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ──────────────────────────────────────────────────────────── */}
+      {/* 4. VISTA: MARKETING & ESTACIONALIDAD (AURA IA REPORTES)     */}
+      {/* ──────────────────────────────────────────────────────────── */}
+      {activeTab === 'marketing' && (
+        <div className="space-y-6">
+          {/* BARRA DE CONSULTA PROMPT-TO-REPORT (LÓGICO E ILÓGICO) */}
+          <div className="bg-gradient-to-br from-slate-900 via-purple-950/30 to-slate-900 backdrop-blur-2xl p-6 rounded-3xl border border-purple-500/30 shadow-2xl space-y-4 text-white">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/40 flex items-center gap-1.5">
+                    <Sparkles className="w-3 h-3 text-purple-300 animate-spin" style={{ animationDuration: '4s' }} />
+                    Motor de Inteligencia de Mercado &amp; IA 2027
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400/10 text-amber-300 border border-amber-400/30">
+                    Cruce Lógico &amp; Exploratorio
+                  </span>
+                </div>
+                <h2 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
+                  <span>Generador de Reportes &amp; Briefs para Publicistas</span>
+                </h2>
+                <p className="text-xs text-slate-300 mt-0.5">
+                  Formula cualquier pregunta o cruce de datos en lenguaje natural. Aura IA analiza pacientes, citas y transacciones en tiempo real.
+                </p>
+              </div>
+
+              {aiReportData?.marketingBrief && (
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleCopyMarketingBrief}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-500 hover:bg-purple-600 text-white text-xs font-black transition-all cursor-pointer shadow-md shadow-purple-500/20"
+                  >
+                    {copiedBrief ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
+                    <span>{copiedBrief ? '¡Copiado para WhatsApp!' : 'Copiar Brief (WhatsApp)'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleExportBriefWord}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all cursor-pointer border border-slate-700"
+                  >
+                    <FileText className="w-4 h-4 text-purple-400" />
+                    <span>Descargar Brief (.doc)</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Input de Prompt */}
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={aiPrompt}
+                  onChange={e => setAiPrompt(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleQueryAiReport()
+                    }
+                  }}
+                  placeholder="Ej: ¿Qué servicios bajaron este mes y qué campaña publicitaria debemos lanzar?..."
+                  className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-slate-950/90 border border-slate-700 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-400"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleQueryAiReport()}
+                disabled={loadingAiReport}
+                className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-60 shadow-lg shadow-purple-600/30 shrink-0"
+              >
+                {loadingAiReport ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Analizando con IA...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 text-amber-300" />
+                    <span>Consultar IA</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Chips de Consultas Rápidas (Lógicas e Ilógicas) */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1">
+              <span className="text-[11px] font-bold text-slate-400 shrink-0 flex items-center gap-1">
+                <Zap className="w-3.5 h-3.5 text-amber-400" /> Sugerencias:
+              </span>
+
+              {[
+                { label: '📉 Servicios en declive este mes', query: '¿Qué servicios tuvieron una baja este mes y qué campaña publicitaria debemos implementar?' },
+                { label: '💎 Tratamientos de mayor rentabilidad', query: '¿Cuáles tratamientos generan mayor rentabilidad y cuál es su cuota de ingresos?' },
+                { label: '🔮 Reporte ilógico: Servicios vs días', query: 'Reporte exploratorio ilógico: Cruce de días de la semana con mayor afluencia de procedimientos dentales' },
+                { label: '📢 Generar Brief completo para Publicista', query: 'Genera un Brief publicitario completo con público meta, copys y canales para el publicista' },
+                { label: '🗓️ Estacionalidad de 19 servicios', query: 'Radar de estacionalidad anual de los 19 servicios odontológicos con meses pico y valle' }
+              ].map((chip, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    setAiPrompt(chip.query)
+                    handleQueryAiReport(chip.query)
+                  }}
+                  className="px-2.5 py-1 rounded-xl bg-slate-950/70 hover:bg-purple-950/60 border border-slate-800 hover:border-purple-500/40 text-[11px] font-semibold text-slate-300 hover:text-white transition-all shrink-0 cursor-pointer"
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ESTADO DE CARGA DE IA */}
+          {loadingAiReport && (
+            <div className="bg-slate-900/60 backdrop-blur-xl p-10 rounded-3xl border border-purple-500/20 text-center space-y-4">
+              <div className="w-12 h-12 rounded-2xl bg-purple-500/20 border border-purple-500/40 text-purple-400 mx-auto flex items-center justify-center animate-bounce">
+                <Sparkles className="w-6 h-6 animate-spin" style={{ animationDuration: '3s' }} />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-white">Aura IA Procesando Correlaciones Clínicas...</h3>
+                <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                  Analizando el catálogo de servicios odontológicos, registros de pacientes, estacionalidad semestral y generando estrategias para tu publicista.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* RESULTADO DEL REPORTE IA */}
+          {!loadingAiReport && aiReportData && (
+            <div className="space-y-6">
+              {/* TARJETA 1: RESUMEN EJECUTIVO & HALLAZGOS CLAVE */}
+              <div className="bg-slate-900/80 backdrop-blur-xl p-6 rounded-3xl border border-slate-800 shadow-xl space-y-4 text-white">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-purple-400">
+                      Diagnóstico Analítico
+                    </span>
+                    <h3 className="text-lg font-black text-white flex items-center gap-2">
+                      <Target className="w-5 h-5 text-purple-400" />
+                      <span>{aiReportData.title || 'Reporte de Inteligencia Clínica & Marketing'}</span>
+                    </h3>
+                  </div>
+
+                  <span className="text-[11px] font-mono px-2.5 py-1 rounded-xl bg-slate-950 border border-slate-800 text-slate-400">
+                    Sede: {selectedBranch === 'all' ? 'Ambas Sucursales' : selectedBranch}
+                  </span>
+                </div>
+
+                <p className="text-sm text-slate-300 leading-relaxed">
+                  {aiReportData.summary}
+                </p>
+
+                {aiReportData.keyFindings && aiReportData.keyFindings.length > 0 && (
+                  <div className="space-y-2 pt-2">
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Hallazgos Estratégicos Clave:</span>
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                      {aiReportData.keyFindings.map((finding: string, idx: number) => (
+                        <div
+                          key={idx}
+                          className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800/80 text-xs text-slate-200 flex items-start gap-2"
+                        >
+                          <span className="w-5 h-5 rounded-lg bg-purple-500/20 text-purple-300 font-bold flex items-center justify-center shrink-0 text-[10px] mt-0.5">
+                            {idx + 1}
+                          </span>
+                          <span className="leading-snug">{finding}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* TARJETA 2: BRIEF EJECUTIVO PARA EL PUBLICISTA (ENTREGABLE DIRECTO) */}
+              {aiReportData.marketingBrief && (
+                <div className="bg-gradient-to-br from-purple-950/40 via-slate-900 to-indigo-950/40 backdrop-blur-xl p-6 rounded-3xl border-2 border-purple-500/40 shadow-2xl space-y-5 text-white">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-purple-500/30 pb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-2xl bg-purple-500/20 text-purple-300 border border-purple-500/50 flex items-center justify-center shadow-lg shadow-purple-500/20">
+                        <Megaphone className="w-6 h-6 text-purple-300" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-black text-white">
+                            Brief Estratégico para el Publicista / Agencia
+                          </h3>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase">
+                            Listo para Ejecutar
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-300 mt-0.5">
+                          Diseñado para entregar directamente a tu especialista de pauta publicitaria digital o física.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleCopyMarketingBrief}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-500 hover:bg-purple-600 text-white text-xs font-black transition-all cursor-pointer shadow-md shadow-purple-500/30"
+                      >
+                        {copiedBrief ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
+                        <span>{copiedBrief ? '¡Copiado!' : 'Copiar para WhatsApp'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleExportBriefWord}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all cursor-pointer border border-slate-700"
+                      >
+                        <FileText className="w-4 h-4 text-purple-300" />
+                        <span>Exportar Word (.doc)</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Componentes del Brief */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* Servicios a Impulsar */}
+                    <div className="p-4 rounded-2xl bg-slate-950/70 border border-purple-500/30 space-y-2">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
+                        <Target className="w-3.5 h-3.5 text-purple-400" />
+                        Servicios a Impulsar en Pauta
+                      </span>
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {(aiReportData.marketingBrief.targetServices || []).map((srv: string, idx: number) => (
+                          <span
+                            key={idx}
+                            className="px-2.5 py-1 rounded-xl bg-purple-500/20 text-purple-200 border border-purple-500/40 text-xs font-bold"
+                          >
+                            {srv}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Diagnóstico del Problema */}
+                    <div className="p-4 rounded-2xl bg-slate-950/70 border border-purple-500/30 space-y-2">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-rose-300 flex items-center gap-1.5">
+                        <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
+                        Problema u Oportunidad
+                      </span>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        {aiReportData.marketingBrief.problemIdentified || 'Activación estacional preventiva.'}
+                      </p>
+                    </div>
+
+                    {/* Público Objetivo */}
+                    <div className="p-4 rounded-2xl bg-slate-950/70 border border-purple-500/30 space-y-2">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-cyan-400" />
+                        Público Objetivo (Target)
+                      </span>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        {aiReportData.marketingBrief.targetAudience || 'Pacientes adultos locales y familias.'}
+                      </p>
+                    </div>
+
+                    {/* Copywriting / Ángulo Recomendado */}
+                    <div className="md:col-span-2 p-4 rounded-2xl bg-slate-950/70 border border-purple-500/30 space-y-2">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                        Ángulo Publicitario / Copy Sugerido para Anuncios
+                      </span>
+                      <blockquote className="text-xs text-amber-100 italic bg-amber-500/10 border-l-2 border-amber-400 p-2.5 rounded-r-xl">
+                        "{aiReportData.marketingBrief.recommendedAngle}"
+                      </blockquote>
+                    </div>
+
+                    {/* Oferta / Gancho Sugerido */}
+                    <div className="p-4 rounded-2xl bg-slate-950/70 border border-purple-500/30 space-y-2">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-emerald-300 flex items-center gap-1.5">
+                        <Award className="w-3.5 h-3.5 text-emerald-400" />
+                        Oferta o Gancho Comercial
+                      </span>
+                      <p className="text-xs text-emerald-200 font-semibold bg-emerald-500/10 p-2 rounded-xl border border-emerald-500/20">
+                        {aiReportData.marketingBrief.suggestedOffer}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Canales Recomendados */}
+                  {aiReportData.marketingBrief.recommendedChannels && (
+                    <div className="flex items-center gap-2 flex-wrap pt-1">
+                      <span className="text-xs font-bold text-slate-400">Canales Sugeridos:</span>
+                      {aiReportData.marketingBrief.recommendedChannels.map((ch: string, idx: number) => (
+                        <span
+                          key={idx}
+                          className="px-2.5 py-1 rounded-xl bg-slate-950 text-slate-300 border border-slate-800 text-[11px] font-mono font-bold"
+                        >
+                          📲 {ch}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TARJETA 3: RADAR DE ESTACIONALIDAD (19 SERVICIOS OFICIALES) */}
+              {aiReportData.seasonalityRadar && aiReportData.seasonalityRadar.length > 0 && (
+                <div className="bg-slate-900/80 backdrop-blur-xl p-6 rounded-3xl border border-slate-800 shadow-xl space-y-4 text-white">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                    <div>
+                      <h3 className="text-base font-black text-white flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-amber-400" />
+                        <span>Radar de Estacionalidad de Tratamientos (19 Procedimientos)</span>
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Comportamiento mensual de demanda: identifica en qué mes baja cada servicio para programar la publicidad antes de la caída.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                        🟢 Auge
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/30">
+                        🔴 Declive
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                        🟡 Estable
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 pt-2">
+                    {aiReportData.seasonalityRadar.map((item: any, idx: number) => {
+                      const isLow = item.trend === 'baja'
+                      const isHigh = item.trend === 'alta'
+                      return (
+                        <div
+                          key={idx}
+                          className={`p-4 rounded-2xl border transition-all ${
+                            isLow
+                              ? 'bg-rose-950/20 border-rose-500/40 hover:border-rose-400'
+                              : isHigh
+                              ? 'bg-emerald-950/20 border-emerald-500/40 hover:border-emerald-400'
+                              : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <h4 className="text-xs font-black text-white leading-tight">
+                                {item.service}
+                              </h4>
+                              <span className="text-[10px] text-slate-400 block mt-0.5">
+                                {item.category}
+                              </span>
+                            </div>
+
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase shrink-0 border ${
+                                isLow
+                                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                                  : isHigh
+                                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                                  : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                              }`}
+                            >
+                              {isLow ? 'En Declive' : isHigh ? 'En Auge' : 'Demanda Estable'}
+                            </span>
+                          </div>
+
+                          <div className="mt-3 grid grid-cols-2 gap-2 text-[10px] font-mono">
+                            <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800">
+                              <span className="text-slate-400 block text-[9px]">MES PICO:</span>
+                              <span className="text-emerald-300 font-bold">{item.peakMonth}</span>
+                            </div>
+                            <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800">
+                              <span className="text-slate-400 block text-[9px]">MES VALLE (BAJA):</span>
+                              <span className="text-rose-300 font-bold">{item.valleyMonth}</span>
+                            </div>
+                          </div>
+
+                          <p className="text-[11px] text-slate-300 mt-2.5 leading-snug">
+                            {item.currentMonthStatus}
+                          </p>
+
+                          <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px]">
+                            <span className="text-purple-300 font-bold">🎯 Acción de Campaña:</span>
+                            <span className="text-slate-300 truncate max-w-[170px]" title={item.recommendedAction}>
+                              {item.recommendedAction}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* TARJETA 4: TABLA DINÁMICA DE REPORTE LIBRE */}
+              {aiReportData.customTable && aiReportData.customTable.headers && (
+                <div className="bg-slate-900/80 backdrop-blur-xl p-6 rounded-3xl border border-slate-800 shadow-xl space-y-4 text-white">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-base font-black text-white flex items-center gap-2">
+                        <BarChart3 className="w-4 h-4 text-cyan-400" />
+                        <span>Tabla de Resultados Personalizada</span>
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Cruce dinámico generado por IA según tu solicitud
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-2xl border border-slate-800">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 uppercase text-[10px] tracking-wider font-bold">
+                          {aiReportData.customTable.headers.map((header: string, idx: number) => (
+                            <th key={idx} className="py-3 px-4 font-black">
+                              {header}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800 bg-slate-900/40">
+                        {aiReportData.customTable.rows && aiReportData.customTable.rows.map((row: any[], rIdx: number) => (
+                          <tr key={rIdx} className="hover:bg-slate-800/50 transition-colors">
+                            {row.map((cell: any, cIdx: number) => (
+                              <td key={cIdx} className="py-3 px-4 font-medium text-slate-200">
+                                {String(cell)}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
