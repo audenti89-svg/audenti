@@ -109,20 +109,42 @@ function PatientLoginForm() {
     phone?: string;
   } | null>(null);
 
-  // 0. AUTO-REDIRECCIÓN: Si el usuario ya cuenta con sesión activa en Supabase,
-  // validar inmediatamente y redirigir sin mostrar bucles de login o activación.
+  // 0. AUTO-REDIRECCIÓN CON PROTECCIÓN CONTRA BUCLES (Audenti 2027)
   useEffect(() => {
     let mounted = true;
+    const isLogout = searchParams.get('logout') === 'true' || searchParams.get('reauth') === 'true';
+
+    if (isLogout) {
+      try { sessionStorage.removeItem('audenti_portal_redirects'); } catch {}
+      return;
+    }
+
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (user && mounted) {
+        // Protección estricta contra bucles en navegadores móviles e in-app
+        let redirectCount = 0;
+        try {
+          redirectCount = parseInt(sessionStorage.getItem('audenti_portal_redirects') || '0', 10);
+          if (redirectCount >= 2) {
+            console.warn('Protección de navegación activada: deteniendo redirección automática para evitar bloqueo móvil.');
+            sessionStorage.removeItem('audenti_portal_redirects');
+            return;
+          }
+          sessionStorage.setItem('audenti_portal_redirects', String(redirectCount + 1));
+        } catch {}
+
         const target = await determineTargetRoute(supabase, user);
-        window.location.replace(target);
+        if (typeof window !== 'undefined' && window.location.pathname !== target) {
+          window.location.replace(target);
+        }
+      } else {
+        try { sessionStorage.removeItem('audenti_portal_redirects'); } catch {}
       }
     });
     return () => {
       mounted = false;
     };
-  }, [supabase]);
+  }, [supabase, searchParams]);
 
   // Sincronizar parámetro URL (?mode=activate o ?mode=register)
   useEffect(() => {

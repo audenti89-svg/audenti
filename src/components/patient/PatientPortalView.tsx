@@ -156,9 +156,20 @@ export function PatientPortalView({
         const { data: { user: authUser } } = await supabase.auth.getUser();
 
         if (!authUser) {
-          window.location.href = '/portal/login';
+          try {
+            const redirectCount = parseInt(sessionStorage.getItem('audenti_portal_redirects') || '0', 10);
+            if (redirectCount >= 2) {
+              sessionStorage.removeItem('audenti_portal_redirects');
+              window.location.href = '/portal/login?reauth=true';
+              return;
+            }
+            sessionStorage.setItem('audenti_portal_redirects', String(redirectCount + 1));
+          } catch {}
+          window.location.replace('/portal/login');
           return;
         }
+
+        try { sessionStorage.removeItem('audenti_portal_redirects'); } catch {}
 
         setUser(authUser);
 
