@@ -454,31 +454,29 @@ export default function LandingPage() {
             <a href="#contacto" className="hover:text-amber-400 transition-colors">Ubicación</a>
           </nav>
 
-          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-            {/* Botón 1: Iniciar Sesión Médica (Dra. Aura Estudillo y Personal Clínico) */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Botón 1: Iniciar Sesión Médica (Dra. Aura Estudillo y Personal Clínico - Visible en Desktop/Tablet) */}
             <Link
               href="/auth/login"
-              className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full border border-slate-700 hover:border-amber-400/50 bg-slate-900/90 text-[11px] sm:text-xs font-bold text-slate-200 hover:text-white transition-all shadow-sm cursor-pointer whitespace-nowrap shrink-0"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-700 hover:border-amber-400/50 bg-slate-900/90 text-xs font-bold text-slate-200 hover:text-white transition-all shadow-sm cursor-pointer whitespace-nowrap shrink-0"
               title="Acceso oficial para la Dra. Aura Estudillo y personal clínico"
             >
-              <Lock className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-amber-400 shrink-0" />
-              <span className="hidden sm:inline">Iniciar Sesión Médica</span>
-              <span className="sm:hidden">Médica</span>
+              <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span>Iniciar Sesión Médica</span>
             </Link>
 
-            {/* Botón 2: Portal del Paciente */}
+            {/* Botón 2: Portal del Paciente (Visible en Móvil y Desktop, 100% legible y sin truncamiento) */}
             <Link
               href="/portal/login"
-              className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 text-[11px] sm:text-xs font-black transition-all shadow-md shadow-amber-500/20 cursor-pointer whitespace-nowrap shrink-0"
+              className="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-all shadow-md shadow-amber-500/20 cursor-pointer whitespace-nowrap shrink-0"
               title="Portal de Pacientes: Citas, Recetas y Odontograma"
             >
-              <UserCheck className="w-3 sm:w-3.5 h-3 sm:h-3.5 shrink-0" />
-              <span className="hidden sm:inline">Portal del Paciente</span>
-              <span className="sm:hidden">Paciente</span>
+              <UserCheck className="w-3.5 h-3.5 shrink-0" />
+              <span>Soy Paciente</span>
             </Link>
 
             {/* Botón Principal Agendar Cita */}
-            <a href="#reservar" className="hidden sm:inline-block shrink-0">
+            <a href="#reservar" className="hidden lg:inline-block shrink-0">
               <ShimmerButton variant="primary" className="py-1.5 px-3.5 text-xs font-black font-hanken">
                 <Calendar className="w-3.5 h-3.5 text-slate-950" />
                 <span>Agendar</span>
@@ -698,7 +696,7 @@ export default function LandingPage() {
           </div>
 
           {/* 3° Área del Modelo Dental Interactivo con Comida Veo 3 Visible */}
-          <div className="relative w-full h-[340px] rounded-3xl overflow-hidden border border-white/20 shadow-2xl bg-slate-950 my-1">
+          <div className="relative w-full h-[250px] sm:h-[300px] rounded-3xl overflow-hidden border border-white/20 shadow-2xl bg-slate-950 my-1">
             {/* FONDO DE COMIDA VEO 3 CLARAMENTE VISIBLE */}
             <div 
               className="absolute inset-0 pointer-events-none z-10 overflow-hidden transition-all duration-300 ease-out"
@@ -722,7 +720,7 @@ export default function LandingPage() {
                 fill
                 priority
                 sizes="(max-width: 768px) 100vw, 400px"
-                className="object-cover object-center scale-110 pointer-events-none mix-blend-screen"
+                className="object-cover object-[center_75%] scale-110 pointer-events-none mix-blend-screen"
               />
             </div>
 
@@ -741,7 +739,7 @@ export default function LandingPage() {
                   fill
                   priority
                   sizes="(max-width: 768px) 100vw, 400px"
-                  className="object-cover object-center scale-110 pointer-events-none mix-blend-screen"
+                  className="object-cover object-[center_75%] scale-110 pointer-events-none mix-blend-screen"
                 />
               </div>
             </div>

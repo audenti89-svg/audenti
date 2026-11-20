@@ -75,6 +75,8 @@ function PatientLoginForm() {
 
   // Modo: 'login' (Iniciar Sesión) | 'activate' (Registrarme / Activar Cuenta)
   const [mode, setMode] = useState<'login' | 'activate'>('login');
+  // Método de login: 'phone' (Acceso Rápido con Celular sin contraseña) | 'password' (Contraseña tradicional)
+  const [loginMethod, setLoginMethod] = useState<'phone' | 'password'>('phone');
 
   // Estados comunes
   const [loadingGoogle, setLoadingGoogle] = useState(false);
@@ -146,11 +148,23 @@ function PatientLoginForm() {
     };
   }, [supabase, searchParams]);
 
-  // Sincronizar parámetro URL (?mode=activate o ?mode=register)
+  // Sincronizar parámetro URL (?mode=activate o ?mode=register o ?phone=... o ?email=...)
   useEffect(() => {
     const modeParam = searchParams.get('mode');
     if (modeParam === 'activate' || modeParam === 'register') {
       setMode('activate');
+    }
+
+    const phoneParam = searchParams.get('phone');
+    if (phoneParam) {
+      const clean = phoneParam.replace(/\D/g, '').slice(-10);
+      setLoginEmailOrPhone(clean);
+      setLoginMethod('phone');
+    }
+
+    const emailParam = searchParams.get('email');
+    if (emailParam) {
+      setLoginEmailOrPhone(emailParam.trim().toLowerCase());
     }
 
     const errorParam = searchParams.get('error');
@@ -222,6 +236,53 @@ function PatientLoginForm() {
       console.error('Error en autenticación de paciente con Google:', err);
       setErrorMsg(err?.message || 'Error al conectar con Google OAuth');
       setLoadingGoogle(false);
+    }
+  };
+
+  // 1.5 ACCESO DIRECTO CON CELULAR O CORREO REGISTRADO (SIN CONTRASEÑA OBLIGATORIA)
+  const handleInstantPhoneLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const input = loginEmailOrPhone.trim();
+    if (!input) {
+      setErrorMsg('Por favor ingresa tu número de celular (10 dígitos) o tu correo registrado.');
+      return;
+    }
+
+    setLoadingLogin(true);
+    setErrorMsg('');
+    setSuccessMsg('Verificando expediente en clínica...');
+
+    try {
+      const currentSearch = typeof window !== 'undefined' ? window.location.search : '';
+      const destUrl = `${window.location.origin}/portal-paciente${currentSearch}`;
+
+      const resp = await fetch('/api/auth/patient-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phoneOrEmail: input,
+          redirectUrl: destUrl
+        })
+      });
+
+      const res = await resp.json();
+      if (!resp.ok || !res.ok) {
+        throw new Error(res.error || 'No encontramos un expediente activo con ese número o correo.');
+      }
+
+      setSuccessMsg(`¡Expediente verificado! Bienvenido(a) ${res.patient?.fullName || ''}. Ingresando...`);
+
+      if (res.actionLink) {
+        setTimeout(() => {
+          window.location.href = res.actionLink;
+        }, 300);
+      } else {
+        window.location.href = `/portal-paciente${currentSearch}`;
+      }
+    } catch (err: any) {
+      console.error('Error en acceso por teléfono:', err);
+      setErrorMsg(err.message || 'Error al conectar con tu expediente.');
+      setLoadingLogin(false);
     }
   };
 
@@ -476,67 +537,139 @@ function PatientLoginForm() {
       {/* ───────────────────────────────────────────────────────────── */}
       {mode === 'login' && (
         <>
-          <form onSubmit={handlePatientLogin} className="space-y-3.5 text-left mb-4">
-            <div>
-              <label className="block text-[11px] font-black uppercase tracking-wider text-slate-300 mb-1.5">
-                Correo Registrado o Teléfono
-              </label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  required
-                  placeholder="tu@correo.com o celular a 10 dígitos"
-                  value={loginEmailOrPhone}
-                  onChange={(e) => setLoginEmailOrPhone(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-xl text-xs font-medium text-white placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-amber-400 transition-all"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-black uppercase tracking-wider text-slate-300 mb-1.5">
-                Contraseña
-              </label>
-              <div className="relative">
-                <KeyRound className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  placeholder="••••••••••••"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2.5 bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-xl text-xs font-medium text-white placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-amber-400 transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 cursor-pointer"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
+          {/* PESTAÑAS DE MÉTODO DE ACCESO */}
+          <div className="flex rounded-xl bg-slate-900/90 p-1 border border-slate-800 mb-4">
             <button
-              type="submit"
-              disabled={loadingLogin || loadingGoogle}
-              className="w-full py-3 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-colors flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 cursor-pointer disabled:opacity-60 mt-2"
+              type="button"
+              onClick={() => {
+                setLoginMethod('phone');
+                setErrorMsg('');
+              }}
+              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                loginMethod === 'phone'
+                  ? 'bg-amber-400 text-slate-950 shadow-md font-black'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
             >
-              {loadingLogin ? 'Accediendo a tu expediente...' : 'Ingresar a mi Expediente Dental'}
+              <Phone className="w-3.5 h-3.5" />
+              <span>Con Celular (Rápido)</span>
             </button>
-          </form>
+            <button
+              type="button"
+              onClick={() => {
+                setLoginMethod('password');
+                setErrorMsg('');
+              }}
+              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                loginMethod === 'password'
+                  ? 'bg-amber-400 text-slate-950 shadow-md font-black'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <KeyRound className="w-3.5 h-3.5" />
+              <span>Con Contraseña</span>
+            </button>
+          </div>
+
+          {/* MÉTODO A: ACCESO RÁPIDO CON CELULAR O CORREO (SIN CONTRASEÑA) */}
+          {loginMethod === 'phone' ? (
+            <form onSubmit={handleInstantPhoneLogin} className="space-y-3.5 text-left mb-4">
+              <div>
+                <label className="block text-[11px] font-black uppercase tracking-wider text-slate-300 mb-1.5 flex items-center justify-between">
+                  <span>Celular Registrado o Correo</span>
+                  <span className="text-[10px] text-amber-400 font-bold bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/20">
+                    Acceso 1-Click
+                  </span>
+                </label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. 55 1234 5678 o tu@correo.com"
+                    value={loginEmailOrPhone}
+                    onChange={(e) => setLoginEmailOrPhone(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-xl text-xs font-medium text-white placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-amber-400 transition-all"
+                  />
+                </div>
+                <p className="text-[10.5px] text-slate-400 mt-1.5 leading-relaxed">
+                  Ingresa el celular con el que te diste de alta en sucursal Balbuena o Chalma de Guadalupe para ver tus citas y recetas al instante.
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loadingLogin || loadingGoogle}
+                className="w-full py-3 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-colors flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 cursor-pointer disabled:opacity-60 mt-2"
+              >
+                <UserCheck className="w-4 h-4 shrink-0" />
+                <span>{loadingLogin ? 'Accediendo a tu expediente...' : 'Ingresar a mi Expediente Dental'}</span>
+              </button>
+            </form>
+          ) : (
+            /* MÉTODO B: ACCESO TRADICIONAL CON CONTRASEÑA */
+            <form onSubmit={handlePatientLogin} className="space-y-3.5 text-left mb-4">
+              <div>
+                <label className="block text-[11px] font-black uppercase tracking-wider text-slate-300 mb-1.5">
+                  Correo Registrado o Teléfono
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    required
+                    placeholder="tu@correo.com o celular a 10 dígitos"
+                    value={loginEmailOrPhone}
+                    onChange={(e) => setLoginEmailOrPhone(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-xl text-xs font-medium text-white placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-amber-400 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-black uppercase tracking-wider text-slate-300 mb-1.5">
+                  Contraseña
+                </label>
+                <div className="relative">
+                  <KeyRound className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    placeholder="••••••••••••"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    className="w-full pl-10 pr-10 py-2.5 bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-xl text-xs font-medium text-white placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-amber-400 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 cursor-pointer"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loadingLogin || loadingGoogle}
+                className="w-full py-3 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-colors flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 cursor-pointer disabled:opacity-60 mt-2"
+              >
+                {loadingLogin ? 'Accediendo a tu expediente...' : 'Iniciar Sesión con Contraseña'}
+              </button>
+            </form>
+          )}
 
           {/* TARJETA DESTACADA PARA ACTIVACIÓN / PRIMER ACCESO */}
           <div className="p-3.5 rounded-2xl bg-slate-900/90 border border-amber-500/30 text-left space-y-1.5 mb-4">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-black uppercase text-amber-300 flex items-center gap-1.5 tracking-wider">
                 <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                ¿Te atendiste en clínica y es tu primer acceso?
+                ¿Es tu primera visita o deseas registrarte?
               </span>
             </div>
             <p className="text-[11px] text-slate-300 leading-snug">
-              Si la Dra. Aura abrió tu expediente en Balbuena o Chalma, activa tu cuenta para configurar tu contraseña sin duplicar tus datos.
+              Si aún no estás registrado en el sistema clínico de Audenti, activa tu cuenta gratis en 30 segundos.
             </p>
             <button
               type="button"
@@ -546,6 +679,8 @@ function PatientLoginForm() {
                   const clean = loginEmailOrPhone.trim().toLowerCase();
                   setActEmail(clean);
                   handleCheckEmailInClinic(clean);
+                } else if (loginEmailOrPhone.trim()) {
+                  setActPhone(loginEmailOrPhone.replace(/\D/g, '').slice(-10));
                 }
               }}
               className="w-full mt-2 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-400/40 text-xs font-black transition-colors flex items-center justify-center gap-2 cursor-pointer"

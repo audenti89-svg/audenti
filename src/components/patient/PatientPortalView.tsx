@@ -156,6 +156,31 @@ export function PatientPortalView({
         const { data: { user: authUser } } = await supabase.auth.getUser();
 
         if (!authUser) {
+          // Si el enlace incluye el celular del paciente (ej. desde WhatsApp), autenticarlo de inmediato
+          if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            const phoneParam = params.get('phone');
+            if (phoneParam) {
+              try {
+                const autoResp = await fetch('/api/auth/patient-login', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    phoneOrEmail: phoneParam,
+                    redirectUrl: window.location.href
+                  })
+                });
+                const autoJson = await autoResp.json();
+                if (autoJson.ok && autoJson.actionLink) {
+                  window.location.href = autoJson.actionLink;
+                  return;
+                }
+              } catch (autoErr) {
+                console.warn('Nota auto-acceso por celular:', autoErr);
+              }
+            }
+          }
+
           try {
             const redirectCount = parseInt(sessionStorage.getItem('audenti_portal_redirects') || '0', 10);
             if (redirectCount >= 2) {
@@ -165,7 +190,9 @@ export function PatientPortalView({
             }
             sessionStorage.setItem('audenti_portal_redirects', String(redirectCount + 1));
           } catch {}
-          window.location.replace('/portal/login');
+
+          const currentSearch = typeof window !== 'undefined' ? window.location.search : '';
+          window.location.replace('/portal/login' + currentSearch);
           return;
         }
 
