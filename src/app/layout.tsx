@@ -102,10 +102,11 @@ export default function RootLayout({
                 window.addEventListener('load', function() {
                   navigator.serviceWorker.register('/service-worker.js')
                     .then(function(reg) {
-                      console.log('[PWA] Service Worker registrado con éxito en:', reg.scope);
+                      reg.update();
+                      console.log('[PWA] Service Worker activo:', reg.scope);
                     })
                     .catch(function(err) {
-                      console.warn('[PWA] Fallo de registro de Service Worker:', err);
+                      console.warn('[PWA] Nota registro Service Worker:', err);
                     });
                 });
               }

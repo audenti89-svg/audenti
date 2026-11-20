@@ -35,7 +35,9 @@ import {
   Users,
   Bell,
   CalendarCheck,
-  AlertCircle
+  AlertCircle,
+  UserCheck,
+  MessageSquare
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -135,6 +137,14 @@ export function PatientPortalView({
   const [clinicalTimeline, setClinicalTimeline] = useState<ClinicalTreatmentRecord[]>([]);
   const [prescriptions, setPrescriptions] = useState<DigitalPrescription[]>([]);
 
+  // Estados para confirmación directa de cita (WhatsApp sin login obligatorio)
+  const [guestAppointment, setGuestAppointment] = useState<any | null>(null);
+  const [guestConfirmSuccess, setGuestConfirmSuccess] = useState(false);
+  const [guestConfirming, setGuestConfirming] = useState(false);
+  const [guestPhoneInput, setGuestPhoneInput] = useState('');
+  const [guestLoginLoading, setGuestLoginLoading] = useState(false);
+  const [guestLoginError, setGuestLoginError] = useState('');
+
   // Estados de Registro Completo & Asignación de Sucursal
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -156,10 +166,36 @@ export function PatientPortalView({
         const { data: { user: authUser } } = await supabase.auth.getUser();
 
         if (!authUser) {
-          // Si el enlace incluye el celular del paciente (ej. desde WhatsApp), autenticarlo de inmediato
           if (typeof window !== 'undefined') {
             const params = new URLSearchParams(window.location.search);
+            const confirmParam = params.get('confirmAppt');
             const phoneParam = params.get('phone');
+
+            // 1. Si viene con confirmAppt (enlace oficial de WhatsApp de la cita):
+            // Cargar y mostrar la cita directamente en pantalla sin forzar redirección
+            if (confirmParam) {
+              try {
+                const apptResp = await fetch(`/api/appointments?id=${encodeURIComponent(confirmParam)}`);
+                if (apptResp.ok) {
+                  const apptJson = await apptResp.json();
+                  if (apptJson.success && apptJson.appointment) {
+                    setGuestAppointment(apptJson.appointment);
+                    if (apptJson.appointment.attendance_confirmed) {
+                      setGuestConfirmSuccess(true);
+                    }
+                    if (apptJson.appointment.patient_phone) {
+                      setGuestPhoneInput(apptJson.appointment.patient_phone.replace(/\D/g, '').slice(-10));
+                    }
+                    setLoading(false);
+                    return; // ¡NO REDIRIGIR! Cargar la cita en pantalla
+                  }
+                }
+              } catch (apptErr) {
+                console.warn('Nota cargando cita por folio:', apptErr);
+              }
+            }
+
+            // 2. Si viene con phone (auto-login 1-click):
             if (phoneParam) {
               try {
                 const autoResp = await fetch('/api/auth/patient-login', {
@@ -181,18 +217,9 @@ export function PatientPortalView({
             }
           }
 
-          try {
-            const redirectCount = parseInt(sessionStorage.getItem('audenti_portal_redirects') || '0', 10);
-            if (redirectCount >= 2) {
-              sessionStorage.removeItem('audenti_portal_redirects');
-              window.location.href = '/portal/login?reauth=true';
-              return;
-            }
-            sessionStorage.setItem('audenti_portal_redirects', String(redirectCount + 1));
-          } catch {}
-
+          // Si no hay confirmAppt ni usuario autenticado, transicionar limpiamente
           const currentSearch = typeof window !== 'undefined' ? window.location.search : '';
-          window.location.replace('/portal/login' + currentSearch);
+          window.location.href = '/portal/login' + currentSearch;
           return;
         }
 
@@ -640,6 +667,58 @@ export function PatientPortalView({
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startIso}/${endIso}&details=${details}&location=${location}`;
   }, [upcomingAppointment, appointmentCountdown, branchInfo]);
 
+  const handleConfirmGuestAppointment = async () => {
+    if (!guestAppointment?.id && !guestAppointment?.folio) return;
+    setGuestConfirming(true);
+    try {
+      const resp = await fetch('/api/appointments', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: guestAppointment.id || guestAppointment.folio,
+          attendance_confirmed: true
+        })
+      });
+      const data = await resp.json();
+      if (data.success) {
+        setGuestConfirmSuccess(true);
+        setGuestAppointment((prev: any) => ({ ...prev, attendance_confirmed: true }));
+      }
+    } catch (err) {
+      console.error('Error confirmando cita:', err);
+    } finally {
+      setGuestConfirming(false);
+    }
+  };
+
+  const handleGuestPhoneLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const phone = guestPhoneInput.trim();
+    if (!phone) return;
+    setGuestLoginLoading(true);
+    setGuestLoginError('');
+    try {
+      const resp = await fetch('/api/auth/patient-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phoneOrEmail: phone,
+          redirectUrl: window.location.origin + '/portal-paciente'
+        })
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        throw new Error(data.error || 'No encontramos un expediente con ese celular.');
+      }
+      if (data.actionLink) {
+        window.location.href = data.actionLink;
+      }
+    } catch (err: any) {
+      setGuestLoginError(err.message || 'Error al acceder a tu expediente.');
+      setGuestLoginLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#040711] flex items-center justify-center p-4 text-white">
@@ -647,6 +726,165 @@ export function PatientPortalView({
           <div className="w-10 h-10 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
           <p className="text-sm font-semibold text-slate-300">Cargando tu expediente clínico seguro...</p>
         </div>
+      </div>
+    );
+  }
+
+  // ── VISTA DE CONFIRMACIÓN DIRECTA DE CITA (WHATSAPP SIN LOGIN OBLIGATORIO) ──
+  if (guestAppointment) {
+    const isChalma = (guestAppointment.branch || '').toLowerCase().includes('chalma');
+    const branchName = isChalma ? 'Sucursal Chalma de Guadalupe' : 'Sucursal Balbuena (Matriz)';
+    const branchAddress = isChalma
+      ? 'Av. Chalma de Guadalupe #124, Gustavo A. Madero, CDMX'
+      : 'Calle Cecilio Robelo #345, Jardín Balbuena, Venustiano Carranza, CDMX';
+    const mapUrl = isChalma
+      ? 'https://maps.google.com/?q=Guadalupe+Chalma+Gustavo+A+Madero'
+      : 'https://maps.google.com/?q=Jardin+Balbuena+CDMX';
+    const waClinicPhone = isChalma ? '525566068975' : '525522427769';
+
+    return (
+      <div className="min-h-screen bg-[#070b14] text-white flex flex-col justify-between py-6 px-4 sm:px-6">
+        <header className="max-w-md mx-auto w-full flex items-center justify-between pb-6 border-b border-slate-800">
+          <AudentiLogo size={28} doctorName="Dra. Aura Estudillo" />
+          <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-400 text-slate-950">
+            Confirmación Oficial
+          </span>
+        </header>
+
+        <main className="max-w-md mx-auto w-full py-6 space-y-5">
+          <div className="bg-slate-900/90 border border-amber-500/30 rounded-3xl p-6 shadow-2xl backdrop-blur-xl text-left space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-400">
+                  Cita Odontológica Programada
+                </span>
+                <h2 className="text-xl font-black text-white mt-0.5">
+                  {guestAppointment.patient_name}
+                </h2>
+              </div>
+              <span className="text-xs font-mono font-bold text-slate-400 px-2 py-0.5 rounded bg-slate-800">
+                {guestAppointment.folio || guestAppointment.id}
+              </span>
+            </div>
+
+            <div className="space-y-3 pt-2 border-t border-slate-800 text-xs">
+              <div className="flex items-center gap-3 text-slate-200">
+                <Calendar className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>
+                  <strong>Fecha:</strong> {guestAppointment.appointment_date}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3 text-slate-200">
+                <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>
+                  <strong>Horario:</strong> {guestAppointment.appointment_time} hrs
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3 text-slate-200">
+                <UserCheck className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>
+                  <strong>Atención Médica:</strong> Dra. Aura Estudillo (Céd. Prof. 8492019)
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3 text-slate-200">
+                <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>
+                  <strong>Tratamiento:</strong> {guestAppointment.treatment}
+                </span>
+              </div>
+
+              <div className="flex items-start gap-3 text-slate-200">
+                <Building2 className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold text-white">{branchName}</p>
+                  <p className="text-[11px] text-slate-400">{branchAddress}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-800">
+              {guestConfirmSuccess ? (
+                <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-2.5">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <span>¡Asistencia Confirmada! Te esperamos con gusto en la clínica.</span>
+                </div>
+              ) : (
+                <button
+                  onClick={handleConfirmGuestAppointment}
+                  disabled={guestConfirming}
+                  className="w-full py-3.5 px-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 active:scale-98 cursor-pointer disabled:opacity-60"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>{guestConfirming ? 'Confirmando...' : 'Confirmar Mi Asistencia Ahora'}</span>
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <a
+                href={mapUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors border border-slate-700"
+              >
+                <MapPin className="w-3.5 h-3.5 text-amber-400" />
+                <span>Cómo Llegar</span>
+              </a>
+
+              <a
+                href={`https://wa.me/${waClinicPhone}?text=${encodeURIComponent(`Hola Dra. Aura Estudillo, confirmo mi cita ${guestAppointment.folio || ''} a nombre de ${guestAppointment.patient_name}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors border border-slate-700"
+              >
+                <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+                <span>WhatsApp</span>
+              </a>
+            </div>
+          </div>
+
+          <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 text-left space-y-3">
+            <div>
+              <h3 className="text-xs font-bold text-white flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>¿Deseas consultar tu Odontograma 3D y Recetas?</span>
+              </h3>
+              <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+                Accede a tu expediente completo ingresando tu celular registrado:
+              </p>
+            </div>
+
+            <form onSubmit={handleGuestPhoneLoginSubmit} className="space-y-2">
+              {guestLoginError && (
+                <p className="text-[11px] text-rose-400 font-semibold">{guestLoginError}</p>
+              )}
+              <div className="flex gap-2">
+                <input
+                  type="tel"
+                  maxLength={10}
+                  placeholder="55 1234 5678"
+                  value={guestPhoneInput}
+                  onChange={(e) => setGuestPhoneInput(e.target.value)}
+                  className="flex-1 px-3 py-2 bg-slate-950 border border-slate-700 focus:border-amber-400 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-hidden"
+                />
+                <button
+                  type="submit"
+                  disabled={guestLoginLoading}
+                  className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-colors shrink-0 cursor-pointer disabled:opacity-60"
+                >
+                  {guestLoginLoading ? '...' : 'Entrar →'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </main>
+
+        <footer className="text-center text-[10px] text-slate-500 py-3">
+          Audenti Clinical • Dra. Aura Estudillo • Céd. Prof. 8492019 • Balbuena &amp; Chalma
+        </footer>
       </div>
     );
   }

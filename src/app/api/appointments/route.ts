@@ -9,12 +9,40 @@ import { findDuplicatePatient } from '@/lib/patients/patientDeduplicator';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    // 0. Búsqueda pública por Folio o ID de Cita (Permite a pacientes verificar su cita desde WhatsApp sin login)
+    const { searchParams } = new URL(request.url);
+    const queryId = searchParams.get('id') || searchParams.get('folio') || searchParams.get('confirmAppt');
+
+    if (queryId) {
+      const list = await getPersistedAppointments();
+      const matched: any = list.find((a: any) => String(a.id || a.folio) === String(queryId));
+      if (matched) {
+        return NextResponse.json({
+          success: true,
+          appointment: {
+            id: matched.id,
+            folio: matched.folio,
+            patient_name: matched.patient_name || 'Paciente Audenti',
+            patient_phone: matched.patient_phone,
+            appointment_date: matched.appointment_date,
+            appointment_time: matched.appointment_time,
+            treatment: matched.treatment || matched.treatment_type || 'Consulta Odontológica',
+            branch: matched.branch || 'Sucursal Balbuena (Matriz)',
+            status: matched.status,
+            attendance_confirmed: matched.attendance_confirmed || false,
+            notes: matched.notes || ''
+          }
+        });
+      }
+      return NextResponse.json({ success: false, error: 'Cita no encontrada.' }, { status: 404 });
+    }
+
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    // Verificación de sesión activa
+    // Verificación de sesión activa para listados generales
     if (authError || !user) {
       return NextResponse.json({ success: false, error: 'No autorizado. Se requiere iniciar sesión.' }, { status: 401 });
     }
@@ -220,24 +248,18 @@ export async function POST(request: Request) {
 // ── PATCH: Confirmar Asistencia de Cita por parte del Paciente o Staff ──
 export async function PATCH(request: Request) {
   try {
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ success: false, error: 'No autorizado. Se requiere iniciar sesión.' }, { status: 401 });
-    }
-
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const { id, attendance_confirmed = true } = body;
 
     if (!id) {
       return NextResponse.json({ success: false, error: 'ID de la cita requerido.' }, { status: 400 });
     }
 
+    // Permitir confirmación pública de asistencia para pacientes que vienen desde WhatsApp sin login
     const current = await getPersistedAppointments();
     let found = false;
     const updated = current.map((a: any) => {
-      if (a.id === id || a.folio === id) {
+      if (String(a.id || a.folio) === String(id)) {
         found = true;
         return {
           ...a,
@@ -254,6 +276,8 @@ export async function PATCH(request: Request) {
     }
 
     await savePersistedAppointments(updated);
+
+    const supabase = await createClient();
 
     // Sincronizar en tabla relacional appointments de Supabase
     try {

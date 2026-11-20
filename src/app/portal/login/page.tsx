@@ -123,21 +123,24 @@ function PatientLoginForm() {
 
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (user && mounted) {
-        // Protección estricta contra bucles en navegadores móviles e in-app
+        // Si hay confirmAppt o reauth en la URL, no forzar redirección para evitar bucles móviles
+        if (searchParams.get('confirmAppt') || searchParams.get('reauth') === 'true') {
+          return;
+        }
+
         let redirectCount = 0;
         try {
           redirectCount = parseInt(sessionStorage.getItem('audenti_portal_redirects') || '0', 10);
-          if (redirectCount >= 2) {
-            console.warn('Protección de navegación activada: deteniendo redirección automática para evitar bloqueo móvil.');
+          if (redirectCount >= 1) {
             sessionStorage.removeItem('audenti_portal_redirects');
             return;
           }
-          sessionStorage.setItem('audenti_portal_redirects', String(redirectCount + 1));
+          sessionStorage.setItem('audenti_portal_redirects', '1');
         } catch {}
 
         const target = await determineTargetRoute(supabase, user);
         if (typeof window !== 'undefined' && window.location.pathname !== target) {
-          window.location.replace(target);
+          window.location.href = target;
         }
       } else {
         try { sessionStorage.removeItem('audenti_portal_redirects'); } catch {}
