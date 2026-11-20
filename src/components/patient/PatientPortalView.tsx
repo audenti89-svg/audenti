@@ -50,6 +50,7 @@ import { PatientSpeechContext } from '@/lib/assistantSpeech';
 import { PATIENT_VISIBILITY_CONFIG } from '@/config/role-visibility';
 import { UnifiedCommunicationWidget } from '@/components/chat/UnifiedCommunicationWidget';
 import { InformedConsentSignModal } from '@/components/clinical/InformedConsentSignModal';
+import { evalAllergyStatus } from '@/components/clinical/ClinicalRiskSemaphore';
 
 // ── SUCURSALES OFICIALES AUDENTI (CANÓNICAS) ──
 const BRANCH_DETAILS: Record<string, {
@@ -160,26 +161,236 @@ export function PatientPortalView({
     referrerName: ''
   });
 
+  // Reloj en vivo para reevaluar la caducidad exacta de 65 minutos (1h 5m) cada 15 segundos
+  const [currentTime, setCurrentTime] = useState<number>(() => Date.now());
+
   useEffect(() => {
-    async function loadPortal() {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 15000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Función atómica y segura para cargar datos del paciente
+  const fetchPatientData = async (authUser: any) => {
+    try {
+      const userEmail = (authUser.email || '').trim().toLowerCase();
+      let { data: myProfile } = await supabase
+        .from('patients')
+        .select('*')
+        .or(`user_id.eq.${authUser.id}${userEmail ? `,email.eq.${userEmail}` : ''}`)
+        .maybeSingle();
+
+      const isDocOrAdmin = 
+        userEmail === 'audenti89@gmail.com' || 
+        isSystemAdminEmail(userEmail) ||
+        isInternalUser(userEmail, authUser.user_metadata?.role || '');
+
+      if (!myProfile && isDocOrAdmin) {
+        myProfile = {
+          id: '00000000-0000-0000-0000-000000000001',
+          user_id: authUser.id,
+          full_name: authUser.user_metadata?.full_name || 'Dra. Aura Estudillo (Vista Médica)',
+          phone: '5522427769',
+          email: userEmail,
+          branch_name: 'Sucursal Balbuena (Matriz)',
+          tenant_id: '00000000-0000-0000-0000-000000000001',
+          status: 'active'
+        };
+      }
+
+      if (!myProfile && userEmail) {
+        try {
+          const syncRes = await fetch('/api/auth/sync-profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: authUser.id,
+              email: userEmail,
+              fullName: authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'Paciente Audenti'
+            })
+          });
+          if (syncRes.ok) {
+            const syncData = await syncRes.json();
+            if (syncData.patient) {
+              myProfile = syncData.patient;
+            }
+          }
+        } catch (syncErr) {
+          console.warn('Nota sincronización de perfil en portal:', syncErr);
+        }
+      }
+
+      setPatient(myProfile);
+
+      // Inicializar formulario de perfil completo, sucursal y canal de adquisición
+      const rawBranch = myProfile?.branch || myProfile?.branch_name || '';
+      const isChalmaBranch = rawBranch.toLowerCase().includes('chalma') || (myProfile?.tenant_id === '00000000-0000-0000-0000-000000000002');
+      const rawChannel = (myProfile?.acquisition_channel || '').toLowerCase();
+      const initChannel: 'referral' | 'qr' = rawChannel.includes('qr') ? 'qr' : 'referral';
+
+      setProfileForm({
+        fullName: myProfile?.full_name || authUser?.user_metadata?.full_name || '',
+        phone: myProfile?.phone || '',
+        birthDate: myProfile?.birth_date ? myProfile.birth_date.split('T')[0] : '',
+        branchName: isChalmaBranch ? 'Sucursal Chalma de Guadalupe' : 'Sucursal Balbuena',
+        branchId: isChalmaBranch ? '00000000-0000-0000-0000-000000000002' : '00000000-0000-0000-0000-000000000001',
+        acquisitionChannel: initChannel,
+        referrerName: myProfile?.referrer_name || ''
+      });
+
+      if (myProfile?.id) {
+        // 1. Cargar citas reales del paciente
+        let realAppts: any[] = [];
+        try {
+          const res = await fetch('/api/appointments');
+          if (res.ok) {
+            const json = await res.json();
+            if (json.success && Array.isArray(json.appointments)) {
+              realAppts = json.appointments;
+            }
+          }
+        } catch {}
+
+        if (realAppts.length === 0) {
+          try {
+            const { data: appts } = await supabase
+              .from('appointments')
+              .select('*')
+              .or(`patient_id.eq.${myProfile.id},phone.ilike.%${(myProfile.phone || '').replace(/\D/g, '').slice(-10)}%`)
+              .order('starts_at', { ascending: true });
+            if (appts && appts.length > 0) {
+              realAppts = appts;
+            }
+          } catch {}
+        }
+        setAppointments(realAppts);
+
+        // 2. Cargar odontograma y bitácora clínica real desde chat_messages
+        try {
+          const { data: clinicalRecords } = await supabase
+            .from('chat_messages')
+            .select('*')
+            .eq('patient_id', myProfile.id)
+            .eq('channel_type', 'odontogram_clinical_entry')
+            .order('created_at', { ascending: false });
+
+          if (clinicalRecords && clinicalRecords.length > 0) {
+            const timeline: ClinicalTreatmentRecord[] = [];
+            clinicalRecords.forEach((r: any) => {
+              const meta = r.metadata || {};
+              const toothFdi = Number(meta.toothFdi) || 11;
+
+              timeline.push({
+                id: r.id,
+                toothCode: `FDI #${toothFdi} (UNS #${meta.toothUniversal || '?'})`,
+                toothName: meta.toothName || `Pieza Dental #${toothFdi}`,
+                surfaces: meta.surfacesSummary || 'General / Oclusal',
+                treatmentName: meta.procedure || 'Tratamiento Odontológico',
+                appliedDate: new Date(r.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' }),
+                doctor: r.sender_name || 'Dra. Aura Estudillo',
+                license: 'Céd. Prof. 8492019',
+                status: (meta.status?.includes('Confirmado') || meta.status?.includes('Finalizado')) ? 'Completado' : 'En Seguimiento',
+                notes: meta.notes || 'Procedimiento certificado bajo protocolo NOM-004-SSA3.'
+              });
+            });
+            setClinicalTimeline(timeline);
+          } else {
+            setClinicalTimeline([]);
+          }
+        } catch (clinicalErr) {
+          console.warn('Nota cargando bitácora clínica:', clinicalErr);
+          setClinicalTimeline([]);
+        }
+
+        // 3. Cargar recetas médicas reales NOM-004-SSA3
+        try {
+          const { data: rxRecords } = await supabase
+            .from('chat_messages')
+            .select('*')
+            .eq('patient_id', myProfile.id)
+            .eq('channel_type', 'prescription')
+            .order('created_at', { ascending: false });
+
+          if (rxRecords && rxRecords.length > 0) {
+            const loadedPrescriptions: DigitalPrescription[] = rxRecords.map((rx: any) => ({
+              id: rx.id,
+              folio: rx.metadata?.folio || `AUD-RX-${rx.id.slice(0, 8).toUpperCase()}`,
+              date: new Date(rx.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' }),
+              title: rx.metadata?.title || 'Receta Médica Digital Certificada',
+              diagnosis: rx.metadata?.diagnosis || rx.content || 'Diagnóstico odontológico',
+              doctorName: rx.sender_name || 'Dra. Aura Estudillo',
+              licenseNumber: rx.metadata?.licenseNumber || '8492019',
+              institution: 'Secretaría de Educación Pública • DGP / Fac. Odontología UNAM',
+              medications: rx.metadata?.medications || [],
+              generalInstructions: rx.metadata?.generalInstructions || [],
+              verificationHash: rx.metadata?.verificationHash || 'SHA256: CERTIFICADA-NOM-004-SSA3'
+            }));
+            setPrescriptions(loadedPrescriptions);
+          } else {
+            setPrescriptions([]);
+          }
+        } catch (rxErr) {
+          console.warn('Nota cargando recetas:', rxErr);
+          setPrescriptions([]);
+        }
+      }
+    } catch (err) {
+      console.error('Error cargando datos del paciente:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function initAuth() {
       try {
         setLoading(true);
+
+        // 1. Obtener usuario de la sesión actual
         const { data: { user: authUser } } = await supabase.auth.getUser();
 
-        if (!authUser) {
-          if (typeof window !== 'undefined') {
-            const params = new URLSearchParams(window.location.search);
-            const confirmParam = params.get('confirmAppt');
-            const phoneParam = params.get('phone');
+        if (authUser) {
+          if (!isMounted) return;
+          setUser(authUser);
+          await fetchPatientData(authUser);
 
-            // 1. Si viene con confirmAppt (enlace oficial de WhatsApp de la cita):
-            // Cargar y mostrar la cita directamente en pantalla sin forzar redirección
-            if (confirmParam) {
-              try {
-                const apptResp = await fetch(`/api/appointments?id=${encodeURIComponent(confirmParam)}`);
-                if (apptResp.ok) {
-                  const apptJson = await apptResp.json();
-                  if (apptJson.success && apptJson.appointment) {
+          // Limpiar hash de access_token de forma segura de la barra de direcciones
+          if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+            const cleanUrl = window.location.pathname + window.location.search;
+            window.history.replaceState(null, '', cleanUrl);
+          }
+          return;
+        }
+
+        // 2. Si no hay usuario pero el hash tiene access_token, permitir que Supabase lo capture
+        if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+          const { data: sessionData } = await supabase.auth.getSession();
+          if (sessionData.session?.user) {
+            if (!isMounted) return;
+            setUser(sessionData.session.user);
+            await fetchPatientData(sessionData.session.user);
+            const cleanUrl = window.location.pathname + window.location.search;
+            window.history.replaceState(null, '', cleanUrl);
+            return;
+          }
+        }
+
+        // 3. Parámetros especiales de acceso (confirmAppt o phone)
+        if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search);
+          const confirmParam = params.get('confirmAppt');
+          const phoneParam = params.get('phone');
+
+          if (confirmParam) {
+            try {
+              const apptResp = await fetch(`/api/appointments?id=${encodeURIComponent(confirmParam)}`);
+              if (apptResp.ok) {
+                const apptJson = await apptResp.json();
+                if (apptJson.success && apptJson.appointment) {
+                  if (isMounted) {
                     setGuestAppointment(apptJson.appointment);
                     if (apptJson.appointment.attendance_confirmed) {
                       setGuestConfirmSuccess(true);
@@ -188,238 +399,85 @@ export function PatientPortalView({
                       setGuestPhoneInput(apptJson.appointment.patient_phone.replace(/\D/g, '').slice(-10));
                     }
                     setLoading(false);
-                    return; // ¡NO REDIRIGIR! Cargar la cita en pantalla
                   }
+                  return;
                 }
-              } catch (apptErr) {
-                console.warn('Nota cargando cita por folio:', apptErr);
               }
+            } catch (apptErr) {
+              console.warn('Nota cargando cita por folio:', apptErr);
             }
+          }
 
-            // 2. Si viene con phone (auto-login 1-click):
-            if (phoneParam) {
-              try {
-                const autoResp = await fetch('/api/auth/patient-login', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    phoneOrEmail: phoneParam,
-                    redirectUrl: window.location.href
-                  })
+          if (phoneParam) {
+            try {
+              const autoResp = await fetch('/api/auth/patient-login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  phoneOrEmail: phoneParam,
+                  redirectUrl: window.location.href
+                })
+              });
+              const autoJson = await autoResp.json();
+              if (autoJson.ok && autoJson.hashedToken) {
+                const { error: otpErr } = await supabase.auth.verifyOtp({
+                  token_hash: autoJson.hashedToken,
+                  type: 'magiclink'
                 });
-                const autoJson = await autoResp.json();
-                if (autoJson.ok && autoJson.hashedToken) {
-                  const { error: otpErr } = await supabase.auth.verifyOtp({
-                    token_hash: autoJson.hashedToken,
-                    type: 'magiclink'
-                  });
-                  if (!otpErr) {
-                    window.location.reload();
+                if (!otpErr) {
+                  const { data: { user: verifiedUser } } = await supabase.auth.getUser();
+                  if (verifiedUser && isMounted) {
+                    setUser(verifiedUser);
+                    await fetchPatientData(verifiedUser);
                     return;
                   }
                 }
-                if (autoJson.ok && autoJson.actionLink) {
-                  window.location.href = autoJson.actionLink;
-                  return;
-                }
-              } catch (autoErr) {
-                console.warn('Nota auto-acceso por celular:', autoErr);
               }
+              if (autoJson.ok && autoJson.actionLink) {
+                window.location.href = autoJson.actionLink;
+                return;
+              }
+            } catch (autoErr) {
+              console.warn('Nota auto-acceso por celular:', autoErr);
             }
           }
+        }
 
-          // CERO REDIRECCIONES EXTERNAS: Desactivar carga para mostrar el acceso seguro en el mismo portal
+        if (isMounted) {
           setLoading(false);
-          return;
-        }
-
-        try { sessionStorage.removeItem('audenti_portal_redirects'); } catch {}
-
-        setUser(authUser);
-
-        // Consulta filtrada estrictamente al usuario autenticado usando la FK user_id
-        let { data: myProfile } = await supabase
-          .from('patients')
-          .select('*')
-          .or(`user_id.eq.${authUser.id},email.eq.${authUser.email}`)
-          .maybeSingle();
-
-        // Si es la Dra. Aura o personal médico revisando el portal del paciente
-        const isDocOrAdmin = 
-          authUser.email === 'audenti89@gmail.com' || 
-          isSystemAdminEmail(authUser.email || '') ||
-          isInternalUser(authUser.email || '', authUser.user_metadata?.role || '');
-
-        if (!myProfile && isDocOrAdmin) {
-          myProfile = {
-            id: '00000000-0000-0000-0000-000000000001',
-            user_id: authUser.id,
-            full_name: authUser.user_metadata?.full_name || 'Dra. Aura Estudillo (Vista Médica)',
-            phone: '5522427769',
-            email: authUser.email,
-            branch_name: 'Sucursal Balbuena (Matriz)',
-            tenant_id: '00000000-0000-0000-0000-000000000001',
-            status: 'active'
-          };
-        }
-
-        // Enlace de contingencia administrativa si no estaba vinculado o RLS limitó la consulta
-        if (!myProfile && authUser.email) {
-          try {
-            const syncRes = await fetch('/api/auth/sync-profile', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                userId: authUser.id,
-                email: authUser.email,
-                fullName: authUser.user_metadata?.full_name || authUser.user_metadata?.name || 'Paciente Audenti'
-              })
-            });
-            if (syncRes.ok) {
-              const syncData = await syncRes.json();
-              if (syncData.patient) {
-                myProfile = syncData.patient;
-              }
-            }
-          } catch (syncErr) {
-            console.warn('Nota sincronización de perfil en portal:', syncErr);
-          }
-        }
-
-        // Asegurar status activo en tabla users y patients para evitar bloqueos
-        if (myProfile && myProfile.status !== 'active') {
-          supabase.from('patients').update({ status: 'active' }).eq('id', myProfile.id).then(() => {});
-        }
-        supabase.from('users').update({ is_active: true, onboarding_completed: true }).eq('id', authUser.id).then(() => {});
-
-        setPatient(myProfile);
-
-        // Inicializar formulario de perfil completo, sucursal y canal de adquisición
-        const rawBranch = myProfile?.branch || myProfile?.branch_name || '';
-        const isChalmaBranch = rawBranch.toLowerCase().includes('chalma') || (myProfile?.tenant_id === '00000000-0000-0000-0000-000000000002');
-        const rawChannel = (myProfile?.acquisition_channel || '').toLowerCase();
-        const initChannel: 'referral' | 'qr' = rawChannel.includes('qr') ? 'qr' : 'referral';
-
-        setProfileForm({
-          fullName: myProfile?.full_name || authUser?.user_metadata?.full_name || '',
-          phone: myProfile?.phone || '',
-          birthDate: myProfile?.birth_date ? myProfile.birth_date.split('T')[0] : '',
-          branchName: isChalmaBranch ? 'Sucursal Chalma de Guadalupe' : 'Sucursal Balbuena',
-          branchId: isChalmaBranch ? '00000000-0000-0000-0000-000000000002' : '00000000-0000-0000-0000-000000000001',
-          acquisitionChannel: initChannel,
-          referrerName: myProfile?.referrer_name || ''
-        });
-
-        if (myProfile?.id) {
-          // 1. Cargar citas reales del paciente (sin mock, con doble sincronización)
-          let realAppts: any[] = [];
-          try {
-            const res = await fetch('/api/appointments');
-            if (res.ok) {
-              const json = await res.json();
-              if (json.success && Array.isArray(json.appointments)) {
-                realAppts = json.appointments;
-              }
-            }
-          } catch {}
-
-          if (realAppts.length === 0) {
-            try {
-              const { data: appts } = await supabase
-                .from('appointments')
-                .select('*')
-                .or(`patient_id.eq.${myProfile.id},phone.ilike.%${(myProfile.phone || '').replace(/\D/g, '').slice(-10)}%`)
-                .order('starts_at', { ascending: true });
-              if (appts && appts.length > 0) {
-                realAppts = appts;
-              }
-            } catch {}
-          }
-          setAppointments(realAppts);
-
-          // Disparo de verificación y recordatorios automáticos de citas (24h y 1h)
-          fetch('/api/cron/appointment-reminders?key=internal_cron_trigger').catch(() => {});
-
-          // 2. Cargar odontograma y bitácora clínica real desde chat_messages / api
-          try {
-            const { data: clinicalRecords } = await supabase
-              .from('chat_messages')
-              .select('*')
-              .eq('patient_id', myProfile.id)
-              .eq('channel_type', 'odontogram_clinical_entry')
-              .order('created_at', { ascending: false });
-
-            if (clinicalRecords && clinicalRecords.length > 0) {
-              const timeline: ClinicalTreatmentRecord[] = [];
-
-              clinicalRecords.forEach((r: any) => {
-                const meta = r.metadata || {};
-                const toothFdi = Number(meta.toothFdi) || 11;
-
-                timeline.push({
-                  id: r.id,
-                  toothCode: `FDI #${toothFdi} (UNS #${meta.toothUniversal || '?'})`,
-                  toothName: meta.toothName || `Pieza Dental #${toothFdi}`,
-                  surfaces: meta.surfacesSummary || 'General / Oclusal',
-                  treatmentName: meta.procedure || 'Tratamiento Odontológico',
-                  appliedDate: new Date(r.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' }),
-                  doctor: r.sender_name || 'Dra. Aura Estudillo',
-                  license: 'Céd. Prof. 8492019',
-                  status: (meta.status?.includes('Confirmado') || meta.status?.includes('Finalizado')) ? 'Completado' : 'En Seguimiento',
-                  notes: meta.notes || 'Procedimiento certificado bajo protocolo NOM-004-SSA3.'
-                });
-              });
-
-              setClinicalTimeline(timeline);
-            } else {
-              setClinicalTimeline([]);
-            }
-          } catch (clinicalErr) {
-            console.warn('Nota cargando bitácora clínica:', clinicalErr);
-            setClinicalTimeline([]);
-          }
-
-          // 3. Cargar recetas médicas reales NOM-004-SSA3
-          try {
-            const { data: rxRecords } = await supabase
-              .from('chat_messages')
-              .select('*')
-              .eq('patient_id', myProfile.id)
-              .eq('channel_type', 'prescription')
-              .order('created_at', { ascending: false });
-
-            if (rxRecords && rxRecords.length > 0) {
-              const loadedPrescriptions: DigitalPrescription[] = rxRecords.map((rx: any) => ({
-                id: rx.id,
-                folio: rx.metadata?.folio || `AUD-RX-${rx.id.slice(0, 8).toUpperCase()}`,
-                date: new Date(rx.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' }),
-                title: rx.metadata?.title || 'Receta Médica Digital Certificada',
-                diagnosis: rx.metadata?.diagnosis || rx.content || 'Diagnóstico odontológico',
-                doctorName: rx.sender_name || 'Dra. Aura Estudillo',
-                licenseNumber: rx.metadata?.licenseNumber || '8492019',
-                institution: 'Secretaría de Educación Pública • DGP / Fac. Odontología UNAM',
-                medications: rx.metadata?.medications || [],
-                generalInstructions: rx.metadata?.generalInstructions || [],
-                verificationHash: rx.metadata?.verificationHash || 'SHA256: CERTIFICADA-NOM-004-SSA3'
-              }));
-              setPrescriptions(loadedPrescriptions);
-            } else {
-              setPrescriptions([]);
-            }
-          } catch (rxErr) {
-            console.warn('Nota cargando recetas:', rxErr);
-            setPrescriptions([]);
-          }
         }
       } catch (err) {
-        console.error('Error cargando portal del paciente:', err);
-      } finally {
-        setLoading(false);
+        console.error('Error inicializando autenticación:', err);
+        if (isMounted) setLoading(false);
       }
     }
 
-    loadPortal();
-  }, [router, supabase]);
+    initAuth();
+
+    // 4. Suscripción a cambios de sesión (ej. cuando se procesa el magic link hash)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: any, session: any) => {
+      if (!isMounted) return;
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+        if (session?.user) {
+          setUser(session.user);
+          await fetchPatientData(session.user);
+          if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+            const cleanUrl = window.location.pathname + window.location.search;
+            window.history.replaceState(null, '', cleanUrl);
+          }
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setPatient(null);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription?.unsubscribe();
+    };
+  }, []);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -571,25 +629,31 @@ export function PatientPortalView({
     return 0;
   };
 
-  // Citas Próximas y Pasadas (Estrictamente reales)
+  // Caducidad de cita: exactamente 65 minutos (1 hora y 5 minutos) posteriores a la hora programada
+  const APPOINTMENT_EXPIRATION_MS = 65 * 60 * 1000;
+
+  // Citas Próximas y Pasadas (Estrictamente reales con caducidad automática a 1h 5m)
   const { upcomingAppointment, upcomingList, pastList } = useMemo(() => {
     if (!appointments || appointments.length === 0) {
       return { upcomingAppointment: null, upcomingList: [], pastList: [] };
     }
 
-    const now = Date.now();
-    // Considerar próximas aquellas que no han concluido (hasta 1 hora después del inicio)
+    // Considerar próximas aquellas que no han concluido y no superan 65 minutos desde su inicio
     const upcoming = appointments
       .filter(a => {
         const t = parseApptTime(a);
-        return t >= (now - 1000 * 60 * 60) && a.status !== 'cancelled';
+        if (!t) return false;
+        const isNotExpired = (currentTime - t) <= APPOINTMENT_EXPIRATION_MS;
+        return isNotExpired && a.status !== 'cancelled' && a.status !== 'completed';
       })
       .sort((a, b) => parseApptTime(a) - parseApptTime(b));
 
     const past = appointments
       .filter(a => {
         const t = parseApptTime(a);
-        return t < (now - 1000 * 60 * 60) || a.status === 'completed';
+        if (!t) return true;
+        const isExpired = (currentTime - t) > APPOINTMENT_EXPIRATION_MS;
+        return isExpired || a.status === 'completed';
       })
       .sort((a, b) => parseApptTime(b) - parseApptTime(a));
 
@@ -598,7 +662,7 @@ export function PatientPortalView({
       upcomingList: upcoming,
       pastList: past
     };
-  }, [appointments]);
+  }, [appointments, currentTime]);
 
   // Cálculo dinámico de tiempos, cuenta regresiva y estado de recordatorios (24h y 1h)
   const appointmentCountdown = useMemo(() => {
@@ -606,15 +670,16 @@ export function PatientPortalView({
     const time = parseApptTime(upcomingAppointment);
     if (!time) return null;
 
-    const diffMs = time - Date.now();
+    const diffMs = time - currentTime;
     const diffHours = diffMs / (1000 * 60 * 60);
     const diffDays = Math.floor(diffHours / 24);
     const remainingHours = Math.floor(diffHours % 24);
     const remainingMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
 
     let countdownText = '';
-    if (diffHours < 0) {
-      countdownText = '¡En curso ahora en consultorio!';
+    if (diffMs < 0) {
+      const elapsedMins = Math.floor(Math.abs(diffMs) / (1000 * 60));
+      countdownText = `En consultorio (inició hace ${elapsedMins} min)`;
     } else if (diffHours < 1) {
       countdownText = `¡En ${Math.max(1, remainingMinutes)} minutos!`;
     } else if (diffDays === 0) {
@@ -662,7 +727,16 @@ export function PatientPortalView({
       formattedDate,
       formattedTime
     };
-  }, [upcomingAppointment]);
+  }, [upcomingAppointment, currentTime]);
+
+  // Semáforo exacto de alergias del paciente (NOM-004-SSA3): Verde, Amarillo o Rojo
+  const allergyEval = useMemo(() => {
+    return evalAllergyStatus(
+      patient?.allergies_medication || patient?.allergies,
+      patient?.has_no_allergies,
+      patient?.allergy_notes
+    );
+  }, [patient]);
 
   // Confirmar asistencia directamente desde el portal
   const handleConfirmAttendance = async (apptId: string) => {
@@ -713,9 +787,9 @@ export function PatientPortalView({
         doctor: upcoming.doctor_name || 'la Dra. Aura Estudillo',
         branch: branchInfo.name
       } : null,
-      allergies: Array.isArray(patient?.allergies_medication) ? patient.allergies_medication : []
+      allergies: allergyEval.status === 'rojo' ? allergyEval.realAllergies : []
     };
-  }, [patientName, patient, profileForm.birthDate, calculatedAge, appointments, branchInfo.name]);
+  }, [patientName, patient, profileForm.birthDate, calculatedAge, appointments, branchInfo.name, allergyEval]);
 
   const handleConfirmGuestAppointment = async () => {
     if (!guestAppointment?.id && !guestAppointment?.folio) return;
@@ -1165,7 +1239,7 @@ export function PatientPortalView({
 
       {/* ── 2. BANNER DE BIOSEGURIDAD Y ALERTA DE ALERGIAS (NOM-004-SSA3) ── */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4">
-        {Array.isArray(patient?.allergies_medication) && patient.allergies_medication.length > 0 ? (
+        {allergyEval.status === 'rojo' ? (
           <div className="bg-rose-950/70 border border-rose-500/60 rounded-2xl p-4 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 backdrop-blur-md">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-rose-500/20 border border-rose-500/50 flex items-center justify-center text-rose-400 shrink-0">
@@ -1173,19 +1247,19 @@ export function PatientPortalView({
               </div>
               <div>
                 <p className="text-[10px] font-black uppercase tracking-wider text-rose-300">
-                  Alerta Médica NOM-004-SSA3: Alergias Reportadas
+                  Alerta Médica NOM-004-SSA3: Alergia Confirmada
                 </p>
                 <p className="text-sm font-bold text-white mt-0.5">
-                  {patient.allergies_medication.join(', ')}
+                  {allergyEval.label}
                 </p>
               </div>
             </div>
             <div className="text-xs text-slate-200 bg-rose-900/40 px-3.5 py-1.5 rounded-xl border border-rose-500/40 self-stretch sm:self-auto text-left sm:text-right">
               <span className="text-rose-300 text-[10px] block font-bold uppercase">Contacto de Emergencia</span>
-              <strong className="text-white">{patient.emergency_contact_name || 'Familiar Registrado'}</strong> • {patient.emergency_phone || patient.emergency_contact_phone || 'Sin teléfono'}
+              <strong className="text-white">{patient?.emergency_contact_name || 'Familiar Registrado'}</strong> • {patient?.emergency_phone || patient?.emergency_contact_phone || 'Sin teléfono'}
             </div>
           </div>
-        ) : (
+        ) : allergyEval.status === 'verde' ? (
           <div className="bg-emerald-950/50 border border-emerald-500/40 rounded-2xl p-3.5 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 backdrop-blur-md">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
@@ -1196,7 +1270,7 @@ export function PatientPortalView({
                   Bioseguridad Médica Validada (NOM-004-SSA3)
                 </span>
                 <p className="text-xs font-bold text-emerald-200">
-                  Sin alergias farmacológicas reportadas en cuestionario inicial (Sujeto a verificación presencial)
+                  Sin alergias confirmadas reportadas en el expediente clínico
                 </p>
               </div>
             </div>
@@ -1204,6 +1278,26 @@ export function PatientPortalView({
               <span className="text-emerald-400 text-[11px] font-bold">Emergencia:</span>
               <span className="text-white font-semibold">{patient?.emergency_contact_name || 'Registrado'}</span>
               <span className="text-slate-300">({patient?.emergency_phone || patient?.emergency_contact_phone || patient?.phone || 'Sin número'})</span>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-amber-950/40 border border-amber-500/40 rounded-2xl p-3.5 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 backdrop-blur-md">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+                <AlertTriangle className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-amber-400">
+                  Expediente Clínico en Proceso (NOM-004-SSA3)
+                </span>
+                <p className="text-xs font-bold text-amber-200">
+                  No se tiene registro de alergias • Pendiente de capturar en cuestionario presencial
+                </p>
+              </div>
+            </div>
+            <div className="text-xs text-slate-300 flex items-center gap-2 bg-amber-950/40 px-3 py-1 rounded-xl border border-amber-500/30">
+              <span className="text-amber-400 text-[11px] font-bold">Sede:</span>
+              <span className="text-white font-semibold">{branchInfo.name}</span>
             </div>
           </div>
         )}
@@ -1336,104 +1430,130 @@ export function PatientPortalView({
           </div>
         )}
 
-        {/* ── 4. BANNER DESTACADO DE PRÓXIMA CITA MÉDICA & NOTIFICACIONES ── */}
-        <div className="bg-gradient-to-r from-blue-950/80 via-slate-950 to-indigo-950/80 border border-blue-500/40 rounded-3xl p-6 sm:p-7 shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 backdrop-blur-xl">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-blue-400 font-black">
-                <Calendar className="w-4 h-4 text-blue-400" /> Próxima Cita Médica
-              </span>
-              {appointmentCountdown?.is1hAlert && (
-                <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-black uppercase flex items-center gap-1 animate-pulse">
-                  <AlertTriangle className="w-3 h-3 text-rose-400" /> ¡En menos de 1 hora!
+        {/* ── 4. TARJETA 'PRÓXIMA CITA' SOLO CON CITAS FUTURAS REALES (O ESTADO AMABLE) ── */}
+        {upcomingAppointment && appointmentCountdown ? (
+          <div className="bg-gradient-to-r from-blue-950/80 via-slate-950 to-indigo-950/80 border border-blue-500/40 rounded-3xl p-6 sm:p-7 shadow-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 backdrop-blur-xl">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-blue-400 font-black">
+                  <Calendar className="w-4 h-4 text-blue-400" /> Próxima Cita Médica
                 </span>
-              )}
-              {appointmentCountdown?.is24hAlert && (
-                <span className="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-black uppercase flex items-center gap-1">
-                  <Bell className="w-3 h-3 text-amber-400" /> Recordatorio 24h activo
-                </span>
-              )}
-              {appointmentCountdown?.countdownText && (
-                <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-bold">
-                  ⏱️ {appointmentCountdown.countdownText}
-                </span>
-              )}
-            </div>
-
-            <h2 className="text-xl sm:text-2xl font-black text-white">
-              {upcomingAppointment && appointmentCountdown ? (
-                `${appointmentCountdown.formattedDate} • ${appointmentCountdown.formattedTime} hrs`
-              ) : (
-                'Sin citas próximas programadas'
-              )}
-            </h2>
-
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-300">
-              <span className="flex items-center gap-1.5">
-                <Building2 className="w-3.5 h-3.5 text-amber-400" />
-                Sede: <strong className="text-white">{branchInfo.name}</strong>
-              </span>
-              <span className="text-slate-500">•</span>
-              <span className="flex items-center gap-1.5">
-                <Stethoscope className="w-3.5 h-3.5 text-blue-400" />
-                Dra. Aura Estudillo (Céd. 8492019)
-              </span>
-              {upcomingAppointment && (
-                <>
-                  <span className="text-slate-500">•</span>
-                  <span className="flex items-center gap-1 text-amber-300 font-bold">
-                    <Bell className="w-3.5 h-3.5 text-amber-400" />
-                    Avisos: 24h y 1h sincronizados
+                {appointmentCountdown.is1hAlert && (
+                  <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-black uppercase flex items-center gap-1 animate-pulse">
+                    <AlertTriangle className="w-3 h-3 text-rose-400" /> ¡En menos de 1 hora!
                   </span>
-                </>
-              )}
+                )}
+                {appointmentCountdown.is24hAlert && (
+                  <span className="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] font-black uppercase flex items-center gap-1">
+                    <Bell className="w-3 h-3 text-amber-400" /> Recordatorio 24h activo
+                  </span>
+                )}
+                {appointmentCountdown.countdownText && (
+                  <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-bold">
+                    ⏱️ {appointmentCountdown.countdownText}
+                  </span>
+                )}
+              </div>
+
+              <h2 className="text-xl sm:text-2xl font-black text-white">
+                {appointmentCountdown.formattedDate} • {appointmentCountdown.formattedTime} hrs
+              </h2>
+
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-300">
+                <span className="flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-amber-400" />
+                  Sede: <strong className="text-white">{branchInfo.name}</strong>
+                </span>
+                <span className="text-slate-500">•</span>
+                <span className="flex items-center gap-1.5">
+                  <Stethoscope className="w-3.5 h-3.5 text-blue-400" />
+                  Dra. Aura Estudillo (Céd. 8492019)
+                </span>
+                <span className="text-slate-500">•</span>
+                <span className="flex items-center gap-1 text-amber-300 font-bold">
+                  <Bell className="w-3.5 h-3.5 text-amber-400" />
+                  Avisos: 24h y 1h sincronizados
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+              <button
+                type="button"
+                onClick={() => handleConfirmAttendance(upcomingAppointment.id || upcomingAppointment.folio)}
+                disabled={confirmingAppt || appointmentCountdown.isConfirmed}
+                className={`inline-flex items-center justify-center gap-2 font-black px-4 py-3 rounded-2xl text-xs shadow-lg transition-all cursor-pointer flex-1 sm:flex-initial ${
+                  appointmentCountdown.isConfirmed
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 cursor-default'
+                    : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20'
+                }`}
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                {appointmentCountdown.isConfirmed ? 'Asistencia Confirmada' : (confirmingAppt ? 'Confirmando...' : 'Confirmar Asistencia')}
+              </button>
+
+              <a
+                href={`https://wa.me/${branchInfo.phoneClean}?text=${encodeURIComponent(`Hola Dra. Aura Estudillo, soy el paciente ${patientName}. Deseo confirmar los detalles de mi cita en ${branchInfo.name}.`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-bold px-3.5 py-3 rounded-2xl text-xs border border-slate-700 transition-all cursor-pointer"
+                title="Contactar a la clínica por WhatsApp"
+              >
+                <MessageCircle className="w-4 h-4 text-emerald-400" />
+                WhatsApp
+              </a>
+
+              <button
+                type="button"
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('audenti_open_communication_widget', {
+                    detail: { tab: 'voice' }
+                  }));
+                }}
+                className="inline-flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-5 py-3 rounded-2xl text-xs shadow-lg shadow-amber-500/20 transition-all cursor-pointer flex-1 sm:flex-initial"
+              >
+                <PlusCircle className="w-4 h-4 stroke-[2.5]" />
+                Agendar / Reprogramar
+              </button>
             </div>
           </div>
+        ) : (
+          <div className="bg-slate-950/80 border border-slate-800 rounded-3xl p-6 sm:p-7 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 backdrop-blur-xl">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 shrink-0">
+                <Calendar className="w-6 h-6 text-amber-400/80" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                    Control Clínico Preventivo
+                  </span>
+                  <span className="text-xs text-slate-400 font-mono">
+                    {branchInfo.name}
+                  </span>
+                </div>
+                <h2 className="text-lg sm:text-xl font-black text-white">
+                  Aún no tienes una próxima cita agendada
+                </h2>
+                <p className="text-xs text-slate-400 max-w-xl leading-relaxed">
+                  Tu expediente clínico se encuentra activo con la Dra. Aura Estudillo. Si requieres valoración, revisión periódica o continuar tu tratamiento, solicita tu turno directo aquí.
+                </p>
+              </div>
+            </div>
 
-          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            {upcomingAppointment && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => handleConfirmAttendance(upcomingAppointment.id || upcomingAppointment.folio)}
-                  disabled={confirmingAppt || appointmentCountdown?.isConfirmed}
-                  className={`inline-flex items-center justify-center gap-2 font-black px-4 py-3 rounded-2xl text-xs shadow-lg transition-all cursor-pointer flex-1 sm:flex-initial ${
-                    appointmentCountdown?.isConfirmed
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 cursor-default'
-                      : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20'
-                  }`}
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  {appointmentCountdown?.isConfirmed ? 'Asistencia Confirmada' : (confirmingAppt ? 'Confirmando...' : 'Confirmar Asistencia')}
-                </button>
-
-                <a
-                  href={`https://wa.me/${branchInfo.phoneClean}?text=${encodeURIComponent(`Hola Dra. Aura Estudillo, soy el paciente ${patientName}. Deseo confirmar los detalles de mi cita en ${branchInfo.name}.`)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-bold px-3.5 py-3 rounded-2xl text-xs border border-slate-700 transition-all cursor-pointer"
-                  title="Contactar a la clínica por WhatsApp"
-                >
-                  <MessageCircle className="w-4 h-4 text-emerald-400" />
-                  WhatsApp
-                </a>
-              </>
-            )}
-
-            <button
-              type="button"
-              onClick={() => {
-                window.dispatchEvent(new CustomEvent('audenti_open_communication_widget', {
-                  detail: { tab: 'voice' }
-                }));
-              }}
-              className="inline-flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-5 py-3 rounded-2xl text-xs shadow-lg shadow-amber-500/20 transition-all cursor-pointer flex-1 sm:flex-initial"
-            >
-              <PlusCircle className="w-4 h-4 stroke-[2.5]" />
-              Agendar / Reprogramar
-            </button>
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              <a
+                href={`https://wa.me/${branchInfo.phoneClean}?text=${encodeURIComponent(`Hola Dra. Aura Estudillo, soy el paciente ${patientName}. Deseo agendar una consulta odontológica en ${branchInfo.name}.`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-5 py-3 rounded-2xl text-xs shadow-lg shadow-amber-500/20 transition-all cursor-pointer flex-1 md:flex-initial"
+              >
+                <PlusCircle className="w-4 h-4 stroke-[2.5]" />
+                <span>Solicitar Nueva Cita</span>
+              </a>
+            </div>
           </div>
-        </div>
+        )}
 
         {confirmationNotice && (
           <div className="p-4 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-200 text-xs font-bold flex items-center justify-between gap-3 animate-fade-in">
@@ -2029,9 +2149,9 @@ export function PatientPortalView({
                     <CalendarCheck className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="text-base font-black text-white">Sin Citas Pendientes en tu Expediente</h3>
+                    <h3 className="text-base font-black text-white">Aún no tienes una próxima cita agendada</h3>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      Tu expediente clínico se encuentra activo. La Dra. Aura Estudillo recomienda una revisión semestral preventiva.
+                      Tu expediente clínico se encuentra activo con la Dra. Aura Estudillo. Si requieres valoración, revisión semestral o continuar tu tratamiento, solicita tu turno directo aquí.
                     </p>
                   </div>
                 </div>
@@ -2270,9 +2390,19 @@ export function PatientPortalView({
                 <div>
                   <p className="text-slate-400 text-[10px] uppercase font-bold">Diagnóstico Clínico Oficial</p>
                   <p className="text-xs font-semibold text-amber-200 mt-0.5">{selectedPrescription.diagnosis}</p>
-                  {Array.isArray(patient?.allergies_medication) && patient.allergies_medication.length > 0 && (
+                  {allergyEval.status === 'rojo' && (
                     <p className="text-[11px] text-rose-400 font-bold mt-1">
-                      ⚠️ Alergias: {patient.allergies_medication.join(', ')}
+                      ⚠️ Alergia confirmada: {allergyEval.realAllergies.join(', ')}
+                    </p>
+                  )}
+                  {allergyEval.status === 'verde' && (
+                    <p className="text-[11px] text-emerald-400 font-bold mt-1">
+                      ✓ Sin alergias confirmadas
+                    </p>
+                  )}
+                  {allergyEval.status === 'amarillo' && (
+                    <p className="text-[11px] text-amber-400 font-medium mt-1">
+                      ℹ️ Sin registro de alergias
                     </p>
                   )}
                 </div>

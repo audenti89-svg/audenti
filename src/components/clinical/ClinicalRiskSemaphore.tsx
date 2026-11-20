@@ -17,6 +17,86 @@ import { cn } from '@/lib/utils';
 
 export type RiskLevel = 'verde' | 'amarillo' | 'naranja' | 'rojo' | 'azul';
 
+/**
+ * Normaliza y evalúa estrictamente los 3 estados clínicos de alergias:
+ * 1. VERDE: "Sin alergias confirmadas" (hasNoAllergies === true o negadas: "ninguna", "no", "negadas", "sin alergias", "sano").
+ * 2. AMARILLO: "No se tiene registro de alergias" (vacío, null o pendiente de captura. NUNCA en rojo).
+ * 3. ROJO: "Alergia confirmada: [detalle]" (ÚNICAMENTE si existe alérgeno real reportado y activo).
+ */
+export function evalAllergyStatus(
+  allergies?: string[] | string | null,
+  hasNoAllergies?: boolean,
+  allergyNotes?: string | null
+): {
+  status: 'verde' | 'amarillo' | 'rojo';
+  label: string;
+  badgeText: string;
+  description: string;
+  realAllergies: string[];
+} {
+  const isNegation = (s: string) => {
+    const low = s.toLowerCase().trim();
+    return (
+      low === 'ninguna' ||
+      low === 'ninguno' ||
+      low === 'no' ||
+      low === 'no tiene' ||
+      low === 'no registra' ||
+      low === 'sin alergias' ||
+      low === 'sin alergia' ||
+      low === 'sano' ||
+      low === 'desconoce' ||
+      low === 'nkda' ||
+      low === 'n/a' ||
+      low === 'negativo' ||
+      low === 'negadas' ||
+      low === 'negada' ||
+      low.includes('niega')
+    );
+  };
+
+  const rawList: string[] = Array.isArray(allergies)
+    ? allergies
+    : typeof allergies === 'string' && allergies.trim()
+    ? allergies.split(',').map((s) => s.trim())
+    : [];
+
+  const cleanList = rawList.map((s) => s.trim()).filter(Boolean);
+  const realAllergies = cleanList.filter((s) => !isNegation(s));
+  const hasExplicitNegation = cleanList.some(isNegation);
+
+  // 1. ROJO: Únicamente cuando existe un alérgeno real confirmado
+  if (realAllergies.length > 0) {
+    return {
+      status: 'rojo',
+      label: `Alergia confirmada: ${realAllergies.join(', ')}`,
+      badgeText: 'Alergia Confirmada',
+      description: `Alerta médica activa: ${realAllergies.join(', ')}. Extremar precauciones antes de administrar o prescribir fármacos.`,
+      realAllergies
+    };
+  }
+
+  // 2. VERDE: Confirmó explícitamente que no tiene alergias
+  if (hasNoAllergies === true || hasExplicitNegation) {
+    return {
+      status: 'verde',
+      label: 'Sin alergias confirmadas',
+      badgeText: 'Sin Alergias Confirmadas',
+      description: 'El paciente confirmó que no presenta alergias medicamentosas conocidas.',
+      realAllergies: []
+    };
+  }
+
+  // 3. AMARILLO: No se tiene registro de alergias capturado (vacío, null o no confirmado)
+  return {
+    status: 'amarillo',
+    label: 'No se tiene registro de alergias',
+    badgeText: 'Registro Pendiente',
+    description: 'No se tiene registro de alergias capturado en el expediente. Pendiente de confirmar en cuestionario presencial.',
+    realAllergies: []
+  };
+}
+
 export interface ClinicalRiskSemaphoreProps {
   allergies?: string[] | string | null;
   hasNoAllergies?: boolean;
@@ -38,67 +118,42 @@ export function ClinicalRiskSemaphore({
   compact = false,
   className
 }: ClinicalRiskSemaphoreProps) {
-  // Normalizar lista de alergias
-  const allergiesList: string[] = Array.isArray(allergies)
-    ? allergies
-    : typeof allergies === 'string' && allergies.trim()
-    ? allergies.split(',').map((a) => a.trim()).filter(Boolean)
-    : [];
+  // Evaluación estricta de alergias
+  const allergyEval = evalAllergyStatus(allergies, hasNoAllergies, allergyNotes);
 
-  const rawLower = (Array.isArray(allergies) ? allergies.join(' ') : String(allergies || '')).toLowerCase();
-  const notesLower = String(allergyNotes || '').toLowerCase();
+  // Evaluación combinada del Semáforo Clínico (NOM-004-SSA3)
+  let level: RiskLevel = allergyEval.status;
+  let title = allergyEval.label;
+  let description = allergyEval.description;
+  let badgeText = allergyEval.badgeText;
 
-  // Detección de gravedad de alergias y riesgos
-  const isPenicillinOrAnesthetic =
-    rawLower.includes('penicil') ||
-    rawLower.includes('amoxicil') ||
-    rawLower.includes('lidocain') ||
-    rawLower.includes('anestes') ||
-    rawLower.includes('latex') ||
-    notesLower.includes('penicil') ||
-    notesLower.includes('anafil');
-
-  const isNsaidOrModerate =
-    rawLower.includes('aspirin') ||
-    rawLower.includes('ibuprofen') ||
-    rawLower.includes('ketorolac') ||
-    rawLower.includes('naproxen') ||
-    rawLower.includes('sulfas');
-
-  // Evaluación del Semáforo Clínico (NOM-004-SSA3)
-  let level: RiskLevel = 'verde';
-  let title = 'Sin Alergias Reportadas';
-  let description = 'Paciente sin alergias medicamentosas conocidas ni factores de riesgo agudo.';
-  let badgeText = 'Seguro • Sin Alergias';
-
-  if (isPenicillinOrAnesthetic || hasPainOrEmergency) {
+  if (allergyEval.status === 'rojo') {
     level = 'rojo';
-    title = isPenicillinOrAnesthetic
-      ? '¡ALERTA CRÍTICA: Alergia a Betalactámicos / Anestésico!'
-      : '¡URGENCIA ACTIVA: Dolor Agudo / Infección!';
-    description = isPenicillinOrAnesthetic
-      ? 'Prohibida la administración de penicilinas, amoxicilina o anestésicos con el alérgeno detectado.'
-      : 'Paciente con dolor dental severo o proceso infeccioso activo que requiere atención inmediata.';
-    badgeText = 'Riesgo Crítico';
-  } else if (isNsaidOrModerate || hasStructuralRisk) {
+    title = `¡ALERTA MÉDICA: ${allergyEval.label}!`;
+    description = allergyEval.description;
+    badgeText = 'Alergia Confirmada';
+  } else if (hasPainOrEmergency) {
+    level = 'rojo';
+    title = '¡URGENCIA ACTIVA: Dolor Agudo / Proceso Infeccioso!';
+    description = 'Paciente con sintomatología dolorosa severa o absceso que requiere atención clínica prioritaria.';
+    badgeText = 'Urgencia Activa';
+  } else if (hasStructuralRisk) {
     level = 'naranja';
-    title = isNsaidOrModerate
-      ? 'Precaución: Alergia a Medicamentos (AINEs / Sulfas)'
-      : 'Riesgo Estructural Dental / Periodontal';
-    description = isNsaidOrModerate
-      ? 'Ajustar prescripción analgésica alternativa (evitar AINEs reportados).'
-      : 'Pieza con destrucción coronal mayor al 60% o pérdida ósea severa.';
-    badgeText = 'Riesgo Moderado';
+    title = 'Riesgo Estructural Dental / Periodontal';
+    description = 'Pieza con destrucción coronal mayor al 60% o pérdida de soporte óseo avanzado.';
+    badgeText = 'Riesgo Estructural';
   } else if (hasNerveInvolvement) {
     level = 'azul';
     title = 'Compromiso de Inervación / Sistema Nervioso';
     description = 'Presencia de parestesia, dolor urente o afectación en ramas trigeminales (V1, V2, V3).';
     badgeText = 'Inervación Nerviosa';
-  } else if (allergiesList.length > 0 && !hasNoAllergies) {
-    level = 'amarillo';
-    title = 'Alergias Leves / Factores de Precaución';
-    description = `Alergias reportadas: ${allergiesList.join(', ')}. Verificar antes de anestesiar.`;
-    badgeText = 'Precaución Leve';
+  } else {
+    // Si no hay urgencia ni riesgo estructural ni compromiso nervioso:
+    // El semáforo toma exactamente el estado de alergias: VERDE o AMARILLO (NUNCA ROJO)
+    level = allergyEval.status;
+    title = allergyEval.label;
+    description = allergyEval.description;
+    badgeText = allergyEval.badgeText;
   }
 
   // Estilos visuales por código de color

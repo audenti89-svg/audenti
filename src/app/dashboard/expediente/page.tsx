@@ -1060,7 +1060,7 @@ export default function ExpedientePage() {
                   {selectedPatient && (
                     <ClinicalRiskSemaphore
                       allergies={selectedPatient.allergies_medication || selectedPatient.allergies}
-                      hasNoAllergies={selectedPatient.has_no_allergies || (!selectedPatient.allergies_medication && !selectedPatient.allergies)}
+                      hasNoAllergies={Boolean(selectedPatient.has_no_allergies)}
                       allergyNotes={selectedPatient.allergy_notes || selectedPatient.notes}
                       hasPainOrEmergency={Boolean(selectedPatient.has_pain_emergency || selectedPatient.notes?.toLowerCase().includes('dolor'))}
                       hasStructuralRisk={Boolean(selectedPatient.notes?.toLowerCase().includes('fractura'))}

@@ -17,12 +17,15 @@ import {
   Pencil,
   X,
   Save,
-  ShieldCheck
+  ShieldCheck,
+  AlertTriangle,
+  Info
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
 import { QuickRegisterModal } from '@/components/clinical/QuickRegisterModal'
 import { PatientDirectActionWidget } from '@/components/clinical/PatientDirectActionWidget'
+import { evalAllergyStatus } from '@/components/clinical/ClinicalRiskSemaphore'
 
 export default function PacientesPage() {
   const [patients, setPatients] = useState<any[]>([])
@@ -474,41 +477,17 @@ export default function PacientesPage() {
                           </td>
                           <td className="px-6 py-4">
                             {(() => {
-                              const rawAllergies = p.allergies_medication || p.allergies || []
-                              const allergiesList: string[] = (
-                                Array.isArray(rawAllergies)
-                                  ? rawAllergies
-                                  : typeof rawAllergies === 'string' && rawAllergies.trim()
-                                  ? rawAllergies.split(',').map((s: string) => s.trim())
-                                  : []
-                              ).filter(Boolean)
+                              const evalRes = evalAllergyStatus(
+                                p.allergies_medication || p.allergies,
+                                Boolean(p.has_no_allergies),
+                                p.allergy_notes || p.notes
+                              )
 
-                              const isNegatedAllergy = (a: string) => {
-                                const low = String(a).toLowerCase().trim()
-                                return (
-                                  low === 'ninguna' ||
-                                  low === 'ninguno' ||
-                                  low === 'no' ||
-                                  low === 'no registra' ||
-                                  low === 'sin alergias' ||
-                                  low === 'sin alergia' ||
-                                  low.includes('niega') ||
-                                  low.includes('nkda') ||
-                                  low === 'n/a' ||
-                                  low === 'negativo'
-                                )
-                              }
-
-                              const isAngeles = p.full_name?.toLowerCase().includes('angeles') || p.id === '9e88144f-9858-4408-9c2a-bd0894512ce3'
-                              const realAllergies = allergiesList.filter(a => !isNegatedAllergy(a))
-                              const finalAllergies = realAllergies.length > 0 ? realAllergies : (isAngeles ? ['Penicilina / Betalactámicos'] : [])
-
-                              // Si tiene alergia real comprobada, mostrar alerta roja visible y destacada
-                              if (finalAllergies.length > 0) {
+                              if (evalRes.status === 'rojo') {
                                 return (
                                   <div className="flex flex-col gap-1">
                                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white border border-rose-700 shadow-xs animate-pulse">
-                                      ⚠️ ALERGIA: {finalAllergies.join(', ')}
+                                      ⚠️ {evalRes.label}
                                     </span>
                                     <span className="text-[10px] text-rose-700 font-bold">
                                       NOM-004: Precaución
@@ -517,11 +496,19 @@ export default function PacientesPage() {
                                 )
                               }
 
-                              // Si no tiene alertas de alergia, mostrar distintivo en color VERDE (Bioseguridad Validada)
+                              if (evalRes.status === 'verde') {
+                                return (
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/40">
+                                    <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                                    Sin alergias confirmadas
+                                  </span>
+                                )
+                              }
+
                               return (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/40">
-                                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                                  Sin Alergias (Bioseguro)
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/40">
+                                  <Info className="w-3 h-3 text-amber-400" />
+                                  Sin registro de alergias
                                 </span>
                               )
                             })()}

@@ -48,6 +48,13 @@ export function PatientAppointmentNotifications({
   const [notifications, setNotifications] = useState<PatientNotification[]>([])
   const [loading, setLoading] = useState(true)
   const [confirmedIds, setConfirmedIds] = useState<Set<string>>(new Set())
+  const [currentNow, setCurrentNow] = useState<number>(() => Date.now())
+
+  // Intervalo ligero para actualizar la caducidad en tiempo real (cada 15s)
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentNow(Date.now()), 15000)
+    return () => clearInterval(timer)
+  }, [])
 
   const fetchPatientNotifications = async () => {
     try {
@@ -74,6 +81,19 @@ export function PatientAppointmentNotifications({
     return () => clearInterval(interval)
   }, [patientId])
 
+  // Filtrar notificaciones caducadas: una vez transcurridos 65 minutos (1h 5m) se ocultan automáticamente
+  const activeNotifications = notifications.filter(item => {
+    if (item.type === 'appointment' && item.appointmentDate) {
+      const timeStr = item.appointmentTime || '12:00'
+      const [h, m] = timeStr.split(':').map(n => parseInt(n, 10) || 0)
+      const apptTime = new Date(`${item.appointmentDate}T${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:00`).getTime()
+      if (!isNaN(apptTime) && (currentNow - apptTime) > 65 * 60 * 1000) {
+        return false // Caducada automáticamente (65 minutos posteriores al inicio)
+      }
+    }
+    return true
+  })
+
   const handleConfirmAppointment = (notifId: string, apptDate?: string, apptTime?: string, treatment?: string) => {
     setConfirmedIds(prev => new Set(prev).add(notifId))
     const msg = `Hola Dra. Aura Estudillo, confirmo mi asistencia a mi cita dental programada para el ${apptDate || 'próximo turno'} a las ${apptTime || ''} hrs (${treatment || 'Consulta'}). Paciente: ${patientName}.`
@@ -89,7 +109,7 @@ export function PatientAppointmentNotifications({
     )
   }
 
-  if (notifications.length === 0) {
+  if (activeNotifications.length === 0) {
     return null
   }
 
@@ -104,7 +124,7 @@ export function PatientAppointmentNotifications({
             Avisos &amp; Recordatorios de tus Citas
           </span>
           <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-black">
-            {notifications.length}
+            {activeNotifications.length}
           </span>
         </div>
 
@@ -114,7 +134,7 @@ export function PatientAppointmentNotifications({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-        {notifications.map((item) => {
+        {activeNotifications.map((item) => {
           const isConfirmed = confirmedIds.has(item.id)
           const isPreparation = item.type === 'preparation'
 

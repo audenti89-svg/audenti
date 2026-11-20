@@ -109,13 +109,40 @@ export async function GET(req: NextRequest) {
     // ────────────────────────────────────────────────────────────
     if (effectiveRole === 'paciente') {
       const targetPatientId = queryPatientId || user?.id
+      const nowMs = Date.now()
+      const EXPIRATION_CUTOFF_MS = 65 * 60 * 1000 // 1 hora y 5 minutos (65 min)
+
+      // Helper para calcular timestamp de la cita
+      const getApptTimestamp = (a: any): number => {
+        if (a.starts_at) {
+          const t = new Date(a.starts_at).getTime()
+          if (!isNaN(t)) return t
+        }
+        if (a.appointment_date) {
+          const timeStr = a.appointment_time || '12:00'
+          const [h, m] = timeStr.split(':').map((n: string) => parseInt(n, 10) || 0)
+          const t = new Date(`${a.appointment_date}T${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:00`).getTime()
+          if (!isNaN(t)) return t
+        }
+        return 0
+      }
 
       // Buscar citas correspondientes a este paciente (por ID, email, o nombre)
+      // Excluir citas canceladas o que ya hayan caducado (> 65 minutos posteriores al inicio)
       const patientAppts = combinedAppts.filter(a => {
-        if (targetPatientId && (a.patient_id === targetPatientId || a.patientId === targetPatientId)) return true
-        if (user?.email && a.patient_email === user.email) return true
-        if (user?.user_metadata?.full_name && a.patient_name?.toLowerCase().includes(user.user_metadata.full_name.toLowerCase())) return true
-        return false
+        if (a.status === 'cancelled') return false
+        const belongsToPatient = 
+          (targetPatientId && (a.patient_id === targetPatientId || a.patientId === targetPatientId)) ||
+          (user?.email && a.patient_email === user.email) ||
+          (user?.user_metadata?.full_name && a.patient_name?.toLowerCase().includes(user.user_metadata.full_name.toLowerCase()))
+        
+        if (!belongsToPatient) return false
+
+        const t = getApptTimestamp(a)
+        if (t > 0 && (nowMs - t) > EXPIRATION_CUTOFF_MS) {
+          return false // Caducada automáticamente (más de 1h 5m)
+        }
+        return true
       })
 
       if (patientAppts.length === 0) {
