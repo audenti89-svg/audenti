@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import {
   Building2,
   Search,
@@ -22,7 +22,11 @@ import {
   GraduationCap,
   Lock,
   UserCheck,
-  LogOut
+  LogOut,
+  Volume2,
+  VolumeX,
+  HeartPulse,
+  Wrench
 } from 'lucide-react'
 import { useBranchStore, BranchId, BRANCHES_DATA } from '@/stores/branchStore'
 import { useNotificationSound } from '@/hooks/useNotificationSound'
@@ -37,11 +41,15 @@ export interface HeaderProps {
 
 interface NotificationItem {
   id: string
-  type: 'emergency' | 'appointment' | 'general'
+  type: 'emergency' | 'appointment' | 'biosecurity' | 'clinical_task' | 'financial' | 'general'
   title: string
   message: string
   time: string
   link?: string
+  branch?: string
+  patientName?: string
+  urgencyLevel?: 'baja' | 'media' | 'alta' | 'critica'
+  actionLabel?: string
 }
 
 export function Header({ onMenuToggle }: HeaderProps) {
@@ -58,12 +66,45 @@ export function Header({ onMenuToggle }: HeaderProps) {
   const [currentUser, setCurrentUser] = useState<any>(null)
   const notifRef = useRef<HTMLDivElement>(null)
 
-  const fetchLiveNotifications = async () => {
+  // Rol del personal clínico para segmentación de notificaciones
+  const [staffRole, setStaffRole] = useState<'socio' | 'trabajador' | 'recepcion' | 'pasante'>('socio')
+  const [activeNotifTab, setActiveNotifTab] = useState<'all' | 'citas' | 'bioseguridad' | 'operativas'>('all')
+  const [soundEnabled, setSoundEnabled] = useState(true)
+
+  const fetchLiveNotifications = async (roleOverride?: string) => {
     try {
+      const activeRole = roleOverride || staffRole
       const items: NotificationItem[] = []
       const supabase = createClient()
 
-      // 1. Hidratar desde doctor_alerts.json (alertas directas de la Dra. Aura generadas por IA)
+      // 1. Obtener notificaciones segmentadas por rol clínico desde /api/notifications
+      try {
+        const branchParam = currentBranchId || 'all'
+        const res = await fetch(`/api/notifications?role=${activeRole}&branch=${branchParam}`)
+        if (res.ok) {
+          const json = await res.json()
+          if (json.success && Array.isArray(json.notifications)) {
+            json.notifications.forEach((n: any) => {
+              items.push({
+                id: n.id,
+                type: n.type,
+                title: n.title,
+                message: n.message,
+                time: n.time,
+                link: n.actionUrl || '/dashboard',
+                branch: n.branch,
+                patientName: n.patientName,
+                urgencyLevel: n.urgencyLevel,
+                actionLabel: n.actionLabel
+              })
+            })
+          }
+        }
+      } catch (apiErr) {
+        console.warn('Nota /api/notifications:', apiErr)
+      }
+
+      // 2. Hidratar desde doctor_alerts.json (alertas directas de la Dra. Aura generadas por IA)
       try {
         const { data: alertsFile } = await supabase.storage.from('audenti_database').download('doctor_alerts.json')
         if (alertsFile) {
@@ -73,14 +114,19 @@ export function Header({ onMenuToggle }: HeaderProps) {
             if (Array.isArray(parsedAlerts)) {
               parsedAlerts.forEach((a: any) => {
                 const isEmergency = a.type === 'urgencia'
-                items.push({
-                  id: a.id || `alert-${Math.random()}`,
-                  type: isEmergency ? 'emergency' : 'appointment',
-                  title: a.title || (isEmergency ? '🔴 Alerta: Urgencia Clínica' : '📅 Nueva cita agendada por IA'),
-                  message: a.message || `${a.patient_name || 'Paciente'} - ${a.branch || 'Sede Balbuena'}`,
-                  time: a.appointment_time || a.time || 'Reciente',
-                  link: isEmergency ? '/dashboard' : '/dashboard/calendar'
-                })
+                const already = items.some(it => it.id === a.id)
+                if (!already) {
+                  items.unshift({
+                    id: a.id || `alert-${Math.random()}`,
+                    type: isEmergency ? 'emergency' : 'appointment',
+                    title: a.title || (isEmergency ? '🔴 Alerta: Urgencia Clínica' : '📅 Cita en Plataforma'),
+                    message: a.message || `${a.patient_name || 'Paciente'} - ${a.branch || 'Sede Balbuena'}`,
+                    time: a.appointment_time || a.time || 'Reciente',
+                    link: isEmergency ? '/dashboard' : '/dashboard/calendar',
+                    urgencyLevel: isEmergency ? 'critica' : 'media',
+                    actionLabel: isEmergency ? 'Revisar Urgencia' : 'Ver Agenda'
+                  })
+                }
               })
             }
           }
@@ -89,60 +135,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
         console.warn('Nota doctor_alerts hydration:', storageAlertErr)
       }
 
-      // 2. Hidratar desde appointments.json en Storage
-      try {
-        const { data: apptFile } = await supabase.storage.from('audenti_database').download('appointments.json')
-        if (apptFile) {
-          const apptText = await apptFile.text()
-          if (apptText && apptText.trim()) {
-            const parsedAppts = JSON.parse(apptText)
-            if (Array.isArray(parsedAppts)) {
-              parsedAppts.slice(0, 5).forEach((p: any) => {
-                const isPending = p.status === 'pending_review'
-                const alreadyExists = items.some(it => it.id.includes(p.id || p.folio))
-                if (!alreadyExists) {
-                  items.push({
-                    id: `appt-storage-${p.id || p.folio}`,
-                    type: isPending ? 'emergency' : 'appointment',
-                    title: isPending ? '🔴 Urgencia en Espera' : '📅 Cita Agendada',
-                    message: `${p.patient_name || 'Paciente'} • ${p.treatment || p.treatment_type || 'Consulta'} (${p.appointment_date || ''} ${p.appointment_time || ''})`,
-                    time: p.appointment_time || 'En agenda',
-                    link: isPending ? '/dashboard' : '/dashboard/calendar'
-                  })
-                }
-              })
-            }
-          }
-        }
-      } catch {}
-
-      // 3. Fallback / Complemento con tabla relacional de Supabase
-      try {
-        const { data } = await supabase
-          .from('appointments')
-          .select('id, status, starts_at, notes, patients(full_name)')
-          .order('created_at', { ascending: false })
-          .limit(4)
-
-        if (data) {
-          data.forEach((a: any) => {
-            const isPending = a.status === 'pending_review'
-            const existing = items.some(it => it.id.includes(a.id))
-            if (!existing) {
-              items.push({
-                id: `appt-db-${a.id}`,
-                type: isPending ? 'emergency' : 'appointment',
-                title: isPending ? '🔴 Alerta: Urgencia en Espera' : '📅 Cita en Plataforma',
-                message: `${a.patients?.full_name || 'Paciente'} • ${a.treatment_type || 'Consulta Odontológica'}`,
-                time: 'En vivo',
-                link: isPending ? '/dashboard' : '/dashboard/calendar'
-              })
-            }
-          })
-        }
-      } catch {}
-
-      const emergencyItems = items.filter(item => item.type === 'emergency')
+      const emergencyItems = items.filter(item => item.type === 'emergency' || item.urgencyLevel === 'critica')
       setHasActiveEmergency(emergencyItems.length > 0)
       setEmergencyCount(emergencyItems.length)
       if (emergencyItems.length > 0 && !activeEmergencyFolio) {
@@ -158,11 +151,24 @@ export function Header({ onMenuToggle }: HeaderProps) {
       } catch {}
 
       const unreadNotifications = items.filter(it => !readIds.includes(it.id))
-      setNotifications(unreadNotifications.slice(0, 15))
+      setNotifications(unreadNotifications.slice(0, 20))
     } catch {
       // Ignorar errores transitorios
     }
   }
+
+  const filteredNotifications = useMemo(() => {
+    if (activeNotifTab === 'citas') {
+      return notifications.filter(n => n.type === 'appointment')
+    }
+    if (activeNotifTab === 'bioseguridad') {
+      return notifications.filter(n => n.type === 'biosecurity' || n.type === 'emergency')
+    }
+    if (activeNotifTab === 'operativas') {
+      return notifications.filter(n => n.type === 'clinical_task' || n.type === 'financial' || n.type === 'general')
+    }
+    return notifications
+  }, [notifications, activeNotifTab])
 
   const handleMarkAllAsAttended = () => {
     try {
@@ -347,11 +353,20 @@ export function Header({ onMenuToggle }: HeaderProps) {
         </Link>
         <div className="hidden sm:flex relative items-center bg-slate-900 px-2.5 py-1.5 rounded-xl border border-slate-800">
           <ShieldCheck className="w-3.5 h-3.5 text-amber-400 mr-1.5 shrink-0" />
-          <select className="bg-transparent text-[11px] font-bold text-slate-300 pr-4 appearance-none focus:outline-none cursor-pointer">
-            <option className="bg-slate-950 text-white">Rol: Director Médico</option>
-            <option className="bg-slate-950 text-white">Rol: Especialista</option>
-            <option className="bg-slate-950 text-white">Rol: Recepción / Caja</option>
-            <option className="bg-slate-950 text-white">Rol: Asistente Dental</option>
+          <select
+            value={staffRole}
+            onChange={(e) => {
+              const r = e.target.value as any
+              setStaffRole(r)
+              try { localStorage.setItem('audenti_staff_role', r) } catch {}
+              fetchLiveNotifications(r)
+            }}
+            className="bg-transparent text-[11px] font-bold text-slate-300 pr-4 appearance-none focus:outline-none cursor-pointer"
+          >
+            <option value="socio" className="bg-slate-950 text-white">Rol: Director Médico (Socio)</option>
+            <option value="trabajador" className="bg-slate-950 text-white">Rol: Especialista (Odontólogo)</option>
+            <option value="recepcion" className="bg-slate-950 text-white">Rol: Recepción / Caja</option>
+            <option value="pasante" className="bg-slate-950 text-white">Rol: Asistente / Pasante</option>
           </select>
           <ChevronDown className="w-3 h-3 absolute right-1 pointer-events-none text-slate-400" />
         </div>
@@ -419,25 +434,35 @@ export function Header({ onMenuToggle }: HeaderProps) {
           </button>
 
           {showNotifications && (
-            <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-slate-950/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-amber-500/30 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200 text-white">
+            <div className="absolute right-0 mt-2 w-80 sm:w-[420px] bg-slate-950/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-amber-500/30 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200 text-white">
               {/* Header del Dropdown */}
               <div className="p-3.5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
                 <div className="flex items-center gap-2">
                   <Bell className="w-4 h-4 text-amber-400" />
                   <span className="text-xs font-black tracking-wide uppercase">Notificaciones en Vivo</span>
-                  <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-bold">
-                    {notifications.length}
+                  <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-black">
+                    {filteredNotifications.length}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSoundEnabled(!soundEnabled)}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                    title={soundEnabled ? 'Silenciar alertas sonoras' : 'Activar sonido de alertas'}
+                  >
+                    {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-amber-400" /> : <VolumeX className="w-3.5 h-3.5 text-slate-500" />}
+                  </button>
+
                   <button
                     type="button"
                     onClick={handleMarkAllAsAttended}
                     className="px-2 py-0.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-[10px] font-bold border border-emerald-500/30 transition cursor-pointer"
                     title="Marcar todas las alertas como atendidas y limpiar la campana"
                   >
-                    ✓ Marcar Atendidas
+                    ✓ Atendidas
                   </button>
+
                   <button
                     type="button"
                     onClick={() => setShowNotifications(false)}
@@ -448,40 +473,113 @@ export function Header({ onMenuToggle }: HeaderProps) {
                 </div>
               </div>
 
-              {/* Lista de Notificaciones */}
+              {/* Pestañas de Filtrado por Tipo (Citas, Bioseguridad, Operativas) */}
+              <div className="flex items-center gap-1 p-1.5 bg-slate-950 border-b border-slate-800 text-[11px] font-bold overflow-x-auto">
+                {[
+                  { id: 'all', label: 'Todas', count: notifications.length },
+                  { id: 'citas', label: 'Citas', count: notifications.filter(n => n.type === 'appointment').length },
+                  { id: 'bioseguridad', label: 'Bioseguridad', count: notifications.filter(n => n.type === 'biosecurity' || n.type === 'emergency').length },
+                  { id: 'operativas', label: 'Operativas', count: notifications.filter(n => n.type === 'clinical_task' || n.type === 'financial' || n.type === 'general').length }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveNotifTab(tab.id as any)}
+                    className={`px-2.5 py-1 rounded-lg transition-all cursor-pointer shrink-0 flex items-center gap-1 ${
+                      activeNotifTab === tab.id
+                        ? 'bg-amber-400 text-slate-950 font-black shadow-xs'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+                    {tab.count > 0 && (
+                      <span className={`px-1 rounded-full text-[9px] font-mono ${
+                        activeNotifTab === tab.id ? 'bg-slate-950 text-amber-300' : 'bg-slate-800 text-slate-300'
+                      }`}>
+                        {tab.count}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {/* Lista de Notificaciones Segmentadas */}
               <div className="max-h-80 overflow-y-auto divide-y divide-slate-800/80">
-                {notifications.length === 0 ? (
+                {filteredNotifications.length === 0 ? (
                   <div className="p-6 text-center text-slate-400 text-xs">
                     <CheckCircle className="w-7 h-7 mx-auto mb-2 text-emerald-400/80" />
-                    <p className="font-semibold text-slate-200">Bandeja despejada</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">No hay alertas ni citas pendientes en este momento.</p>
+                    <p className="font-semibold text-slate-200">Sin notificaciones pendientes</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">La agenda y los expedientes están al día para tu rol.</p>
                   </div>
                 ) : (
-                  notifications.map((item) => (
-                    <Link
-                      key={item.id}
-                      href={item.link || '/dashboard'}
-                      onClick={() => setShowNotifications(false)}
-                      className={`p-3.5 block transition-colors hover:bg-slate-900/80 cursor-pointer ${
-                        item.type === 'emergency' ? 'bg-rose-950/30' : ''
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <span className={`text-[11px] font-bold ${
-                          item.type === 'emergency' ? 'text-rose-400' : 'text-slate-100'
-                        }`}>
-                          {item.title}
-                        </span>
-                        <span className="text-[10px] font-mono text-slate-400 shrink-0 flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-amber-400" />
-                          {item.time}
-                        </span>
+                  filteredNotifications.map((item) => {
+                    const isBiosecurity = item.type === 'biosecurity'
+                    const isEmergency = item.type === 'emergency'
+                    const isTask = item.type === 'clinical_task'
+
+                    return (
+                      <div
+                        key={item.id}
+                        className={`p-3.5 transition-colors hover:bg-slate-900/90 ${
+                          isEmergency ? 'bg-rose-950/40 border-l-2 border-rose-500' :
+                          isBiosecurity ? 'bg-rose-950/20 border-l-2 border-rose-400' :
+                          isTask ? 'bg-purple-950/20 border-l-2 border-purple-400' : ''
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {isEmergency ? (
+                              <ShieldAlert className="w-3.5 h-3.5 text-rose-400 shrink-0 animate-pulse" />
+                            ) : isBiosecurity ? (
+                              <HeartPulse className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                            ) : isTask ? (
+                              <Wrench className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                            ) : (
+                              <Calendar className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            )}
+                            <span className={`text-[11px] font-bold truncate ${
+                              isEmergency || isBiosecurity ? 'text-rose-300' : isTask ? 'text-purple-300' : 'text-slate-100'
+                            }`}>
+                              {item.title}
+                            </span>
+                          </div>
+
+                          <span className="text-[10px] font-mono text-slate-400 shrink-0 flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-amber-400" />
+                            {item.time}
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                          {item.message}
+                        </p>
+
+                        {/* Botón de Acción Directa */}
+                        {item.link && (
+                          <div className="mt-2 flex items-center justify-between pt-1">
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              {item.branch || 'Audenti Cloud'}
+                            </span>
+
+                            <Link
+                              href={item.link}
+                              onClick={() => setShowNotifications(false)}
+                              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[10px] font-black transition-all ${
+                                isBiosecurity || isEmergency
+                                  ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-xs'
+                                  : isTask
+                                  ? 'bg-purple-600 hover:bg-purple-500 text-white'
+                                  : 'bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-xs'
+                              }`}
+                            >
+                              <span>{item.actionLabel || 'Ver Detalles'}</span>
+                              <ArrowRight className="w-3 h-3" />
+                            </Link>
+                          </div>
+                        )}
                       </div>
-                      <p className="text-xs text-slate-300 mt-1 line-clamp-2 leading-relaxed">
-                        {item.message}
-                      </p>
-                    </Link>
-                  ))
+                    )
+                  })
                 )}
               </div>
 
@@ -492,14 +590,14 @@ export function Header({ onMenuToggle }: HeaderProps) {
                   onClick={() => setShowNotifications(false)}
                   className="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 transition"
                 >
-                  <span>Ver toda la agenda</span>
+                  <span>Ver agenda completa</span>
                   <ArrowRight className="w-3 h-3" />
                 </Link>
                 <button
                   type="button"
                   onClick={() => {
                     fetchLiveNotifications()
-                    playTone('message')
+                    if (soundEnabled) playTone('message')
                   }}
                   className="text-slate-400 hover:text-slate-200 font-medium transition cursor-pointer"
                 >

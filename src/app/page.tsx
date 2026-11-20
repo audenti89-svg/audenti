@@ -439,10 +439,10 @@ export default function LandingPage() {
       {/* ======================================================== */}
       {/* 1. NAVBAR MINIMALISTA FLOTANTE */}
       {/* ======================================================== */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-[#0B0F19]/90 backdrop-blur-md border-b border-slate-800/80 px-3 sm:px-8 lg:px-12 py-2.5 sm:py-3.5 transition-all">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-[#0B0F19]/90 backdrop-blur-md border-b border-slate-800/80 px-2.5 sm:px-8 lg:px-12 py-2 sm:py-3.5 transition-all">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-1.5 sm:gap-2">
           <Link href="/" className="hover:opacity-90 transition-opacity shrink-0">
-            <AudentiLogo size={32} doctorName="Dra. Aura Estudillo" />
+            <AudentiLogo size={28} doctorName="Dra. Aura Estudillo" />
           </Link>
 
           {/* Menú Desktop */}
@@ -454,14 +454,14 @@ export default function LandingPage() {
             <a href="#contacto" className="hover:text-amber-400 transition-colors">Ubicación</a>
           </nav>
 
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             {/* Botón 1: Iniciar Sesión Médica (Dra. Aura Estudillo y Personal Clínico) */}
             <Link
               href="/auth/login"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-slate-700 hover:border-amber-400/50 bg-slate-900/90 text-xs font-bold text-slate-200 hover:text-white transition-all shadow-sm cursor-pointer whitespace-nowrap shrink-0"
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full border border-slate-700 hover:border-amber-400/50 bg-slate-900/90 text-[11px] sm:text-xs font-bold text-slate-200 hover:text-white transition-all shadow-sm cursor-pointer whitespace-nowrap shrink-0"
               title="Acceso oficial para la Dra. Aura Estudillo y personal clínico"
             >
-              <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <Lock className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-amber-400 shrink-0" />
               <span className="hidden sm:inline">Iniciar Sesión Médica</span>
               <span className="sm:hidden">Médica</span>
             </Link>
@@ -469,11 +469,12 @@ export default function LandingPage() {
             {/* Botón 2: Portal del Paciente */}
             <Link
               href="/portal/login"
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-all shadow-md shadow-amber-500/20 cursor-pointer whitespace-nowrap shrink-0"
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 text-[11px] sm:text-xs font-black transition-all shadow-md shadow-amber-500/20 cursor-pointer whitespace-nowrap shrink-0"
               title="Portal de Pacientes: Citas, Recetas y Odontograma"
             >
-              <UserCheck className="w-3.5 h-3.5 shrink-0" />
-              <span>Portal del Paciente</span>
+              <UserCheck className="w-3 sm:w-3.5 h-3 sm:h-3.5 shrink-0" />
+              <span className="hidden sm:inline">Portal del Paciente</span>
+              <span className="sm:hidden">Paciente</span>
             </Link>
 
             {/* Botón Principal Agendar Cita */}
@@ -487,10 +488,10 @@ export default function LandingPage() {
             {/* Botón Menú Móvil */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-2 rounded-xl text-slate-300 hover:bg-slate-800 transition-colors"
+              className="md:hidden p-1.5 sm:p-2 rounded-xl text-slate-300 hover:bg-slate-800 transition-colors shrink-0"
               aria-label="Abrir menú"
             >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              {mobileMenuOpen ? <X className="w-5 h-5 text-amber-400" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>

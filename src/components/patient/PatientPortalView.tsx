@@ -40,6 +40,7 @@ import {
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { PatientCalendarSchedule } from '@/components/patient/PatientCalendarSchedule';
+import { PatientAppointmentNotifications } from '@/components/patient/PatientAppointmentNotifications';
 import { PATIENT_VISIBILITY_CONFIG } from '@/config/role-visibility';
 import { UnifiedCommunicationWidget } from '@/components/chat/UnifiedCommunicationWidget';
 import { InformedConsentSignModal } from '@/components/clinical/InformedConsentSignModal';
@@ -1180,6 +1181,14 @@ export function PatientPortalView({
         {/* ── SECCIÓN 3: MÓDULO DE CALENDARIO Y PERFIL EN PÁGINA PRINCIPAL ── */}
         {activeTab === 'citas' && (
           <div className="space-y-6">
+            {/* Notificaciones y Avisos de Citas en Vivo para el Paciente */}
+            <PatientAppointmentNotifications
+              patientId={patient?.id}
+              patientName={patientName}
+              branchName={branchInfo.name}
+              branchPhoneClean={branchInfo.phoneClean}
+            />
+
             <PatientCalendarSchedule
               appointments={appointments}
               patientName={patientName}

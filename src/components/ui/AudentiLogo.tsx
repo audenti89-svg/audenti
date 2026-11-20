@@ -82,19 +82,19 @@ export function AudentiLogo({
   }
 
   return (
-    <div className={`inline-flex items-center gap-3 group ${className}`}>
+    <div className={`inline-flex items-center gap-2 sm:gap-3 group ${className}`}>
       {IconSvg}
       <div className="flex flex-col text-left">
-        <div className="flex items-center gap-1.5">
-          <span className="font-black tracking-tight text-xl text-white group-hover:text-amber-300 transition-colors leading-none">
+        <div className="flex items-center gap-1 sm:gap-1.5">
+          <span className="font-black tracking-tight text-base sm:text-xl text-white group-hover:text-amber-300 transition-colors leading-none">
             AUDENTI
           </span>
-          <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 uppercase tracking-wider">
+          <span className="text-[9px] sm:text-[10px] font-black px-1 sm:px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 uppercase tracking-wider shrink-0">
             CLINICAL
           </span>
         </div>
         {showSubtitle && (
-          <span className="text-[10px] text-amber-300/90 font-bold tracking-wider uppercase mt-0.5 truncate">
+          <span className="text-[9px] sm:text-[10px] text-amber-300/90 font-bold tracking-wider uppercase mt-0.5 truncate max-w-[120px] sm:max-w-none">
             {doctorName}
           </span>
         )}
