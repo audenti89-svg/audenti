@@ -696,6 +696,27 @@ export function PatientPortalView({
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startIso}/${endIso}&details=${details}&location=${location}`;
   }, [upcomingAppointment, appointmentCountdown, branchInfo]);
 
+  const patientName = patient?.full_name || user?.user_metadata?.full_name || 'Paciente Audenti';
+
+  // Contexto para la Asistente de Voz Audenti 24/7 (personalizada según edad y citas)
+  // DEBE DECLARARSE AQUÍ ANTES DE CUALQUIER RETURN CONDICIONAL PARA CUMPLIR LAS REGLAS DE HOOKS DE REACT
+  const assistantVoiceContext: PatientSpeechContext = useMemo(() => {
+    const upcoming = appointments.find(a => a.status !== 'cancelled' && a.status !== 'completed');
+    return {
+      fullName: patientName,
+      birthDate: patient?.birth_date || profileForm.birthDate || null,
+      age: calculatedAge,
+      nextAppointment: upcoming ? {
+        date: upcoming.appointment_date,
+        time: upcoming.appointment_time,
+        treatment: upcoming.reason || upcoming.treatment_name || 'Consulta Dental Integral',
+        doctor: upcoming.doctor_name || 'la Dra. Aura Estudillo',
+        branch: branchInfo.name
+      } : null,
+      allergies: Array.isArray(patient?.allergies_medication) ? patient.allergies_medication : []
+    };
+  }, [patientName, patient, profileForm.birthDate, calculatedAge, appointments, branchInfo.name]);
+
   const handleConfirmGuestAppointment = async () => {
     if (!guestAppointment?.id && !guestAppointment?.folio) return;
     setGuestConfirming(true);
@@ -1093,26 +1114,6 @@ export function PatientPortalView({
       </div>
     );
   }
-
-  const patientName = patient?.full_name || user?.user_metadata?.full_name || 'Paciente Audenti';
-
-  // Contexto para la Asistente de Voz Audenti 24/7 (personalizada según edad y citas)
-  const assistantVoiceContext: PatientSpeechContext = useMemo(() => {
-    const upcoming = appointments.find(a => a.status !== 'cancelled' && a.status !== 'completed');
-    return {
-      fullName: patientName,
-      birthDate: patient?.birth_date || profileForm.birthDate || null,
-      age: calculatedAge,
-      nextAppointment: upcoming ? {
-        date: upcoming.appointment_date,
-        time: upcoming.appointment_time,
-        treatment: upcoming.reason || upcoming.treatment_name || 'Consulta Dental Integral',
-        doctor: upcoming.doctor_name || 'la Dra. Aura Estudillo',
-        branch: branchInfo.name
-      } : null,
-      allergies: Array.isArray(patient?.allergies_medication) ? patient.allergies_medication : []
-    };
-  }, [patientName, patient, profileForm.birthDate, calculatedAge, appointments, branchInfo.name]);
 
   return (
     <div className="min-h-screen bg-[#040711] text-white selection:bg-amber-400 selection:text-slate-950 pb-24">
