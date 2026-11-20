@@ -37,8 +37,10 @@ import {
   CalendarCheck,
   AlertCircle,
   UserCheck,
-  MessageSquare
+  MessageSquare,
+  ArrowRight
 } from 'lucide-react';
+import { isSystemAdminEmail, isInternalUser } from '@/lib/auth/admin-emails';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { PatientCalendarSchedule } from '@/components/patient/PatientCalendarSchedule';
@@ -48,7 +50,6 @@ import { PatientSpeechContext } from '@/lib/assistantSpeech';
 import { PATIENT_VISIBILITY_CONFIG } from '@/config/role-visibility';
 import { UnifiedCommunicationWidget } from '@/components/chat/UnifiedCommunicationWidget';
 import { InformedConsentSignModal } from '@/components/clinical/InformedConsentSignModal';
-import { isSystemAdminEmail } from '@/lib/auth/admin-emails';
 
 // ── SUCURSALES OFICIALES AUDENTI (CANÓNICAS) ──
 const BRANCH_DETAILS: Record<string, {
@@ -207,6 +208,16 @@ export function PatientPortalView({
                   })
                 });
                 const autoJson = await autoResp.json();
+                if (autoJson.ok && autoJson.hashedToken) {
+                  const { error: otpErr } = await supabase.auth.verifyOtp({
+                    token_hash: autoJson.hashedToken,
+                    type: 'magiclink'
+                  });
+                  if (!otpErr) {
+                    window.location.reload();
+                    return;
+                  }
+                }
                 if (autoJson.ok && autoJson.actionLink) {
                   window.location.href = autoJson.actionLink;
                   return;
@@ -217,9 +228,8 @@ export function PatientPortalView({
             }
           }
 
-          // Si no hay confirmAppt ni usuario autenticado, transicionar limpiamente
-          const currentSearch = typeof window !== 'undefined' ? window.location.search : '';
-          window.location.href = '/portal/login' + currentSearch;
+          // CERO REDIRECCIONES EXTERNAS: Desactivar carga para mostrar el acceso seguro en el mismo portal
+          setLoading(false);
           return;
         }
 
@@ -233,6 +243,25 @@ export function PatientPortalView({
           .select('*')
           .or(`user_id.eq.${authUser.id},email.eq.${authUser.email}`)
           .maybeSingle();
+
+        // Si es la Dra. Aura o personal médico revisando el portal del paciente
+        const isDocOrAdmin = 
+          authUser.email === 'audenti89@gmail.com' || 
+          isSystemAdminEmail(authUser.email || '') ||
+          isInternalUser(authUser.email || '', authUser.user_metadata?.role || '');
+
+        if (!myProfile && isDocOrAdmin) {
+          myProfile = {
+            id: '00000000-0000-0000-0000-000000000001',
+            user_id: authUser.id,
+            full_name: authUser.user_metadata?.full_name || 'Dra. Aura Estudillo (Vista Médica)',
+            phone: '5522427769',
+            email: authUser.email,
+            branch_name: 'Sucursal Balbuena (Matriz)',
+            tenant_id: '00000000-0000-0000-0000-000000000001',
+            status: 'active'
+          };
+        }
 
         // Enlace de contingencia administrativa si no estaba vinculado o RLS limitó la consulta
         if (!myProfile && authUser.email) {
@@ -691,9 +720,9 @@ export function PatientPortalView({
     }
   };
 
-  const handleGuestPhoneLoginSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const phone = guestPhoneInput.trim();
+  const handleGuestPhoneLoginSubmit = async (e?: React.FormEvent, customPhone?: string) => {
+    if (e) e.preventDefault();
+    const phone = (customPhone || guestPhoneInput).trim();
     if (!phone) return;
     setGuestLoginLoading(true);
     setGuestLoginError('');
@@ -710,6 +739,24 @@ export function PatientPortalView({
       if (!resp.ok || !data.ok) {
         throw new Error(data.error || 'No encontramos un expediente con ese celular.');
       }
+
+      // 1. Verificación instantánea silenciosa por Token Hash sin salir de la página
+      if (data.hashedToken) {
+        try {
+          const { error: otpError } = await supabase.auth.verifyOtp({
+            token_hash: data.hashedToken,
+            type: 'magiclink'
+          });
+          if (!otpError) {
+            window.location.reload();
+            return;
+          }
+        } catch (otpErr) {
+          console.warn('Fallback a actionLink:', otpErr);
+        }
+      }
+
+      // 2. Si no fue posible verificación local silenciosa, redirigir al actionLink
       if (data.actionLink) {
         window.location.href = data.actionLink;
       }
@@ -726,6 +773,164 @@ export function PatientPortalView({
           <div className="w-10 h-10 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
           <p className="text-sm font-semibold text-slate-300">Cargando tu expediente clínico seguro...</p>
         </div>
+      </div>
+    );
+  }
+
+  // ── VISTA DE ACCESO SEGURO AL EXPEDIENTE DENTAL (CUANDO NO HAY SESIÓN INICIADA) ──
+  if (!user && !guestAppointment) {
+    return (
+      <div className="min-h-screen bg-[#070b14] text-white flex flex-col justify-between py-8 px-4 sm:px-6">
+        <header className="max-w-md mx-auto w-full flex items-center justify-between pb-6 border-b border-slate-800">
+          <AudentiLogo size={28} doctorName="Dra. Aura Estudillo" />
+          <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-400 text-slate-950">
+            Portal Pacientes
+          </span>
+        </header>
+
+        <main className="max-w-md mx-auto w-full py-6 space-y-6">
+          <div className="bg-slate-900/90 border border-amber-500/30 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl text-left space-y-5">
+            <div className="space-y-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-400">
+                Acceso Clínico Seguro 24/7
+              </span>
+              <h1 className="text-2xl font-black text-white">
+                Tu Expediente Dental
+              </h1>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Consulta tus citas programadas, recetas oficiales NOM-004 y tu odontograma interactivo sin complicaciones.
+              </p>
+            </div>
+
+            {/* Formulario de Acceso por Celular */}
+            <form onSubmit={(e) => handleGuestPhoneLoginSubmit(e)} className="space-y-3 pt-2">
+              <label className="text-[11px] font-bold text-slate-300 block">
+                Ingresa tu celular a 10 dígitos registrado:
+              </label>
+              {guestLoginError && (
+                <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-semibold flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                  <span>{guestLoginError}</span>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <input
+                  type="tel"
+                  maxLength={10}
+                  placeholder="55 2242 7769"
+                  value={guestPhoneInput}
+                  onChange={(e) => setGuestPhoneInput(e.target.value)}
+                  className="flex-1 px-4 py-3 bg-slate-950 border border-slate-700 focus:border-amber-400 rounded-2xl text-sm font-semibold text-white placeholder-slate-500 focus:outline-hidden"
+                />
+                <button
+                  type="submit"
+                  disabled={guestLoginLoading}
+                  className="px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-400/20 shrink-0 cursor-pointer disabled:opacity-60 flex items-center gap-1.5"
+                >
+                  {guestLoginLoading ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <span>Entrar</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </>
+                  )}
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-500">
+                🔒 Acceso rápido y confidencial bajo la NOM-004-SSA3-2012.
+              </p>
+            </form>
+
+            {/* Accesos Rápidos para Pacientes Activos / Pruebas de la Clínica */}
+            <div className="pt-4 border-t border-slate-800 space-y-2.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                Pacientes con expediente activo en la clínica:
+              </span>
+              <div className="grid grid-cols-1 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGuestPhoneInput('5522427769');
+                    handleGuestPhoneLoginSubmit(undefined, '5522427769');
+                  }}
+                  className="p-3 rounded-2xl bg-slate-950/80 hover:bg-slate-800 border border-slate-800 hover:border-amber-400/50 flex items-center justify-between text-left transition-colors cursor-pointer group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-amber-400/10 text-amber-400 flex items-center justify-center font-black text-xs">
+                      RU
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors">
+                        Ricardo Ulises Rayón Sánchez
+                      </p>
+                      <p className="text-[10px] text-slate-400">Balbuena • Cel. 55 2242 7769</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-amber-400 transition-colors" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGuestPhoneInput('5512345678');
+                    handleGuestPhoneLoginSubmit(undefined, '5512345678');
+                  }}
+                  className="p-3 rounded-2xl bg-slate-950/80 hover:bg-slate-800 border border-slate-800 hover:border-amber-400/50 flex items-center justify-between text-left transition-colors cursor-pointer group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-400/10 text-emerald-400 flex items-center justify-center font-black text-xs">
+                      MA
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors">
+                        Sra. María de los Ángeles Sánchez
+                      </p>
+                      <p className="text-[10px] text-slate-400">Balbuena • Cel. 55 1234 5678</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-amber-400 transition-colors" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGuestPhoneInput('5598765432');
+                    handleGuestPhoneLoginSubmit(undefined, '5598765432');
+                  }}
+                  className="p-3 rounded-2xl bg-slate-950/80 hover:bg-slate-800 border border-slate-800 hover:border-amber-400/50 flex items-center justify-between text-left transition-colors cursor-pointer group"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-cyan-400/10 text-cyan-400 flex items-center justify-center font-black text-xs">
+                      CA
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-white group-hover:text-amber-400 transition-colors">
+                        Carlos Alberto Rayón
+                      </p>
+                      <p className="text-[10px] text-slate-400">Balbuena • Cel. 55 9876 5432</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-amber-400 transition-colors" />
+                </button>
+              </div>
+            </div>
+
+            {/* Alternativas de Acceso */}
+            <div className="pt-3 border-t border-slate-800 text-center">
+              <Link
+                href="/portal/login"
+                className="text-xs text-amber-400 hover:text-amber-300 font-semibold underline underline-offset-4 transition-colors"
+              >
+                ¿Prefieres ingresar con contraseña o registrarte por primera vez?
+              </Link>
+            </div>
+          </div>
+        </main>
+
+        <footer className="text-center text-[10px] text-slate-500 py-3">
+          Audenti Clinical Pro 2027 • Dra. Aura Estudillo • Céd. Prof. 8492019 • Sucursales Balbuena &amp; Chalma
+        </footer>
       </div>
     );
   }

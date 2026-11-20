@@ -111,45 +111,13 @@ function PatientLoginForm() {
     phone?: string;
   } | null>(null);
 
-  // 0. AUTO-REDIRECCIÓN CON PROTECCIÓN CONTRA BUCLES (Audenti 2027)
+  // 0. GESTIÓN LIMPIA DE SESIÓN (Sin bucles de redirección automática)
   useEffect(() => {
-    let mounted = true;
     const isLogout = searchParams.get('logout') === 'true' || searchParams.get('reauth') === 'true';
-
     if (isLogout) {
       try { sessionStorage.removeItem('audenti_portal_redirects'); } catch {}
-      return;
     }
-
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (user && mounted) {
-        // Si hay confirmAppt o reauth en la URL, no forzar redirección para evitar bucles móviles
-        if (searchParams.get('confirmAppt') || searchParams.get('reauth') === 'true') {
-          return;
-        }
-
-        let redirectCount = 0;
-        try {
-          redirectCount = parseInt(sessionStorage.getItem('audenti_portal_redirects') || '0', 10);
-          if (redirectCount >= 1) {
-            sessionStorage.removeItem('audenti_portal_redirects');
-            return;
-          }
-          sessionStorage.setItem('audenti_portal_redirects', '1');
-        } catch {}
-
-        const target = await determineTargetRoute(supabase, user);
-        if (typeof window !== 'undefined' && window.location.pathname !== target) {
-          window.location.href = target;
-        }
-      } else {
-        try { sessionStorage.removeItem('audenti_portal_redirects'); } catch {}
-      }
-    });
-    return () => {
-      mounted = false;
-    };
-  }, [supabase, searchParams]);
+  }, [searchParams]);
 
   // Sincronizar parámetro URL (?mode=activate o ?mode=register o ?phone=... o ?email=...)
   useEffect(() => {

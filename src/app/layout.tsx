@@ -85,9 +85,9 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
         />
 
-        {/* Registro Automático de Service Worker Universal y Captura de Prompt PWA */}
+        {/* Limpiador Universal de Service Worker y Caches (Garantía Cero Bloqueos Android/WhatsApp) */}
         <Script
-          id="pwa-service-worker-register"
+          id="pwa-service-worker-cleaner"
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `
@@ -98,17 +98,19 @@ export default function RootLayout({
                 window.dispatchEvent(new CustomEvent('pwa-prompt-ready'));
               });
 
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/service-worker.js')
-                    .then(function(reg) {
-                      reg.update();
-                      console.log('[PWA] Service Worker activo:', reg.scope);
-                    })
-                    .catch(function(err) {
-                      console.warn('[PWA] Nota registro Service Worker:', err);
-                    });
+              if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                  for (var i = 0; i < registrations.length; i++) {
+                    registrations[i].unregister().catch(function() {});
+                  }
                 });
+                if ('caches' in window) {
+                  caches.keys().then(function(names) {
+                    for (var j = 0; j < names.length; j++) {
+                      caches.delete(names[j]).catch(function() {});
+                    }
+                  });
+                }
               }
             `,
           }}

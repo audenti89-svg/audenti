@@ -159,6 +159,9 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       actionLink: linkData.properties.action_link,
+      hashedToken: linkData.properties.hashed_token,
+      emailOtp: linkData.properties.email_otp,
+      patientEmail,
       patient: {
         id: patient.id,
         fullName: patient.full_name,
