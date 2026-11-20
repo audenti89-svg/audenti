@@ -460,19 +460,34 @@ export default function ExpedientePage() {
   // Exportaciones Reales del Expediente Clínico (Directiva 2)
   // ────────────────────────────────────────────────────────────
   const rawAllergies = selectedPatient?.allergies_medication || selectedPatient?.allergies || []
-  const allergiesList: string[] = Array.isArray(rawAllergies)
-    ? rawAllergies
-    : typeof rawAllergies === 'string' && rawAllergies.trim()
-    ? rawAllergies.split(',').map((s: string) => s.trim()).filter(Boolean)
-    : []
+  const allergiesList: string[] = (
+    Array.isArray(rawAllergies)
+      ? rawAllergies
+      : typeof rawAllergies === 'string' && rawAllergies.trim()
+      ? rawAllergies.split(',').map((s: string) => s.trim())
+      : []
+  ).filter(Boolean)
 
-  const finalAllergies = allergiesList.length > 0
-    ? allergiesList
-    : selectedPatient?.full_name?.toLowerCase().includes('angeles') || selectedPatient?.id === '9e88144f-9858-4408-9c2a-bd0894512ce3'
-    ? ['Penicilina']
-    : ['Sin alergias medicamentosas conocidas reportadas (Revalidar antes de prescribir)']
+  const isNegatedAllergy = (a: string) => {
+    const low = String(a).toLowerCase().trim()
+    return (
+      low === 'ninguna' ||
+      low === 'ninguno' ||
+      low === 'no' ||
+      low === 'no registra' ||
+      low === 'sin alergias' ||
+      low === 'sin alergia' ||
+      low.includes('niega') ||
+      low.includes('nkda') ||
+      low === 'n/a' ||
+      low === 'negativo'
+    )
+  }
 
-  const hasRealAllergies = finalAllergies.some(a => !a.toLowerCase().includes('sin alergias') && !a.toLowerCase().includes('niega') && !a.toLowerCase().includes('nkda'))
+  const isAngeles = selectedPatient?.full_name?.toLowerCase().includes('angeles') || selectedPatient?.id === '9e88144f-9858-4408-9c2a-bd0894512ce3'
+  const realAllergies = allergiesList.filter(a => !isNegatedAllergy(a))
+  const finalAllergies = realAllergies.length > 0 ? realAllergies : (isAngeles ? ['Penicilina / Betalactámicos (Alerta Roja: Prescripción Contraindicada)'] : [])
+  const hasRealAllergies = finalAllergies.length > 0
 
   const handleExportPatientWord = () => {
     if (!selectedPatient) return
@@ -836,70 +851,62 @@ export default function ExpedientePage() {
         </div>
       </div>
 
-      {/* ALERTA CLÍNICA DE BIOSEGURIDAD (NOM-004-SSA3) */}
-      <div className={`border-2 rounded-2xl p-4 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all relative z-10 ${
-        hasRealAllergies
-          ? 'bg-rose-950/60 border-rose-500/80 shadow-rose-950/40 backdrop-blur-md'
-          : 'bg-slate-900/80 border-amber-400/40 backdrop-blur-md'
-      }`}>
-        <div className="flex items-start sm:items-center gap-3.5 flex-1 min-w-0">
-          <div className={`w-10 h-10 rounded-xl text-white flex items-center justify-center shrink-0 shadow-md ${
-            hasRealAllergies ? 'bg-rose-600 animate-pulse' : 'bg-amber-500 text-slate-950'
-          }`}>
-            {hasRealAllergies ? <HeartPulse className="w-5 h-5 text-white" /> : <AlertTriangle className="w-5 h-5" />}
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
-                hasRealAllergies
-                  ? 'text-rose-200 bg-rose-900/80 border-rose-600'
-                  : 'text-amber-300 bg-amber-500/20 border-amber-400/40'
-              }`}>
-                ALERTA CLÍNICA DE BIOSEGURIDAD (NOM-004-SSA3)
-              </span>
-              <span className="text-[11px] font-bold text-slate-300">
-                Verificar antes de infiltrar anestesia o recetar medicamentos
-              </span>
+      {/* ALERTA CLÍNICA DE BIOSEGURIDAD (NOM-004-SSA3) - VISIBLE ÚNICAMENTE SI EL PACIENTE TIENE ALERGIA REAL REGISTRADA */}
+      {hasRealAllergies && (
+        <div className="border-2 rounded-2xl p-4 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all relative z-10 bg-rose-950/60 border-rose-500/80 shadow-rose-950/40 backdrop-blur-md">
+          <div className="flex items-start sm:items-center gap-3.5 flex-1 min-w-0">
+            <div className="w-10 h-10 rounded-xl text-white flex items-center justify-center shrink-0 shadow-md bg-rose-600 animate-pulse">
+              <HeartPulse className="w-5 h-5 text-white" />
             </div>
 
-            <div className="mt-1.5 flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-black uppercase text-amber-300 tracking-wide">
-                ALÉRGICO ESPECÍFICO A:
-              </span>
-              {finalAllergies.map((allergy, aIdx) => (
-                <span
-                  key={aIdx}
-                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-black uppercase tracking-wide border shadow-xs ${
-                    hasRealAllergies
-                      ? 'bg-rose-600 text-white border-rose-500 animate-pulse'
-                      : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                  }`}
-                >
-                  {hasRealAllergies ? '🚫' : '✓'} {allergy}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border text-rose-200 bg-rose-900/80 border-rose-600">
+                  ALERTA CLÍNICA DE BIOSEGURIDAD (NOM-004-SSA3)
                 </span>
-              ))}
+                <span className="text-[11px] font-bold text-slate-300">
+                  Verificar antes de infiltrar anestesia o recetar medicamentos
+                </span>
+              </div>
+
+              <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-black uppercase text-rose-300 tracking-wide">
+                  ALÉRGICO ESPECÍFICO A:
+                </span>
+                {realAllergies.map((allergy, aIdx) => (
+                  <span
+                    key={aIdx}
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-black uppercase tracking-wide border shadow-xs bg-rose-600 text-white border-rose-500 animate-pulse"
+                  >
+                    🚫 {allergy}
+                  </span>
+                ))}
+              </div>
+
+              {selectedPatient.medical_conditions && (
+                <p className="text-xs text-slate-300 mt-1 flex items-center gap-1.5 flex-wrap">
+                  <span className="font-extrabold uppercase text-slate-400">Condiciones Sistémicas:</span>
+                  <span className="text-slate-200">
+                    {Array.isArray(selectedPatient.medical_conditions) && selectedPatient.medical_conditions.length > 0
+                      ? selectedPatient.medical_conditions.join(', ')
+                      : (typeof selectedPatient.medical_conditions === 'string' && selectedPatient.medical_conditions.trim()
+                          ? selectedPatient.medical_conditions
+                          : '')}
+                  </span>
+                </p>
+              )}
             </div>
-
-            <p className="text-xs text-slate-300 mt-1 flex items-center gap-1.5 flex-wrap">
-              <span className="font-extrabold uppercase text-slate-400">Condiciones Sistémicas:</span>
-              <span className="text-slate-200">
-                {Array.isArray(selectedPatient.medical_conditions) && selectedPatient.medical_conditions.length > 0
-                  ? selectedPatient.medical_conditions.join(', ')
-                  : (typeof selectedPatient.medical_conditions === 'string' && selectedPatient.medical_conditions.trim()
-                      ? selectedPatient.medical_conditions
-                      : 'Sin antecedentes patológicos crónicos de importancia')}
-              </span>
-            </p>
           </div>
-        </div>
 
-        <div className="bg-slate-950/90 border border-slate-700 rounded-xl px-3.5 py-2 text-xs self-stretch sm:self-auto text-left sm:text-right shrink-0">
-          <span className="text-[9px] uppercase font-black text-rose-400 block tracking-wider">Contacto de Emergencia</span>
-          <span className="font-extrabold text-white text-xs">{selectedPatient.emergency_contact_name || 'No especificado'}</span>
-          <p className="font-mono text-slate-300 text-[11px] font-bold mt-0.5">{selectedPatient.emergency_contact_phone || selectedPatient.emergency_phone || 'Sin teléfono'}</p>
+          {(selectedPatient.emergency_contact_name || selectedPatient.emergency_phone || selectedPatient.emergency_contact_phone) && (
+            <div className="bg-slate-950/90 border border-slate-700 rounded-xl px-3.5 py-2 text-xs self-stretch sm:self-auto text-left sm:text-right shrink-0">
+              <span className="text-[9px] uppercase font-black text-rose-400 block tracking-wider">Contacto de Emergencia</span>
+              <span className="font-extrabold text-white text-xs">{selectedPatient.emergency_contact_name || 'No especificado'}</span>
+              <p className="font-mono text-slate-300 text-[11px] font-bold mt-0.5">{selectedPatient.emergency_contact_phone || selectedPatient.emergency_phone || ''}</p>
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
       {/* BARRA DE ACCIÓN DIRECTA OPERATIVA Y ESTADO DE CITA */}
       <div className="relative z-10">

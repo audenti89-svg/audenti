@@ -33,6 +33,8 @@ export type SurfaceCondition =
 export type ToothWholeCondition =
   | 'sano'
   | 'ausente'
+  | 'resto_radicular'
+  | 'tratamiento_conductos'
   | 'endodoncia'
   | 'corona'
   | 'implante'
@@ -81,19 +83,24 @@ export interface ToothState {
 // Catálogo de Tratamientos Oficiales (Costos 2.html - Dra. Aura Estudillo)
 export const TREATMENT_CATALOG: Record<DentalSpecialty, Array<{ name: string; cost: number; condition: ToothWholeCondition }>> = {
   operatoria: [
+    { name: 'Diente Ausente (Registro Clínico / Agenesia)', cost: 0, condition: 'ausente' },
+    { name: 'Diagnóstico de Resto Radicular', cost: 0, condition: 'resto_radicular' },
     { name: 'Resina Estética Fotocurable ($400 - $600)', cost: 500, condition: 'sano' },
-    { name: 'Blanqueamiento Dental', cost: 2000, condition: 'sano' },
+    { name: 'Blanqueamiento Dental Profesional', cost: 2000, condition: 'sano' },
     { name: 'Selladores de Fosetas y Fisuras (por cuadrante)', cost: 400, condition: 'sano' },
     { name: 'Resina Infantil (Dientes Temporales)', cost: 300, condition: 'sano' },
   ],
   endodoncia: [
-    { name: 'Endodoncia Dientes Anteriores', cost: 1200, condition: 'endodoncia' },
-    { name: 'Endodoncia Dientes Posteriores', cost: 1800, condition: 'endodoncia' },
-    { name: 'Pulpotomía Infantil', cost: 500, condition: 'endodoncia' },
-    { name: 'Pulpectomía Infantil', cost: 800, condition: 'endodoncia' },
+    { name: 'Tratamiento de Conductos (Dientes Anteriores)', cost: 1200, condition: 'tratamiento_conductos' },
+    { name: 'Tratamiento de Conductos (Dientes Posteriores / Molares)', cost: 1800, condition: 'tratamiento_conductos' },
+    { name: 'Retratamiento de Conductos Radiculares', cost: 2200, condition: 'tratamiento_conductos' },
+    { name: 'Pulpotomía Infantil', cost: 500, condition: 'tratamiento_conductos' },
+    { name: 'Pulpectomía Infantil', cost: 800, condition: 'tratamiento_conductos' },
   ],
   cirugia: [
-    { name: 'Extracción Dental ($500 - $800)', cost: 650, condition: 'extraccion_indicada' },
+    { name: 'Extracción de Resto Radicular ($650 - $950)', cost: 750, condition: 'resto_radicular' },
+    { name: 'Cirugía de Resto Radicular Complejo', cost: 1200, condition: 'resto_radicular' },
+    { name: 'Extracción Dental / Pieza Ausente ($500 - $800)', cost: 650, condition: 'ausente' },
     { name: 'Extracción Terceros Molares ($1,000 - $2,000)', cost: 1500, condition: 'extraccion_indicada' },
   ],
   implantes: [
@@ -298,6 +305,47 @@ export function Odontogram({
     }
   }
 
+  // Asignar diagnóstico clínico directo a la pieza seleccionada (Ausente, Resto Radicular, Tratamiento de Conductos)
+  const handleApplyQuickConditionFromOdontogram = (
+    cond: ToothWholeCondition,
+    procedureName: string,
+    cost: number = 0,
+    specialtyName: DentalSpecialty = 'operatoria'
+  ) => {
+    const toothNum = selectedToothNum
+    const current = teeth[toothNum] || {
+      number: toothNum,
+      wholeCondition: 'sano',
+      surfaces: { vestibular: 'sano', lingual: 'sano', mesial: 'sano', distal: 'sano', oclusal: 'sano' },
+      notes: ''
+    }
+
+    const updatedSurfaces: ToothSurfaces = cond === 'ausente'
+      ? { vestibular: 'sano', lingual: 'sano', mesial: 'sano', distal: 'sano', oclusal: 'sano' }
+      : current.surfaces
+
+    setTeeth(prev => ({
+      ...prev,
+      [toothNum]: {
+        ...current,
+        wholeCondition: cond,
+        surfaces: updatedSurfaces
+      }
+    }))
+
+    if (cond !== 'sano') {
+      handleAddTreatmentFrom3D({
+        toothNumber: toothNum,
+        specialty: specialtyName,
+        procedure: procedureName,
+        surfaces: [cond === 'ausente' ? 'Pieza Completa' : (cond === 'resto_radicular' ? 'Conducto / Raíz' : 'Conductometría')],
+        notes: `Condición asignada: ${procedureName}`,
+        estimatedCost: cost,
+        condition: cond
+      })
+    }
+  }
+
   // Guardar Odontograma de forma persistente (LocalStorage + Supabase)
   const handleSaveOdontogram = async () => {
     try {
@@ -375,6 +423,92 @@ export function Odontogram({
           >
             <Save className="w-4 h-4 text-slate-950" />
             <span>{savedSuccess ? '¡Expediente Guardado!' : 'Guardar Expediente & Supabase'}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* BARRA DE ACCIÓN RÁPIDA NOM-004: AUSENTE, RESTO RADICULAR, TRATAMIENTO DE CONDUCTOS */}
+      <div className="mx-3 sm:mx-5 p-3 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 text-white">
+        <div className="flex items-center gap-2.5">
+          <span className="w-8 h-8 rounded-xl bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center shrink-0 shadow-md">
+            #{selectedToothNum}
+          </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black text-white">
+                {TOOTH_BY_FDI[selectedToothNum]?.name || `Pieza #${selectedToothNum}`}
+              </span>
+              <span className={cn(
+                "text-[10px] font-black uppercase px-2 py-0.5 rounded-md border",
+                selectedTooth?.wholeCondition === 'ausente' ? 'bg-slate-800 text-slate-300 border-slate-700' :
+                selectedTooth?.wholeCondition === 'resto_radicular' ? 'bg-rose-500/20 text-rose-300 border-rose-500/50' :
+                (selectedTooth?.wholeCondition === 'tratamiento_conductos' || selectedTooth?.wholeCondition === 'endodoncia') ? 'bg-amber-500/20 text-amber-300 border-amber-500/50' :
+                'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+              )}>
+                {selectedTooth?.wholeCondition === 'tratamiento_conductos' || selectedTooth?.wholeCondition === 'endodoncia' ? 'Tratamiento de Conductos' :
+                 selectedTooth?.wholeCondition === 'resto_radicular' ? 'Resto Radicular' :
+                 selectedTooth?.wholeCondition === 'ausente' ? 'Ausente' :
+                 (selectedTooth?.wholeCondition || 'SANO').toUpperCase()}
+              </span>
+            </div>
+            <span className="text-[10px] text-slate-400">
+              Aplica diagnóstico con 1 clic:
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            type="button"
+            onClick={() => handleApplyQuickConditionFromOdontogram('ausente', 'Pieza Ausente', 0)}
+            className={cn(
+              "px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 border",
+              selectedTooth?.wholeCondition === 'ausente'
+                ? "bg-slate-700 text-white border-slate-400 shadow-md ring-1 ring-slate-300"
+                : "bg-slate-950/80 text-slate-300 border-slate-700 hover:border-slate-500 hover:bg-slate-800"
+            )}
+            title="Marcar pieza como ausente (diente extraído o agenesia)"
+          >
+            <span>🚫</span>
+            <span>Ausente</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleApplyQuickConditionFromOdontogram('resto_radicular', 'Extracción de Resto Radicular', 750, 'cirugia')}
+            className={cn(
+              "px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 border",
+              selectedTooth?.wholeCondition === 'resto_radicular'
+                ? "bg-rose-600 text-white border-rose-300 shadow-md shadow-rose-600/30 ring-1 ring-rose-300"
+                : "bg-slate-950/80 text-rose-300 border-rose-500/30 hover:border-rose-400 hover:bg-rose-950/40"
+            )}
+            title="Marcar como resto radicular (corona destruida, raíz remanente)"
+          >
+            <span>⚠️</span>
+            <span>Resto Radicular</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleApplyQuickConditionFromOdontogram('tratamiento_conductos', 'Tratamiento de Conductos (Endodoncia)', 1800, 'endodoncia')}
+            className={cn(
+              "px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 border",
+              selectedTooth?.wholeCondition === 'tratamiento_conductos' || selectedTooth?.wholeCondition === 'endodoncia'
+                ? "bg-amber-500 text-slate-950 border-amber-300 shadow-md shadow-amber-500/30 ring-1 ring-amber-200"
+                : "bg-slate-950/80 text-amber-300 border-amber-500/30 hover:border-amber-400 hover:bg-amber-950/40"
+            )}
+            title="Marcar con tratamiento de conductos (endodoncia)"
+          >
+            <span>⚡</span>
+            <span>Tratamiento de Conductos</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleApplyQuickConditionFromOdontogram('sano', 'Pieza Sana', 0)}
+            className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-slate-400 hover:text-emerald-300 hover:bg-slate-800 transition-colors cursor-pointer"
+          >
+            Restablecer Sano
           </button>
         </div>
       </div>

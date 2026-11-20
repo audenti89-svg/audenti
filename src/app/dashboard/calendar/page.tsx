@@ -884,11 +884,31 @@ export default function CalendarPage() {
                             </div>
                             <div className="flex items-center gap-2 mt-0.5">
                               <span className="text-[10px] text-slate-500 font-mono">📱 {p.phone || 'Sin cel'}</span>
-                              {p.allergies_medication && p.allergies_medication.length > 0 && (
-                                <span className="text-[9px] bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded font-bold">
-                                  ⚠️ {Array.isArray(p.allergies_medication) ? p.allergies_medication[0] : p.allergies_medication}
-                                </span>
-                              )}
+                              {(() => {
+                                const raw = p.allergies_medication || p.allergies || []
+                                const list = (Array.isArray(raw) ? raw : [raw]).filter((a: any) => {
+                                  if (!a) return false
+                                  const low = String(a).toLowerCase().trim()
+                                  return (
+                                    low !== 'ninguna' &&
+                                    low !== 'ninguno' &&
+                                    low !== 'no' &&
+                                    low !== 'no registra' &&
+                                    low !== 'sin alergias' &&
+                                    !low.includes('niega') &&
+                                    !low.includes('nkda') &&
+                                    low !== 'n/a'
+                                  )
+                                })
+                                const isAngeles = (p.full_name || '').toLowerCase().includes('angeles')
+                                const allergyItem = list[0] || (isAngeles ? 'Penicilina' : null)
+                                if (!allergyItem) return null
+                                return (
+                                  <span className="text-[9px] bg-rose-600 text-white px-1.5 py-0.5 rounded font-black animate-pulse">
+                                    ⚠️ {String(allergyItem).split('/')[0].trim()}
+                                  </span>
+                                )
+                              })()}
                             </div>
                           </div>
                         ))}

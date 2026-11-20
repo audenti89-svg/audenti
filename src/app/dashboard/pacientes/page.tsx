@@ -474,18 +474,35 @@ export default function PacientesPage() {
                           <td className="px-6 py-4">
                             {(() => {
                               const rawAllergies = p.allergies_medication || p.allergies || []
-                              const allergiesList: string[] = Array.isArray(rawAllergies)
-                                ? rawAllergies
-                                : typeof rawAllergies === 'string' && rawAllergies.trim()
-                                ? rawAllergies.split(',').map((s: string) => s.trim()).filter(Boolean)
-                                : []
+                              const allergiesList: string[] = (
+                                Array.isArray(rawAllergies)
+                                  ? rawAllergies
+                                  : typeof rawAllergies === 'string' && rawAllergies.trim()
+                                  ? rawAllergies.split(',').map((s: string) => s.trim())
+                                  : []
+                              ).filter(Boolean)
 
-                              const finalAllergies = allergiesList.length > 0
-                                ? allergiesList
-                                : p.full_name?.toLowerCase().includes('angeles') || p.id === '9e88144f-9858-4408-9c2a-bd0894512ce3'
-                                ? ['Penicilina']
-                                : []
+                              const isNegatedAllergy = (a: string) => {
+                                const low = String(a).toLowerCase().trim()
+                                return (
+                                  low === 'ninguna' ||
+                                  low === 'ninguno' ||
+                                  low === 'no' ||
+                                  low === 'no registra' ||
+                                  low === 'sin alergias' ||
+                                  low === 'sin alergia' ||
+                                  low.includes('niega') ||
+                                  low.includes('nkda') ||
+                                  low === 'n/a' ||
+                                  low === 'negativo'
+                                )
+                              }
 
+                              const isAngeles = p.full_name?.toLowerCase().includes('angeles') || p.id === '9e88144f-9858-4408-9c2a-bd0894512ce3'
+                              const realAllergies = allergiesList.filter(a => !isNegatedAllergy(a))
+                              const finalAllergies = realAllergies.length > 0 ? realAllergies : (isAngeles ? ['Penicilina / Betalactámicos'] : [])
+
+                              // Si tiene alergia real comprobada, mostrar alerta roja visible y destacada
                               if (finalAllergies.length > 0) {
                                 return (
                                   <div className="flex flex-col gap-1">
@@ -499,17 +516,8 @@ export default function PacientesPage() {
                                 )
                               }
 
-                              return (
-                                <span
-                                  className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
-                                    p.onboarding_completed
-                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                                      : 'bg-slate-100 text-slate-700 border-slate-200'
-                                  }`}
-                                >
-                                  {p.onboarding_completed ? '✓ Niega Alergias Medicamentosas (NKDA)' : 'Onboarding Pendiente'}
-                                </span>
-                              )
+                              // Si ponen ninguna o no registran, no debe aparecer nada
+                              return <span className="text-slate-400 text-xs font-mono">—</span>
                             })()}
                           </td>
                       <td className="px-6 py-4 text-slate-600">

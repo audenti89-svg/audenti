@@ -73,10 +73,12 @@ const CONDITION_COLORS: Record<string, number> = {
   fractura: 0xec4899,
   incrustacion: 0xf59e0b,
   endodoncia: 0xf97316,
+  tratamiento_conductos: 0xf97316,
   corona: 0xeab308,
   implante: 0xa855f7,
   bracket: 0x6366f1,
   ausente: 0x1e293b,
+  resto_radicular: 0xb91c1c,
   extraccion_indicada: 0xd97706
 }
 
@@ -580,12 +582,27 @@ export function Dental3DViewer({
           }
         } else {
           // Vista general sin atenuación
+          const isAbsent = condition === 'ausente'
+          const isResto = condition === 'resto_radicular'
+          const isConducto = condition === 'tratamiento_conductos' || condition === 'endodoncia'
+
           mat.transparent = isAbsent
-          mat.opacity = isAbsent ? 0.22 : 1.0
-          const hex = CONDITION_COLORS[condition] || 0xfcfbfa
+          mat.opacity = isAbsent ? 0.16 : (isResto ? 0.9 : 1.0)
+          let hex = CONDITION_COLORS[condition] || 0xfcfbfa
+          if (isConducto) hex = 0xf97316
+          if (isResto) hex = 0xb91c1c
+          if (isAbsent) hex = 0x334155
+
           mat.color.setHex(hex)
           mat.roughness = condition === 'sano' ? 0.2 : 0.4
-          mesh.scale.set(1.0, 1.0, 1.0)
+
+          if (isResto) {
+            mesh.scale.set(0.85, 0.45, 0.85) // Simulación anatómica de raíz remanente
+          } else if (isAbsent) {
+            mesh.scale.set(0.9, 0.9, 0.9)
+          } else {
+            mesh.scale.set(1.0, 1.0, 1.0)
+          }
         }
       }
     })
@@ -874,6 +891,82 @@ export function Dental3DViewer({
       setSaveSuccessNotification(false)
       handleCloseModal()
     }, 1200)
+  }
+
+  // ASIGNAR CONDICIÓN RÁPIDA (AUSENTE, RESTO RADICULAR, TRATAMIENTO DE CONDUCTOS)
+  const handleSetQuickCondition = async (
+    cond: ToothWholeCondition,
+    procedureName: string,
+    cost: number = 0,
+    specialtyName?: DentalSpecialty
+  ) => {
+    if (!modalData) return
+    setIsPersistingSupabase(true)
+
+    const updatedCondition = cond
+    const updatedSurfaces: ToothSurfaces = cond === 'ausente'
+      ? { vestibular: 'sano', lingual: 'sano', mesial: 'sano', distal: 'sano', oclusal: 'sano' }
+      : modalData.activeSurfaces
+
+    setModalData({
+      ...modalData,
+      selectedCondition: updatedCondition,
+      activeSurfaces: updatedSurfaces,
+      procedure: procedureName,
+      estimatedCost: cost,
+      specialty: specialtyName || modalSpecialty
+    })
+
+    if (specialtyName) {
+      setModalSpecialty(specialtyName)
+    }
+
+    if (onUpdateToothSurfaces) {
+      onUpdateToothSurfaces(modalData.toothFdi, updatedSurfaces, updatedCondition)
+    }
+
+    if (onAddTreatment) {
+      onAddTreatment({
+        toothNumber: modalData.toothFdi,
+        toothUniversal: modalData.toothUniversal,
+        specialty: specialtyName || modalSpecialty,
+        procedure: procedureName,
+        surfaces: cond === 'ausente' ? ['Pieza Completa'] : (cond === 'resto_radicular' ? ['Conducto / Raíz'] : ['Conductometría / Raíz']),
+        notes: `Diagnóstico: ${procedureName}`,
+        estimatedCost: cost,
+        condition: updatedCondition
+      })
+    }
+
+    if (patientId) {
+      try {
+        await fetch('/api/clinical/odontogram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            patientId,
+            patientName,
+            toothFdi: modalData.toothFdi,
+            toothUniversal: modalData.toothUniversal,
+            surfaces: updatedSurfaces,
+            condition: updatedCondition,
+            procedure: procedureName,
+            specialty: specialtyName || modalSpecialty,
+            notes: `Diagnóstico: ${procedureName} (NOM-004-SSA3)`,
+            estimatedCost: cost,
+            doctorRole,
+            branch
+          })
+        })
+        if (onHistoryUpdated) onHistoryUpdated()
+      } catch (err) {
+        console.warn('Auto-sync Supabase aviso:', err)
+      }
+    }
+
+    setIsPersistingSupabase(false)
+    setSaveSuccessNotification(true)
+    setTimeout(() => setSaveSuccessNotification(false), 1800)
   }
 
   return (
@@ -1496,6 +1589,88 @@ export function Dental3DViewer({
               {/* COLUMNA DERECHA: CATÁLOGO POR ESPECIALIDAD & VINCULACIÓN (IDÉNTICO A IMAGEN 2 Y 3) */}
               <div className="lg:col-span-6 space-y-3 bg-slate-950/60 p-4 rounded-2xl border border-slate-800 flex flex-col justify-between">
                 <div>
+                  {/* DIAGNÓSTICO CLÍNICO RÁPIDO DE LA PIEZA (AUSENTE, RESTO RADICULAR, TRATAMIENTO DE CONDUCTOS) */}
+                  <div className="p-3 bg-slate-900/95 rounded-2xl border border-purple-500/30 mb-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                        Diagnóstico Global de la Pieza (NOM-004):
+                      </span>
+                      <span className={cn(
+                        "text-[10px] font-black uppercase px-2 py-0.5 rounded-lg border",
+                        modalData.selectedCondition === 'ausente' ? 'bg-slate-800 text-slate-300 border-slate-700' :
+                        modalData.selectedCondition === 'resto_radicular' ? 'bg-rose-500/20 text-rose-300 border-rose-500/50' :
+                        (modalData.selectedCondition === 'tratamiento_conductos' || modalData.selectedCondition === 'endodoncia') ? 'bg-amber-500/20 text-amber-300 border-amber-500/50' :
+                        'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                      )}>
+                        {modalData.selectedCondition === 'tratamiento_conductos' || modalData.selectedCondition === 'endodoncia' ? 'Tratamiento de Conductos' :
+                         modalData.selectedCondition === 'resto_radicular' ? 'Resto Radicular' :
+                         modalData.selectedCondition === 'ausente' ? 'Ausente' :
+                         modalData.selectedCondition.toUpperCase()}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {/* BOTÓN 1: AUSENTE */}
+                      <button
+                        type="button"
+                        onClick={() => handleSetQuickCondition('ausente', 'Pieza Ausente (Pérdida previa / Agenesia)', 0)}
+                        className={cn(
+                          "px-2.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center gap-1 text-center border",
+                          modalData.selectedCondition === 'ausente'
+                            ? "bg-slate-700 text-white border-slate-400 shadow-lg ring-1 ring-slate-300"
+                            : "bg-slate-950/80 text-slate-300 border-slate-800 hover:border-slate-600 hover:bg-slate-800"
+                        )}
+                        title="Marcar pieza como ausente (diente extraído o ausente congénito)"
+                      >
+                        <span className="text-base">🚫</span>
+                        <span className="text-[11px] font-black">Ausente</span>
+                      </button>
+
+                      {/* BOTÓN 2: RESTO RADICULAR */}
+                      <button
+                        type="button"
+                        onClick={() => handleSetQuickCondition('resto_radicular', 'Extracción de Resto Radicular', 750, 'cirugia')}
+                        className={cn(
+                          "px-2.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center gap-1 text-center border",
+                          modalData.selectedCondition === 'resto_radicular'
+                            ? "bg-rose-600 text-white border-rose-300 shadow-lg shadow-rose-600/30 ring-1 ring-rose-300"
+                            : "bg-slate-950/80 text-rose-300 border-rose-500/30 hover:border-rose-400 hover:bg-rose-950/40"
+                        )}
+                        title="Marcar como resto radicular (corona destruida, raíz remanente)"
+                      >
+                        <span className="text-base">⚠️</span>
+                        <span className="text-[11px] font-black">Resto Radicular</span>
+                      </button>
+
+                      {/* BOTÓN 3: TRATAMIENTO DE CONDUCTOS */}
+                      <button
+                        type="button"
+                        onClick={() => handleSetQuickCondition('tratamiento_conductos', 'Tratamiento de Conductos (Endodoncia)', 1800, 'endodoncia')}
+                        className={cn(
+                          "px-2.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex flex-col items-center justify-center gap-1 text-center border",
+                          modalData.selectedCondition === 'tratamiento_conductos' || modalData.selectedCondition === 'endodoncia'
+                            ? "bg-amber-500 text-slate-950 border-amber-300 shadow-lg shadow-amber-500/30 ring-1 ring-amber-200"
+                            : "bg-slate-950/80 text-amber-300 border-amber-500/30 hover:border-amber-400 hover:bg-amber-950/40"
+                        )}
+                        title="Marcar con tratamiento de conductos (endodoncia)"
+                      >
+                        <span className="text-base">⚡</span>
+                        <span className="text-[11px] font-black leading-tight">Tratamiento de Conductos</span>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-1.5 pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => handleSetQuickCondition('sano', 'Pieza Sana y Funcional', 0)}
+                        className="text-[10px] text-slate-400 hover:text-emerald-300 font-bold underline transition-colors cursor-pointer"
+                      >
+                        Restablecer a Sano
+                      </button>
+                    </div>
+                  </div>
+
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-black uppercase tracking-wider text-amber-300">
                       Especialidades &amp; Procedimientos
@@ -1503,14 +1678,14 @@ export function Dental3DViewer({
                     <span className="text-[10px] text-emerald-400 font-bold">Autoguardado en Supabase</span>
                   </div>
 
-                  {/* Selector Rápido de Tratamientos Clave (Composite, Crown, Root Canal, Extraction) */}
+                  {/* Selector Rápido de Tratamientos Clave (Conductos, Resto Radicular, Resina, Corona) */}
                   <div className="flex items-center gap-1.5 p-1 bg-slate-900 rounded-xl border border-slate-700/80 mb-2.5 overflow-x-auto">
                     <span className="text-[10px] font-black uppercase text-amber-300 px-1.5 shrink-0">Tratamientos:</span>
                     {[
-                      { label: 'Composite', spec: 'operatoria' as DentalSpecialty },
-                      { label: 'Crown', spec: 'implantes' as DentalSpecialty },
-                      { label: 'Root Canal', spec: 'endodoncia' as DentalSpecialty },
-                      { label: 'Extraction', spec: 'cirugia' as DentalSpecialty }
+                      { label: 'Conductos (Endodoncia)', spec: 'endodoncia' as DentalSpecialty },
+                      { label: 'Resto Radicular / Cirugía', spec: 'cirugia' as DentalSpecialty },
+                      { label: 'Resina (Composite)', spec: 'operatoria' as DentalSpecialty },
+                      { label: 'Corona / Implante', spec: 'implantes' as DentalSpecialty }
                     ].map(btn => (
                       <button
                         key={btn.label}
