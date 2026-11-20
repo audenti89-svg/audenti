@@ -124,10 +124,6 @@ export class MetaWhatsAppCloudApi {
       ? '🦷 *RECORDATORIO DE CITA ODONTOLÓGICA (24 HORAS ANTES)*'
       : '⏰ *AVISO PREVENTIVO: TU CITA ES EN 1 HORA*';
 
-    const branchPhone = payload.branchName.toLowerCase().includes('balbuena')
-      ? '+52 55 5764 8810'
-      : '+52 55 5389 1204';
-
     const message = 
       `${title}\n\n` +
       `Estimado(a) *${payload.patientName}*,\n\n` +
@@ -138,7 +134,7 @@ export class MetaWhatsAppCloudApi {
       `🩺 *Especialista:* Dra. Aura Estudillo (Céd. Prof. 8492019)\n\n` +
       `Tu sillón clínico se encuentra reservado. Para confirmar tu asistencia de forma inmediata con un solo clic:\n` +
       `👉 *${payload.confirmUrl}*\n\n` +
-      `📞 Teléfono de Sede: ${branchPhone}\n` +
+      `🌐 Gestión de tu cita en la App Web: https://audenti.vercel.app/portal-paciente\n` +
       `_Audenti Cloud Pro • Odontología Integral de Precisión (NOM-004-SSA3)_`;
 
     return this.sendTextMessage(payload.patientPhone, message);

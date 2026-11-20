@@ -43,7 +43,7 @@ export function PatientAppointmentNotifications({
   patientId,
   patientName = 'Paciente Audenti',
   branchName = 'Sucursal Balbuena',
-  branchPhoneClean = '525557648810'
+  branchPhoneClean = '525522427769'
 }: PatientAppointmentNotificationsProps) {
   const [notifications, setNotifications] = useState<PatientNotification[]>([])
   const [loading, setLoading] = useState(true)

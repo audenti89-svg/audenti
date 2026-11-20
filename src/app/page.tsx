@@ -28,7 +28,8 @@ import {
   Coffee,
   Wine,
   UserCheck,
-  UserPlus
+  UserPlus,
+  QrCode
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { SpotlightCard } from '@/components/ui/spotlight-card'
@@ -1268,25 +1269,27 @@ export default function LandingPage() {
 
               {/* Punto Balbuena (Matriz) */}
               <div className="relative z-10 flex items-center gap-3">
-                <div className="w-3.5 h-3.5 rounded-full bg-amber-400 ring-4 ring-amber-400/20 animate-pulse" />
+                <div className="w-3.5 h-3.5 rounded-full bg-amber-400 ring-4 ring-amber-400/20 animate-pulse shrink-0" />
                 <div>
                   <h4 className="text-xs font-bold text-white">Sede Matriz — Jardín Balbuena</h4>
-                  <p className="text-[11px] text-slate-400">Av. del Taller &amp; Retorno 12, Venustiano Carranza</p>
+                  <p className="text-[11px] text-amber-400 font-medium">Jardín Balbuena • Atención exclusiva con cita previa vía App Web</p>
                 </div>
               </div>
 
               {/* Punto Guadalupe Chalma */}
               <div className="relative z-10 flex items-center gap-3">
-                <div className="w-3.5 h-3.5 rounded-full bg-blue-400 ring-4 ring-blue-400/20" />
+                <div className="w-3.5 h-3.5 rounded-full bg-blue-400 ring-4 ring-blue-400/20 shrink-0" />
                 <div>
                   <h4 className="text-xs font-bold text-white">Sede Norte — Chalma de Guadalupe</h4>
-                  <p className="text-[11px] text-slate-400">Av. Guadalupe Victoria 45, Gustavo A. Madero</p>
+                  <p className="text-[11px] text-cyan-400 font-medium">Chalma de Guadalupe • Atención exclusiva con cita previa vía App Web</p>
                 </div>
               </div>
 
               <div className="relative z-10 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-                <span>Teléfono directo: <strong>+52 55 5764 8810</strong></span>
-                <span className="text-amber-400 font-bold">Lunes a Sábado</span>
+                <span className="text-slate-300 font-semibold">Citas y Expediente: <strong>100% Digital en la App Web</strong></span>
+                <a href="#qr-pwa" className="text-amber-400 hover:text-amber-300 font-bold underline underline-offset-4 transition-colors">
+                  Escanear Código QR →
+                </a>
               </div>
             </div>
 
@@ -1348,21 +1351,42 @@ export default function LandingPage() {
           </div>
 
           <div className="md:col-span-3 space-y-3 text-xs">
-            <h4 className="font-bold text-white uppercase tracking-wider text-[11px]">Atención &amp; Contacto</h4>
-            <p className="text-slate-400">Sede Matriz Balbuena: Av. del Taller &amp; Retorno 12, CDMX</p>
-            <p className="text-amber-400 font-bold">Tel: +52 55 5764 8810</p>
-            <button
-              onClick={() => openAuth('login')}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-white text-xs hover:bg-slate-800 transition-colors"
-            >
-              <Lock className="w-3.5 h-3.5 text-amber-400" />
-              Portal de Especialistas
-            </button>
+            <h4 className="font-bold text-white uppercase tracking-wider text-[11px]">Citas &amp; Registro Digital</h4>
+            <div className="space-y-1">
+              <p className="text-white font-semibold">Sede Matriz — Jardín Balbuena</p>
+              <p className="text-white font-semibold">Sede Norte — Chalma de Guadalupe</p>
+            </div>
+            <p className="text-slate-400 text-[11px] leading-relaxed">
+              Toda la atención clínica, presupuestos y citas se gestionan exclusivamente a través de la App Web oficial.
+            </p>
+            <div className="flex flex-col gap-2 pt-1">
+              <a
+                href="#qr-pwa"
+                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black transition-all shadow-md shadow-amber-500/20 cursor-pointer"
+              >
+                <QrCode className="w-4 h-4 shrink-0" />
+                <span>Escanear Código QR (PWA)</span>
+              </a>
+              <Link
+                href="/portal/login"
+                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 hover:border-amber-400 text-white text-xs font-bold transition-colors"
+              >
+                <UserCheck className="w-3.5 h-3.5 text-amber-400" />
+                <span>Registrarme / Mi Expediente</span>
+              </Link>
+              <button
+                onClick={() => openAuth('login')}
+                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 text-[11px] transition-colors cursor-pointer"
+              >
+                <Lock className="w-3 h-3 text-amber-400" />
+                <span>Acceso Especialistas / Doctores</span>
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Tarjeta QR con Psicología Inversa para PWA / Mobile Instant Access */}
-        <div className="max-w-xl mx-auto my-6 rounded-3xl overflow-hidden border-2 border-amber-400/80 shadow-2xl relative bg-slate-900/90 backdrop-blur-md">
+        <div id="qr-pwa" className="max-w-xl mx-auto my-6 rounded-3xl overflow-hidden border-2 border-amber-400/80 shadow-2xl relative bg-slate-900/90 backdrop-blur-md scroll-mt-24">
           <div className="p-6 sm:p-8 text-center space-y-4">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 text-[10px] font-black uppercase tracking-widest">
               Acceso Inmediato PWA

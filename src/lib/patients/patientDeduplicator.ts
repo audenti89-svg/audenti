@@ -54,6 +54,68 @@ export function normalizePhone10(raw: string | null | undefined): string | null 
 }
 
 /**
+ * Detecta si un nombre es un alias, apodo, nombre de canal o handle tecnológico
+ * (ej. "TecnoWorld", "Tecno", "admin", "gamer123", o nombres de una sola palabra técnica)
+ * en lugar de un nombre legal y apellidos reales de una persona.
+ */
+export function isAliasOrHandle(name: string | null | undefined): boolean {
+  if (!name || typeof name !== 'string') return false
+  const trimmed = name.trim()
+  if (!trimmed) return false
+
+  // Términos conocidos de alias/canales
+  const aliasKeywords = /tecno|world|gaming|gamer|channel|canal|official|oficial|admin|test|pruevaz|prueba|user|usuario|cuenta/i
+  if (aliasKeywords.test(trimmed)) return true
+
+  // Nombres de una sola palabra que no parecen nombres propios o tienen camelCase / números
+  const words = trimmed.split(/\s+/).filter(Boolean)
+  if (words.length === 1) {
+    // Si contiene números o caracteres especiales
+    if (/[0-9_]/.test(trimmed)) return true
+    // Si es camelCase (ej. "TecnoWorld", "SuperDoctor")
+    if (/[a-z][A-Z]/.test(trimmed)) return true
+  }
+
+  return false
+}
+
+/**
+ * Resuelve el mejor nombre legal y formal entre dos registros:
+ * - Protege los nombres reales con apellidos (ej. "Ricardo Ulises Rayón Sánchez")
+ * - Descarta apodos o alias (ej. "TecnoWorld")
+ * - Prefiere el nombre más completo (con apellidos paterno y materno)
+ */
+export function resolveBestLegalName(
+  existingName: string | null | undefined,
+  incomingName: string | null | undefined
+): string {
+  const normExist = (existingName || '').trim()
+  const normIncom = (incomingName || '').trim()
+
+  if (!normExist && !normIncom) return 'Paciente Audenti'
+  if (!normExist) return normIncom
+  if (!normIncom) return normExist
+
+  const existIsAlias = isAliasOrHandle(normExist)
+  const incomIsAlias = isAliasOrHandle(normIncom)
+
+  // Si el entrante es alias y el existente es nombre real -> MANTENER EXISTENTE
+  if (incomIsAlias && !existIsAlias) return normExist
+  // Si el existente es alias y el entrante es nombre real -> ACTUALIZAR AL ENTRANTE
+  if (existIsAlias && !incomIsAlias) return normIncom
+
+  // Si ambos son nombres reales, preferir el que tenga mayor desglose de nombres y apellidos
+  const existWords = normExist.split(/\s+/).length
+  const incomWords = normIncom.split(/\s+/).length
+
+  if (incomWords > existWords) return normIncom
+  if (existWords > incomWords) return normExist
+
+  // Si tienen el mismo número de palabras, preferir el de mayor longitud de caracteres
+  return normIncom.length > normExist.length ? normIncom : normExist
+}
+
+/**
  * Calcula similitud de tokens (Jaccard) entre dos nombres
  */
 export function calculateNameSimilarity(nameA: string, nameB: string): number {
@@ -206,11 +268,11 @@ export async function mergeAndConsolidatePatient(
 
   const updatePayload: Record<string, any> = {}
 
-  // 1. Nombre completo: si el actual es corto (ej. "Ricardo Sánchez") y el nuevo es completo ("Ricardo Ulises Rayón Sánchez"), actualizar al más completo
+  // 1. Nombre completo y apellidos reales (protección absoluta contra alias de cuentas como "TecnoWorld")
   if (incomingData.full_name && incomingData.full_name.trim()) {
-    const newName = incomingData.full_name.trim()
-    if (!current.full_name || newName.length > current.full_name.length || current.full_name.toLowerCase().includes('tecnoworld')) {
-      updatePayload.full_name = newName
+    const bestName = resolveBestLegalName(current.full_name, incomingData.full_name)
+    if (bestName && bestName !== current.full_name) {
+      updatePayload.full_name = bestName
     }
   }
 

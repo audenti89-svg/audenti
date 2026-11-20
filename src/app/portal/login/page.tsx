@@ -190,6 +190,40 @@ function PatientLoginForm() {
     }
   };
 
+  // Validar si el teléfono ya existe en clínica al desenfocar el campo (Upsert feedback)
+  const handleCheckPhoneInClinic = async (phoneToCheck: string) => {
+    const clean = phoneToCheck.replace(/\D/g, '').slice(-10);
+    if (!clean || clean.length < 10) return;
+
+    setCheckingRecord(true);
+    try {
+      const resp = await fetch(`/api/auth/sync-profile?phone=${encodeURIComponent(clean)}`);
+      if (resp.ok) {
+        const res = await resp.json();
+        if (res.patient) {
+          setExistingMatch(res.patient);
+          if (res.patient.full_name && !actFullName) {
+            setActFullName(res.patient.full_name);
+          }
+          if (res.patient.email && !actEmail) {
+            setActEmail(res.patient.email);
+          }
+          if (res.patient.tenant_id) {
+            setActBranchId(res.patient.tenant_id);
+          }
+        }
+        if (res.hasAuthUser) {
+          setIsEmailAlreadyRegistered(true);
+          setErrorMsg('Este número ya está registrado en tu expediente digital. Por favor inicia sesión con tu celular o correo.');
+        }
+      }
+    } catch (err) {
+      console.warn('Nota comprobación previa por teléfono:', err);
+    } finally {
+      setCheckingRecord(false);
+    }
+  };
+
   // 1. INICIAR SESIÓN CON GOOGLE (OAuth)
   const handleGoogleLogin = async () => {
     setLoadingGoogle(true);
@@ -789,6 +823,7 @@ function PatientLoginForm() {
                 placeholder="55 1234 5678"
                 value={actPhone}
                 onChange={(e) => setActPhone(e.target.value)}
+                onBlur={(e) => handleCheckPhoneInClinic(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-xl text-xs font-medium text-white placeholder-slate-500 focus:outline-hidden focus:ring-1 focus:ring-amber-400 transition-all"
               />
             </div>

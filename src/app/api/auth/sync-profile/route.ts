@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isSystemAdminEmail } from '@/lib/auth/admin-emails';
-import { findDuplicatePatient, mergeAndConsolidatePatient } from '@/lib/patients/patientDeduplicator';
+import { findDuplicatePatient, mergeAndConsolidatePatient, resolveBestLegalName } from '@/lib/patients/patientDeduplicator';
 
 /**
  * API DE VINCULACIÓN EXACTA Y ACTIVACIÓN UNIVERSAL AUTH-SUPABASE (Audenti 2027)
@@ -26,31 +26,34 @@ function getDbClient() {
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const email = searchParams.get('email')?.trim().toLowerCase();
+    const email = searchParams.get('email')?.trim().toLowerCase() || null;
+    const rawPhone = searchParams.get('phone');
+    const phone = rawPhone ? rawPhone.replace(/\D/g, '').slice(-10) : null;
 
-    if (!email || !email.includes('@')) {
-      return NextResponse.json({ exists: false, error: 'Correo inválido' }, { status: 400 });
+    if (!email && !phone) {
+      return NextResponse.json({ exists: false, error: 'Correo o teléfono requerido' }, { status: 400 });
     }
 
     const admin = createAdminClient();
 
-    // 1. Buscar en patients por email usando admin
-    const { data: patient, error: patientErr } = await admin
-      .from('patients')
-      .select('id, user_id, branch_name, tenant_id, status, birth_date, acquisition_channel, referrer_name')
-      .ilike('email', email)
-      .maybeSingle();
+    // 1. Motor de deduplicación inteligente para buscar paciente existente
+    const dupCheck = await findDuplicatePatient(admin, {
+      email: email || undefined,
+      phone: phone || undefined
+    });
 
-    if (patientErr) {
-      console.warn('[sync-profile GET] Nota buscando paciente en DB:', patientErr.message);
-    }
+    const patient = dupCheck.isDuplicate ? dupCheck.matchedPatient : null;
 
     // 2. Comprobar si ya existe usuario registrado en Supabase Auth
     let authUserExists = false;
     let authUserId: string | null = null;
     try {
       const { data: userList } = await admin.auth.admin.listUsers();
-      const matched = userList?.users?.find(u => u.email?.toLowerCase() === email);
+      const matched = userList?.users?.find(u => 
+        (email && u.email?.toLowerCase() === email) ||
+        (patient?.email && u.email?.toLowerCase() === patient.email.toLowerCase()) ||
+        (patient?.user_id && u.id === patient.user_id)
+      );
       if (matched) {
         authUserExists = true;
         authUserId = matched.id;
@@ -67,6 +70,9 @@ export async function GET(request: Request) {
         tenant_id: patient.tenant_id,
         branch_name: patient.branch_name,
         birth_date: patient.birth_date,
+        full_name: patient.full_name,
+        phone: patient.phone,
+        email: patient.email,
         acquisition_channel: patient.acquisition_channel,
         referrer_name: patient.referrer_name
       } : null,
@@ -147,11 +153,16 @@ export async function POST(request: Request) {
       // Sincronización post-login legítima o confirmación administrativa
       if (autoConfirm && targetUserId) {
         try {
+          const resolvedAuthName = resolveBestLegalName(
+            existingAuthUser.user_metadata?.full_name,
+            fullName
+          );
           await admin.auth.admin.updateUserById(targetUserId, {
             email_confirm: true,
             user_metadata: {
               ...(existingAuthUser.user_metadata || {}),
-              full_name: fullName || existingAuthUser.user_metadata?.full_name || 'Paciente Audenti',
+              full_name: resolvedAuthName,
+              name: resolvedAuthName,
               phone: cleanPhone || existingAuthUser.user_metadata?.phone,
               email_verified: true,
             }
@@ -205,7 +216,9 @@ export async function POST(request: Request) {
       };
       if (targetUserId) updateData.user_id = targetUserId;
       if (cleanEmail) updateData.email = cleanEmail;
-      if (fullName) updateData.full_name = fullName;
+      if (fullName) {
+        updateData.full_name = resolveBestLegalName(existingPatient.full_name, fullName);
+      }
       if (cleanPhone) updateData.phone = cleanPhone;
       if (branchId) {
         updateData.branch_id = branchId;

@@ -57,12 +57,12 @@ const BRANCH_DETAILS: Record<string, {
   phoneClean: string;
 }> = {
   '00000000-0000-0000-0000-000000000001': {
-    name: 'Sucursal Balbuena',
-    phoneClean: '525557648810'
+    name: 'Sede Matriz — Jardín Balbuena',
+    phoneClean: '525522427769'
   },
   '00000000-0000-0000-0000-000000000002': {
-    name: 'Sucursal Chalma de Guadalupe',
-    phoneClean: '525553891204'
+    name: 'Sede Norte — Chalma de Guadalupe',
+    phoneClean: '525566068975'
   }
 };
 
@@ -959,10 +959,10 @@ export function PatientPortalView({
   // ── VISTA DE CONFIRMACIÓN DIRECTA DE CITA (WHATSAPP SIN LOGIN OBLIGATORIO) ──
   if (guestAppointment) {
     const isChalma = (guestAppointment.branch || '').toLowerCase().includes('chalma');
-    const branchName = isChalma ? 'Sucursal Chalma de Guadalupe' : 'Sucursal Balbuena (Matriz)';
+    const branchName = isChalma ? 'Sede Norte — Chalma de Guadalupe' : 'Sede Matriz — Jardín Balbuena';
     const branchAddress = isChalma
-      ? 'Av. Chalma de Guadalupe #124, Gustavo A. Madero, CDMX'
-      : 'Calle Cecilio Robelo #345, Jardín Balbuena, Venustiano Carranza, CDMX';
+      ? 'Chalma de Guadalupe'
+      : 'Jardín Balbuena';
     const mapUrl = isChalma
       ? 'https://maps.google.com/?q=Guadalupe+Chalma+Gustavo+A+Madero'
       : 'https://maps.google.com/?q=Jardin+Balbuena+CDMX';

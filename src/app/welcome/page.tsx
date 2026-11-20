@@ -117,20 +117,20 @@ export default function LandingPresentationPage() {
   // 2. Sedes de la Clínica
   const branchesData = {
     balbuena: {
-      name: 'Sucursal Balbuena (Sede Matriz)',
+      name: 'Sede Matriz — Jardín Balbuena',
       doctor: 'Dra. Aura Estudillo — Dirección General',
-      address: 'Av. del Taller & Retorno 12, Jardín Balbuena, Venustiano Carranza, CDMX',
-      phone: '+52 55 5764 8810',
+      address: 'Jardín Balbuena, CDMX (Atención con Cita Previa)',
+      phone: 'Gestión exclusiva vía App Web',
       hours: 'Lunes a Sábado: 16:00 - 21:00 hrs (Turno Vespertino) | Domingos según agenda',
       facilities: '2 Gabinetes Dentales Equipados • Área de Esterilización Grado Hospitalario • Sala de Espera VIP',
       badge: 'Sede Principal Activa',
       mapUrl: 'https://maps.google.com/?q=Jardin+Balbuena+CDMX',
     },
     guadalupe: {
-      name: 'Sucursal Chalma de Guadalupe',
+      name: 'Sede Norte — Chalma de Guadalupe',
       doctor: 'Dra. Aura Estudillo — Dirección Médica General',
-      address: 'Av. Morelos 144, Guadalupe Chalma, Gustavo A. Madero, CDMX',
-      phone: '+52 55 5306 9920',
+      address: 'Chalma de Guadalupe, CDMX (Atención con Cita Previa)',
+      phone: 'Gestión exclusiva vía App Web',
       hours: 'Lunes a Sábado: 16:00 - 21:00 hrs (Turno Vespertino) | Domingos según agenda',
       facilities: 'Quirófano Odontológico Esterilizado • Gabinete Quirúrgico para Cirugías e Implantes',
       badge: 'Unidad Quirúrgica Activa',

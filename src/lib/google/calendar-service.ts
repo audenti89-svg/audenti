@@ -27,8 +27,8 @@ export interface GoogleCalendarSyncResult {
 }
 
 const BRANCH_LOCATIONS: Record<string, string> = {
-  balbuena: 'Av. del Taller & Retorno 12, Jardín Balbuena, Venustiano Carranza, CDMX',
-  'guadalupe-chalma': 'Av. Guadalupe Victoria 45, Chalma de Guadalupe, Gustavo A. Madero, CDMX'
+  balbuena: 'Sede Matriz — Jardín Balbuena',
+  'guadalupe-chalma': 'Sede Norte — Chalma de Guadalupe'
 };
 
 export class GoogleCalendarService {

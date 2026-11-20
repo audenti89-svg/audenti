@@ -98,11 +98,11 @@ export default function RegisterHubPage() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[11px] text-slate-300">
           <div className="flex items-center gap-1.5">
             <Building2 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <span><strong>Balbuena (Matriz):</strong> Av. del Taller &amp; Retorno 12</span>
+            <span><strong>Sede Matriz — Jardín Balbuena</strong></span>
           </div>
           <div className="flex items-center gap-1.5">
             <Building2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-            <span><strong>Chalma:</strong> Av. Guadalupe Victoria 45</span>
+            <span><strong>Sede Norte — Chalma de Guadalupe</strong></span>
           </div>
         </div>
       </div>

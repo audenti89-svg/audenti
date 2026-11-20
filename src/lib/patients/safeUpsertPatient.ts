@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
-import { findDuplicatePatient, mergeAndConsolidatePatient } from './patientDeduplicator';
+import { findDuplicatePatient, mergeAndConsolidatePatient, resolveBestLegalName } from './patientDeduplicator';
 
 export interface SafePatientData {
   id?: string;
@@ -142,8 +142,12 @@ export async function safeUpsertPatient(
     const updatePayload: Record<string, any> = {};
 
     // Mapear campos canónicos compatibles con la tabla `patients`
+    // Protección absoluta de nombres y apellidos legales: nunca sobrescribir con alias como "TecnoWorld"
     if (patientData.full_name || patientData.name) {
-      updatePayload.full_name = patientData.full_name || patientData.name;
+      const bestName = resolveBestLegalName(existingPatient.full_name, patientData.full_name || patientData.name);
+      if (bestName) {
+        updatePayload.full_name = bestName;
+      }
     }
     if (cleanEmail) {
       updatePayload.email = cleanEmail;
