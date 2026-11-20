@@ -144,6 +144,9 @@ export function Dental3DViewer({
     estimatedCost: number
     specialty: string
     procedure: string
+    originType: 'nuevo_audenti' | 'previo_externo'
+    treatmentStatus: 'diagnostico' | 'en_proceso' | 'finalizado' | 'rechazado_no_realizado'
+    zoneType: 'corona' | 'interproximal' | 'implante' | 'protesis_guarda'
   } | null>(null)
   const [isPersistingSupabase, setIsPersistingSupabase] = useState(false)
   const [saveSuccessNotification, setSaveSuccessNotification] = useState(false)
@@ -183,6 +186,10 @@ export function Dental3DViewer({
         controlsRef.current.update()
       }
 
+      let initialZone: 'corona' | 'interproximal' | 'implante' | 'protesis_guarda' = isInterproximal ? 'interproximal' : 'corona'
+      if (toothInfo?.wholeCondition === 'implante') initialZone = 'implante'
+      if (toothInfo?.wholeCondition === 'protesis') initialZone = 'protesis_guarda'
+
       setModalData({
         toothFdi,
         toothUniversal,
@@ -199,7 +206,10 @@ export function Dental3DViewer({
         specialty: 'operatoria',
         procedure: isInterproximal
           ? 'Resina Estética 2 Caras (MO / DO)'
-          : 'Resina Estética 1 Cara (Oclusal/Vestibular)'
+          : 'Resina Estética 1 Cara (Oclusal/Vestibular)',
+        originType: 'nuevo_audenti',
+        treatmentStatus: 'diagnostico',
+        zoneType: initialZone
       })
       setModalOpen(true)
     },
@@ -838,6 +848,11 @@ export function Dental3DViewer({
       .filter(([_, cond]) => cond !== 'sano')
       .map(([face]) => face)
 
+    const originTag = modalData.originType === 'previo_externo' ? '[HISTORIAL PREVIO EXTERNO] ' : '[TRABAJO NUEVO AUDENTI] '
+    const statusTag = modalData.treatmentStatus === 'rechazado_no_realizado' ? '[RECHAZADO/NO REALIZADO POR PACIENTE] ' : ''
+    const zoneTag = `[ZONA: ${modalData.zoneType.toUpperCase()}] `
+    const finalNote = `${statusTag}${originTag}${zoneTag}${modalData.notes}`.trim()
+
     if (onUpdateToothSurfaces) {
       onUpdateToothSurfaces(modalData.toothFdi, modalData.activeSurfaces, modalData.selectedCondition)
     }
@@ -849,8 +864,8 @@ export function Dental3DViewer({
         specialty: modalData.specialty,
         procedure: modalData.procedure,
         surfaces: treatedFaces.length > 0 ? treatedFaces : ['corona_completa'],
-        notes: modalData.notes,
-        estimatedCost: modalData.estimatedCost,
+        notes: finalNote,
+        estimatedCost: modalData.treatmentStatus === 'rechazado_no_realizado' ? 0 : modalData.estimatedCost,
         condition: modalData.selectedCondition
       })
     }
@@ -869,12 +884,15 @@ export function Dental3DViewer({
             condition: modalData.selectedCondition,
             procedure: modalData.procedure,
             specialty: modalData.specialty,
-            notes: modalData.notes,
-            estimatedCost: modalData.estimatedCost,
+            notes: finalNote,
+            estimatedCost: modalData.treatmentStatus === 'rechazado_no_realizado' ? 0 : modalData.estimatedCost,
             doctorName,
             doctorRole,
             branch,
-            fullTeethState: teethState
+            fullTeethState: teethState,
+            originType: modalData.originType,
+            treatmentStatus: modalData.treatmentStatus,
+            zoneType: modalData.zoneType
           })
         })
         if (onHistoryUpdated) {
@@ -1201,7 +1219,8 @@ export function Dental3DViewer({
         onClick={handleCloseModal}
       >
         <div
-          className="relative max-w-6xl w-[92vw] h-[88vh] bg-slate-950/95 backdrop-blur-2xl border border-amber-500/50 shadow-2xl rounded-2xl p-6 overflow-y-auto text-white flex flex-col justify-between space-y-5 animate-in zoom-in-95 duration-200"
+          className="relative max-w-6xl w-[92vw] h-[88vh] bg-slate-950/95 backdrop-blur-2xl border border-amber-500/50 shadow-2xl rounded-2xl p-6 overflow-y-auto overscroll-contain text-white flex flex-col justify-between space-y-5 animate-in zoom-in-95 duration-200"
+          style={{ WebkitOverflowScrolling: 'touch' }}
           onClick={(e) => e.stopPropagation()}
         >
             {/* Notificación de Guardado / Sincronización en Supabase */}
@@ -1769,6 +1788,97 @@ export function Dental3DViewer({
                         </div>
                       )
                     })}
+                  </div>
+                </div>
+
+                {/* SECCIÓN AVANZADA: ORIGEN, ZONA CLÍNICA Y ESTADO / RECHAZO (NOM-004) */}
+                <div className="p-3 bg-slate-900/90 rounded-2xl border border-slate-800 space-y-2.5">
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* ORIGEN: PREVIO EXTERNO VS NUEVO AUDENTI */}
+                    <div>
+                      <label className="text-[10px] font-black uppercase text-amber-300 block mb-1">
+                        Origen del Registro
+                      </label>
+                      <div className="grid grid-cols-2 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => setModalData({ ...modalData, originType: 'nuevo_audenti' })}
+                          className={cn(
+                            'py-1 px-1.5 rounded-lg text-[10px] font-black transition-all cursor-pointer truncate',
+                            modalData.originType === 'nuevo_audenti'
+                              ? 'bg-amber-400 text-slate-950 shadow-xs'
+                              : 'text-slate-400 hover:text-white'
+                          )}
+                        >
+                          Audenti Nuevo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setModalData({ ...modalData, originType: 'previo_externo' })}
+                          className={cn(
+                            'py-1 px-1.5 rounded-lg text-[10px] font-black transition-all cursor-pointer truncate',
+                            modalData.originType === 'previo_externo'
+                              ? 'bg-cyan-400 text-slate-950 shadow-xs'
+                              : 'text-slate-400 hover:text-white'
+                          )}
+                        >
+                          Historial Previo
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* ZONA: CORONA / ENTRE DIENTES / IMPLANTE / PRÓTESIS */}
+                    <div>
+                      <label className="text-[10px] font-black uppercase text-cyan-300 block mb-1">
+                        Zona Anatómica
+                      </label>
+                      <select
+                        value={modalData.zoneType}
+                        onChange={(e) => setModalData({ ...modalData, zoneType: e.target.value as any })}
+                        className="w-full px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-bold text-white focus:outline-hidden focus:border-cyan-400 cursor-pointer"
+                      >
+                        <option value="corona">Corona Dental</option>
+                        <option value="interproximal">Entre Dientes (Interproximal)</option>
+                        <option value="implante">Implante (Fijación/Pilar/Corona)</option>
+                        <option value="protesis_guarda">Placas / Prótesis / Guardas</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* ESTADO DEL PROCEDIMIENTO / REGISTRO DE RECHAZO */}
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-slate-400 flex items-center justify-between mb-1">
+                      <span>Estado / Aceptación del Paciente</span>
+                      {modalData.treatmentStatus === 'rechazado_no_realizado' && (
+                        <span className="text-[9px] font-black uppercase text-rose-400 bg-rose-500/20 px-1.5 py-0.5 rounded-md">
+                          Documentado como No Realizado
+                        </span>
+                      )}
+                    </label>
+                    <div className="grid grid-cols-4 gap-1">
+                      {[
+                        { id: 'diagnostico', label: 'Planificado' },
+                        { id: 'en_proceso', label: 'En Proceso' },
+                        { id: 'finalizado', label: 'Realizado' },
+                        { id: 'rechazado_no_realizado', label: '❌ Rechazado' }
+                      ].map((st) => (
+                        <button
+                          key={st.id}
+                          type="button"
+                          onClick={() => setModalData({ ...modalData, treatmentStatus: st.id as any })}
+                          className={cn(
+                            'py-1 px-1.5 rounded-lg text-[10px] font-black transition-all border cursor-pointer truncate text-center',
+                            modalData.treatmentStatus === st.id
+                              ? st.id === 'rechazado_no_realizado'
+                                ? 'bg-rose-500/30 text-rose-200 border-rose-400'
+                                : 'bg-amber-400 text-slate-950 border-amber-300 shadow-xs'
+                              : 'bg-slate-950/70 text-slate-400 border-slate-800 hover:text-white'
+                          )}
+                        >
+                          {st.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 

@@ -14,6 +14,7 @@ export interface SafePatientData {
   gender?: string | null;
   address?: string | null;
   tenant_id?: string | null;
+  branch?: string | null;
   branch_id?: string | null;
   branch_name?: string | null;
   notes?: string | null;
@@ -22,9 +23,17 @@ export interface SafePatientData {
   emergency_phone?: string | null;
   allergies?: string[] | null;
   allergies_medication?: string[] | null;
+  has_no_allergies?: boolean;
+  allergies_list?: string[] | null;
+  allergy_notes?: string | null;
   medical_conditions?: string[] | null;
   referral_source?: string | null;
   acquisition_channel?: string | null;
+  referral_type?: string | null;
+  referred_by_id?: string | null;
+  referred_by_name?: string | null;
+  last_visit_date?: string | null;
+  last_visit_at?: string | null;
   qr_code_id?: string | null;
   referred_by?: string | null;
   referrer_name?: string | null;
@@ -44,12 +53,16 @@ export interface SafeUpsertResult {
 const VALID_PATIENT_COLUMNS = new Set([
   'id',
   'tenant_id',
+  'branch',
   'branch_id',
   'primary_branch_id',
   'branch_name',
   'user_id',
   'referral_code',
+  'referral_type',
   'referred_by',
+  'referred_by_id',
+  'referred_by_name',
   'full_name',
   'first_name',
   'last_name',
@@ -64,6 +77,7 @@ const VALID_PATIENT_COLUMNS = new Set([
   'loyalty_points',
   'referral_ltv',
   'last_visit_at',
+  'last_visit_date',
   'acquisition_channel',
   'referrer_id',
   'referrer_name',
@@ -72,6 +86,9 @@ const VALID_PATIENT_COLUMNS = new Set([
   'family_nucleus_id',
   'emergency_contact_name',
   'emergency_contact_phone',
+  'has_no_allergies',
+  'allergies_list',
+  'allergy_notes',
   'allergies_medication',
   'allergies_food',
   'medical_conditions',
@@ -164,7 +181,21 @@ export async function safeUpsertPatient(
     if (patientData.branch_name || patientData.branch) {
       const bName = patientData.branch_name || patientData.branch;
       updatePayload.branch_name = bName;
+      updatePayload.branch = bName;
     }
+    if (patientData.referral_type) updatePayload.referral_type = patientData.referral_type;
+    if (patientData.referred_by_id) updatePayload.referred_by_id = patientData.referred_by_id;
+    if (patientData.referred_by_name) updatePayload.referred_by_name = patientData.referred_by_name;
+    if (patientData.last_visit_date || patientData.last_visit_at) {
+      updatePayload.last_visit_date = patientData.last_visit_date || patientData.last_visit_at;
+      updatePayload.last_visit_at = patientData.last_visit_at || patientData.last_visit_date;
+    }
+    if (patientData.has_no_allergies !== undefined) updatePayload.has_no_allergies = patientData.has_no_allergies;
+    if (patientData.allergies_list || patientData.allergies_medication) {
+      updatePayload.allergies_medication = patientData.allergies_list || patientData.allergies_medication;
+      updatePayload.allergies_list = patientData.allergies_list || patientData.allergies_medication;
+    }
+    if (patientData.allergy_notes) updatePayload.allergy_notes = patientData.allergy_notes;
     if (patientData.tenant_id) {
       updatePayload.tenant_id = patientData.tenant_id;
     }
@@ -254,11 +285,21 @@ export async function safeUpsertPatient(
     tenant_id: patientData.tenant_id || defaultTenantId,
     branch_id: defaultBranchId,
     branch_name: defaultBranchName,
+    branch: defaultBranchName,
     full_name: patientData.full_name || patientData.name || 'Paciente Audenti',
     email: cleanEmail,
     phone: cleanPhone,
     user_id: targetUserId,
     status: 'active',
+    has_no_allergies: patientData.has_no_allergies ?? true,
+    allergies_medication: patientData.allergies_list || patientData.allergies_medication || null,
+    allergies_list: patientData.allergies_list || patientData.allergies_medication || null,
+    allergy_notes: patientData.allergy_notes || null,
+    referral_type: patientData.referral_type || 'directo',
+    referred_by_id: patientData.referred_by_id || null,
+    referred_by_name: patientData.referred_by_name || patientData.referrer_name || null,
+    last_visit_date: patientData.last_visit_date || patientData.last_visit_at || new Date().toISOString(),
+    last_visit_at: patientData.last_visit_at || patientData.last_visit_date || new Date().toISOString(),
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   };

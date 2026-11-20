@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { executeAIAgent, AITaskDomain } from '@/lib/ai/router'
-import { inspectRequestSecurity } from '@/lib/security/ai-sentinel'
+import { inspectRequestSecurity, logSecurityThreat } from '@/lib/security/ai-sentinel'
+import { createClient } from '@/utils/supabase/server'
+import { isSystemAdminEmail, isInternalUser } from '@/lib/auth/admin-emails'
 
 export const runtime = 'nodejs'
 
@@ -8,6 +10,49 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     const { domain, prompt, contextData, userContext, patientContext, taskType, history, messages } = body
+
+    // 🛡️ VERIFICACIÓN ESTRICTA DE ROL Y SESIÓN EN SERVIDOR (Sin confiar en el cliente)
+    let verifiedRole = 'anonymous'
+    let verifiedEmail = ''
+    let verifiedUserId = null
+    let verifiedBranch = 'Sede Matriz — Jardín Balbuena'
+
+    try {
+      const serverSupabase = await createClient()
+      const { data: { user } } = await serverSupabase.auth.getUser()
+      if (user) {
+        verifiedUserId = user.id
+        verifiedEmail = (user.email || '').toLowerCase().trim()
+        const metaRole = (user.user_metadata?.role || user.app_metadata?.role || '').toLowerCase().trim()
+        if (isSystemAdminEmail(verifiedEmail) || metaRole === 'superadmin' || metaRole === 'owner') {
+          verifiedRole = 'superadmin'
+        } else if (isInternalUser(verifiedEmail, metaRole)) {
+          verifiedRole = metaRole || 'doctor'
+        } else {
+          verifiedRole = 'patient'
+        }
+        verifiedBranch = user.user_metadata?.branch_name || user.user_metadata?.branch || 'Sede Matriz — Jardín Balbuena'
+      }
+    } catch (authErr) {
+      console.warn('[AI Route] Nota autenticando sesión en servidor:', authErr)
+    }
+
+    // Detección de Suplantación o Escalación Arbitraria de Privilegios
+    const clientClaimedRole = (userContext?.role || '').toLowerCase().trim()
+    if (clientClaimedRole && (clientClaimedRole === 'superadmin' || clientClaimedRole === 'doctor' || clientClaimedRole === 'socio')) {
+      if (verifiedRole === 'anonymous' || verifiedRole === 'patient') {
+        const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown-client'
+        await logSecurityThreat({
+          identifier: clientIp,
+          threatType: 'SYSTEM_PROBE',
+          reason: `Intento de suplantación de rol detectado: El cliente declaró rol "${clientClaimedRole}" pero su sesión real es "${verifiedRole}".`,
+          riskScore: 90,
+          promptSnippet: String(prompt || '').slice(0, 100),
+          domain: String(domain || 'security'),
+          metadata: { clientClaimedRole, verifiedRole, verifiedEmail }
+        })
+      }
+    }
 
     // Soporte flexible para peticiones de router (domain) o peticiones legadas (taskType/prompt)
     const resolvedDomain = (domain || taskType || 'patient_chat') as AITaskDomain
@@ -112,12 +157,26 @@ export async function POST(request: Request) {
       }
     }
 
+    // Contexto enriquecido y blindado en servidor con rol y sucursal verificados
+    const effectiveContext = {
+      ...(contextData || patientContext || {}),
+      userContext: {
+        ...(userContext || {}),
+        role: verifiedRole,
+        email: verifiedEmail,
+        userId: verifiedUserId,
+        branch: verifiedBranch
+      },
+      verifiedRole,
+      verifiedBranch
+    }
+
     // Ejecutamos el enrutador de agentes especializados con historial y Function Calling
     const result = await executeAIAgent({
       domain: resolvedDomain,
       prompt: sanitizedPrompt,
       history: resolvedHistory.slice(-15), // Máximo 15 turnos para evitar desbordamiento de contexto
-      contextData: contextData || patientContext || userContext,
+      contextData: effectiveContext,
     })
 
     return NextResponse.json({

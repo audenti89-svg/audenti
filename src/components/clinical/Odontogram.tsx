@@ -104,14 +104,19 @@ export const TREATMENT_CATALOG: Record<DentalSpecialty, Array<{ name: string; co
     { name: 'Extracción Terceros Molares ($1,000 - $2,000)', cost: 1500, condition: 'extraccion_indicada' },
   ],
   implantes: [
+    { name: 'Fijación de Implante Titanio Quirúrgico', cost: 9500, condition: 'implante' },
+    { name: 'Pilar Transepitelial / Aditamento Protésico', cost: 1800, condition: 'implante' },
+    { name: 'Corona sobre Implante (Zirconia / Porcelana)', cost: 4500, condition: 'corona' },
     { name: 'Corona Metal-Porcelana', cost: 1800, condition: 'corona' },
-    { name: 'Corona Porcelana', cost: 2500, condition: 'corona' },
-    { name: 'Dentadura Completa', cost: 5000, condition: 'protesis' },
-    { name: 'Prótesis Parcial Removible', cost: 4000, condition: 'protesis' },
+    { name: 'Corona Porcelana Pura', cost: 2500, condition: 'corona' },
+    { name: 'Dentadura Completa (Placa Total Acrílica)', cost: 5000, condition: 'protesis' },
+    { name: 'Prótesis Parcial Removible (Bilateral)', cost: 4000, condition: 'protesis' },
+    { name: 'Guarda Oclusal / Férula Miorrelajante (Bruxismo)', cost: 800, condition: 'protesis' },
   ],
   ortodoncia: [
-    { name: 'Guarda (Bruxismo)', cost: 800, condition: 'bracket' },
+    { name: 'Guarda (Bruxismo) Acrílica Termocurada', cost: 800, condition: 'bracket' },
     { name: 'Protector Bucal Deportivo ($1,000 - $1,800)', cost: 1400, condition: 'bracket' },
+    { name: 'Retenedor Essix / Placa de Alineación', cost: 1200, condition: 'bracket' },
   ],
   periodoncia: [
     { name: 'Consulta Odontológica General', cost: 300, condition: 'sano' },

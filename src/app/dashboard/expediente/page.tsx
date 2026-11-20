@@ -43,11 +43,14 @@ import {
   DollarSign,
   Check,
   Info,
-  Building2
+  Building2,
+  Zap
 } from 'lucide-react'
 import { Odontogram } from '@/components/clinical/Odontogram'
 import { FamilyNucleusManager } from '@/components/clinical/FamilyNucleusManager'
 import { MedicalQuestionnaire } from '@/components/clinical/MedicalQuestionnaire'
+import { ClinicalRiskSemaphore } from '@/components/clinical/ClinicalRiskSemaphore'
+import { NervousSystemSection } from '@/components/clinical/NervousSystemSection'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
 import { QuickRegisterModal } from '@/components/clinical/QuickRegisterModal'
@@ -73,7 +76,10 @@ export default function ExpedientePage() {
   const [downloadingExport, setDownloadingExport] = useState<string | null>(null)
 
   // Pestaña activa del Panel Izquierdo (en modo doctor)
-  const [leftTab, setLeftTab] = useState<'patient' | 'agenda' | 'history' | 'questionnaire' | 'family'>('patient')
+  const [leftTab, setLeftTab] = useState<'patient' | 'agenda' | 'history' | 'questionnaire' | 'nervous' | 'family'>('patient')
+
+  // Modo de inicio de odontograma: Boca trabajada previa vs Limpio primera vez
+  const [initialMouthMode, setInitialMouthMode] = useState<'limpio_primera_vez' | 'trabajada_previa'>('trabajada_previa')
 
   // Agenda Diaria en Tiempo Real
   const [todayAppointments, setTodayAppointments] = useState<any[]>([])
@@ -1032,11 +1038,36 @@ export default function ExpedientePage() {
                   <ClipboardList className="w-3.5 h-3.5" />
                   <span>Anamnesis</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setLeftTab('nervous')}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                    leftTab === 'nervous'
+                      ? 'bg-cyan-400 text-slate-950 font-black shadow-xs'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>Sistema Nervioso</span>
+                </button>
               </div>
 
               {/* CONTENIDO SUB-TAB: PACIENTES ACTIVOS */}
               {leftTab === 'patient' && (
                 <div className="space-y-4 flex-1">
+                  {/* Semáforo de Riesgo y Alergias NOM-004 */}
+                  {selectedPatient && (
+                    <ClinicalRiskSemaphore
+                      allergies={selectedPatient.allergies_medication || selectedPatient.allergies}
+                      hasNoAllergies={selectedPatient.has_no_allergies || (!selectedPatient.allergies_medication && !selectedPatient.allergies)}
+                      allergyNotes={selectedPatient.allergy_notes || selectedPatient.notes}
+                      hasPainOrEmergency={Boolean(selectedPatient.has_pain_emergency || selectedPatient.notes?.toLowerCase().includes('dolor'))}
+                      hasStructuralRisk={Boolean(selectedPatient.notes?.toLowerCase().includes('fractura'))}
+                      hasNerveInvolvement={Boolean(selectedPatient.notes?.toLowerCase().includes('nervio') || selectedPatient.notes?.toLowerCase().includes('conductos'))}
+                    />
+                  )}
+
                   <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3">
                     <div className="flex items-center gap-3.5">
                       <div className="w-14 h-14 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center font-black text-lg shadow-lg ring-2 ring-amber-400/40">
@@ -1302,6 +1333,19 @@ export default function ExpedientePage() {
                   </div>
                 </div>
               )}
+
+              {/* CONTENIDO SUB-TAB: SISTEMA NERVIOSO E INERVACIÓN */}
+              {leftTab === 'nervous' && (
+                <div className="space-y-4 flex-1 overflow-y-auto max-h-[680px] pr-2 scrollbar-thin scrollbar-thumb-cyan-500/20 scrollbar-track-transparent">
+                  <NervousSystemSection
+                    patientId={selectedPatient?.id}
+                    patientName={selectedPatient?.full_name || selectedPatient?.name}
+                    doctorName={doctorProfile.name}
+                    branchName={selectedPatient?.branch_name || doctorProfile.branch}
+                    onRecordSaved={() => fetchPatientHistory(selectedPatient)}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
@@ -1321,7 +1365,35 @@ export default function ExpedientePage() {
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {/* Selector de Modo de Inicio de Expediente */}
+                  <div className="flex items-center p-1 bg-slate-950 rounded-xl border border-slate-700/80">
+                    <button
+                      type="button"
+                      onClick={() => setInitialMouthMode('trabajada_previa')}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
+                        initialMouthMode === 'trabajada_previa'
+                          ? 'bg-amber-400 text-slate-950 shadow-xs'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                      title="Registrar obturaciones y trabajos realizados externamente"
+                    >
+                      Boca Trabajada Previa
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInitialMouthMode('limpio_primera_vez')}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all cursor-pointer ${
+                        initialMouthMode === 'limpio_primera_vez'
+                          ? 'bg-cyan-400 text-slate-950 shadow-xs'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                      title="Expediente sin tratamientos previos (1ª Vez)"
+                    >
+                      Expediente Limpio (1ª Vez)
+                    </button>
+                  </div>
+
                   <span className="px-2.5 py-1 rounded-xl text-[10px] font-black uppercase bg-cyan-400/10 text-cyan-300 border border-cyan-400/30">
                     Rotación 360° &amp; Zoom
                   </span>

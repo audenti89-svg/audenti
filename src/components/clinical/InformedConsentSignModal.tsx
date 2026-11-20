@@ -256,7 +256,8 @@ export function InformedConsentSignModal({
                   ref={sigPadRef}
                   penColor="#0f172a"
                   canvasProps={{
-                    className: 'w-full h-44 cursor-crosshair',
+                    className: 'w-full h-44 cursor-crosshair touch-none select-none',
+                    style: { touchAction: 'none' },
                     width: 600,
                     height: 176
                   }}

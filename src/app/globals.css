@@ -154,3 +154,30 @@ nextjs-portal {
     opacity: 0.2;
   }
 }
+
+/* ======================================================== */
+/* Optimizaciones iOS (iPhone/iPad) & macOS (Safari/Chrome) */
+/* ======================================================== */
+/* 1. Prevenir auto-zoom molesto en inputs en Safari iOS al enfocar */
+@media screen and (max-width: 768px) {
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="password"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* 2. Scroll inercial suave y contención en ventanas glass / modales en WebKit */
+.overscroll-contain {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 3. Evitar gestos de scroll accidentales al firmar en pantallas táctiles / Apple Pencil */
+.touch-none {
+  touch-action: none !important;
+}
