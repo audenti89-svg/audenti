@@ -41,6 +41,8 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { PatientCalendarSchedule } from '@/components/patient/PatientCalendarSchedule';
 import { PatientAppointmentNotifications } from '@/components/patient/PatientAppointmentNotifications';
+import { AudentiVoiceAssistantCard } from '@/components/ai/AudentiVoiceAssistantCard';
+import { PatientSpeechContext } from '@/lib/assistantSpeech';
 import { PATIENT_VISIBILITY_CONFIG } from '@/config/role-visibility';
 import { UnifiedCommunicationWidget } from '@/components/chat/UnifiedCommunicationWidget';
 import { InformedConsentSignModal } from '@/components/clinical/InformedConsentSignModal';
@@ -613,6 +615,24 @@ export function PatientPortalView({
 
   const patientName = patient?.full_name || user?.user_metadata?.full_name || 'Paciente Audenti';
 
+  // Contexto para la Asistente de Voz Audenti 24/7 (personalizada según edad y citas)
+  const assistantVoiceContext: PatientSpeechContext = useMemo(() => {
+    const upcoming = appointments.find(a => a.status !== 'cancelled' && a.status !== 'completed');
+    return {
+      fullName: patientName,
+      birthDate: patient?.birth_date || profileForm.birthDate || null,
+      age: calculatedAge,
+      nextAppointment: upcoming ? {
+        date: upcoming.appointment_date,
+        time: upcoming.appointment_time,
+        treatment: upcoming.reason || upcoming.treatment_name || 'Consulta Dental Integral',
+        doctor: upcoming.doctor_name || 'la Dra. Aura Estudillo',
+        branch: branchInfo.name
+      } : null,
+      allergies: Array.isArray(patient?.allergies_medication) ? patient.allergies_medication : []
+    };
+  }, [patientName, patient, profileForm.birthDate, calculatedAge, appointments, branchInfo.name]);
+
   return (
     <div className="min-h-screen bg-[#040711] text-white selection:bg-amber-400 selection:text-slate-950 pb-24">
       {/* ── 1. HEADER INSTITUCIONAL EXCLUSIVO DEL PACIENTE ── */}
@@ -708,6 +728,9 @@ export function PatientPortalView({
       </div>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 space-y-6">
+        {/* ── ASISTENTE CONVERSACIONAL AUDENTI 24/7 CON VOZ INTELIGENTE POR EDAD ── */}
+        <AudentiVoiceAssistantCard context={assistantVoiceContext} />
+
         {/* ── 3. TARJETA DE BIENVENIDA Y SUCURSAL ASIGNADA ── */}
         <div className="bg-slate-950/90 border border-amber-500/30 rounded-3xl p-6 sm:p-7 shadow-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-6 backdrop-blur-xl relative overflow-hidden">
           <div className="absolute -top-16 -right-16 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />

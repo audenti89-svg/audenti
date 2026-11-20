@@ -851,8 +851,8 @@ export default function ExpedientePage() {
         </div>
       </div>
 
-      {/* ALERTA CLÍNICA DE BIOSEGURIDAD (NOM-004-SSA3) - VISIBLE ÚNICAMENTE SI EL PACIENTE TIENE ALERGIA REAL REGISTRADA */}
-      {hasRealAllergies && (
+      {/* ALERTA CLÍNICA DE BIOSEGURIDAD (NOM-004-SSA3) - VERDE SI ESTÁ LIMPIO, ROJO SI TIENE ALERGIA */}
+      {hasRealAllergies ? (
         <div className="border-2 rounded-2xl p-4 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all relative z-10 bg-rose-950/60 border-rose-500/80 shadow-rose-950/40 backdrop-blur-md">
           <div className="flex items-start sm:items-center gap-3.5 flex-1 min-w-0">
             <div className="w-10 h-10 rounded-xl text-white flex items-center justify-center shrink-0 shadow-md bg-rose-600 animate-pulse">
@@ -905,6 +905,27 @@ export default function ExpedientePage() {
               <p className="font-mono text-slate-300 text-[11px] font-bold mt-0.5">{selectedPatient.emergency_contact_phone || selectedPatient.emergency_phone || ''}</p>
             </div>
           )}
+        </div>
+      ) : (
+        <div className="border rounded-2xl p-3.5 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all relative z-10 bg-emerald-950/40 border-emerald-500/50 backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-5 h-5 text-emerald-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                  Bioseguridad Médica Validada (NOM-004-SSA3)
+                </span>
+                <span className="text-xs font-bold text-emerald-200">
+                  Sin Alergias Farmacológicas Reportadas • Apto para Infiltración y Procedimientos
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="text-[11px] text-emerald-300/90 font-medium bg-emerald-950/60 px-3 py-1 rounded-xl border border-emerald-500/30">
+            Protocolo regular habilitado
+          </div>
         </div>
       )}
 

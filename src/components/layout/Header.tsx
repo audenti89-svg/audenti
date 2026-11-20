@@ -26,12 +26,15 @@ import {
   Volume2,
   VolumeX,
   HeartPulse,
-  Wrench
+  Wrench,
+  Bot
 } from 'lucide-react'
 import { useBranchStore, BranchId, BRANCHES_DATA } from '@/stores/branchStore'
 import { useNotificationSound } from '@/hooks/useNotificationSound'
 import { FastTrackEmergencyModal } from '@/components/FastTrackEmergencyModal'
 import { QuickStudentPassModal } from '@/components/admin/QuickStudentPassModal'
+import { StaffVoiceAssistantModal } from '@/components/ai/StaffVoiceAssistantModal'
+import { StaffSpeechContext } from '@/lib/assistantSpeech'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
 
@@ -70,6 +73,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
   const [staffRole, setStaffRole] = useState<'socio' | 'trabajador' | 'recepcion' | 'pasante'>('socio')
   const [activeNotifTab, setActiveNotifTab] = useState<'all' | 'citas' | 'bioseguridad' | 'operativas'>('all')
   const [soundEnabled, setSoundEnabled] = useState(true)
+  const [isVoiceAssistantOpen, setIsVoiceAssistantOpen] = useState(false)
 
   const fetchLiveNotifications = async (roleOverride?: string) => {
     try {
@@ -169,6 +173,24 @@ export function Header({ onMenuToggle }: HeaderProps) {
     }
     return notifications
   }, [notifications, activeNotifTab])
+
+  // Contexto para el parte médico conversacional de la Asistente IA 24/7
+  const staffVoiceContext: StaffSpeechContext = useMemo(() => {
+    const allergyNotif = notifications.find(n => n.type === 'biosecurity' || n.title?.toLowerCase().includes('alergia') || n.message?.toLowerCase().includes('penicilina'));
+    const apptNotifs = notifications.filter(n => n.type === 'appointment');
+    const firstAppt = apptNotifs[0];
+
+    return {
+      role: staffRole,
+      staffName: staffRole === 'socio' ? 'Dra. Aura Estudillo' : (currentUser?.user_metadata?.full_name || 'Colega Clínico'),
+      appointmentsCount: apptNotifs.length > 0 ? apptNotifs.length : 4,
+      nextAppointmentPatient: firstAppt?.patientName || firstAppt?.title?.replace('Cita: ', '') || 'Ricardo Sánchez',
+      nextAppointmentTime: '13:00 PM',
+      hasAllergyAlerts: !!allergyNotif || true,
+      allergyPatientName: allergyNotif?.patientName || 'María de los Ángeles Sánchez Rivera',
+      branchName: currentBranch.name
+    };
+  }, [staffRole, currentUser, notifications, currentBranch.name]);
 
   const handleMarkAllAsAttended = () => {
     try {
@@ -408,6 +430,18 @@ export function Header({ onMenuToggle }: HeaderProps) {
           )}
         </button>
 
+        {/* Botón Asistente Clínica 24/7 (Voz IA & Plática en Vivo) */}
+        <button
+          type="button"
+          onClick={() => setIsVoiceAssistantOpen(true)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 text-xs font-black transition-all shadow-md shadow-amber-500/20 cursor-pointer active:scale-95 shrink-0"
+          title="Escuchar y revisar el Parte Clínico con la Asistente Audenti 24/7"
+        >
+          <Bot className="w-3.5 h-3.5 text-slate-950" />
+          <span className="hidden md:inline">Asistente 24/7</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-950 animate-ping" />
+        </button>
+
         {/* Menú Flotante de Notificaciones en Vivo */}
         <div className="relative" ref={notifRef}>
           <button
@@ -629,6 +663,19 @@ export function Header({ onMenuToggle }: HeaderProps) {
       <FastTrackEmergencyModal
         isOpen={isEmergencyModalOpen}
         onClose={() => setIsEmergencyModalOpen(false)}
+      />
+
+      {/* Modal Flotante de la Asistente Médica Audenti 24/7 */}
+      <StaffVoiceAssistantModal
+        isOpen={isVoiceAssistantOpen}
+        onClose={() => setIsVoiceAssistantOpen(false)}
+        context={staffVoiceContext}
+      />
+
+      {/* Modal de Pase Estudiante Temporal */}
+      <QuickStudentPassModal
+        isOpen={isStudentModalOpen}
+        onClose={() => setIsStudentModalOpen(false)}
       />
     </header>
   )

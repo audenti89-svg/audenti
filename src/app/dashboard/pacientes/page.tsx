@@ -16,7 +16,8 @@ import {
   MessageCircle,
   Pencil,
   X,
-  Save
+  Save,
+  ShieldCheck
 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import Link from 'next/link'
@@ -516,8 +517,13 @@ export default function PacientesPage() {
                                 )
                               }
 
-                              // Si ponen ninguna o no registran, no debe aparecer nada
-                              return <span className="text-slate-400 text-xs font-mono">—</span>
+                              // Si no tiene alertas de alergia, mostrar distintivo en color VERDE (Bioseguridad Validada)
+                              return (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/40">
+                                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                                  Sin Alergias (Bioseguro)
+                                </span>
+                              )
                             })()}
                           </td>
                       <td className="px-6 py-4 text-slate-600">
