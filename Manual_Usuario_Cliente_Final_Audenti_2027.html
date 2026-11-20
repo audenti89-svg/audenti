@@ -1,0 +1,1729 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manual Oficial de Usuario Final • Audenti Cloud Pro 2027</title>
+  <style>
+    /* ── RESET Y VARIABLES DE COLOR DE ALTO LUJO DENTAL ── */
+    :root {
+      --bg-dark: #070B14;
+      --bg-card: #0D1424;
+      --bg-card-hover: #131D33;
+      --bg-surface: #10192D;
+      --gold: #F59E0B;
+      --gold-light: #FBBF24;
+      --gold-dark: #B45309;
+      --emerald: #10B981;
+      --emerald-dark: #065F46;
+      --emerald-bg: rgba(16, 185, 129, 0.12);
+      --rose: #EF4444;
+      --rose-dark: #991B1B;
+      --rose-bg: rgba(239, 68, 68, 0.14);
+      --sky: #38BDF8;
+      --sky-bg: rgba(56, 189, 248, 0.12);
+      --text-main: #F1F5F9;
+      --text-muted: #94A3B8;
+      --text-soft: #CBD5E1;
+      --border-card: rgba(245, 158, 11, 0.22);
+      --border-subtle: #1E293B;
+      --shadow-gold: 0 10px 30px -10px rgba(245, 158, 11, 0.25);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      line-height: 1.65;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── LAYOUT PRINCIPAL: SIDEBAR + CONTENIDO ── */
+    .app-layout {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* Barra lateral de navegación */
+    .sidebar {
+      width: 320px;
+      background: #090E1B;
+      border-right: 1px solid var(--border-subtle);
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      transition: all 0.3s ease;
+    }
+
+    .sidebar-header {
+      padding: 24px 20px 16px 20px;
+      border-bottom: 1px solid var(--border-subtle);
+      background: linear-gradient(180deg, rgba(245, 158, 11, 0.08) 0%, transparent 100%);
+    }
+
+    .sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .brand-logo-badge {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #FBBF24, #D97706);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #070B14;
+      font-weight: 900;
+      font-size: 20px;
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+    }
+
+    .brand-title {
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      color: #FFFFFF;
+      line-height: 1.1;
+    }
+
+    .brand-subtitle {
+      font-size: 11px;
+      color: var(--gold);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .search-box-container {
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .search-input {
+      width: 100%;
+      background: #111A2E;
+      border: 1px solid #1E293B;
+      color: #FFFFFF;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 13px;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .search-input:focus {
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+    }
+
+    .sidebar-menu {
+      padding: 14px 10px 40px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      color: var(--text-soft);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .nav-item:hover {
+      background: #131E35;
+      color: var(--gold-light);
+      transform: translateX(3px);
+    }
+
+    .nav-item.active {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--gold-light);
+      border-left: 3px solid var(--gold);
+    }
+
+    .nav-item-num {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      background: #18233C;
+      color: var(--gold);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    /* Contenido Principal */
+    .main-content {
+      margin-left: 320px;
+      flex: 1;
+      padding: 40px 60px 100px 60px;
+      max-width: 1240px;
+    }
+
+    /* Botón flotante para imprimir o guardar PDF */
+    .floating-print-btn {
+      position: fixed;
+      bottom: 24px;
+      right: 28px;
+      background: linear-gradient(135deg, #F59E0B, #D97706);
+      color: #070B14;
+      font-weight: 900;
+      padding: 12px 22px;
+      border-radius: 50px;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 8px 24px rgba(245, 158, 11, 0.4);
+      z-index: 100;
+      transition: all 0.2s;
+      font-size: 14px;
+    }
+
+    .floating-print-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 30px rgba(245, 158, 11, 0.6);
+      background: #FBBF24;
+    }
+
+    /* ── SECCIONES Y ENCABEZADOS ── */
+    section {
+      margin-bottom: 70px;
+      scroll-margin-top: 30px;
+    }
+
+    .section-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--gold-light);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      padding: 4px 12px;
+      border-radius: 50px;
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 12px;
+    }
+
+    h1.doc-title {
+      font-size: 38px;
+      font-weight: 900;
+      letter-spacing: -1px;
+      color: #FFFFFF;
+      line-height: 1.15;
+      margin-bottom: 16px;
+    }
+
+    h2.section-title {
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      color: #FFFFFF;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    h3.block-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--gold-light);
+      margin: 24px 0 10px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    p.lead-text {
+      font-size: 17px;
+      color: var(--text-soft);
+      line-height: 1.7;
+      margin-bottom: 24px;
+    }
+
+    p.body-text {
+      color: var(--text-soft);
+      margin-bottom: 16px;
+      font-size: 15px;
+    }
+
+    /* ── TARJETAS Y CONTENEDORES VISUALES ── */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+      margin: 24px 0;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 18px;
+      padding: 24px;
+      position: relative;
+      transition: all 0.25s;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-3px);
+      background: var(--bg-card-hover);
+      border-color: var(--gold);
+      box-shadow: var(--shadow-gold);
+    }
+
+    .card-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--gold);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      margin-bottom: 16px;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: #FFFFFF;
+      margin-bottom: 8px;
+    }
+
+    .card-desc {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* ── PASOS NUMERADOS (PASO 1, PASO 2, PASO 3) ── */
+    .steps-container {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin: 20px 0;
+    }
+
+    .step-item {
+      display: flex;
+      gap: 16px;
+      background: #0E1627;
+      border: 1px solid #1E293B;
+      border-radius: 14px;
+      padding: 18px 20px;
+      align-items: flex-start;
+      transition: all 0.2s;
+    }
+
+    .step-item:hover {
+      border-color: rgba(245, 158, 11, 0.4);
+      background: #121C32;
+    }
+
+    .step-number {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: var(--gold);
+      color: #070B14;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+      box-shadow: 0 4px 10px rgba(245, 158, 11, 0.3);
+    }
+
+    .step-content {
+      flex: 1;
+    }
+
+    .step-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: #FFFFFF;
+      margin-bottom: 4px;
+    }
+
+    .step-desc {
+      font-size: 14px;
+      color: var(--text-soft);
+      line-height: 1.55;
+    }
+
+    /* ── RECUADROS DE ALERTA, CONSEJO Y CUIDADO ── */
+    .callout {
+      border-radius: 16px;
+      padding: 18px 22px;
+      margin: 20px 0;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .callout-icon {
+      font-size: 22px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .callout-content {
+      flex: 1;
+    }
+
+    .callout-title {
+      font-size: 14px;
+      font-weight: 800;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .callout-desc {
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    /* Variantes de callout */
+    .callout-tip {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #D1FAE5;
+    }
+    .callout-tip .callout-title { color: #34D399; }
+
+    .callout-warning {
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      color: #FEF3C7;
+    }
+    .callout-warning .callout-title { color: #FBBF24; }
+
+    .callout-alert {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.4);
+      color: #FEE2E2;
+    }
+    .callout-alert .callout-title { color: #F87171; }
+
+    .callout-info {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      color: #E0F2FE;
+    }
+    .callout-info .callout-title { color: #38BDF8; }
+
+    /* ── TABLAS ESTILIZADAS (CATÁLOGO Y PRECIOS) ── */
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+      margin: 24px 0;
+      border-radius: 16px;
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-card);
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 14px;
+    }
+
+    table.data-table th {
+      background: #111A2E;
+      color: var(--gold-light);
+      font-weight: 800;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.8px;
+      padding: 14px 18px;
+      border-bottom: 2px solid #1E293B;
+    }
+
+    table.data-table td {
+      padding: 14px 18px;
+      border-bottom: 1px solid #1A2337;
+      color: var(--text-soft);
+    }
+
+    table.data-table tbody tr:hover {
+      background: #121C32;
+    }
+
+    table.data-table td.price-cell {
+      font-weight: 900;
+      color: #34D399;
+      font-family: monospace;
+      font-size: 15px;
+    }
+
+    .badge-code {
+      display: inline-block;
+      background: #1E293B;
+      color: var(--text-main);
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 800;
+      font-family: monospace;
+    }
+
+    .badge-pediatric {
+      background: rgba(244, 114, 182, 0.15);
+      color: #F472B6;
+      border: 1px solid rgba(244, 114, 182, 0.3);
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    /* ── SEMÁFOROS Y BADGES DE ESTADO ── */
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .status-green { background: rgba(16, 185, 129, 0.2); color: #34D399; border: 1px solid #059669; }
+    .status-yellow { background: rgba(245, 158, 11, 0.2); color: #FBBF24; border: 1px solid #D97706; }
+    .status-red { background: rgba(239, 68, 68, 0.2); color: #F87171; border: 1px solid #DC2626; }
+    .status-blue { background: rgba(56, 189, 248, 0.2); color: #38BDF8; border: 1px solid #0284C7; }
+    .status-gray { background: rgba(148, 163, 184, 0.2); color: #94A3B8; border: 1px solid #475569; }
+
+    /* ── SECCIÓN FAQ ACORDEÓN ── */
+    .faq-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin: 20px 0;
+    }
+
+    .faq-card {
+      background: var(--bg-card);
+      border: 1px solid #1E293B;
+      border-radius: 14px;
+      overflow: hidden;
+      transition: all 0.2s;
+    }
+
+    .faq-question {
+      padding: 16px 20px;
+      font-weight: 800;
+      color: #FFFFFF;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 15px;
+      user-select: none;
+    }
+
+    .faq-question:hover {
+      background: #111B30;
+      color: var(--gold-light);
+    }
+
+    .faq-answer {
+      padding: 0 20px 18px 20px;
+      color: var(--text-soft);
+      font-size: 14px;
+      line-height: 1.6;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding-top: 14px;
+    }
+
+    /* ── ESTILOS DE IMPRESIÓN (PDF Y PAPEL) ── */
+    @media print {
+      body {
+        background: #FFFFFF !important;
+        color: #0F172A !important;
+        font-size: 12pt;
+      }
+      .sidebar, .floating-print-btn, .search-box-container {
+        display: none !important;
+      }
+      .main-content {
+        margin-left: 0 !important;
+        padding: 0 !important;
+        max-width: 100% !important;
+      }
+      .feature-card, .step-item, .callout, .table-container, .faq-card {
+        background: #F8FAFC !important;
+        color: #0F172A !important;
+        border: 1px solid #CBD5E1 !important;
+        box-shadow: none !important;
+        page-break-inside: avoid;
+      }
+      h1, h2, h3, .card-title, .step-title, .faq-question {
+        color: #0F172A !important;
+      }
+      .card-desc, .step-desc, .callout-desc, .body-text, .faq-answer {
+        color: #334155 !important;
+      }
+      table.data-table th {
+        background: #E2E8F0 !important;
+        color: #0F172A !important;
+      }
+      table.data-table td {
+        color: #0F172A !important;
+        border-color: #E2E8F0 !important;
+      }
+      table.data-table td.price-cell {
+        color: #065F46 !important;
+      }
+      section {
+        page-break-after: auto;
+      }
+    }
+
+    /* ── RESPONSIVIDAD PARA CELULARES Y TABLETS ── */
+    @media (max-width: 900px) {
+      .sidebar {
+        width: 100%;
+        position: relative;
+        height: auto;
+        border-right: none;
+        border-bottom: 2px solid var(--border-subtle);
+      }
+      .main-content {
+        margin-left: 0;
+        padding: 24px 18px 80px 18px;
+      }
+      .app-layout {
+        flex-direction: column;
+      }
+      h1.doc-title {
+        font-size: 28px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- BOTÓN FLOTANTE PARA IMPRIMIR O GENERAR PDF -->
+  <button class="floating-print-btn" onclick="window.print()" title="Imprimir este manual o guardarlo como PDF oficial">
+    🖨️ Imprimir / Guardar como PDF
+  </button>
+
+  <div class="app-layout">
+    <!-- BARRA LATERAL NAVEGADORA -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          <div class="brand-logo-badge">🦷</div>
+          <div>
+            <div class="brand-title">AUDENTI PRO</div>
+            <div class="brand-subtitle">Dra. Aura Estudillo</div>
+          </div>
+        </div>
+        <p style="font-size: 11px; color: #64748B;">Manual Oficial 2027 • Sin tecnicismos</p>
+      </div>
+
+      <div class="search-box-container">
+        <input 
+          type="text" 
+          id="manualSearch" 
+          class="search-input" 
+          placeholder="🔍 Buscar (ej. cita, abono, receta)..."
+          oninput="filtrarManual()"
+        >
+      </div>
+
+      <nav class="sidebar-menu" id="navigationMenu">
+        <a href="#capitulo-1" class="nav-item">
+          <span class="nav-item-num">1</span>
+          <span>Portada y Resumen Ejecutivo</span>
+        </a>
+        <a href="#capitulo-2" class="nav-item">
+          <span class="nav-item-num">2</span>
+          <span>Acceso y Roles del Equipo</span>
+        </a>
+        <a href="#capitulo-3" class="nav-item">
+          <span class="nav-item-num">3</span>
+          <span>Recepción y Agenda Sucursales</span>
+        </a>
+        <a href="#capitulo-4" class="nav-item">
+          <span class="nav-item-num">4</span>
+          <span>Expediente y Odontograma</span>
+        </a>
+        <a href="#capitulo-5" class="nav-item">
+          <span class="nav-item-num">5</span>
+          <span>Dra. Aura AI (Llamadas & Voz)</span>
+        </a>
+        <a href="#capitulo-6" class="nav-item">
+          <span class="nav-item-num">6</span>
+          <span>Finanzas, Caja y Costos 2</span>
+        </a>
+        <a href="#capitulo-7" class="nav-item">
+          <span class="nav-item-num">7</span>
+          <span>Reportes, Edades y Recall</span>
+        </a>
+        <a href="#capitulo-8" class="nav-item">
+          <span class="nav-item-num">8</span>
+          <span>Portal Móvil del Paciente</span>
+        </a>
+        <a href="#capitulo-9" class="nav-item">
+          <span class="nav-item-num">9</span>
+          <span>Preguntas Frecuentes (FAQ)</span>
+        </a>
+      </nav>
+    </aside>
+
+    <!-- CONTENIDO PRINCIPAL DEL MANUAL -->
+    <main class="main-content">
+
+      <!-- ======================================================== -->
+      <!-- CAPÍTULO 1: PORTADA Y RESUMEN EJECUTIVO -->
+      <!-- ======================================================== -->
+      <section id="capitulo-1">
+        <div class="section-badge">Capítulo 1 • Bienvenida a la Plataforma</div>
+        <h1 class="doc-title">Manual de Operación y Uso Clínico Audenti Cloud Pro 2027</h1>
+        <p class="lead-text">
+          Diseñado exclusivamente para la <strong>Dra. Aura Estudillo</strong> (Cédula Profesional 8492019), sus odontólogos especialistas, personal de recepción y equipo de apoyo en las sucursales <strong>Balbuena</strong> y <strong>Chalma de Guadalupe</strong>.
+        </p>
+
+        <div class="callout callout-tip">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <div class="callout-title">¿Qué hace Audenti Cloud Pro por tu clínica en 1 minuto?</div>
+            <div class="callout-desc">
+              Es el cerebro digital que organiza todo tu consultorio: agenda citas sin encimarse, lleva el expediente médico con odontograma 3D, calcula cobros con el tabulador oficial de precios (Costos 2), contesta llamadas y mensajes las 24 horas del día con inteligencia artificial, y avisa a los doctores sobre alertas de salud antes de tocar a un paciente. Todo sin papeleos ni pérdidas de dinero.
+            </div>
+          </div>
+        </div>
+
+        <h3 class="block-title">⭐ Los 5 Grandes Beneficios en tu Día a Día</h3>
+        <div class="card-grid">
+          <div class="feature-card">
+            <div class="card-icon">🎯</div>
+            <div class="card-title">1. Cero Pacientes Duplicados</div>
+            <div class="card-desc">
+              Si Don Ricardo o Aaron vuelven a llamar o escribir, el sistema reconoce su número o nombre de inmediato. Nunca habrá dos expedientes de la misma persona.
+            </div>
+          </div>
+
+          <div class="feature-card">
+            <div class="card-icon">⚡</div>
+            <div class="card-title">2. Citas y WhatsApp en 1 Clic</div>
+            <div class="card-desc">
+              Recepción ya no pierde tiempo redactando mensajes. Al agendar, se genera un mensaje de confirmación automático con sucursal, fecha y ubicación de mapa.
+            </div>
+          </div>
+
+          <div class="feature-card">
+            <div class="card-icon">🛡️</div>
+            <div class="card-title">3. Bioseguridad y Alergias (NOM-004)</div>
+            <div class="card-desc">
+              Si la Sra. María de los Ángeles es alérgica a la Penicilina, la pantalla brillará en rojo de alerta. Si un paciente no tiene alergias, brillará en verde esmeralda validado.
+            </div>
+          </div>
+
+          <div class="feature-card">
+            <div class="card-icon">💰</div>
+            <div class="card-title">4. Caja y Dinero Transparente</div>
+            <div class="card-desc">
+              Cada peso que entra en efectivo, tarjeta o transferencia queda registrado con recibo. Sabrás con exactitud cuánto cobró cada doctor y su comisión justa.
+            </div>
+          </div>
+
+          <div class="feature-card">
+            <div class="card-icon">🤖</div>
+            <div class="card-title">5. Asistente con Voz 24/7</div>
+            <div class="card-desc">
+              Atiende urgencias en la madrugada, clasifica con un semáforo si el paciente tiene dolor agudo y le da el parte médico matutino y vespertino al personal.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- CAPÍTULO 2: ACCESO Y ROLES DEL EQUIPO -->
+      <!-- ======================================================== -->
+      <section id="capitulo-2">
+        <div class="section-badge">Capítulo 2 • Control de Accesos y Seguridad</div>
+        <h2 class="section-title">👥 Guía de Acceso y Roles del Equipo</h2>
+        <p class="body-text">
+          Cada integrante de la clínica tiene una llave digital personalizada. El sistema sabe exactamente quién eres y te muestra únicamente lo que necesitas para tu trabajo, protegiendo la información confidencial.
+        </p>
+
+        <h3 class="block-title">📲 ¿Cómo Iniciar Sesión en Computadora o Celular?</h3>
+        <div class="steps-container">
+          <div class="step-item">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <div class="step-title">Ingresa a la dirección web oficial de Audenti</div>
+              <div class="step-desc">Abre tu navegador (Google Chrome o Safari en iPhone/Android) y escribe el enlace de tu clínica o toca el botón "Iniciar Sesión Médica" en la esquina superior derecha.</div>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <div class="step-title">Escribe tu correo y tu contraseña personal</div>
+              <div class="step-desc">Ejemplo: <code>dra.aura@audenti.mx</code> o tu correo autorizado. Tu contraseña se mantiene cifrada y segura.</div>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <div class="step-title">Haz clic en "Entrar al Sistema"</div>
+              <div class="step-desc">Se abrirá de inmediato tu pantalla de trabajo. Si estás en celular, aparecerá un aviso de <strong>"Instalar App Audenti"</strong> para tenerla como un icono directo en tu pantalla de inicio sin ocupar memoria.</div>
+            </div>
+          </div>
+        </div>
+
+        <h3 class="block-title">📋 ¿Quién Puede Ver Qué? (Tabla de Permisos por Rol)</h3>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Perfil / Puesto</th>
+                <th>¿Qué puede ver y hacer?</th>
+                <th>¿Qué tiene estrictamente prohibido?</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Dra. Aura Estudillo (Dirección / Dueña)</strong></td>
+                <td>Control total del 100%: ver ganancias globales, editar precios de Costos 2, autorizar pases de estudiantes, ver comisiones y expedientes de ambas sucursales.</td>
+                <td>Ninguna restricción. Es la administradora máxima.</td>
+              </tr>
+              <tr>
+                <td><strong>Odontólogo Socio / Especialista</strong></td>
+                <td>Su propia agenda, expedientes clínicos completos, odontograma 3D/2D, emitir recetas digitales oficiales y ver sus propias comisiones generadas.</td>
+                <td>No puede ver las comisiones de otros doctores ni cambiar la configuración general de la clínica.</td>
+              </tr>
+              <tr>
+                <td><strong>Odontólogo Colaborador (Trabajador)</strong></td>
+                <td>Atender a sus pacientes citados, registrar notas de evolución en el expediente y consultar su listado de tratamientos del día.</td>
+                <td>No puede alterar precios del tabulador ni ver estados financieros globales.</td>
+              </tr>
+              <tr>
+                <td><strong>Estudiante / Pasante (Servicio Social)</strong></td>
+                <td>Modo formativo: ver el expediente de su paciente asignado, aprender la historia clínica y apoyar en la preparación de gabinete.</td>
+                <td>No puede borrar pacientes, no puede tocar cobros ni caja, y no puede recetar medicamentos por sí solo.</td>
+              </tr>
+              <tr>
+                <td><strong>Recepción y Administración</strong></td>
+                <td>Dar de alta pacientes, agendar citas, confirmar por WhatsApp, cobrar consultas, registrar abonos y hacer el corte de caja diario.</td>
+                <td>No puede inventar ni modificar diagnósticos médicos, ni ver la evolución médica privada.</td>
+              </tr>
+              <tr>
+                <td><strong>Finanzas / Contador</strong></td>
+                <td>Ver ingresos en efectivo, tarjeta y transferencia, reportes de corte diario por sucursal y cálculo de comisiones.</td>
+                <td>No puede modificar expedientes clínicos ni recetas médicas.</td>
+              </tr>
+              <tr>
+                <td><strong>Asesor Legal / Abogado</strong></td>
+                <td>Auditar consentimientos informados firmados digitalmente y verificar que todo cumpla con la norma mexicana NOM-004-SSA3.</td>
+                <td>Solo lectura de respaldo legal. No interviene en la operación de citas.</td>
+              </tr>
+              <tr>
+                <td><strong>Personal de Limpieza</strong></td>
+                <td>Consultar los horarios de entrada, salida y tiempos libres entre pacientes para desinfectar sillones dentales y áreas comunes.</td>
+                <td>Bloqueo total a dinero y a datos de pacientes.</td>
+              </tr>
+              <tr>
+                <td><strong>Portal del Paciente (En su propio Celular)</strong></td>
+                <td>Ver su próxima cita con cuenta regresiva, recomendaciones previas de la doctora, sus recetas médicas y su odontograma personal.</td>
+                <td><strong>100% BLINDADO:</strong> Jamás puede ver dinero de la clínica, ni comisiones, ni notas privadas, ni expedientes de otros pacientes.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- CAPÍTULO 3: RECEPCIÓN Y AGENDA MULTI-SUCURSAL -->
+      <!-- ======================================================== -->
+      <section id="capitulo-3">
+        <div class="section-badge">Capítulo 3 • El Corazón Operativo de la Clínica</div>
+        <h2 class="section-title">📅 Operación Diaria en Recepción y Agenda</h2>
+        <p class="body-text">
+          La agenda es el reloj de la clínica. Te permite tener bajo control los sillones dentales de <strong>Sucursal Balbuena (Matriz)</strong> y <strong>Sucursal Chalma de Guadalupe</strong> sin confusiones.
+        </p>
+
+        <h3 class="block-title">🏢 ¿Cómo Cambiar de Sucursal en la Barra Superior?</h3>
+        <p class="body-text">
+          En la parte superior de la pantalla verás un botón con un ícono de edificio médico:
+        </p>
+        <div class="steps-container">
+          <div class="step-item">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <div class="step-title">Haz clic en el menú desplegable de Sucursal</div>
+              <div class="step-desc">Puedes elegir: <code>🏥 Sucursal Balbuena</code>, <code>🏥 Sucursal Chalma de Guadalupe</code> o <code>🌐 Todas las Sedes (Consolidado)</code>.</div>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <div class="step-title">La pantalla se adapta al instante</div>
+              <div class="step-desc">Al elegir Chalma de Guadalupe, la agenda solo te mostrará los pacientes y sillones de esa sede, filtrando los números de WhatsApp locales correspondientes.</div>
+            </div>
+          </div>
+        </div>
+
+        <h3 class="block-title">➕ ¿Cómo Agendar una Cita Nueva Paso a Paso?</h3>
+        <div class="steps-container">
+          <div class="step-item">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <div class="step-title">Toca el botón "+ Nueva Cita" o haz clic en el horario libre</div>
+              <div class="step-desc">Por ejemplo, el viernes a la 1:00 PM. Se abrirá una ventana limpia.</div>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <div class="step-title">Escribe el nombre o teléfono del paciente</div>
+              <div class="step-desc">Si escribes <code>Ricardo Sánchez</code>, la inteligencia del sistema lo encontrará de inmediato con su teléfono <code>5522427769</code> y evitará duplicarlo. Si es nuevo, escribe su nombre completo y número a 10 dígitos.</div>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <div class="step-title">Selecciona el tratamiento y el doctor</div>
+              <div class="step-desc">Elige del catálogo oficial Costos 2 (ejemplo: <em>Consulta Odontológica General</em> o <em>Profilaxis</em>) y asigna a la <strong>Dra. Aura Estudillo</strong> o al odontólogo de turno.</div>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-number">4</div>
+            <div class="step-content">
+              <div class="step-title">Guarda la cita y envía el WhatsApp</div>
+              <div class="step-desc">Al tocar "Confirmar y Agendar", la cita aparecerá en el calendario con su color correspondiente y se abrirá el botón verde de WhatsApp con el mensaje ya listo para enviar al paciente.</div>
+            </div>
+          </div>
+        </div>
+
+        <h3 class="block-title">🎨 Semáforo de Colores en la Agenda (Aprende a Leerla en 2 Segundos)</h3>
+        <div class="card-grid">
+          <div class="feature-card">
+            <span class="status-pill status-blue">🔵 Azul • Cita Programada</span>
+            <div class="card-desc" style="margin-top: 10px;">
+              El paciente tiene su espacio reservado pero aún faltan más de 24 horas para su consulta.
+            </div>
+          </div>
+
+          <div class="feature-card">
+            <span class="status-pill status-yellow">🟡 Amarillo • Pendiente de Confirmar</span>
+            <div class="card-desc" style="margin-top: 10px;">
+              Falta menos de un día. Recepción debe tocar el botón de WhatsApp para que el paciente confirme su asistencia.
+            </div>
+          </div>
+
+          <div class="feature-card">
+            <span class="status-pill status-green">🟢 Verde • Confirmado / En Sala</span>
+            <div class="card-desc" style="margin-top: 10px;">
+              El paciente ya confirmó o acaba de llegar a la clínica. El sillón dental está listo para recibirlo.
+            </div>
+          </div>
+
+          <div class="feature-card">
+            <span class="status-pill status-red">🔴 Rojo • Urgencia / Dolor Severo</span>
+            <div class="card-desc" style="margin-top: 10px;">
+              ¡Atención inmediata! Es un paciente con dolor agudo, hemorragia o traumatismo clasificado por la IA.
+            </div>
+          </div>
+
+          <div class="feature-card">
+            <span class="status-pill status-gray">⚪ Gris • Cita Concluida</span>
+            <div class="card-desc" style="margin-top: 10px;">
+              Tratamiento terminado, nota clínica registrada y cobro procesado en caja.
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-content">
+            <div class="callout-title">¿Cómo Reprogramar o Cancelar una Cita sin Romper Nada?</div>
+            <div class="callout-desc">
+              Solo haz clic sobre la cita del paciente. Toca <strong>"Reprogramar Fecha/Hora"</strong> para moverla de día, o <strong>"Cancelar con Motivo"</strong> (ej. <em>"Paciente avisó que tiene junta de trabajo"</em>). El sistema liberará el sillón dental de inmediato y registrará el motivo en su historial.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- CAPÍTULO 4: EXPEDIENTE CLÍNICO Y ODONTOGRAMA -->
+      <!-- ======================================================== -->
+      <section id="capitulo-4">
+        <div class="section-badge">Capítulo 4 • Expediente Electrónico NOM-004-SSA3</div>
+        <h2 class="section-title">🦷 Expediente Clínico Digital y Odontograma</h2>
+        <p class="body-text">
+          Olvida los expedientes de papel que se pierden o se manchan. Todo queda registrado digitalmente con validez legal mexicana bajo la norma estricta <strong>NOM-004-SSA3</strong>.
+        </p>
+
+        <h3 class="block-title">🚫 Alta de Paciente sin Duplicados (La Regla de Oro)</h3>
+        <p class="body-text">
+          Cuando llegue una persona por primera vez, toca el botón <strong>"+ Nuevo Paciente"</strong>. La plataforma analizará en tiempo real si el número de teléfono ya existe:
+        </p>
+        <div class="callout callout-info">
+          <div class="callout-icon">🔍</div>
+          <div class="callout-content">
+            <div class="callout-title">Ejemplo Real de Protección Antiduplicados</div>
+            <div class="callout-desc">
+              Si registras a <em>Don Ricardo Ulises Rayón Sánchez</em> con el teléfono <code>5522427769</code>, y tres días después alguien intenta registrarlo como <em>Ricardo Sánchez</em> con el mismo número, el sistema te avisará con una ventana dorada: <em>"¡Atención! Este paciente ya está registrado como Don Ricardo. ¿Deseas abrir su expediente existente en lugar de duplicarlo?"</em>. Esto mantiene tu base de datos impecable.
+            </div>
+          </div>
+        </div>
+
+        <h3 class="block-title">🎨 Odontograma Interactivo: ¿Cómo Marcar Dientes en 2D y 3D?</h3>
+        <p class="body-text">
+          En la pestaña <strong>"Odontograma"</strong> verás la dentadura completa del paciente dividida en cuadrantes. Puedes girar el modelo 3D o hacer clic directo sobre cualquier diente:
+        </p>
+
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Estado Dental</th>
+                <th>Color Visual</th>
+                <th>¿Qué significa en la clínica?</th>
+                <th>¿Cómo se aplica?</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Diente Sano</strong></td>
+                <td><span class="status-pill status-gray">⚪ Blanco Marfil</span></td>
+                <td>Diente natural en perfecto estado sin lesiones ni restauraciones.</td>
+                <td>Estado por defecto de cada pieza dental.</td>
+              </tr>
+              <tr>
+                <td><strong>Caries Activa</strong></td>
+                <td><span class="status-pill status-red">🔴 Rojo Carmesí</span></td>
+                <td>Cavidad o desmineralización que requiere tratamiento inmediato.</td>
+                <td>Toca la cara del diente (Oclusal, Mesial, Distal, Vestibular o Lingual) y selecciona "Caries".</td>
+              </tr>
+              <tr>
+                <td><strong>Resina / Calza Realizada</strong></td>
+                <td><span class="status-pill status-blue">🔵 Azul Marino</span></td>
+                <td>Restauración estética terminada con material compuesto fotocurable.</td>
+                <td>Selecciona la cara y toca "Resina". Quedará sellada en el historial.</td>
+              </tr>
+              <tr>
+                <td><strong>Diente Ausente</strong></td>
+                <td><span class="status-pill status-gray">🔘 Contorno / Fantasma</span></td>
+                <td>El paciente perdió la pieza anteriormente o nunca erupcionó.</td>
+                <td>Toca el botón rápido <strong>"Ausente"</strong>. El diente se volverá traslúcido con silueta tenue.</td>
+              </tr>
+              <tr>
+                <td><strong>Resto Radicular</strong></td>
+                <td><span class="status-pill status-red">🔻 Raíz Roja Aplanada</span></td>
+                <td>La corona del diente se fracturó y solo queda la raíz sepultada.</td>
+                <td>Toca <strong>"Resto Radicular"</strong>. En 3D se reducirá a la mitad y brillará en carmesí para alertar extracción.</td>
+              </tr>
+              <tr>
+                <td><strong>Tratamiento de Conductos</strong></td>
+                <td><span class="status-pill status-yellow">🟠 Naranja Gutapercha</span></td>
+                <td>Endodoncia realizada con sellado pulpar radicular.</td>
+                <td>Toca <strong>"Tratamiento de Conductos"</strong>. El diente se marcará en naranja endodóntico oficial.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="block-title">✍️ Consentimiento Informado con Firma en Pantalla</h3>
+        <p class="body-text">
+          Antes de cualquier cirugía, extracción o endodoncia, el paciente debe firmar su autorización médica:
+        </p>
+        <div class="steps-container">
+          <div class="step-item">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <div class="step-title">Abre la pestaña "Consentimiento Informado" en el expediente</div>
+              <div class="step-desc">Se generará la carta legal con el nombre de la <strong>Dra. Aura Estudillo</strong> y el procedimiento a realizar.</div>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <div class="step-title">Gira la tablet o el celular hacia el paciente</div>
+              <div class="step-desc">El paciente firma directamente con su dedo o lápiz táctil sobre el recuadro blanco en la pantalla.</div>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <div class="step-title">Toca "Guardar Firma Oficial"</div>
+              <div class="step-desc">El documento queda sellado con fecha, hora exacta y folio inalterable. Puedes imprimirlo o enviarlo por WhatsApp.</div>
+            </div>
+          </div>
+        </div>
+
+        <h3 class="block-title">💊 Recetas Médicas Digitales Oficiales</h3>
+        <p class="body-text">
+          En la pestaña <strong>"Recetas"</strong>, selecciona los medicamentos (amoxicilina, ibuprofeno, enjuagues), escribe las dosis (ej. <em>"Tomar cada 8 horas por 5 días"</em>) y presiona <strong>"Emitir Receta con Cédula 8492019"</strong>. Se genera un archivo PDF formal con membrete de Audenti que se envía en 1 segundo al WhatsApp del paciente.
+        </p>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- CAPÍTULO 5: DRA. AURA AI (ASISTENTE 24/7 & VOZ) -->
+      <!-- ======================================================== -->
+      <section id="capitulo-5">
+        <div class="section-badge">Capítulo 5 • La Asistente Inteligente de la Clínica</div>
+        <h2 class="section-title">🤖 Dra. Aura AI: Asistente 24/7 y Voz Humana</h2>
+        <p class="body-text">
+          Tu clínica nunca duerme. La Asistente Audenti AI responde llamadas y mensajes a las 2 de la madrugada, los domingos o días festivos, garantizando que ningún paciente se quede sin atención.
+        </p>
+
+        <h3 class="block-title">🚨 Semáforo de Urgencias Médicas (Clasificación de Llamadas)</h3>
+        <p class="body-text">
+          En la sección <strong>"Comunicación / Llamadas"</strong>, cada mensaje o llamada telefónica recibida se analiza con un semáforo inteligente de 3 colores:
+        </p>
+        <div class="card-grid">
+          <div class="feature-card" style="border-color: rgba(239, 68, 68, 0.4);">
+            <span class="status-pill status-red">🔴 ROJO • Urgencia Médica Prioritaria</span>
+            <div class="card-title" style="margin-top: 12px;">Dolor Intenso / Hemorragia / Accidente</div>
+            <div class="card-desc">
+              Ejemplo: <em>"Doctora, se me cayó una resina y me duele horrible al morder"</em>. La pantalla de la clínica emite un sonido de alerta y muestra el folio en pantalla para llamar al paciente de inmediato y asignarle un sillón.
+            </div>
+          </div>
+
+          <div class="feature-card" style="border-color: rgba(245, 158, 11, 0.4);">
+            <span class="status-pill status-yellow">🟡 AMARILLO • Pregunta Informativa</span>
+            <div class="card-title" style="margin-top: 12px;">Precios Costos 2 / Horarios / Ubicación</div>
+            <div class="card-desc">
+              Ejemplo: <em>"¿Cuánto cuesta la limpieza con ultrasonido y a qué hora abren en Chalma?"</em>. La IA le responde amablemente con el precio de $500 MXN del tabulador oficial y la dirección exacta.
+            </div>
+          </div>
+
+          <div class="feature-card" style="border-color: rgba(16, 185, 129, 0.4);">
+            <span class="status-pill status-green">🟢 VERDE • Paciente Listo para Agendar</span>
+            <div class="card-title" style="margin-top: 12px;">Reserva de Cita Preventiva</div>
+            <div class="card-desc">
+              Ejemplo: <em>"Quiero agendar una cita para mi hijo el próximo sábado"</em>. La IA toma sus datos, sugiere los horarios disponibles y le manda el enlace a recepción para autorizarlo.
+            </div>
+          </div>
+        </div>
+
+        <h3 class="block-title">🗣️ La Voz de la Asistente: Habla con Respeto según la Edad</h3>
+        <p class="body-text">
+          La asistente de voz no habla como un robot frío; se adapta a la persona con la que está conversando:
+        </p>
+        <div class="steps-container">
+          <div class="step-item">
+            <div class="step-number">👴</div>
+            <div class="step-content">
+              <div class="step-title">Adultos Mayores / Tercera Edad (60+ años)</div>
+              <div class="step-desc">
+                Habla con máximo respeto, calidez y afecto: <em>"Estimada Doña María de los Ángeles / Don Ricardo, muy buenos días. Qué gran alegría saludarle con el respeto de siempre. Le recuerdo que hoy tiene su cita con la Dra. Aura a la 1:00 PM. Venga con calma y ropa cómoda..."</em>.
+              </div>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-number">👔</div>
+            <div class="step-content">
+              <div class="step-title">Adultos (30 a 59 años)</div>
+              <div class="step-desc">
+                Trato formal, ejecutivo y enfocado en su tiempo: <em>"Buenas tardes, Don Ricardo. Le recordamos su cita a la 1:00 PM en Sucursal Chalma. Le sugerimos llegar 10 minutos antes para registrar sus signos vitales..."</em>.
+              </div>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-number">⚡</div>
+            <div class="step-content">
+              <div class="step-title">Jóvenes (13 a 29 años)</div>
+              <div class="step-desc">
+                Trato dinámico, fresco y motivador de tú: <em>"¡Hola Aaron! ¿Cómo estás? Te recuerdo tu cita hoy a la 1:00 PM con la Dra. Aura. Recuerda lavarte bien los dientes y llegar 5 minutitos antes. ¡Te esperamos!"</em>.
+              </div>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-number">🎈</div>
+            <div class="step-content">
+              <div class="step-title">Niños / Pediátrico (Menores de 13 años)</div>
+              <div class="step-desc">
+                Trato cariñoso, lúdico y sin miedo al dentista: <em>"¡Hola pequeño campeón! La Dra. Aura ya tiene listos los instrumentos mágicos para cuidar tus dientitos y dejarlos brillantes como los de un superhéroe..."</em>.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <h3 class="block-title">📋 Checklist Obligatorio para el Personal (Botón "Asistente 24/7" en el Header)</h3>
+        <p class="body-text">
+          Al tocar el botón dorado <strong>"Asistente 24/7"</strong> en la barra superior, la IA le dará al personal su parte clínico por voz y texto para que <strong>nada se les olvide</strong>:
+        </p>
+        <div class="card-grid">
+          <div class="feature-card">
+            <div class="card-title">🩺 Para la Dra. Aura Estudillo</div>
+            <div class="card-desc">
+              1. Verificar toma de presión arterial.<br>
+              2. Validar firma digital de consentimiento.<br>
+              3. Corroborar testigo biológico de autoclave en el instrumental antes de abrir.
+            </div>
+          </div>
+
+          <div class="feature-card">
+            <div class="card-title">💼 Para Recepción y Caja</div>
+            <div class="card-desc">
+              1. Solicitar credencial y confirmar WhatsApp.<br>
+              2. Validar cuestionario de bioseguridad al llegar.<br>
+              3. Cobrar y entregar recibo oficial.<br>
+              4. Ofrecer agua en sala y avisar a la asistente.
+            </div>
+          </div>
+
+          <div class="feature-card">
+            <div class="card-title">🥼 Para Pasantes y Asistentes</div>
+            <div class="card-desc">
+              1. Colocar barreras de plástico estériles en mangueras y lámpara.<br>
+              2. Montar charola con kit específico según el tratamiento.<br>
+              3. Colocar babero y gafas de protección al paciente antes de iniciar.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- CAPÍTULO 6: FINANZAS, CAJA Y TABULADOR COSTOS 2 -->
+      <!-- ======================================================== -->
+      <section id="capitulo-6">
+        <div class="section-badge">Capítulo 6 • Dinero, Cobros y Precios Oficiales</div>
+        <h2 class="section-title">💵 Finanzas, Caja y Tabulador Costos 2</h2>
+        <p class="body-text">
+          La claridad financiera es la paz mental de la clínica. Aquí aprenderás a cobrar, hacer presupuestos en segundos y cuadrar tu caja al final de cada turno.
+        </p>
+
+        <h3 class="block-title">📖 TABULADOR OFICIAL COMPLETO DE PRECIOS VIGENTES (Costos 2)</h3>
+        <p class="body-text">
+          Este es el catálogo oficial de los <strong>19 servicios autorizados</strong> por la Dra. Aura Estudillo, con precios al público, costos de materiales y tiempos de atención:
+        </p>
+
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Servicio Odontológico</th>
+                <th>Categoría</th>
+                <th>Precio al Paciente</th>
+                <th>Costo Insumos</th>
+                <th>Tiempo Sillón</th>
+                <th>Comisión Dr.</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="badge-code">TX-CONS-01</span></td>
+                <td><strong>Consulta Odontológica General</strong></td>
+                <td>Diagnóstico & Prevención</td>
+                <td class="price-cell">$300 MXN</td>
+                <td>$50 MXN</td>
+                <td>30 min</td>
+                <td>10%</td>
+              </tr>
+              <tr>
+                <td><span class="badge-code">TX-PREV-01</span></td>
+                <td><strong>Profilaxis con Ultrasonido (Limpieza)</strong></td>
+                <td>Diagnóstico & Prevención</td>
+                <td class="price-cell">$500 MXN</td>
+                <td>$80 MXN</td>
+                <td>45 min</td>
+                <td>10%</td>
+              </tr>
+              <tr>
+                <td><span class="badge-code">TX-OPER-01</span></td>
+                <td><strong>Resina Estética Fotocurable</strong></td>
+                <td>Operatoria & Estética</td>
+                <td class="price-cell">$400 - $600 MXN</td>
+                <td>$120 MXN</td>
+                <td>45 min</td>
+                <td>10%</td>
+              </tr>
+              <tr>
+                <td><span class="badge-code">TX-ENDO-01</span></td>
+                <td><strong>Endodoncia Dientes Posteriores (Molares)</strong></td>
+                <td>Endodoncia</td>
+                <td class="price-cell">$1,800 MXN</td>
+                <td>$350 MXN</td>
+                <td>75 min</td>
+                <td>12%</td>
+              </tr>
+              <tr>
+                <td><span class="badge-code">TX-ENDO-02</span></td>
+                <td><strong>Endodoncia Dientes Anteriores</strong></td>
+                <td>Endodoncia</td>
+                <td class="price-cell">$1,200 MXN</td>
+                <td>$250 MXN</td>
+                <td>60 min</td>
+                <td>12%</td>
+              </tr>
+              <tr>
+                <td><span class="badge-code">TX-CIRU-01</span></td>
+                <td><strong>Extracción Terceros Molares (Muelas del Juicio)</strong></td>
+                <td>Cirugía & Exodoncia</td>
+                <td class="price-cell">$1,000 - $2,000 MXN</td>
+                <td>$300 MXN</td>
+                <td>60 min</td>
+                <td>15%</td>
+              </tr>
+              <tr>
+                <td><span class="badge-code">TX-CIRU-02</span></td>
+                <td><strong>Extracción Dental Simple</strong></td>
+                <td>Cirugía & Exodoncia</td>
+                <td class="price-cell">$500 - $800 MXN</td>
+                <td>$120 MXN</td>
+                <td>45 min</td>
+                <td>10%</td>
+              </tr>
+              <tr>
+                <td><span class="badge-code">TX-PROT-01</span></td>
+                <td><strong>Corona Metal-Porcelana</strong></td>
+                <td>Prótesis & Rehabilitación</td>
+                <td class="price-cell">$1,800 MXN</td>
+                <td>$500 MXN</td>
+                <td>60 min</td>
+                <td>10%</td>
+              </tr>
+              <tr>
+                <td><span class="badge-code">TX-PROT-02</span></td>
+                <td><strong>Corona Libre de Metal (Porcelana Pura)</strong></td>
+                <td>Prótesis & Rehabilitación</td>
+                <td class="price-cell">$2,500 MXN</td>
+                <td>$700 MXN</td>
+                <td>60 min</td>
+                <td>10%</td>
+              </tr>
+              <tr>
+                <td><span class="badge-code">TX-PROT-03</span></td>
+                <td><strong>Dentadura Completa (Por Arcada)</strong></td>
+                <td>Prótesis & Rehabilitación</td>
+                <td class="price-cell">$5,000 MXN</td>
+                <td>$1,400 MXN</td>
+                <td>60 min</td>
+                <td>10%</td>
+              </tr>
+              <tr>
+                <td><span class="badge-code">TX-PROT-04</span></td>
+                <td><strong>Prótesis Parcial Removible</strong></td>
+                <td>Prótesis & Rehabilitación</td>
+                <td class="price-cell">$4,000 MXN</td>
+                <td>$1,100 MXN</td>
+                <td>60 min</td>
+                <td>10%</td>
+              </tr>
+              <tr>
+                <td><span class="badge-code">TX-FERU-01</span></td>
+                <td><strong>Guarda Oclusal para Bruxismo</strong></td>
+                <td>Férulas & Protectores</td>
+                <td class="price-cell">$800 MXN</td>
+                <td>$200 MXN</td>
+                <td>30 min</td>
+                <td>10%</td>
+              </tr>
+              <tr>
+                <td><span class="badge-code">TX-ESTE-01</span></td>
+                <td><strong>Blanqueamiento Dental Profesional</strong></td>
+                <td>Operatoria & Estética</td>
+                <td class="price-cell">$2,000 MXN</td>
+                <td>$400 MXN</td>
+                <td>60 min</td>
+                <td>10%</td>
+              </tr>
+              <tr>
+                <td><span class="badge-code">TX-FERU-02</span></td>
+                <td><strong>Protector Bucal Deportivo a la Medida</strong></td>
+                <td>Férulas & Protectores</td>
+                <td class="price-cell">$1,000 - $1,800 MXN</td>
+                <td>$300 MXN</td>
+                <td>30 min</td>
+                <td>10%</td>
+              </tr>
+              <tr>
+                <td><span class="badge-code">TX-PEDI-01</span></td>
+                <td><strong>Profilaxis y Flúor Infantil <span class="badge-pediatric">Niños</span></strong></td>
+                <td>Odontopediatría</td>
+                <td class="price-cell">$300 MXN</td>
+                <td>$60 MXN</td>
+                <td>30 min</td>
+                <td>10%</td>
+              </tr>
+              <tr>
+                <td><span class="badge-code">TX-PEDI-02</span></td>
+                <td><strong>Selladores de Fosetas y Fisuras (Cuadrante) <span class="badge-pediatric">Niños</span></strong></td>
+                <td>Odontopediatría</td>
+                <td class="price-cell">$400 MXN</td>
+                <td>$80 MXN</td>
+                <td>30 min</td>
+                <td>10%</td>
+              </tr>
+              <tr>
+                <td><span class="badge-code">TX-PEDI-03</span></td>
+                <td><strong>Resina Infantil (Diente Temporal) <span class="badge-pediatric">Niños</span></strong></td>
+                <td>Odontopediatría</td>
+                <td class="price-cell">$300 MXN</td>
+                <td>$70 MXN</td>
+                <td>30 min</td>
+                <td>10%</td>
+              </tr>
+              <tr>
+                <td><span class="badge-code">TX-PEDI-04</span></td>
+                <td><strong>Pulpotomía Infantil <span class="badge-pediatric">Niños</span></strong></td>
+                <td>Odontopediatría</td>
+                <td class="price-cell">$500 MXN</td>
+                <td>$120 MXN</td>
+                <td>45 min</td>
+                <td>12%</td>
+              </tr>
+              <tr>
+                <td><span class="badge-code">TX-PEDI-05</span></td>
+                <td><strong>Pulpectomía Infantil (Conductos Niños) <span class="badge-pediatric">Niños</span></strong></td>
+                <td>Odontopediatría</td>
+                <td class="price-cell">$800 MXN</td>
+                <td>$180 MXN</td>
+                <td>45 min</td>
+                <td>12%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 class="block-title">💳 ¿Cómo Registrar un Cobro o Abono en Caja?</h3>
+        <div class="steps-container">
+          <div class="step-item">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <div class="step-title">Ve a la pestaña "Finanzas" o haz clic en "Cobrar" en el expediente</div>
+              <div class="step-desc">Se abrirá la ventana de cobro con el nombre del paciente y su saldo actual.</div>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <div class="step-title">Ingresa la cantidad recibida y el método de pago</div>
+              <div class="step-desc">Elige entre: <code>💵 Efectivo</code>, <code>💳 Tarjeta Débito/Crédito</code> (anotando los últimos 4 dígitos del voucher) o <code>📲 Transferencia SPEI</code> (anotando la referencia).</div>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <div class="step-title">Toca "Procesar Cobro y Generar Recibo"</div>
+              <div class="step-desc">El sistema suma de inmediato el ingreso al corte del día de esa sucursal, descuenta el saldo pendiente del paciente y genera el recibo digital con botón para enviarlo a su WhatsApp.</div>
+            </div>
+          </div>
+        </div>
+
+        <h3 class="block-title">📊 ¿Cómo Hacer el Corte de Caja al Final del Día?</h3>
+        <p class="body-text">
+          Al terminar el turno de la tarde (8:00 PM), la recepcionista entra a <strong>"Corte de Caja Diario"</strong>:
+        </p>
+        <div class="callout callout-tip">
+          <div class="callout-icon">✨</div>
+          <div class="callout-content">
+            <div class="callout-title">El Cuadre Perfecto en 3 Pasos</div>
+            <div class="callout-desc">
+              1. Compara el efectivo en físico del cajón con el total de "Efectivo Reportado".<br>
+              2. Compara los vouchers de la terminal con el total de "Tarjetas Reportado".<br>
+              3. Toca el botón verde <strong>"Cerrar Caja del Día y Notificar a la Dra. Aura"</strong>. El sistema bloquea el día para que nadie pueda alterar números y envía el resumen financiero por correo a la dirección.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- CAPÍTULO 7: REPORTES, EDADES Y RECALL -->
+      <!-- ======================================================== -->
+      <section id="capitulo-7">
+        <div class="section-badge">Capítulo 7 • Crecimiento de la Clínica y Marketing</div>
+        <h2 class="section-title">📈 Reportes Demográficos, Referidos y Recall</h2>
+        <p class="body-text">
+          ¿Quieres saber qué servicios promocionar el próximo mes o qué pacientes llevan tiempo sin venir? La sección de reportes te da las respuestas en segundos.
+        </p>
+
+        <h3 class="block-title">🎂 Reporte de Pacientes por Rango de Edad</h3>
+        <p class="body-text">
+          En la pantalla <strong>"Reportes de Pacientes"</strong>, la plataforma clasifica automáticamente tu cartera de clientes:
+        </p>
+        <div class="card-grid">
+          <div class="feature-card">
+            <div class="card-title">🎈 Pacientes Infantiles (0 a 12 años)</div>
+            <div class="card-desc">Ideal para campañas escolares de flúor y selladores de fosetas en vacaciones de verano y regreso a clases.</div>
+          </div>
+
+          <div class="feature-card">
+            <div class="card-title">⚡ Jóvenes (13 a 29 años)</div>
+            <div class="card-desc">El público número uno para alineadores invisibles, brackets estéticos y blanqueamientos dentales.</div>
+          </div>
+
+          <div class="feature-card">
+            <div class="card-title">👔 Adultos (30 a 59 años)</div>
+            <div class="card-desc">Candidatos clave para resinas fotocurables, endodoncias y limpiezas con ultrasonido semestrales.</div>
+          </div>
+
+          <div class="feature-card">
+            <div class="card-title">🤍 Adultos Mayores (60+ años)</div>
+            <div class="card-desc">Atención enfocada en prótesis completas, parciales removibles y coronas de porcelana de alta biocompatibilidad.</div>
+          </div>
+        </div>
+
+        <h3 class="block-title">👥 Reporte de Referidos: ¿Quién te Trae Más Pacientes?</h3>
+        <p class="body-text">
+          Cada vez que das de alta un paciente, el sistema pregunta: <em>"¿Cómo se enteró de nosotros?"</em> (Familiar, Amigo, Código QR en folleto o Doctor externo). En este reporte puedes ver con gráficas quiénes son tus mejores embajadores para agradecerles o darles un beneficio especial.
+        </p>
+
+        <h3 class="block-title">🔄 Campañas de Reactivación (Recall de 6 Meses)</h3>
+        <p class="body-text">
+          El dinero más fácil de ganar es el de los pacientes que ya te conocen. La pantalla de <strong>Reactivación</strong> te muestra una lista con nombre y teléfono de todos los pacientes que llevan más de 6 meses sin visitarte. Con solo presionar el botón <strong>"Enviar Recordatorio de Limpieza Semestral"</strong>, el sistema les manda una invitación amable para revisar su sonrisa.
+        </p>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- CAPÍTULO 8: PORTAL MÓVIL DEL PACIENTE -->
+      <!-- ======================================================== -->
+      <section id="capitulo-8">
+        <div class="section-badge">Capítulo 8 • La Experiencia del Cliente en su Teléfono</div>
+        <h2 class="section-title">📱 Portal Exclusivo del Paciente</h2>
+        <p class="body-text">
+          Tus pacientes tendrán la clínica en la palma de su mano. Al escanear el código QR de la clínica o abrir su enlace de bienvenida, entran a su portal privado sin necesidad de descargar aplicaciones pesadas de tiendas.
+        </p>
+
+        <h3 class="block-title">👁️ ¿Qué Ve el Paciente en su Pantalla?</h3>
+        <div class="steps-container">
+          <div class="step-item">
+            <div class="step-number">1</div>
+            <div class="step-content">
+              <div class="step-title">Bienvenida con su Asistente de Voz Personal</div>
+              <div class="step-desc">
+                Si Don Ricardo entra, verá: <em>"¡Bienvenido, Don Ricardo!"</em> y un botón dorado para <strong>"Escuchar a tu Asistente"</strong>, la cual le dirá en voz alta cuándo es su cita y le recordará: <em>"Recuerda realizar un cepillado dental minucioso antes de salir de casa..."</em>.
+              </div>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-number">2</div>
+            <div class="step-content">
+              <div class="step-title">Reloj de Cuenta Regresiva para su Cita</div>
+              <div class="step-desc">
+                Muestra con claridad cuántos días, horas y minutos faltan para su consulta, con la sucursal asignada (Balbuena o Chalma) y un botón de <strong>"Abrir mapa de cómo llegar"</strong>.
+              </div>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-number">3</div>
+            <div class="step-content">
+              <div class="step-title">Bandeja de Recetas Médicas Digitales</div>
+              <div class="step-desc">
+                Si la doctora le recetó medicamentos, el paciente puede abrir su receta en PDF las 24 horas y mostrarla directamente en cualquier farmacia.
+              </div>
+            </div>
+          </div>
+
+          <div class="step-item">
+            <div class="step-number">4</div>
+            <div class="step-content">
+              <div class="step-title">Su Odontograma Personal</div>
+              <div class="step-desc">
+                Puede ver qué dientes ya tiene sanos y qué tratamientos le faltan para completar su sonrisa, motivándolo a regresar a sus citas.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-tip">
+          <div class="callout-icon">🔒</div>
+          <div class="callout-content">
+            <div class="callout-title">Garantía de Privacidad y Blindaje Financiero</div>
+            <div class="callout-desc">
+              Puedes estar 100% tranquila: el Portal del Paciente está completamente aislado del sistema interno. <strong>Ningún paciente puede ver jamás los precios de laboratorio, las ganancias de la clínica, los cobros a otros pacientes ni las notas médicas confidenciales</strong> que la Dra. Aura anota para su equipo.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- CAPÍTULO 9: PREGUNTAS FRECUENTES (FAQ) -->
+      <!-- ======================================================== -->
+      <section id="capitulo-9">
+        <div class="section-badge">Capítulo 9 • Guía Rápida de Solución de Problemas</div>
+        <h2 class="section-title">❓ Preguntas Frecuentes: "¿Qué Hago Si...?"</h2>
+        <p class="body-text">
+          Respuestas inmediatas a las situaciones más comunes del día a día en el consultorio:
+        </p>
+
+        <div class="faq-container">
+          <div class="faq-card">
+            <div class="faq-question" onclick="toggleFaq(this)">
+              <span>¿Qué hago si olvidé mi contraseña de acceso?</span>
+              <span>▼</span>
+            </div>
+            <div class="faq-answer">
+              En la pantalla de inicio de sesión, toca el enlace que dice <strong>"¿Olvidaste tu contraseña?"</strong>. Escribe tu correo electrónico y recibirás en 1 minuto un enlace seguro para crear una contraseña nueva. También la Dra. Aura puede restablecer tu acceso desde el panel administrativo.
+            </div>
+          </div>
+
+          <div class="faq-card">
+            <div class="faq-question" onclick="toggleFaq(this)">
+              <span>¿Qué hago si un paciente llegó a la sucursal equivocada?</span>
+              <span>▼</span>
+            </div>
+            <div class="faq-answer">
+              No te preocupes. En la barra superior, cambia a la sucursal donde está físicamente el paciente. Abre su cita, toca <strong>"Cambiar Sucursal de Atención"</strong> y selecciona la sede actual. El sistema transferirá el expediente en 1 segundo para que la doctora de esa sede pueda atenderlo de inmediato.
+            </div>
+          </div>
+
+          <div class="faq-card">
+            <div class="faq-question" onclick="toggleFaq(this)">
+              <span>¿Qué hago si se va el internet momentáneamente en la clínica?</span>
+              <span>▼</span>
+            </div>
+            <div class="faq-answer">
+              Audenti Cloud Pro cuenta con memoria local segura (PWA). La pantalla continuará funcionando para consultar la agenda del día. En cuanto regrese la conexión de internet o compartas datos desde tu celular por 10 segundos, todos los cambios se guardarán automáticamente en la nube sin perder un solo dato.
+            </div>
+          </div>
+
+          <div class="faq-card">
+            <div class="faq-question" onclick="toggleFaq(this)">
+              <span>¿Cómo descargo un reporte de pacientes o de dinero en Excel o PDF?</span>
+              <span>▼</span>
+            </div>
+            <div class="faq-answer">
+              En cualquiera de las pantallas de Reportes o Finanzas, verás en la esquina superior derecha un botón verde que dice <strong>"Exportar a Excel / CSV"</strong> y un botón rojo que dice <strong>"Descargar PDF"</strong>. Al tocarlo, el archivo se descargará de inmediato en tu computadora o teléfono listo para abrirse o imprimirse.
+            </div>
+          </div>
+
+          <div class="faq-card">
+            <div class="faq-question" onclick="toggleFaq(this)">
+              <span>¿Cómo atiendo una urgencia de dolor que llega sin cita previa?</span>
+              <span>▼</span>
+            </div>
+            <div class="faq-answer">
+              Toca el botón rojo brillante en el encabezado que dice <strong>"Triage Urgencias"</strong>. Ingresa el nombre del paciente, selecciona el síntoma (ej. dolor agudo o fractura) y presiona <strong>"Ingreso Inmediato"</strong>. El sistema abrirá un espacio prioritario en el sillón dental disponible sin borrar ninguna cita programada.
+            </div>
+          </div>
+
+          <div class="faq-card">
+            <div class="faq-question" onclick="toggleFaq(this)">
+              <span>¿Cómo modifico el número de teléfono o datos de un paciente?</span>
+              <span>▼</span>
+            </div>
+            <div class="faq-answer">
+              Entra a <strong>"Pacientes"</strong>, busca su nombre y toca el ícono del lápiz amarillo <strong>"Editar"</strong>. Corrige el teléfono o la dirección y presiona <strong>"Guardar Cambios"</strong>. Se actualizará en el expediente, en la agenda y en los envíos de WhatsApp automáticamente.
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-warning" style="margin-top: 40px;">
+          <div class="callout-icon">📞</div>
+          <div class="callout-content">
+            <div class="callout-title">Soporte Técnico y Atención a la Clínica</div>
+            <div class="callout-desc">
+              Si tienes cualquier duda operativa adicional o requieres agregar una función nueva a la plataforma, tu sistema cuenta con soporte técnico prioritario 24/7 disponible directamente desde el botón de ayuda de tu plataforma.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PIE DE PÁGINA DEL MANUAL -->
+      <footer style="margin-top: 80px; padding-top: 24px; border-top: 1px solid var(--border-subtle); color: #64748B; font-size: 13px; text-align: center;">
+        <p><strong>Audenti Cloud Pro 2027</strong> • Documento Oficial para la Clínica Dental de la Dra. Aura Estudillo.</p>
+        <p style="margin-top: 4px;">Sucursal Balbuena & Sucursal Chalma de Guadalupe • Todos los derechos reservados.</p>
+      </footer>
+
+    </main>
+  </div>
+
+  <!-- SCRIPT PARA BÚSQUEDA INTERACTIVA Y COLAPSO DE FAQ -->
+  <script>
+    function toggleFaq(element) {
+      const card = element.parentElement;
+      const answer = card.querySelector('.faq-answer');
+      const arrow = element.querySelector('span:last-child');
+      
+      if (answer.style.display === 'none' || !answer.style.display) {
+        answer.style.display = 'block';
+        arrow.textContent = '▲';
+      } else {
+        answer.style.display = 'none';
+        arrow.textContent = '▼';
+      }
+    }
+
+    // Inicializar respuestas de FAQ visibles
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('.faq-answer').forEach(ans => ans.style.display = 'block');
+    });
+
+    function filtrarManual() {
+      const input = document.getElementById('manualSearch');
+      const filter = input.value.toLowerCase().trim();
+      const sections = document.querySelectorAll('main section');
+      
+      sections.forEach(sec => {
+        const text = sec.innerText.toLowerCase();
+        if (filter === '' || text.includes(filter)) {
+          sec.style.display = 'block';
+        } else {
+          sec.style.display = 'none';
+        }
+      });
+    }
+
+    // Resaltar elemento activo en el menú lateral al hacer scroll
+    window.addEventListener('scroll', () => {
+      const sections = document.querySelectorAll('main section');
+      const navLinks = document.querySelectorAll('.sidebar-menu .nav-item');
+      let currentSection = '';
+
+      sections.forEach(section => {
+        const sectionTop = section.offsetTop - 120;
+        if (window.pageYOffset >= sectionTop) {
+          currentSection = section.getAttribute('id');
+        }
+      });
+
+      navLinks.forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href') === '#' + currentSection) {
+          link.classList.add('active');
+        }
+      });
+    });
+  </script>
+</body>
+</html>
