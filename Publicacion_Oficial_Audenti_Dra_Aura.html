@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Publicación Oficial • Clínica Dental Dra. Aura Estudillo</title>
+  <!-- html2canvas para exportación instantánea en alta resolución sin pérdida de calidad -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <!-- qrcodejs para renderizado SVG vectorial 100% nítido del QR oficial -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    :root {
+      --bg-dark: #070b14;
+      --card-bg: #0d1527;
+      --card-border: #1e293b;
+      --gold: #f59e0b;
+      --gold-light: #fbbf24;
+      --gold-dark: #b45309;
+      --cyan: #38bdf8;
+      --cyan-light: #7dd3fc;
+      --emerald: #10b981;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-family);
+      background-color: #030712;
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 60px 16px;
+    }
+
+    /* ── BARRA SUPERIOR DE HERRAMIENTAS Y EXPORTACIÓN ── */
+    .toolbar {
+      width: 100%;
+      max-width: 900px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      border-radius: 20px;
+      padding: 14px 20px;
+      margin-bottom: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+
+    .toolbar-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--gold-light);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 8px 16px;
+      border-radius: 12px;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+    }
+
+    .btn-gold {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      color: #030712;
+      box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35);
+    }
+
+    .btn-gold:hover {
+      background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: #1e293b;
+      color: #e2e8f0;
+      border: 1px solid #334155;
+    }
+
+    .btn-secondary:hover {
+      background: #334155;
+      color: #ffffff;
+    }
+
+    .format-selector {
+      background: #0b1120;
+      color: #94a3b8;
+      border: 1px solid #334155;
+      padding: 6px 12px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      outline: none;
+      cursor: pointer;
+    }
+
+    /* ── LIENZO PRINCIPAL DE LA PUBLICACIÓN (PIEZA VISUAL) ── */
+    #flyer-canvas {
+      width: 100%;
+      max-width: 680px;
+      background: radial-gradient(circle at 50% 0%, #172554 0%, #090d1a 50%, #05070e 100%);
+      border: 1.5px solid rgba(245, 158, 11, 0.4);
+      border-radius: 28px;
+      padding: 44px 36px;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.8), 0 0 40px rgba(245, 158, 11, 0.1);
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+
+    /* Efectos de Iluminación y Marca de Agua Quirúrgica */
+    .glow-sphere-gold {
+      position: absolute;
+      top: -120px;
+      right: -80px;
+      width: 320px;
+      height: 320px;
+      background: radial-gradient(circle, rgba(245, 158, 11, 0.18) 0%, rgba(245, 158, 11, 0) 70%);
+      pointer-events: none;
+    }
+
+    .glow-sphere-cyan {
+      position: absolute;
+      bottom: -100px;
+      left: -80px;
+      width: 320px;
+      height: 320px;
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.14) 0%, rgba(56, 189, 248, 0) 70%);
+      pointer-events: none;
+    }
+
+    /* Encabezado Institucional */
+    .flyer-header {
+      text-align: center;
+      position: relative;
+      z-index: 2;
+      margin-bottom: 28px;
+    }
+
+    .badge-clinical {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 9999px;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      color: var(--gold-light);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+    }
+
+    .doctor-title {
+      font-size: 28px;
+      font-weight: 900;
+      color: #ffffff;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+      margin-bottom: 6px;
+    }
+
+    .doctor-subtitle {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--gold);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .cedula-badge {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: monospace;
+      font-weight: 600;
+    }
+
+    /* Frase de Confianza y Filosofía Clínica */
+    .value-statement {
+      text-align: center;
+      background: rgba(13, 21, 39, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .value-statement p {
+      font-size: 13.5px;
+      color: #e2e8f0;
+      line-height: 1.6;
+      font-weight: 500;
+    }
+
+    /* Grilla de Sedes Oficiales */
+    .branches-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 26px;
+      position: relative;
+      z-index: 2;
+    }
+
+    @media (max-width: 580px) {
+      .branches-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .branch-card {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 18px;
+      padding: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .branch-card.matriz {
+      border-color: rgba(245, 158, 11, 0.35);
+      background: linear-gradient(145deg, rgba(245, 158, 11, 0.06) 0%, rgba(15, 23, 42, 0.8) 100%);
+    }
+
+    .branch-card.norte {
+      border-color: rgba(56, 189, 248, 0.35);
+      background: linear-gradient(145deg, rgba(56, 189, 248, 0.06) 0%, rgba(15, 23, 42, 0.8) 100%);
+    }
+
+    .branch-tag {
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .branch-tag.matriz { color: var(--gold-light); }
+    .branch-tag.norte { color: var(--cyan); }
+
+    .branch-name {
+      font-size: 14px;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+
+    .branch-desc {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* ── SECCIÓN PROTEGIDA Y SAGRADA DEL CÓDIGO QR ── */
+    .qr-sacred-container {
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.9) 0%, rgba(7, 11, 20, 0.95) 100%);
+      border: 2px solid var(--gold);
+      border-radius: 24px;
+      padding: 24px 20px;
+      text-align: center;
+      position: relative;
+      z-index: 2;
+      box-shadow: 0 12px 30px -8px rgba(245, 158, 11, 0.25);
+      margin-bottom: 24px;
+    }
+
+    .qr-header-title {
+      font-size: 16px;
+      font-weight: 900;
+      color: #ffffff;
+      margin-bottom: 4px;
+      letter-spacing: -0.01em;
+    }
+
+    .qr-instructions {
+      font-size: 12px;
+      color: var(--text-muted);
+      max-width: 440px;
+      margin: 0 auto 16px auto;
+      line-height: 1.5;
+    }
+
+    /* Contenedor blanco con Quiet Zone reglamentaria (Margen protegido sin distorsión) */
+    .qr-quiet-zone {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #ffffff !important;
+      padding: 16px;
+      border-radius: 20px;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+      margin: 0 auto;
+      position: relative;
+      border: 3px solid rgba(245, 158, 11, 0.6);
+    }
+
+    /* Dimensiones fijas para nitidez matemática perfecta del QR */
+    #qrcode-display {
+      width: 180px;
+      height: 180px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #qrcode-display img,
+    #qrcode-display canvas,
+    #qrcode-display svg {
+      width: 180px !important;
+      height: 180px !important;
+      display: block;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    .qr-footer-note {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--gold-light);
+      margin-top: 14px;
+      letter-spacing: 0.04em;
+    }
+
+    /* Pilar de Beneficios / Servicios Oficiales */
+    .services-pills {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      position: relative;
+      z-index: 2;
+      margin-bottom: 24px;
+    }
+
+    .service-pill {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 5px 12px;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      color: #cbd5e1;
+    }
+
+    /* Pie de la Publicación */
+    .flyer-footer {
+      text-align: center;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 18px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .footer-text-primary {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .footer-text-secondary {
+      font-size: 10px;
+      color: #64748b;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    /* ── MODO IMPRESIÓN Y CAPTURA ── */
+    @media print {
+      body {
+        background: #ffffff !important;
+        color: #000000 !important;
+        padding: 0;
+      }
+      .toolbar {
+        display: none !important;
+      }
+      #flyer-canvas {
+        box-shadow: none !important;
+        border: 2px solid #000000 !important;
+        max-width: 100% !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+      }
+      .doctor-title, .qr-header-title, .branch-name {
+        color: #000000 !important;
+      }
+      .value-statement, .branch-card, .qr-sacred-container {
+        background: #f8fafc !important;
+        border-color: #cbd5e1 !important;
+        color: #0f172a !important;
+      }
+      .value-statement p, .branch-desc, .qr-instructions, .footer-text-primary {
+        color: #334155 !important;
+      }
+      .badge-clinical, .qr-quiet-zone {
+        border-color: #0f172a !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- BARRA DE CONTROL Y EXPORTACIÓN ULTRA-HD -->
+  <header class="toolbar">
+    <div class="toolbar-title">
+      <span>✦</span>
+      <span>Pieza Visual Oficial • Clínica Dra. Aura Estudillo</span>
+    </div>
+
+    <div class="toolbar-actions">
+      <!-- Selector de imagen local del QR si se desea sustituir sin tocar código -->
+      <label class="btn btn-secondary" title="Cargar imagen existente del QR si cuentas con el archivo PNG/JPG">
+        <span>Subir QR Propio (PNG/JPG)</span>
+        <input type="file" id="qr-file-input" accept="image/*" style="display: none;">
+      </label>
+
+      <!-- Botón de Restaurar QR Original Vectorial -->
+      <button type="button" class="btn btn-secondary" onclick="restoreOfficialQR()" title="Restablecer el QR oficial vectorial de Audenti Web">
+        ↺ QR Oficial Web
+      </button>
+
+      <!-- Botón de Impresión / Guardar PDF -->
+      <button type="button" class="btn btn-secondary" onclick="window.print()">
+        🖨️ Imprimir / PDF
+      </button>
+
+      <!-- Botón Principal: Exportar a Imagen PNG 4K para WhatsApp y Redes Sociales -->
+      <button type="button" class="btn btn-gold" onclick="exportToImage()">
+        📥 Descargar Imagen (PNG Alta Nitidez)
+      </button>
+    </div>
+  </header>
+
+  <!-- LIENZO DE LA PUBLICACIÓN VISUAL (ESTRUCTURA DE ALTA DEFINICIÓN) -->
+  <main id="flyer-canvas">
+    <!-- Esferas de Iluminación Ambiental Quirúrgica -->
+    <div class="glow-sphere-gold"></div>
+    <div class="glow-sphere-cyan"></div>
+
+    <!-- 1. ENCABEZADO INSTITUCIONAL -->
+    <section class="flyer-header">
+      <div class="badge-clinical">
+        Odontología Integral &amp; Estética Biomimética
+      </div>
+
+      <h1 class="doctor-title">
+        Dra. Aura Estudillo
+      </h1>
+
+      <div class="doctor-subtitle">
+        Dirección Médica &amp; Rehabilitación Oral
+      </div>
+
+      <div class="cedula-badge">
+        Cédula Profesional Oficial: 8492019
+      </div>
+    </section>
+
+    <!-- 2. DECLARACIÓN DE CONFIANZA Y ÉTICA CLÍNICA -->
+    <section class="value-statement">
+      <p>
+        Atención dental personalizada, rigurosa bioseguridad quirúrgica y calidez humana. Diagnósticos certeros con tecnología digital para cuidar la salud y armonía de tu sonrisa.
+      </p>
+    </section>
+
+    <!-- 3. SEDES CLÍNICAS OFICIALES -->
+    <section class="branches-grid">
+      <article class="branch-card matriz">
+        <div class="branch-tag matriz">
+          <span>●</span>
+          <span>Sede Matriz</span>
+        </div>
+        <h2 class="branch-name">Jardín Balbuena</h2>
+        <p class="branch-desc">
+          Atención exclusiva con cita previa programada a través de nuestra App Web oficial.
+        </p>
+      </article>
+
+      <article class="branch-card norte">
+        <div class="branch-tag norte">
+          <span>●</span>
+          <span>Sede Norte</span>
+        </div>
+        <h2 class="branch-name">Chalma de Guadalupe</h2>
+        <p class="branch-desc">
+          Atención personalizada y procedimientos clínicos bajo estricto control de agenda digital.
+        </p>
+      </article>
+    </section>
+
+    <!-- 4. CONTENEDOR SAGRADO Y PROTEGIDO PARA EL CÓDIGO QR -->
+    <section class="qr-sacred-container">
+      <h3 class="qr-header-title">
+        Agenda tu Consulta en Línea
+      </h3>
+
+      <p class="qr-instructions">
+        Apunta la cámara de tu teléfono al código para registrarte, consultar tu expediente médico o programar tu próxima cita sin filas ni esperas.
+      </p>
+
+      <!-- Quiet Zone (Margen blanco reglamentario protegido de 16px para escaneo instantáneo) -->
+      <div class="qr-quiet-zone" id="qr-container-wrapper">
+        <div id="qrcode-display"></div>
+      </div>
+
+      <div class="qr-footer-note">
+        Acceso Directo • App Web &amp; Portal del Paciente 2027
+      </div>
+    </section>
+
+    <!-- 5. ESPECIALIDADES Y SERVICIOS DESTACADOS -->
+    <section class="services-pills">
+      <span class="service-pill">✦ Diseño de Sonrisa</span>
+      <span class="service-pill">✦ Alineadores Invisibles</span>
+      <span class="service-pill">✦ Implantes de Titanio</span>
+      <span class="service-pill">✦ Odontopediatría</span>
+      <span class="service-pill">✦ Resinas Biomiméticas</span>
+      <span class="service-pill">✦ Limpieza con Ultrasonido</span>
+    </section>
+
+    <!-- 6. PIE INSTITUCIONAL -->
+    <footer class="flyer-footer">
+      <p class="footer-text-primary">
+        Toda la atención clínica y seguimiento de tratamientos se coordina en nuestra plataforma oficial.
+      </p>
+      <p class="footer-text-secondary">
+        Audenti Clinical Studio • Dra. Aura Estudillo • Protocolo NOM-004-SSA3
+      </p>
+    </footer>
+  </main>
+
+  <script>
+    // URL oficial de la clínica para agendamiento y expediente
+    const OFFICIAL_CLINIC_URL = 'https://audenti.vercel.app';
+
+    // Generar el código QR oficial vectorial inicial
+    function renderOfficialQR() {
+      const container = document.getElementById('qrcode-display');
+      container.innerHTML = '';
+      new QRCode(container, {
+        text: OFFICIAL_CLINIC_URL,
+        width: 180,
+        height: 180,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H
+      });
+    }
+
+    // Permitir cargar una imagen existente del QR si el usuario lo desea sin modificar su proporción
+    document.getElementById('qr-file-input').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const container = document.getElementById('qrcode-display');
+        container.innerHTML = `
+          <img src="${event.target.result}" alt="Código QR Clínica" style="width: 180px; height: 180px; object-fit: contain; display: block;" />
+        `;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    function restoreOfficialQR() {
+      renderOfficialQR();
+    }
+
+    // Inicializar al cargar
+    renderOfficialQR();
+
+    // Exportar lienzo completo a imagen PNG de Ultra Alta Resolución (Escala x3 para 300 DPI nítido)
+    async function exportToImage() {
+      const canvasElem = document.getElementById('flyer-canvas');
+      const btn = event.currentTarget;
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '⏳ Generando imagen HD...';
+      btn.style.opacity = '0.7';
+
+      try {
+        const canvas = await html2canvas(canvasElem, {
+          scale: 3, // Multiplicador x3 para nitidez nítida en pantallas Retina y WhatsApp sin distorsión
+          useCORS: true,
+          backgroundColor: '#070b14',
+          logging: false
+        });
+
+        const imageUri = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = 'Clinica_Dra_Aura_Estudillo_Publicacion_Oficial.png';
+        link.href = imageUri;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (err) {
+        alert('Hubo un inconveniente al generar la imagen. Puedes usar la opción Imprimir / PDF.');
+        console.error(err);
+      } finally {
+        btn.innerHTML = originalText;
+        btn.style.opacity = '1';
+      }
+    }
+  </script>
+</body>
+</html>
