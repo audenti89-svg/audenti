@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sticker & Cartel Mostrador • Psicología Inversa Negra | Dra. Aura Estudillo</title>
+  <!-- html2canvas para renderizado en 300 DPI nítido para imprenta -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <!-- qrcodejs para generación vectorial nítida del QR oficial -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    :root {
+      --bg-black: #05070c;
+      --carbon: #0a0f1d;
+      --carbon-border: #1e293b;
+      --gold-primary: #f59e0b;
+      --gold-light: #fbbf24;
+      --gold-dark: #b45309;
+      --text-white: #ffffff;
+      --text-gray: #94a3b8;
+      --danger-red: #ef4444;
+      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-family);
+      background-color: #020408;
+      color: var(--text-white);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 60px 16px;
+    }
+
+    /* ── BARRA SUPERIOR DE CONTROL Y TAMAÑOS ── */
+    .toolbar {
+      width: 100%;
+      max-width: 840px;
+      background: rgba(10, 15, 29, 0.95);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      border-radius: 18px;
+      padding: 12px 20px;
+      margin-bottom: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+    }
+
+    .toolbar-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--gold-light);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 800;
+      padding: 9px 16px;
+      border-radius: 12px;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-gold {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      color: #000000;
+      box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+    }
+
+    .btn-gold:hover {
+      background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: #1e293b;
+      color: #f1f5f9;
+      border: 1px solid #334155;
+    }
+
+    .btn-secondary:hover {
+      background: #334155;
+    }
+
+    .size-select {
+      background: #090e1a;
+      color: var(--gold-light);
+      border: 1px solid rgba(245, 158, 11, 0.5);
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      outline: none;
+    }
+
+    /* ── CONTENEDOR DE IMPRESIÓN CON MARCAS DE CORTE (CROP MARKS) ── */
+    .print-frame {
+      position: relative;
+      padding: 24px;
+      background: #000000;
+      border: 1px dashed rgba(255, 255, 255, 0.15);
+      border-radius: 36px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9);
+    }
+
+    /* Marcas de corte para guillotina */
+    .crop-mark {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border-color: rgba(255, 255, 255, 0.4);
+      pointer-events: none;
+    }
+    .crop-tl { top: 8px; left: 8px; border-top: 1.5px solid; border-left: 1.5px solid; }
+    .crop-tr { top: 8px; right: 8px; border-top: 1.5px solid; border-right: 1.5px solid; }
+    .crop-bl { bottom: 8px; left: 8px; border-bottom: 1.5px solid; border-left: 1.5px solid; }
+    .crop-br { bottom: 8px; right: 8px; border-bottom: 1.5px solid; border-right: 1.5px solid; }
+
+    /* ── PIEZA VISUAL: PSICOLOGÍA INVERSA NEGRA ── */
+    #sticker-card {
+      width: 440px;
+      background: radial-gradient(circle at 50% 10%, #151d30 0%, #080c14 60%, #030508 100%);
+      border: 2.5px solid var(--gold-primary);
+      border-radius: 28px;
+      padding: 32px 28px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 0 35px rgba(245, 158, 11, 0.18), inset 0 0 40px rgba(0, 0, 0, 0.8);
+      transition: width 0.3s ease;
+    }
+
+    /* Modo Volante Mostrador (Más vertical) */
+    .mode-vertical #sticker-card {
+      width: 460px;
+      padding: 36px 30px;
+    }
+
+    /* Modo Calcomanía Cuadrada */
+    .mode-square #sticker-card {
+      width: 420px;
+      padding: 28px 24px;
+    }
+
+    /* Halo estelar de fondo */
+    .halo-gold {
+      position: absolute;
+      top: -90px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, rgba(245, 158, 11, 0.15) 0%, rgba(245, 158, 11, 0) 70%);
+      pointer-events: none;
+    }
+
+    /* Tag de Alerta Oscura */
+    .prohibition-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.5);
+      color: #f87171;
+      padding: 5px 14px;
+      border-radius: 9999px;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+      box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+    }
+
+    /* Encabezado Retador */
+    .warning-title {
+      font-size: 24px;
+      font-weight: 900;
+      color: #ffffff;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+    }
+
+    .warning-title span {
+      color: var(--gold-primary);
+      display: inline-block;
+    }
+
+    /* Giro de Psicología Inversa */
+    .warning-subtitle {
+      font-size: 12px;
+      color: #cbd5e1;
+      line-height: 1.45;
+      font-weight: 500;
+      max-width: 360px;
+      margin: 0 auto 20px auto;
+    }
+
+    .warning-subtitle strong {
+      color: var(--gold-light);
+      font-weight: 800;
+    }
+
+    /* ── MARCO ANULAR DEL QR CON ELEMENTOS DEL LOGO AUDENTI ── */
+    .qr-annular-wrapper {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      margin-bottom: 18px;
+    }
+
+    /* Anillo exterior inspirado en AudentiLogo */
+    .annular-ring {
+      position: absolute;
+      inset: 0;
+      border-radius: 32px;
+      border: 2px solid transparent;
+      background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #b45309 100%) border-box;
+      -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      box-shadow: 0 0 25px rgba(245, 158, 11, 0.3);
+    }
+
+    /* Silueta y Sonrisa de Diente Estilizado Audenti sobre el marco */
+    .tooth-accent-crest {
+      position: absolute;
+      top: -14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #080c14;
+      padding: 2px 10px;
+      border-radius: 9999px;
+      border: 1.5px solid var(--gold-primary);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      z-index: 10;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.7);
+    }
+
+    .tooth-accent-crest svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .tooth-accent-crest span {
+      font-size: 9px;
+      font-weight: 900;
+      color: var(--gold-light);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    /* Quiet Zone (Margen blanco inmaculado obligatorio para el QR) */
+    .qr-pure-white-box {
+      background-color: #ffffff !important;
+      padding: 12px;
+      border-radius: 18px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+      position: relative;
+      z-index: 5;
+    }
+
+    #qrcode-target {
+      width: 170px;
+      height: 170px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #qrcode-target img,
+    #qrcode-target canvas {
+      width: 170px !important;
+      height: 170px !important;
+      display: block;
+      image-rendering: pixelated;
+    }
+
+    /* Mensaje Directo para el que espera en el mostrador */
+    .action-hook {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      font-size: 11.5px;
+      color: #e2e8f0;
+      line-height: 1.45;
+    }
+
+    .action-hook span {
+      color: var(--gold-light);
+      font-weight: 800;
+    }
+
+    /* Beneficios en Viñetas Negras */
+    .punchy-perks {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #94a3b8;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .perk-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .perk-item span.icon {
+      color: var(--gold-primary);
+    }
+
+    /* Sedes de la Clínica */
+    .branches-strip {
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      padding-top: 12px;
+      display: flex;
+      justify-content: space-around;
+      font-size: 10.5px;
+      color: #cbd5e1;
+    }
+
+    .branch-pill strong {
+      color: #ffffff;
+      display: block;
+      font-size: 11px;
+    }
+
+    .branch-pill span {
+      color: var(--gold-primary);
+      font-size: 9.5px;
+      font-weight: 700;
+    }
+
+    /* Firma Médica Discreta y Autorizada */
+    .doctor-signature {
+      margin-top: 12px;
+      font-size: 10px;
+      color: #64748b;
+      letter-spacing: 0.04em;
+    }
+
+    .doctor-signature strong {
+      color: #94a3b8;
+    }
+
+    /* ── REGLAS DE IMPRESIÓN DIRECTA ── */
+    @media print {
+      body {
+        background: #ffffff !important;
+        padding: 0;
+      }
+      .toolbar {
+        display: none !important;
+      }
+      .print-frame {
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        background: transparent !important;
+      }
+      #sticker-card {
+        box-shadow: none !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- BARRA DE ACCIÓN Y EXPORTACIÓN ULTRA-HD -->
+  <header class="toolbar">
+    <div class="toolbar-title">
+      <span>⛔</span>
+      <span>Sticker Negocios • Psicología Inversa Negra</span>
+    </div>
+
+    <div class="toolbar-actions">
+      <!-- Selector de Formato de Impresión -->
+      <select class="size-select" id="size-selector" onchange="changeFormat(this.value)">
+        <option value="vertical">Cartel Mostrador (A6 / 10x15 cm)</option>
+        <option value="square">Calcomanía Cuadrada (Sticker 10x10 cm)</option>
+      </select>
+
+      <!-- Selector para insertar QR propio existente si se tiene en archivo PNG/JPG -->
+      <label class="btn btn-secondary" title="Cargar el archivo gráfico PNG o JPG de tu QR si ya lo tienes guardado">
+        <span>Subir QR Imagen</span>
+        <input type="file" id="qr-upload" accept="image/*" style="display: none;">
+      </label>
+
+      <!-- Botón de Restaurar QR Vectorial -->
+      <button type="button" class="btn btn-secondary" onclick="resetOfficialQR()">
+        ↺ QR Oficial Web
+      </button>
+
+      <!-- Botón de Impresión Directa -->
+      <button type="button" class="btn btn-secondary" onclick="window.print()">
+        🖨️ Imprimir
+      </button>
+
+      <!-- Botón de Descarga PNG 300 DPI -->
+      <button type="button" class="btn btn-gold" onclick="downloadStickerPNG()">
+        📥 Descargar PNG (Alta Resolución 300 DPI)
+      </button>
+    </div>
+  </header>
+
+  <!-- MARCO DE IMPRESIÓN CON GUÍAS DE CORTE -->
+  <div class="print-frame mode-vertical" id="print-wrapper">
+    <!-- Marcas de corte para imprenta -->
+    <div class="crop-mark crop-tl"></div>
+    <div class="crop-mark crop-tr"></div>
+    <div class="crop-mark crop-bl"></div>
+    <div class="crop-mark crop-br"></div>
+
+    <!-- ── PIEZA VISUAL: CALCOMANÍA / CARTEL ── -->
+    <article id="sticker-card">
+      <div class="halo-gold"></div>
+
+      <!-- 1. BADGE DE ADVERTENCIA PROVOCADORA -->
+      <div class="prohibition-tag">
+        <span>⛔</span>
+        <span>ADVERTENCIA VISUAL</span>
+      </div>
+
+      <!-- 2. TITULAR DE PSICOLOGÍA INVERSA NEGRA -->
+      <h1 class="warning-title">
+        NO ESCANEES<br>
+        <span>ESTE CÓDIGO QR</span>
+      </h1>
+
+      <!-- 3. SUBTÍTULO RETADOR -->
+      <p class="warning-subtitle">
+        A menos que quieras agendar tu cita dental en <strong>3 segundos</strong> desde tu celular y sin hacer llamadas incómodas.
+      </p>
+
+      <!-- 4. CONTENEDOR ANULAR CON EL DIENTE Y SONRISA DE AUDENTI -->
+      <div class="qr-annular-wrapper">
+        <div class="annular-ring"></div>
+
+        <!-- Cresta estilizada del logo Audenti -->
+        <div class="tooth-accent-crest">
+          <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="crestGold" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#FBBF24" />
+                <stop offset="100%" stopColor="#D97706" />
+              </linearGradient>
+            </defs>
+            <circle cx="50" cy="50" r="45" fill="#0A0F1D" stroke="url(#crestGold)" stroke-width="6"/>
+            <!-- Diente blanco estilizado -->
+            <path d="M34 36C34 27 40 24 45 25C48 25.5 49 28 50 28C51 28 52 25.5 55 25C60 24 66 27 66 36C66 46 61 54 58 64C56.5 69 55 74 53 74C51 74 50.5 67 49.5 67C48.5 67 48 74 46 74C44 74 42.5 69 41 64C38 54 34 46 34 36Z" fill="#FFFFFF"/>
+            <!-- Sonrisa dorada Audenti -->
+            <path d="M41 44C44 48 56 48 59 44" stroke="#F59E0B" stroke-width="4" stroke-linecap="round"/>
+          </svg>
+          <span>Audenti</span>
+        </div>
+
+        <!-- Quiet Zone protegida (Blanco puro, sin distorsión) -->
+        <div class="qr-pure-white-box">
+          <div id="qrcode-target"></div>
+        </div>
+      </div>
+
+      <!-- 5. GANCHO PARA LA PERSONA EN EL NEGOCIO -->
+      <div class="action-hook">
+        Si prefieres seguir esperando en el teléfono o posponer ese dolor de muela, <span>ignora este letrero</span>. Pero si quieres atención de primer nivel, tu lugar ya está listo.
+      </div>
+
+      <!-- 6. BENEFICIOS DIRECTOS -->
+      <div class="punchy-perks">
+        <div class="perk-item">
+          <span class="icon">✓</span>
+          <span>100% en Navegador</span>
+        </div>
+        <div class="perk-item">
+          <span class="icon">✓</span>
+          <span>Cero Apps que Descargar</span>
+        </div>
+        <div class="perk-item">
+          <span class="icon">✓</span>
+          <span>Cita Confirmada al Móvil</span>
+        </div>
+      </div>
+
+      <!-- 7. SEDES CLÍNICAS -->
+      <div class="branches-strip">
+        <div class="branch-pill">
+          <strong>Sede Matriz</strong>
+          <span>Jardín Balbuena</span>
+        </div>
+        <div class="branch-pill">
+          <strong>Sede Norte</strong>
+          <span>Chalma de Guadalupe</span>
+        </div>
+      </div>
+
+      <!-- 8. FIRMA MÉDICA -->
+      <div class="doctor-signature">
+        Dirección Médica: <strong>Dra. Aura Estudillo</strong> • Céd. Prof. 8492019
+      </div>
+    </article>
+  </div>
+
+  <script>
+    // URL canónica de la clínica que abre la App Web
+    const CLINIC_WEB_URL = 'https://audenti.vercel.app';
+
+    // Renderizar QR oficial vectorial nítido
+    function renderQR() {
+      const target = document.getElementById('qrcode-target');
+      target.innerHTML = '';
+      new QRCode(target, {
+        text: CLINIC_WEB_URL,
+        width: 170,
+        height: 170,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H
+      });
+    }
+
+    // Permitir insertar imagen de QR existente sin recortarla ni distorsionarla
+    document.getElementById('qr-upload').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const target = document.getElementById('qrcode-target');
+        target.innerHTML = `
+          <img src="${event.target.result}" alt="QR Clínica" style="width: 170px; height: 170px; object-fit: contain; display: block;" />
+        `;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    function resetOfficialQR() {
+      renderQR();
+    }
+
+    // Cambiar entre formato cuadrado (sticker) y vertical (cartel de mostrador)
+    function changeFormat(val) {
+      const wrapper = document.getElementById('print-wrapper');
+      wrapper.classList.remove('mode-vertical', 'mode-square');
+      if (val === 'square') {
+        wrapper.classList.add('mode-square');
+      } else {
+        wrapper.classList.add('mode-vertical');
+      }
+    }
+
+    // Generar y descargar imagen PNG a 300 DPI con factor de escala x3
+    async function downloadStickerPNG() {
+      const card = document.getElementById('sticker-card');
+      const btn = event.currentTarget;
+      const prevText = btn.innerHTML;
+      btn.innerHTML = '⏳ Procesando 300 DPI...';
+      btn.style.opacity = '0.7';
+
+      try {
+        const canvas = await html2canvas(card, {
+          scale: 3, // Factor x3 que asegura 300 DPI sin dientes de sierra en el código QR
+          useCORS: true,
+          backgroundColor: '#05070c',
+          logging: false
+        });
+
+        const image = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = 'Audenti_Sticker_Psicologia_Inversa_Negocios.png';
+        link.href = image;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (err) {
+        alert('Hubo un inconveniente al generar la imagen. Puedes usar el botón de Imprimir.');
+        console.error(err);
+      } finally {
+        btn.innerHTML = prevText;
+        btn.style.opacity = '1';
+      }
+    }
+
+    // Inicializar al cargar
+    renderQR();
+  </script>
+</body>
+</html>
