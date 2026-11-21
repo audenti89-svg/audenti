@@ -98,7 +98,14 @@ export async function POST(req: NextRequest) {
       doctorName = 'Dra. Aura Estudillo',
       doctorRole = 'socio',
       branch = 'Sucursal Balbuena (Matriz)',
-      fullTeethState
+      fullTeethState,
+      originType = 'nuevo_audenti',
+      treatmentStatus = 'diagnostico',
+      zoneType = 'corona',
+      nervousBranch,
+      nervousSide,
+      nervousSymptom,
+      patientExplanation
     } = body
 
     if (!patientId || !toothFdi) {
@@ -175,6 +182,13 @@ export async function POST(req: NextRequest) {
           doctorRole,
           rolePermissionLevel,
           branch,
+          originType,
+          treatmentStatus,
+          zoneType,
+          nervousBranch,
+          nervousSide,
+          nervousSymptom,
+          patientExplanation,
           status: entryStatus,
           timestamp: new Date().toISOString()
         }

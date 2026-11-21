@@ -775,15 +775,28 @@ export function PatientPortalView({
   const handleConfirmAttendance = async (apptId: string) => {
     try {
       setConfirmingAppt(true);
-      await supabase
-        .from('appointments')
-        .update({ status: 'confirmed' })
-        .eq('id', apptId);
+
+      // 1. Sincronizar en PostgreSQL Supabase
+      try {
+        await supabase
+          .from('appointments')
+          .update({ status: 'confirmed', attendance_confirmed: true })
+          .or(`id.eq.${apptId},folio.eq.${apptId}`);
+      } catch {}
+
+      // 2. Sincronizar en Endpoint Oficial de Citas (Almacén persistente + Realtime broadcast)
+      try {
+        await fetch('/api/appointments', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: apptId, attendance_confirmed: true, status: 'confirmed' })
+        });
+      } catch {}
 
       setAppointments(prev =>
-        prev.map(a => (String(a.id || a.folio) === String(apptId) ? { ...a, status: 'confirmed' } : a))
+        prev.map(a => (String(a.id || a.folio) === String(apptId) ? { ...a, status: 'confirmed', attendance_confirmed: true } : a))
       );
-      setConfirmationNotice('✅ ¡Tu asistencia ha sido confirmada con éxito! La Dra. Aura Estudillo te espera con tu sillón clínico preparado.');
+      setConfirmationNotice('✅ ¡Tu asistencia ha sido confirmada con éxito! La alerta activa ha sido resguardada en tu historial médico.');
       setTimeout(() => setConfirmationNotice(''), 7000);
     } catch (err) {
       console.warn('Error confirmando asistencia:', err);

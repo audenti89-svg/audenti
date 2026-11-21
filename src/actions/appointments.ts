@@ -26,6 +26,10 @@ export interface PersistentAppointment {
   treatment: string
   branch: string
   status: 'confirmed' | 'pending_review' | 'scheduled' | 'in_chair' | 'in_waiting' | 'completed' | 'cancelled'
+  attendance_confirmed?: boolean
+  is_deleted?: boolean
+  deleted_at?: string
+  deleted_by?: string
   notes?: string
   created_at: string
 }

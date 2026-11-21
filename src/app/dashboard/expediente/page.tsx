@@ -1410,6 +1410,7 @@ export default function ExpedientePage() {
                   doctorName={doctorProfile.name}
                   doctorRole={doctorProfile.role}
                   branch={selectedPatient?.branch_name || doctorProfile.branch}
+                  initialMouthMode={initialMouthMode}
                   onHistoryUpdated={() => fetchPatientHistory(selectedPatient)}
                 />
               </div>

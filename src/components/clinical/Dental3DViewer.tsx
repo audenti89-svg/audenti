@@ -19,7 +19,8 @@ import {
   Database,
   Plus,
   CheckCircle2,
-  DollarSign
+  DollarSign,
+  Zap
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -47,6 +48,7 @@ export interface Dental3DViewerProps {
   doctorName?: string
   doctorRole?: string
   branch?: string
+  initialMouthMode?: 'limpio_primera_vez' | 'trabajada_previa'
   onUpdateToothSurfaces?: (toothNum: number, surfaces: Partial<ToothSurfaces>, wholeCondition?: ToothWholeCondition) => void
   onAddTreatment?: (treatment: {
     toothNumber: number
@@ -82,6 +84,21 @@ const CONDITION_COLORS: Record<string, number> = {
   extraccion_indicada: 0xd97706
 }
 
+export function getDefaultNerveForTooth(fdi: number): { branch: string; side: 'derecho' | 'izquierdo' } {
+  const quadrant = Math.floor(fdi / 10);
+  const side: 'derecho' | 'izquierdo' = (quadrant === 1 || quadrant === 4) ? 'derecho' : 'izquierdo';
+  const pos = fdi % 10;
+
+  if (quadrant === 1 || quadrant === 2) {
+    if (pos <= 3) return { branch: 'Nervio Alveolar Superior Anterior (NAS-ANT)', side };
+    if (pos <= 5) return { branch: 'Nervio Alveolar Superior Medio (NAS-MED)', side };
+    return { branch: 'Nervio Alveolar Superior Posterior (NAS-POST)', side };
+  } else {
+    if (pos <= 5) return { branch: 'Nervio Mentoniano / Incisivo Mandibular', side };
+    return { branch: 'Nervio Alveolar Inferior (Conducto Mandibular)', side };
+  }
+}
+
 export function Dental3DViewer({
   selectedToothNum,
   onSelectTooth,
@@ -91,6 +108,7 @@ export function Dental3DViewer({
   doctorName = 'Dra. Aura Estudillo',
   doctorRole = 'socio',
   branch = 'Sucursal Balbuena (Matriz)',
+  initialMouthMode = 'trabajada_previa',
   onUpdateToothSurfaces,
   onAddTreatment,
   onHistoryUpdated,
@@ -147,6 +165,10 @@ export function Dental3DViewer({
     originType: 'nuevo_audenti' | 'previo_externo'
     treatmentStatus: 'diagnostico' | 'en_proceso' | 'finalizado' | 'rechazado_no_realizado'
     zoneType: 'corona' | 'interproximal' | 'implante' | 'protesis_guarda'
+    nervousBranch: string
+    nervousSide: 'derecho' | 'izquierdo' | 'bilateral'
+    nervousSymptom: string
+    patientExplanation: string
     isRestoredDraft?: boolean
   } | null>(null)
   const [isPersistingSupabase, setIsPersistingSupabase] = useState(false)
@@ -191,6 +213,9 @@ export function Dental3DViewer({
       if (toothInfo?.wholeCondition === 'implante') initialZone = 'implante'
       if (toothInfo?.wholeCondition === 'protesis') initialZone = 'protesis_guarda'
 
+      const defaultNerve = getDefaultNerveForTooth(toothFdi)
+      const defaultOriginType = initialMouthMode === 'trabajada_previa' ? 'previo_externo' : 'nuevo_audenti'
+
       // Recuperar borrador local si existe y tiene menos de 24 horas
       let restoredDraftNotice = false
       let draftData: any = null
@@ -225,14 +250,18 @@ export function Dental3DViewer({
         procedure: draftData?.procedure || (isInterproximal
           ? 'Resina Estética 2 Caras (MO / DO)'
           : 'Resina Estética 1 Cara (Oclusal/Vestibular)'),
-        originType: draftData?.originType || 'nuevo_audenti',
+        originType: draftData?.originType || defaultOriginType,
         treatmentStatus: draftData?.treatmentStatus || 'diagnostico',
         zoneType: draftData?.zoneType || initialZone,
+        nervousBranch: draftData?.nervousBranch || defaultNerve.branch,
+        nervousSide: draftData?.nervousSide || defaultNerve.side,
+        nervousSymptom: draftData?.nervousSymptom || 'ninguno',
+        patientExplanation: draftData?.patientExplanation || 'Se informa al paciente sobre la proximidad de la pieza dental con la rama nerviosa sensitiva y los cuidados esperados durante la recuperación clínica.',
         isRestoredDraft: restoredDraftNotice
       })
       setModalOpen(true)
     },
-    [teethState, patientId]
+    [teethState, patientId, initialMouthMode]
   )
 
   // Cerrar modal y restablecer cámara general
@@ -901,7 +930,10 @@ export function Dental3DViewer({
     const originTag = modalData.originType === 'previo_externo' ? '[HISTORIAL PREVIO EXTERNO] ' : '[TRABAJO NUEVO AUDENTI] '
     const statusTag = modalData.treatmentStatus === 'rechazado_no_realizado' ? '[RECHAZADO/NO REALIZADO POR PACIENTE] ' : ''
     const zoneTag = `[ZONA: ${modalData.zoneType.toUpperCase()}] `
-    const finalNote = `${statusTag}${originTag}${zoneTag}${modalData.notes}`.trim()
+    const nerveTag = modalData.nervousSymptom && modalData.nervousSymptom !== 'ninguno'
+      ? `[INERVACIÓN: ${modalData.nervousBranch} (${modalData.nervousSide}) - Síntoma: ${modalData.nervousSymptom}. Explicación: ${modalData.patientExplanation}] `
+      : ''
+    const finalNote = `${statusTag}${originTag}${zoneTag}${nerveTag}${modalData.notes}`.trim()
 
     if (onUpdateToothSurfaces) {
       onUpdateToothSurfaces(modalData.toothFdi, modalData.activeSurfaces, modalData.selectedCondition)
@@ -942,9 +974,38 @@ export function Dental3DViewer({
             fullTeethState: teethState,
             originType: modalData.originType,
             treatmentStatus: modalData.treatmentStatus,
-            zoneType: modalData.zoneType
+            zoneType: modalData.zoneType,
+            nervousBranch: modalData.nervousBranch,
+            nervousSide: modalData.nervousSide,
+            nervousSymptom: modalData.nervousSymptom,
+            patientExplanation: modalData.patientExplanation
           })
         })
+
+        // Si se registró un síntoma de inervación, guardar en historial de chat clínico
+        if (modalData.nervousSymptom && modalData.nervousSymptom !== 'ninguno') {
+          try {
+            await fetch('/api/chat/send', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                patient_id: patientId,
+                sender_role: 'doctor',
+                sender_name: doctorName,
+                channel_type: 'nervous_system_evaluation',
+                content: `Evaluación de Inervación en pieza FDI #${modalData.toothFdi}: ${modalData.nervousBranch} (${modalData.nervousSide}). Síntoma: ${modalData.nervousSymptom}. Explicación al paciente: ${modalData.patientExplanation}`,
+                metadata: {
+                  nerveBranch: modalData.nervousBranch,
+                  side: modalData.nervousSide,
+                  symptom: modalData.nervousSymptom,
+                  patientExplanation: modalData.patientExplanation,
+                  toothFdi: modalData.toothFdi
+                }
+              })
+            })
+          } catch {}
+        }
+
         if (onHistoryUpdated) {
           onHistoryUpdated()
         }
@@ -1959,6 +2020,63 @@ export function Dental3DViewer({
                         className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-amber-300 font-bold focus:outline-hidden focus:border-amber-400"
                       />
                     </div>
+                  </div>
+                </div>
+
+                {/* SECCIÓN SISTEMA NERVIOSO E INERVACIÓN ANATÓMICA (NOM-004) */}
+                <div className="p-3 bg-slate-900/80 rounded-2xl border border-cyan-500/30 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase text-cyan-400 flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Sistema Nervioso e Inervación Anatómica</span>
+                    </span>
+                    <span className="text-[10px] text-cyan-300 font-mono font-bold">
+                      {modalData.nervousBranch}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-400 block mb-0.5">Lado / Hemiarco</label>
+                      <select
+                        value={modalData.nervousSide}
+                        onChange={(e) => setModalData({ ...modalData, nervousSide: e.target.value as any })}
+                        className="w-full px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-bold text-white focus:outline-hidden focus:border-cyan-400 cursor-pointer"
+                      >
+                        <option value="derecho">Hemiarco Derecho</option>
+                        <option value="izquierdo">Hemiarco Izquierdo</option>
+                        <option value="bilateral">Bilateral / Línea Media</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[9px] font-bold text-slate-400 block mb-0.5">Síntoma Sensorial</label>
+                      <select
+                        value={modalData.nervousSymptom}
+                        onChange={(e) => setModalData({ ...modalData, nervousSymptom: e.target.value })}
+                        className="w-full px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-bold text-white focus:outline-hidden focus:border-cyan-400 cursor-pointer"
+                      >
+                        <option value="ninguno">Ninguno / Sensibilidad Normal</option>
+                        <option value="dolor_agudo_pulpar">Dolor Agudo Pulpar</option>
+                        <option value="dolor_sordo_constante">Dolor Sordo Constante</option>
+                        <option value="parestesia_entumecimiento">Parestesia / Entumecimiento</option>
+                        <option value="hiperestesia_sensibilidad">Hiperestesia / Hipersensibilidad</option>
+                        <option value="neuralgia_descarga">Neuralgia / Descarga Eléctrica</option>
+                        <option value="ardor_urente">Ardor Urente</option>
+                        <option value="fatiga_muscular_atm">Fatiga Muscular / ATM</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[9px] font-bold text-slate-400 block mb-0.5">Explicación dada al paciente (NOM-004-SSA3)</label>
+                    <input
+                      type="text"
+                      value={modalData.patientExplanation}
+                      onChange={(e) => setModalData({ ...modalData, patientExplanation: e.target.value })}
+                      placeholder="Explicación clínica proporcionada al paciente sobre la inervación..."
+                      className="w-full px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:outline-hidden focus:border-cyan-400"
+                    />
                   </div>
                 </div>
               </div>

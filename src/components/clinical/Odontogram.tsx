@@ -168,6 +168,7 @@ export interface OdontogramProps {
   doctorName?: string
   doctorRole?: string
   branch?: string
+  initialMouthMode?: 'limpio_primera_vez' | 'trabajada_previa'
   onHistoryUpdated?: () => void
 }
 
@@ -177,6 +178,7 @@ export function Odontogram({
   doctorName = 'Dra. Aura Estudillo',
   doctorRole = 'socio',
   branch = 'Sucursal Balbuena (Matriz)',
+  initialMouthMode = 'trabajada_previa',
   onHistoryUpdated
 }: OdontogramProps = {}) {
   const [teeth, setTeeth] = useState<Record<number, ToothState>>(initTeethRecord)
@@ -529,6 +531,7 @@ export function Odontogram({
           doctorName={doctorName}
           doctorRole={doctorRole}
           branch={branch}
+          initialMouthMode={initialMouthMode}
           onUpdateToothSurfaces={handleUpdateToothSurfacesFrom3D}
           onAddTreatment={handleAddTreatmentFrom3D}
           onHistoryUpdated={onHistoryUpdated}

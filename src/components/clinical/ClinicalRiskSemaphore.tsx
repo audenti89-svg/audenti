@@ -261,6 +261,31 @@ export function ClinicalRiskSemaphore({
             <p className="text-[11px] text-slate-300 leading-snug">
               {description}
             </p>
+
+            {/* DAÑOS POTENCIALES SI NO SE ATIENDE (ROJO / NARANJA) */}
+            {level === 'rojo' && (
+              <div className="mt-2.5 p-2 rounded-xl bg-rose-950/90 border border-rose-500/50 text-[11px] text-rose-200 space-y-0.5">
+                <strong className="block text-rose-300 font-black uppercase text-[10px] tracking-wider">
+                  ⚠️ Daño potencial si no se atiende oportunamente:
+                </strong>
+                <p className="leading-snug">
+                  {allergyEval.status === 'rojo'
+                    ? `Riesgo de shock anafiláctico, edema laríngeo o reacción adversa sistémica grave por administración inadvertida de ${allergyEval.realAllergies.join(', ')}.`
+                    : 'Riesgo de flemón odontogénico difuso, celulitis facial, osteomielitis o necrosis pulpar irreversible con pérdida prematura de piezas dentales.'}
+                </p>
+              </div>
+            )}
+
+            {level === 'naranja' && (
+              <div className="mt-2.5 p-2 rounded-xl bg-orange-950/90 border border-orange-500/50 text-[11px] text-orange-200 space-y-0.5">
+                <strong className="block text-orange-300 font-black uppercase text-[10px] tracking-wider">
+                  ⚠️ Daño potencial si no se atiende:
+                </strong>
+                <p className="leading-snug">
+                  Fractura coronal o radicular irreparable que impediría la preservación de la pieza dental, derivando en extracción quirúrgica obligatoria.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
