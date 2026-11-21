@@ -365,8 +365,33 @@ export function PatientPortalView({
           return;
         }
 
-        // 2. Si no hay usuario pero el hash tiene access_token, permitir que Supabase lo capture
+        // 2. Si no hay usuario pero el hash tiene access_token, permitir que Supabase lo capture o establecerlo explícitamente
         if (typeof window !== 'undefined' && window.location.hash.includes('access_token')) {
+          try {
+            const hashRaw = window.location.hash.replace(/^#/, '');
+            const hashParams = new URLSearchParams(hashRaw);
+            const accessToken = hashParams.get('access_token');
+            const refreshToken = hashParams.get('refresh_token');
+
+            if (accessToken) {
+              const { data: setSessionData, error: setSessionErr } = await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken || ''
+              });
+
+              if (!setSessionErr && setSessionData?.session?.user) {
+                if (!isMounted) return;
+                setUser(setSessionData.session.user);
+                await fetchPatientData(setSessionData.session.user);
+                const cleanUrl = window.location.pathname + window.location.search;
+                window.history.replaceState(null, '', cleanUrl);
+                return;
+              }
+            }
+          } catch (tokenParseErr) {
+            console.warn('Nota al procesar token del hash:', tokenParseErr);
+          }
+
           const { data: sessionData } = await supabase.auth.getSession();
           if (sessionData.session?.user) {
             if (!isMounted) return;
@@ -376,6 +401,10 @@ export function PatientPortalView({
             window.history.replaceState(null, '', cleanUrl);
             return;
           }
+
+          // Si el token era inválido o caducó, limpiar el hash residual para evitar bucles
+          const cleanUrl = window.location.pathname + window.location.search;
+          window.history.replaceState(null, '', cleanUrl);
         }
 
         // 3. Parámetros especiales de acceso (confirmAppt o phone)
@@ -480,6 +509,10 @@ export function PatientPortalView({
   }, []);
 
   const handleSignOut = async () => {
+    try {
+      sessionStorage.clear();
+      localStorage.removeItem('audenti_patient_cache');
+    } catch {}
     await supabase.auth.signOut();
     window.location.href = '/portal/login';
   };

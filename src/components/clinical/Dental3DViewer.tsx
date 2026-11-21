@@ -147,6 +147,7 @@ export function Dental3DViewer({
     originType: 'nuevo_audenti' | 'previo_externo'
     treatmentStatus: 'diagnostico' | 'en_proceso' | 'finalizado' | 'rechazado_no_realizado'
     zoneType: 'corona' | 'interproximal' | 'implante' | 'protesis_guarda'
+    isRestoredDraft?: boolean
   } | null>(null)
   const [isPersistingSupabase, setIsPersistingSupabase] = useState(false)
   const [saveSuccessNotification, setSaveSuccessNotification] = useState(false)
@@ -190,6 +191,23 @@ export function Dental3DViewer({
       if (toothInfo?.wholeCondition === 'implante') initialZone = 'implante'
       if (toothInfo?.wholeCondition === 'protesis') initialZone = 'protesis_guarda'
 
+      // Recuperar borrador local si existe y tiene menos de 24 horas
+      let restoredDraftNotice = false
+      let draftData: any = null
+      if (typeof window !== 'undefined') {
+        try {
+          const draftKey = `audenti_draft_${patientId || 'temp'}_tooth_${toothFdi}`
+          const rawDraft = localStorage.getItem(draftKey)
+          if (rawDraft) {
+            const parsed = JSON.parse(rawDraft)
+            if (Date.now() - (parsed.savedAt || 0) < 24 * 60 * 60 * 1000) {
+              draftData = parsed
+              restoredDraftNotice = true
+            }
+          }
+        } catch {}
+      }
+
       setModalData({
         toothFdi,
         toothUniversal,
@@ -197,23 +215,24 @@ export function Dental3DViewer({
         isInterproximal,
         pairFdi,
         pairUniversal,
-        activeSurfaces: { ...surfaces },
-        selectedCondition: (toothInfo?.wholeCondition as ToothWholeCondition) || 'caries',
-        notes: isInterproximal && pairFdi
+        activeSurfaces: draftData?.activeSurfaces || { ...surfaces },
+        selectedCondition: draftData?.selectedCondition || (toothInfo?.wholeCondition as ToothWholeCondition) || 'caries',
+        notes: draftData?.notes !== undefined ? draftData.notes : (isInterproximal && pairFdi
           ? `Punto de contacto entre piezas FDI #${pairFdi[0]} (UNS #${pairUniversal?.[0]}) y FDI #${pairFdi[1]} (UNS #${pairUniversal?.[1]}).`
-          : `Tratamiento en pieza FDI #${toothFdi} (Universal #${toothUniversal}) — ${taxonomy?.name}.`,
-        estimatedCost: 850,
-        specialty: 'operatoria',
-        procedure: isInterproximal
+          : `Tratamiento en pieza FDI #${toothFdi} (Universal #${toothUniversal}) — ${taxonomy?.name}.`),
+        estimatedCost: draftData?.estimatedCost ?? 850,
+        specialty: draftData?.specialty || 'operatoria',
+        procedure: draftData?.procedure || (isInterproximal
           ? 'Resina Estética 2 Caras (MO / DO)'
-          : 'Resina Estética 1 Cara (Oclusal/Vestibular)',
-        originType: 'nuevo_audenti',
-        treatmentStatus: 'diagnostico',
-        zoneType: initialZone
+          : 'Resina Estética 1 Cara (Oclusal/Vestibular)'),
+        originType: draftData?.originType || 'nuevo_audenti',
+        treatmentStatus: draftData?.treatmentStatus || 'diagnostico',
+        zoneType: draftData?.zoneType || initialZone,
+        isRestoredDraft: restoredDraftNotice
       })
       setModalOpen(true)
     },
-    [teethState]
+    [teethState, patientId]
   )
 
   // Cerrar modal y restablecer cámara general
@@ -838,11 +857,42 @@ export function Dental3DViewer({
     setTimeout(() => setSaveSuccessNotification(false), 1800)
   }
 
+  // Auto-guardado de borrador local (protección contra desconexión o recarga accidental)
+  useEffect(() => {
+    if (!modalOpen || !modalData || typeof window === 'undefined') return
+    const timer = setTimeout(() => {
+      try {
+        const draftKey = `audenti_draft_${patientId || 'temp'}_tooth_${modalData.toothFdi}`
+        localStorage.setItem(draftKey, JSON.stringify({
+          activeSurfaces: modalData.activeSurfaces,
+          selectedCondition: modalData.selectedCondition,
+          notes: modalData.notes,
+          estimatedCost: modalData.estimatedCost,
+          specialty: modalData.specialty,
+          procedure: modalData.procedure,
+          originType: modalData.originType,
+          treatmentStatus: modalData.treatmentStatus,
+          zoneType: modalData.zoneType,
+          savedAt: Date.now()
+        }))
+      } catch {}
+    }, 600)
+    return () => clearTimeout(timer)
+  }, [modalData, modalOpen, patientId])
+
   // Guardar Cambios Finales
   const handleSaveModalData = async () => {
     if (!modalData) return
 
     setIsPersistingSupabase(true)
+
+    // Eliminar borrador local al confirmar guardado permanente
+    if (typeof window !== 'undefined') {
+      try {
+        const draftKey = `audenti_draft_${patientId || 'temp'}_tooth_${modalData.toothFdi}`
+        localStorage.removeItem(draftKey)
+      } catch {}
+    }
 
     const treatedFaces = Object.entries(modalData.activeSurfaces)
       .filter(([_, cond]) => cond !== 'sano')
@@ -1263,6 +1313,11 @@ export function Dental3DViewer({
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
                       Estado: {modalData.selectedCondition.toUpperCase()}
                     </span>
+                    {modalData.isRestoredDraft && (
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 shadow-sm animate-pulse flex items-center gap-1">
+                        ⚡ Borrador Local Recuperado
+                      </span>
+                    )}
                   </div>
 
                   <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2 flex-wrap">

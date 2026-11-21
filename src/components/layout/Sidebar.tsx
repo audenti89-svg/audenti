@@ -325,6 +325,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           <button
             type="button"
             onClick={async () => {
+              try {
+                sessionStorage.clear()
+                localStorage.removeItem('audenti_selected_branch')
+              } catch {}
               await supabase.auth.signOut()
               window.location.href = '/auth/login'
             }}

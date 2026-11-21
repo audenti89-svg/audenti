@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getPersistedAppointments } from '@/lib/supabase/appointments-storage'
 import { isSystemAdminEmail } from '@/lib/auth/admin-emails'
+import { logAuditEvent } from '@/lib/audit/auditLogger'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const supabase = await createClient()
 
@@ -19,6 +20,10 @@ export async function GET() {
         { status: 401 }
       )
     }
+
+    const { searchParams } = new URL(request.url)
+    const format = (searchParams.get('format') || 'sql').toLowerCase()
+    const branchFilter = searchParams.get('branch') || 'all'
 
     const userEmail = (user.email || '').toLowerCase().trim()
     const userRole = (user.user_metadata?.role || user.app_metadata?.role || '').toLowerCase().trim()
@@ -79,10 +84,69 @@ export async function GET() {
       if (pay) payments = pay
     } catch {}
 
+    // Filtrar por sucursal si se especifica
+    if (branchFilter && branchFilter !== 'all') {
+      const bLower = branchFilter.toLowerCase().trim()
+      patients = patients.filter(p => ((p.branch_name || p.branch || '').toLowerCase().includes(bLower)))
+      appointments = appointments.filter(a => ((a.branch || '').toLowerCase().includes(bLower)))
+    }
+
     const now = new Date()
     const timestampStr = now.toISOString()
     const dateFormatted = now.toLocaleDateString('es-MX', { timeZone: 'America/Mexico_City' })
     const timeFormatted = now.toLocaleTimeString('es-MX', { timeZone: 'America/Mexico_City' })
+
+    // Registrar acción en la Bitácora de Auditoría
+    try {
+      await logAuditEvent({
+        user_email: userEmail,
+        user_role: userRole || 'superadmin',
+        action: 'BACKUP_EXPORT',
+        target_resource: 'database',
+        target_id: `backup_${format}_${branchFilter}`,
+        branch: branchFilter === 'all' ? 'Todas las Sedes (Consolidado)' : branchFilter,
+        details: `Descarga de respaldo oficial en formato ${format.toUpperCase()} (${patients.length} pacientes, ${appointments.length} citas, ${payments.length} pagos)`,
+        metadata: {
+          format,
+          branch: branchFilter,
+          patients_count: patients.length,
+          appointments_count: appointments.length,
+          payments_count: payments.length
+        }
+      })
+    } catch {}
+
+    // Respuesta en JSON si se solicita ?format=json
+    if (format === 'json') {
+      const backupPayload = {
+        metadata: {
+          platform: 'Audenti Cloud Pro 2027',
+          director: 'Dra. Aura Estudillo',
+          cedula: '8492019',
+          timestamp: timestampStr,
+          branch: branchFilter,
+          counts: {
+            patients: patients.length,
+            appointments: appointments.length,
+            payments: payments.length,
+            chatMessages: chatMessages.length
+          }
+        },
+        patients,
+        appointments,
+        payments,
+        chatMessages
+      }
+
+      return new NextResponse(JSON.stringify(backupPayload, null, 2), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Content-Disposition': `attachment; filename="audenti_backup_${branchFilter}_${now.toISOString().split('T')[0]}.json"`,
+          'Cache-Control': 'no-store, max-age=0'
+        }
+      })
+    }
 
     // Construcción del script SQL DDL + DML
     let sql = `-- ==============================================================================

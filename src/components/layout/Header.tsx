@@ -344,6 +344,10 @@ export function Header({ onMenuToggle }: HeaderProps) {
           <button
             onClick={async () => {
               const supabase = createClient()
+              try {
+                sessionStorage.clear()
+                localStorage.removeItem('audenti_selected_branch')
+              } catch {}
               await supabase.auth.signOut()
               window.location.href = '/auth/login'
             }}

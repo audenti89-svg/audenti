@@ -5,6 +5,7 @@ import { getPersistedAppointments, savePersistedAppointments } from '@/lib/supab
 import { isInternalUser } from '@/lib/auth/admin-emails';
 import { GoogleCalendarService } from '@/lib/google/calendar-service';
 import { findDuplicatePatient } from '@/lib/patients/patientDeduplicator';
+import { logAuditEvent } from '@/lib/audit/auditLogger';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -50,10 +51,14 @@ export async function GET(request: Request) {
     const userEmail = (user.email || '').toLowerCase().trim();
     const userRole = (user.user_metadata?.role || user.app_metadata?.role || '').toLowerCase().trim();
     const isStaff = isInternalUser(userEmail, userRole);
+    const includeDeleted = searchParams.get('includeDeleted') === 'true';
 
     // Si es personal clínico (Doctora / Administrador)
     if (isStaff) {
-      const list = await getPersistedAppointments();
+      let list = await getPersistedAppointments();
+      if (!includeDeleted) {
+        list = list.filter((a: any) => !a.is_deleted);
+      }
       return NextResponse.json({ success: true, appointments: list });
     }
 
@@ -70,7 +75,10 @@ export async function GET(request: Request) {
 
     const cleanPatientPhone = patientProfile.phone ? patientProfile.phone.replace(/\D/g, '').slice(-10) : '';
 
-    const list = await getPersistedAppointments();
+    let list = await getPersistedAppointments();
+    if (!includeDeleted) {
+      list = list.filter((a: any) => !a.is_deleted);
+    }
     const patientFiltered = list.filter((a: any) => {
       // 1. Coincidencia estricta por ID único de paciente
       if (a.patient_id && a.patient_id === patientProfile.id) {
@@ -330,20 +338,62 @@ export async function DELETE(request: Request) {
     }
 
     const current = await getPersistedAppointments();
-    const updated = current.filter((a: any) => a.id !== id && a.folio !== id);
-    await savePersistedAppointments(updated);
+    const targetIndex = current.findIndex((a: any) => String(a.id) === String(id) || String(a.folio) === String(id));
 
-    // También intentar borrar de la tabla SQL de appointments si existe
+    if (targetIndex === -1) {
+      return NextResponse.json({ success: false, error: 'Cita no encontrada.' }, { status: 404 });
+    }
+
+    const appointmentToCancel = current[targetIndex];
+    // Borrado lógico recuperable (soft delete NOM-004-SSA3)
+    current[targetIndex] = {
+      ...appointmentToCancel,
+      status: 'cancelled',
+      is_deleted: true,
+      deleted_at: new Date().toISOString(),
+      deleted_by: user.email || user.id
+    };
+    await savePersistedAppointments(current);
+
+    // También actualizar estado en tabla PostgreSQL si existe
     try {
-      await supabase.from('appointments').delete().eq('id', id);
+      await supabase.from('appointments').update({
+        status: 'cancelled',
+        is_deleted: true,
+        deleted_at: new Date().toISOString(),
+        deleted_by: user.email || user.id
+      }).or(`id.eq.${id},folio.eq.${id}`);
+
       await supabase.channel('calendar_page_realtime').send({
         type: 'broadcast',
         event: 'appointment_deleted',
-        payload: { id }
+        payload: { id, softDeleted: true }
       });
     } catch {}
 
-    return NextResponse.json({ success: true, message: 'Cita eliminada correctamente.' });
+    // Registrar en Bitácora de Auditoría inmutable
+    try {
+      await logAuditEvent({
+        user_email: user.email || 'desconocido',
+        user_role: (user.user_metadata?.role || user.app_metadata?.role || 'doctor'),
+        action: 'RECORD_SOFT_DELETE',
+        target_resource: 'appointments',
+        target_id: String(id),
+        branch: appointmentToCancel.branch || 'Sede Matriz — Jardín Balbuena',
+        details: `Cancelación y borrado lógico seguro de cita para ${appointmentToCancel.patient_name || 'Paciente'} el ${appointmentToCancel.appointment_date} a las ${appointmentToCancel.appointment_time}`,
+        metadata: {
+          folio: appointmentToCancel.folio || id,
+          patient_name: appointmentToCancel.patient_name,
+          appointment_date: appointmentToCancel.appointment_date,
+          treatment: appointmentToCancel.treatment
+        }
+      });
+    } catch {}
+
+    return NextResponse.json({
+      success: true,
+      message: 'Cita cancelada y resguardada en histórico (borrado lógico recuperable).'
+    });
   } catch (err: any) {
     console.error('[API appointments DELETE Error]:', err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
